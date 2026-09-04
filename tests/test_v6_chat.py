@@ -97,34 +97,44 @@ class TestV6ChatUI(unittest.TestCase):
     def test_telegram_style_dynamic_button_and_attachment(self):
         page = ChatPage(self.root)
 
-        # 1. Chapdagi skripka tugmasi mavjudligi
+        # 1. Chapdagi skripka tugmasi mavjudligi va aniq ko'rinishi (transparent emas)
         self.assertEqual(page.attach_btn.cget("text"), "📎")
+        self.assertNotEqual(page.attach_btn.cget("fg_color"), "transparent")
+        self.assertEqual(page.attach_btn.cget("border_width"), 1)
 
-        # 2. Boshlang'ich holat: matn yo'q -> mikrofon icon (🎙️)
+        # 2. Boshlang'ich holat: matn yo'q -> mikrofon icon (🎙️) va aniq ko'rinishi
         self.assertEqual(page.action_btn.cget("text"), "🎙️")
         self.assertEqual(page._action_mode, "mic")
+        self.assertNotEqual(page.action_btn.cget("fg_color"), "transparent")
+        self.assertEqual(page.action_btn.cget("border_width"), 1)
+        self.assertEqual(page.action_btn.cget("text_color"), Colors.PRIMARY)
 
         # 3. Matn yozilganda -> avtomatik yuborish (➤) tugmasiga aylanadi
         page._input_var.set("Salom Mikasa")
         self.assertEqual(page.action_btn.cget("text"), "➤")
         self.assertEqual(page._action_mode, "send")
         self.assertEqual(page.action_btn.cget("fg_color"), Colors.PRIMARY)
+        self.assertEqual(page.action_btn.cget("border_width"), 0)
 
         # 4. Matn o'chirilganda -> avtomatik mikrofon (🎙️) ga qaytadi
         page._input_var.set("")
         self.assertEqual(page.action_btn.cget("text"), "🎙️")
         self.assertEqual(page._action_mode, "mic")
+        self.assertEqual(page.action_btn.cget("border_width"), 1)
 
-        # 5. Fayl biriktirilganda -> tugma ➤ ga aylanadi
+        # 5. Fayl biriktirilganda -> tugma ➤ ga aylanadi va attach_btn active bo'ladi
         page._attached_file = "test_document.pdf"
+        page.attach_btn.configure(fg_color=Colors.PRIMARY)
         page._update_action_button()
         self.assertEqual(page.action_btn.cget("text"), "➤")
         self.assertEqual(page._action_mode, "send")
+        self.assertEqual(page.attach_btn.cget("fg_color"), Colors.PRIMARY)
 
         # 6. Fayl olib tashlanganda -> tugma yana 🎙️ ga qaytadi
         page._remove_attached_file()
         self.assertEqual(page.action_btn.cget("text"), "🎙️")
         self.assertEqual(page._action_mode, "mic")
+        self.assertNotEqual(page.attach_btn.cget("fg_color"), Colors.PRIMARY)
 
         page.destroy()
 
@@ -254,6 +264,24 @@ class TestV6MediaAndMusicPlayback(unittest.TestCase):
         self.assertEqual(buyruqni_aniqla("musiqani to'xtat"), "music_pause")
         self.assertEqual(buyruqni_aniqla("davom ettir"), "music_play")
         self.assertEqual(buyruqni_aniqla("musiqani qo'y"), "music_play")
+
+    def test_settings_rebuild_focus_safety(self):
+        """O'chirilgan widgetlar ustida Tkinter callback TclError berishining oldini olish testi"""
+        import tkinter as tk
+        from unittest.mock import patch
+        from gui.app import MikasaApp
+
+        app = MikasaApp.__new__(MikasaApp)
+        # 1. bad window path name xatoligi xavfsiz o'tkazib yuborilishi kerak (crash bermaydi)
+        err = tk.TclError('bad window path name ".!ctkentry.!entry"')
+        with patch.object(tk.Tk, "report_callback_exception") as mock_super:
+            app.report_callback_exception(tk.TclError, err, None)
+            mock_super.assert_not_called()
+
+        # 2. Boshqa xatoliklar esa super ga uzatilishi kerak
+        with patch.object(tk.Tk, "report_callback_exception") as mock_super:
+            app.report_callback_exception(ValueError, ValueError("Boshqa xato"), None)
+            mock_super.assert_called_once()
 
 
 if __name__ == "__main__":

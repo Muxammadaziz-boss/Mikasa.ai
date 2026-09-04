@@ -9,9 +9,12 @@ from customtkinter.windows.widgets.core_rendering import DrawEngine
 DrawEngine.preferred_drawing_method = "circle_shapes"
 
 import os
+import logging
 import datetime
 import psutil
 import threading
+
+logger = logging.getLogger(__name__)
 from gui.theme import Colors, Fonts, Sizing, Icons
 from gui.components import NavItem, StatusBadge
 from gui.backend import BackendBridge
@@ -64,6 +67,24 @@ class MikasaApp(ctk.CTk):
 
         # Yopish event
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _windows_set_titlebar_color(self, color_mode: str):
+        """CustomTkinter _windows_set_titlebar_color xavfsiz versiyasi:
+        rebuild_shell paytida o'chirilgan widgetlarga focus_set chaqirib TclError bermasligi uchun.
+        """
+        try:
+            super()._windows_set_titlebar_color(color_mode)
+        except Exception:
+            pass
+        finally:
+            self.focused_widget_before_widthdraw = None
+
+    def report_callback_exception(self, exc, val, tb):
+        """Rebuild yoki sahifa almashtirish paytidagi o'chirilgan widgetlar focus TclError larini xavfsiz bartaraf etish"""
+        if issubclass(exc, Exception) and "bad window path name" in str(val):
+            logger.debug(f"Ignored benign Tkinter TclError on destroyed widget: {val}")
+            return
+        super().report_callback_exception(exc, val, tb)
 
     # ========== LAYOUT ==========
 
@@ -150,6 +171,13 @@ class MikasaApp(ctk.CTk):
         page_states = self._capture_page_states()
         self._current_page = None
         self._is_rebuilding_shell = True
+
+        # O'chiriladigan widgetlarga focus tushib qolmasligi uchun
+        self.focused_widget_before_widthdraw = None
+        try:
+            self.focus_set()
+        except Exception:
+            pass
 
         for page in self._pages.values():
             try:

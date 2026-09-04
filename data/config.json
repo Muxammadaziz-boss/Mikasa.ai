@@ -19,13 +19,13 @@
   },
   "gui": {
     "theme": "dark",
-    "color_scheme": "dark-blue",
+    "color_scheme": "green",
     "compact_mode": false,
     "window_size": "1100x800",
     "compact_window_size": "960x700",
     "font_family": "Segoe UI",
     "font_size": 12,
-    "color": "dark-blue",
+    "color": "green",
     "animations": true
   },
   "paths": {
@@ -54,7 +54,7 @@
   },
   "voice": {
     "tts_engine": "silero",
-    "silero_model": "v4_uz",
+    "silero_model": "uz-UZ-MadinaNeural",
     "speed": 2.0,
     "sample_rate": 44100
   },

@@ -198,6 +198,18 @@ class ChatPage(ctk.CTkFrame):
             )
             btn.pack(side="left", padx=4)
 
+    def _center_button_content(self, btn):
+        """CTkButton ichidagi text_label ni to'liq o'rtada (center) joylashtirish"""
+        try:
+            if hasattr(btn, "_text_label") and btn._text_label is not None:
+                btn._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
+                for r in range(5):
+                    btn.grid_rowconfigure(r, weight=1)
+                for c in range(5):
+                    btn.grid_columnconfigure(c, weight=1)
+        except Exception:
+            pass
+
     def _build_input_bar(self, parent):
         """Matn kiritish paneli — Telegram / Apple uslubidagi minimalist dizayn"""
         # Biriktirilgan fayl preview paneli (fayl tanlanganda input_frame ustida chiqadi)
@@ -235,28 +247,32 @@ class ChatPage(ctk.CTkFrame):
         self.input_frame = ctk.CTkFrame(
             parent,
             fg_color=Colors.BG_CARD,
-            corner_radius=16,
+            corner_radius=26,
             border_width=1,
-            border_color=Colors.BORDER,
-            height=54,
+            border_color="#2E2E3E",
+            height=52,
         )
         self.input_frame.pack(fill="x", pady=(0, 8))
         self.input_frame.pack_propagate(False)
 
         # Chap tomonda skripka (📎) tugmasi — fayl/hujjat/rasm biriktirish
+        # Aniq ko'rinadigan, zamonaviy Apple/Telegram circular tugma
         self.attach_btn = ctk.CTkButton(
             self.input_frame,
             text="📎",
             font=(Fonts.FAMILY, 16),
-            fg_color="transparent",
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_MUTED,
+            fg_color="#262634",
+            hover_color="#343446",
+            border_width=1,
+            border_color="#3C3C50",
+            text_color="#C8C8DC",
             width=38,
             height=38,
             corner_radius=19,
             command=self._on_attach_file,
         )
-        self.attach_btn.pack(side="left", padx=(8, 0))
+        self.attach_btn.pack(side="left", padx=(7, 0), pady=7)
+        self._center_button_content(self.attach_btn)
 
         # Matn kiritish maydoni (StringVar orqali dinamik kuzatuv)
         self._input_var = ctk.StringVar()
@@ -271,9 +287,9 @@ class ChatPage(ctk.CTkFrame):
             border_width=0,
             text_color=Colors.TEXT_PRIMARY,
             placeholder_text_color=Colors.TEXT_MUTED,
-            height=46,
+            height=38,
         )
-        self.input_entry.pack(side="left", fill="x", expand=True, padx=8)
+        self.input_entry.pack(side="left", fill="x", expand=True, padx=8, pady=7)
         self.input_entry.bind("<Return>", self._on_enter_pressed)
 
         # O'ng tomondagi Telegram uslubidagi dinamik tugma (🎙️ <-> ➤)
@@ -282,15 +298,18 @@ class ChatPage(ctk.CTkFrame):
             self.input_frame,
             text="🎙️",
             font=(Fonts.FAMILY, 15),
-            fg_color="transparent",
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_MUTED,
+            fg_color="#262634",
+            hover_color="#343446",
+            border_width=1,
+            border_color="#3C3C50",
+            text_color=Colors.PRIMARY,
             width=38,
             height=38,
             corner_radius=19,
             command=self._on_action_button_click,
         )
-        self.action_btn.pack(side="right", padx=8)
+        self.action_btn.pack(side="right", padx=(0, 7), pady=7)
+        self._center_button_content(self.action_btn)
 
         # Mavjud kodlar bilan moslik uchun alias
         self.send_btn = self.action_btn
@@ -371,18 +390,23 @@ class ChatPage(ctk.CTkFrame):
                     font=(Fonts.FAMILY, 15, "bold"),
                     fg_color=Colors.PRIMARY,
                     hover_color=Colors.PRIMARY_HOVER,
+                    border_width=0,
                     text_color="#FFFFFF",
                 )
+                self._center_button_content(self.action_btn)
         else:
             if self._action_mode != "mic":
                 self._action_mode = "mic"
                 self.action_btn.configure(
                     text="🎙️",
                     font=(Fonts.FAMILY, 15),
-                    fg_color="transparent",
-                    hover_color=Colors.BG_HOVER,
-                    text_color=Colors.TEXT_MUTED,
+                    fg_color="#262634",
+                    hover_color="#343446",
+                    border_width=1,
+                    border_color="#3C3C50",
+                    text_color=Colors.PRIMARY,
                 )
+                self._center_button_content(self.action_btn)
 
     def _on_action_button_click(self):
         """O'ngdagi tugma bosilganda: matn bo'lsa yuboradi, bo'sh bo'lsa ovozli tinglaydi"""
@@ -427,6 +451,13 @@ class ChatPage(ctk.CTkFrame):
 
         self._attached_file = file_path
         self._show_attachment_preview(file_path)
+        self.attach_btn.configure(
+            fg_color=Colors.PRIMARY,
+            hover_color=Colors.PRIMARY_HOVER,
+            border_width=0,
+            text_color="#FFFFFF",
+        )
+        self._center_button_content(self.attach_btn)
         self._update_action_button()
 
     def _show_attachment_preview(self, file_path):
@@ -455,6 +486,14 @@ class ChatPage(ctk.CTkFrame):
         self._attached_file = None
         if hasattr(self, "attachment_bar") and self.attachment_bar.winfo_ismapped():
             self.attachment_bar.pack_forget()
+        self.attach_btn.configure(
+            fg_color="#262634",
+            hover_color="#343446",
+            border_width=1,
+            border_color="#3C3C50",
+            text_color="#C8C8DC",
+        )
+        self._center_button_content(self.attach_btn)
         self._update_action_button()
 
     def _on_send(self, event=None):
