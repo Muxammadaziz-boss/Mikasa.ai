@@ -4,7 +4,7 @@
 import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassCard, GlowButton, MessageBubble
+from gui.components import GlassCard, GlowButton, MessageBubble, TypingBubble
 
 
 class ChatPage(ctk.CTkFrame):
@@ -16,6 +16,10 @@ class ChatPage(ctk.CTkFrame):
         self._messages = []
         # Duplikat xabardan himoya — oxirgi yuborilgan user xabar
         self._last_user_text = None
+        # Animatsion yozish indikatori holati
+        self._typing_bubble = None
+        self._typing_row = None
+        self._agent_step_count = 0
         self._build_ui()
 
     def _on_mode_change(self, value):
@@ -190,14 +194,14 @@ class ChatPage(ctk.CTkFrame):
             btn.pack(side="left", padx=4)
 
     def _build_input_bar(self, parent):
-        """Matn kiritish paneli"""
+        """Matn kiritish paneli — Apple uslubidagi minimalist dizayn"""
         input_frame = ctk.CTkFrame(
             parent,
             fg_color=Colors.BG_CARD,
-            corner_radius=12,
+            corner_radius=16,
             border_width=1,
             border_color=Colors.BORDER,
-            height=52,
+            height=54,
         )
         input_frame.pack(fill="x", pady=(0, 8))
         input_frame.pack_propagate(False)
@@ -206,49 +210,49 @@ class ChatPage(ctk.CTkFrame):
         ctk.CTkButton(
             input_frame,
             text="🎙️",
-            font=(Fonts.FAMILY, 16),
+            font=(Fonts.FAMILY, 15),
             fg_color="transparent",
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_MUTED,
-            width=36,
-            height=36,
-            corner_radius=18,
+            width=38,
+            height=38,
+            corner_radius=19,
             bg_color=Colors.BG_CARD,
             command=lambda: self.app.navigate_to("voice") if self.app else None,
-        ).pack(side="left", padx=(6, 0))
+        ).pack(side="left", padx=(8, 0))
 
         # Matn input
         self.input_entry = ctk.CTkEntry(
             input_frame,
-            placeholder_text="Xabar yozing...",
+            placeholder_text="Mikasa ga xabar yozing...",
             font=Fonts.BODY,
             fg_color="transparent",
             border_width=0,
             text_color=Colors.TEXT_PRIMARY,
             placeholder_text_color=Colors.TEXT_MUTED,
-            height=44,
+            height=46,
         )
-        self.input_entry.pack(side="left", fill="x", expand=True, padx=8)
+        self.input_entry.pack(side="left", fill="x", expand=True, padx=10)
         self.input_entry.bind("<Return>", self._on_send)
 
-        # Send tugma
+        # Send tugma — Apple ko'k tugmasi
         self.send_btn = ctk.CTkButton(
             input_frame,
             text="➤",
-            font=(Fonts.FAMILY, 16),
+            font=(Fonts.FAMILY, 15, "bold"),
             fg_color=Colors.PRIMARY,
             hover_color=Colors.PRIMARY_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            width=36,
-            height=36,
-            corner_radius=18,
+            text_color="#FFFFFF",
+            width=38,
+            height=38,
+            corner_radius=19,
             bg_color=Colors.BG_CARD,
             command=self._on_send,
         )
-        self.send_btn.pack(side="right", padx=6)
+        self.send_btn.pack(side="right", padx=8)
 
     def _build_agent_panel(self, parent):
-        """Agent thinking paneli"""
+        """Agent thinking paneli — jarayon qadamlari"""
         self.agent_card = GlassCard(parent, title="🤖 Agent jarayoni")
         self.agent_card.pack(fill="x", pady=(0, 8))
 
@@ -256,33 +260,34 @@ class ChatPage(ctk.CTkFrame):
         self.agent_steps.pack(fill="x")
 
         # Boshlang'ich holat
-        ctk.CTkLabel(
+        self.agent_placeholder = ctk.CTkLabel(
             self.agent_steps,
-            text="Agent hali ishlamagan",
+            text="✦ Agent kutish rejimida",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
-        ).pack(pady=8)
+        )
+        self.agent_placeholder.pack(pady=12)
 
     def _build_context_panel(self, parent):
-        """Kontekst paneli"""
+        """Kontekst paneli — faol sessiya va xotira holati"""
         context_card = GlassCard(parent, title="🧠 Kontekst")
         context_card.pack(fill="both", expand=True, pady=(8, 0))
 
         self.session_summary = ctk.CTkLabel(
             context_card.content,
-            text="Sessiya: tayyor",
+            text="💬 Sessiya: tayyor",
             font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
+            text_color=Colors.TEXT_SECONDARY,
             anchor="w",
         )
-        self.session_summary.pack(fill="x", pady=(0, 6))
+        self.session_summary.pack(fill="x", pady=(0, 4))
 
         # Suhbatlar soni
         self.context_count = ctk.CTkLabel(
             context_card.content,
-            text="Suhbatlar: 0",
+            text="📊 Suhbatlar: 0 ta",
             font=Fonts.SMALL,
-            text_color=Colors.TEXT_SECONDARY,
+            text_color=Colors.TEXT_MUTED,
             anchor="w",
         )
         self.context_count.pack(fill="x", pady=2)
@@ -290,7 +295,7 @@ class ChatPage(ctk.CTkFrame):
         # Xotira holati
         self.memory_status = ctk.CTkLabel(
             context_card.content,
-            text="Xotira: Faol",
+            text="💾 Xotira: Faol (SQLite)",
             font=Fonts.SMALL,
             text_color=Colors.SUCCESS,
             anchor="w",
@@ -300,7 +305,7 @@ class ChatPage(ctk.CTkFrame):
         # Model
         self.model_label = ctk.CTkLabel(
             context_card.content,
-            text="Model: Gemini",
+            text="⚡ Model: Gemini 2.5 Flash",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_SECONDARY,
             anchor="w",
@@ -321,6 +326,7 @@ class ChatPage(ctk.CTkFrame):
         self._last_user_text = text
 
         self.add_message(text, "user")
+        self.show_typing("yozyapti")
 
         # Backend ga buyruq yuborish
         if self.app and hasattr(self.app, "bridge"):
@@ -334,13 +340,51 @@ class ChatPage(ctk.CTkFrame):
 
     def _clear_chat(self):
         """Suhbatni tozalash"""
+        self.hide_typing()
         for widget in self.chat_scroll.winfo_children():
             widget.destroy()
         self._messages.clear()
         self._last_user_text = None
         self._add_welcome_message()
-        self.context_count.configure(text="Suhbatlar: 0")
-        self.session_summary.configure(text="Sessiya: 0 xabar")
+        self.context_count.configure(text="📊 Suhbatlar: 0 ta")
+        self.session_summary.configure(text="💬 Sessiya: 0 xabar")
+        self.clear_agent_steps()
+
+    def show_typing(self, prefix="yozyapti"):
+        """Animatsion 'yozyapti . . .' indikatorini ko'rsatish"""
+        if self._typing_bubble:
+            self._typing_bubble.set_prefix(prefix)
+            self._scroll_to_bottom()
+            return
+
+        # Birinchi xabar bo'lsa welcome tozalash
+        if len(self._messages) == 0:
+            for widget in self.chat_scroll.winfo_children():
+                widget.destroy()
+
+        self._typing_row = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
+        self._typing_row.pack(fill="x", padx=8, pady=3)
+
+        self._typing_bubble = TypingBubble(self._typing_row, prefix=prefix)
+        self._typing_bubble.pack(side="left", padx=(4, 80))
+
+        self.after(50, self._scroll_to_bottom)
+
+    def hide_typing(self):
+        """Animatsion indikatorni to'xtatish va o'chirish"""
+        if self._typing_bubble:
+            try:
+                self._typing_bubble.stop()
+            except Exception:
+                pass
+            self._typing_bubble = None
+
+        if hasattr(self, "_typing_row") and self._typing_row:
+            try:
+                self._typing_row.destroy()
+            except Exception:
+                pass
+            self._typing_row = None
 
     def add_message(self, text, role="user", timestamp=None, track_duplicate=True):
         """Yangi xabar qo'shish — to'g'ri joylashuv bilan"""
@@ -349,11 +393,13 @@ class ChatPage(ctk.CTkFrame):
         # Duplikat user xabar tekshirish
         # (backend callback dan kelgan user xabar — biz allaqachon ko'rsatganmiz)
         if track_duplicate and role == "user" and text == self._last_user_text:
-            # Birinchi marta — o'zimiz yuborgan, ruxsat
-            # Ikkinchi marta — callback dan, blok
             for msg in self._messages:
                 if msg["text"] == text and msg["role"] == "user":
                     return  # Duplikat — o'tkazib yuborish
+
+        # Assistant javob kelganda typing indikatorini avtomatik yopish
+        if role == "assistant":
+            self.hide_typing()
 
         # Welcome xabarni tozalash (birinchi xabar)
         if len(self._messages) == 0:
@@ -364,13 +410,14 @@ class ChatPage(ctk.CTkFrame):
         self._render_message_widget(text, role, timestamp)
 
         # Kontekst yangilash
-        self.context_count.configure(text=f"Suhbatlar: {len(self._messages)}")
+        self.context_count.configure(text=f"📊 Suhbatlar: {len(self._messages)} ta")
+        self.session_summary.configure(text=f"💬 Sessiya: {len(self._messages)} xabar")
 
     def _render_message_widget(self, text, role, timestamp):
         is_user = role == "user"
 
         msg_row = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
-        msg_row.pack(fill="x", padx=8, pady=3)
+        msg_row.pack(fill="x", padx=8, pady=4)
 
         bubble_frame = MessageBubble(
             msg_row,
@@ -393,11 +440,35 @@ class ChatPage(ctk.CTkFrame):
         except Exception:
             pass
 
+    def clear_agent_steps(self):
+        """Agent qadamlari panelini tozalash"""
+        for w in self.agent_steps.winfo_children():
+            w.destroy()
+        self.agent_placeholder = ctk.CTkLabel(
+            self.agent_steps,
+            text="✦ Agent kutish rejimida",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+        )
+        self.agent_placeholder.pack(pady=12)
+        self._agent_step_count = 0
+
     def add_agent_step(self, step_num, step_type, data):
-        """Agent qadamini ko'rsatish"""
-        # Eski placeholder'ni tozalash
-        for widget in self.agent_steps.winfo_children():
-            widget.destroy()
+        """Agent qadamini o'ng paneldagi kartada ko'rsatish"""
+        if hasattr(self, "agent_placeholder") and self.agent_placeholder.winfo_exists():
+            self.agent_placeholder.destroy()
+
+        # Agar birinchi qadam bo'lsa yoki yangi vazifa, eskilarni tozalash
+        if step_num == 1 or self._agent_step_count == 0:
+            for w in self.agent_steps.winfo_children():
+                w.destroy()
+
+        self._agent_step_count += 1
+
+        # O'ng panel juda uzun bo'lib ketmasligi uchun maks 5 ta qadam saqlash
+        children = self.agent_steps.winfo_children()
+        if len(children) >= 5:
+            children[0].destroy()
 
         type_icons = {
             "thought": "💭",
@@ -416,26 +487,41 @@ class ChatPage(ctk.CTkFrame):
             "error": Colors.DANGER,
         }.get(step_type, Colors.TEXT_MUTED)
 
-        step_frame = ctk.CTkFrame(self.agent_steps, fg_color="transparent")
-        step_frame.pack(fill="x", pady=2)
+        step_card = ctk.CTkFrame(
+            self.agent_steps,
+            fg_color=Colors.BG_PANEL,
+            corner_radius=10,
+            border_width=1,
+            border_color=Colors.BORDER,
+        )
+        step_card.pack(fill="x", pady=3)
 
+        inner = ctk.CTkFrame(step_card, fg_color="transparent")
+        inner.pack(fill="x", padx=10, pady=6)
+
+        title = f"{icon} Qadam {step_num}" if isinstance(step_num, int) else f"{icon} {step_num}"
         ctk.CTkLabel(
-            step_frame,
-            text=f"{icon} Qadam {step_num}: {step_type.capitalize()}",
+            inner,
+            text=f"{title}: {step_type.capitalize()}",
             font=Fonts.SMALL_BOLD,
             text_color=color,
             anchor="w",
         ).pack(fill="x")
 
-        if isinstance(data, str):
+        if data:
+            data_text = str(data).strip()
             ctk.CTkLabel(
-                step_frame,
-                text=data[:100],
+                inner,
+                text=data_text[:120],
                 font=Fonts.TINY,
                 text_color=Colors.TEXT_MUTED,
                 anchor="w",
-                wraplength=250,
-            ).pack(fill="x")
+                wraplength=220,
+                justify="left",
+            ).pack(fill="x", pady=(2, 0))
+
+        if step_type == "final":
+            self._agent_step_count = 0
 
     def on_show(self):
         """Sahifa ko'rsatilganda"""

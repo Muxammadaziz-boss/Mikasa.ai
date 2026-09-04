@@ -29,6 +29,7 @@ class BackendBridge:
         "🎙️ Tinglash",
         "🛑 Tinglash",
         "🎯 Buyruq:",  # intent aniqlanishi — ichki log
+        "💡 Eslatma: test_",
     )
 
     def __init__(self, app):
@@ -185,6 +186,11 @@ class BackendBridge:
                 with self._pending_lock:
                     self._pending_user_texts.discard(text)
                 self._queue_ui(lambda: self.app.set_status("online", "Tayyor"))
+                self._queue_ui(
+                    lambda: self.app._pages.get("chat").hide_typing()
+                    if self.app._pages.get("chat")
+                    else None
+                )
 
         thread = threading.Thread(target=_process, daemon=True, name="CmdExec")
         thread.start()
@@ -258,16 +264,18 @@ class BackendBridge:
                 chat_page = self.app._pages.get("chat")
                 voice_page = self.app._pages.get("voice")
 
-                # ICHKI STATUS XABARLAR — chatga qo'shmaymiz
-                if any(xabar.startswith(p) for p in self.STATUS_PREFIXES):
+                clean_xabar = xabar.strip()
+
+                # 1. ICHKI STATUS XABARLAR — chatga qo'shmaymiz
+                if any(clean_xabar.startswith(p) for p in self.STATUS_PREFIXES):
                     return
 
-                # USER GAPIRGANI (ovozli yoki callback'dan)
-                is_user_speech = any(xabar.startswith(p) for p in self.USER_PREFIXES)
+                # 2. USER GAPIRGANI (ovozli yoki callback'dan)
+                is_user_speech = any(clean_xabar.startswith(p) for p in self.USER_PREFIXES)
 
                 if is_user_speech:
                     # Foydalanuvchi matni — tozalash
-                    clean = xabar
+                    clean = clean_xabar
                     clean = clean.replace("🗣️ Siz: ", "")
                     clean = clean.replace("📝 Buyruq: ", "")
                     clean = clean.strip()
@@ -276,31 +284,87 @@ class BackendBridge:
                     with self._pending_lock:
                         is_pending = clean in self._pending_user_texts
                     if is_pending:
-                        # Bu matn allaqachon Chat da ko'rsatilgan — faqat voice ga qo'shamiz
                         pass
                     else:
                         # Ovozdan kelgan yangi buyruq — chatga ham qo'shamiz
                         if chat_page:
                             chat_page.add_message(clean, "user")
+                            chat_page.show_typing("yozyapti")
 
                     # Voice sahifasiga doim qo'shamiz
                     if voice_page:
                         voice_page.add_transcript(clean, "user")
                         voice_page.add_recent_command(clean)
+                    return
 
-                else:
-                    # AI JAVOBI — har doim chatga qo'shamiz
+                # 3. AGENT O'YLASH VA QADAMLAR — asosiy chatga pufakcha qilib tiqilmaydi!
+                # Ular o'ngdagi 'Agent jarayoni' paneliga va animatsion indikatorga yo'naltiriladi
+                if clean_xabar in ("🤖 Agent o'ylamoqda...", "🤖 AI o'ylamoqda..."):
                     if chat_page:
-                        chat_page.add_message(xabar, "assistant")
+                        chat_page.show_typing("yozyapti")
+                        chat_page.add_agent_step(1, "thought", "Vazifa tahlil qilinmoqda...")
+                    return
 
-                    # Voice sahifasiga ham AI javobini qo'shamiz
-                    if voice_page and self._listening:
-                        voice_page.add_transcript(xabar, "assistant")
+                if clean_xabar.startswith("🧠 Qadam "):
+                    step_text = clean_xabar.replace("🧠 Qadam ", "").strip()
+                    parts = step_text.split(":", 1)
+                    try:
+                        step_num = int(parts[0].strip())
+                        desc = parts[1].strip() if len(parts) > 1 else ""
+                    except ValueError:
+                        step_num = parts[0].strip()
+                        desc = parts[1].strip() if len(parts) > 1 else ""
 
-                    # Activity feed
-                    self._add_activity(
-                        xabar[:60], "success" if "✅" in xabar else "info"
-                    )
+                    if chat_page:
+                        chat_page.show_typing(f"Qadam {step_num}")
+                        chat_page.add_agent_step(step_num, "thought", desc)
+                    return
+
+                if clean_xabar.startswith("🔧 Tool '"):
+                    tool_content = clean_xabar.replace("🔧 Tool ", "").strip()
+                    if chat_page:
+                        chat_page.show_typing("asbob ishlamoqda")
+                        chat_page.add_agent_step("Asbob", "action", tool_content)
+                    return
+
+                if clean_xabar.startswith("⚠️ Agent xatolik:"):
+                    err_msg = clean_xabar.replace("⚠️ Agent xatolik:", "").strip()
+                    if chat_page:
+                        chat_page.add_agent_step("Xato", "error", err_msg)
+                    return
+
+                # 4. YAKUNIY JAVOB — robot prefikslarini tozalab chiroyli ko'rsatish
+                final_response = clean_xabar
+                is_final_step = False
+
+                if final_response.startswith("🤖 Agent: "):
+                    final_response = final_response[len("🤖 Agent: "):].strip()
+                    is_final_step = True
+                elif final_response.startswith("🤖 AI: "):
+                    final_response = final_response[len("🤖 AI: "):].strip()
+                    is_final_step = True
+                elif final_response.startswith("✅ Agent: "):
+                    final_response = final_response[len("✅ Agent: "):].strip()
+                    is_final_step = True
+                elif final_response.startswith("⚠️ Agent: "):
+                    final_response = final_response[len("⚠️ Agent: "):].strip()
+                    is_final_step = True
+
+                # Chat sahifasiga javobni qo'shish (ichida hide_typing chaqiriladi)
+                if chat_page:
+                    chat_page.hide_typing()
+                    chat_page.add_message(final_response, "assistant")
+                    if is_final_step:
+                        chat_page.add_agent_step("Yakun", "final", "Javob berildi")
+
+                # Voice sahifasiga ham AI javobini qo'shamiz
+                if voice_page and self._listening:
+                    voice_page.add_transcript(final_response, "assistant")
+
+                # Activity feed
+                self._add_activity(
+                    final_response[:60], "success" if is_final_step or "✅" in clean_xabar else "info"
+                )
 
             except Exception as e:
                 logger.debug(f"GUI callback xatolik: {e}")

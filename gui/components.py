@@ -475,63 +475,167 @@ class StatWidget(ctk.CTkFrame):
 
 
 class MessageBubble(ctk.CTkFrame):
-    """Chat xabar pufakchasi"""
+    """Apple macOS / iMessage uslubidagi toza chat xabar pufakchasi"""
 
     def __init__(self, master, text="", role="user", timestamp="", **kwargs):
         is_user = role == "user"
-        accent = Colors.PRIMARY if is_user else Colors.SECONDARY
-        bg_color = Colors.BG_INPUT if is_user else Colors.BG_CARD
+
+        # Apple styling:
+        # Foydalanuvchi: boy ko'k (#0A84FF), oq matn, hoshiyasiz, radius 16
+        # Mikasa: chuqur grafit (#181820), nozik hoshiya (#242430), radius 16
+        if is_user:
+            bg_color = Colors.PRIMARY
+            border_width = 0
+            border_color = Colors.PRIMARY
+            text_color = "#FFFFFF"
+            time_color = "#CBE4FF"
+        else:
+            bg_color = Colors.BG_CARD
+            border_width = 1
+            border_color = Colors.BORDER
+            text_color = Colors.TEXT_PRIMARY
+            time_color = Colors.TEXT_MUTED
+
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_SURFACE
 
         super().__init__(
             master,
             fg_color=bg_color,
-            corner_radius=14,
-            border_width=1,
-            border_color=Colors.BORDER if is_user else accent,
+            corner_radius=16,
+            border_width=border_width,
+            border_color=border_color,
             **kwargs,
         )
 
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=12, pady=(10, 4))
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=14, pady=10)
 
-        self.avatar = ctk.CTkLabel(
-            header,
-            text="🧑" if is_user else "🤖",
-            font=(Fonts.FAMILY, 12),
-            text_color=accent,
-            width=22,
-        )
-        self.avatar.pack(side="left")
+        # Assistant uchun ixcham mikrosarlavha (✦ Mikasa va vaqt)
+        if not is_user:
+            meta_row = ctk.CTkFrame(container, fg_color="transparent")
+            meta_row.pack(fill="x", pady=(0, 4))
 
-        self.role_label = ctk.CTkLabel(
-            header,
-            text="Siz" if is_user else "Mikasa",
-            font=Fonts.SMALL_BOLD,
-            text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        )
-        self.role_label.pack(side="left", padx=(4, 0))
+            ctk.CTkLabel(
+                meta_row,
+                text="✦ Mikasa",
+                font=Fonts.SMALL_BOLD,
+                text_color=Colors.PRIMARY,
+                anchor="w",
+            ).pack(side="left")
 
-        if timestamp:
-            self.time_label = ctk.CTkLabel(
-                header,
+            if timestamp:
+                ctk.CTkLabel(
+                    meta_row,
+                    text=timestamp,
+                    font=Fonts.TINY,
+                    text_color=time_color,
+                    anchor="e",
+                ).pack(side="right")
+        elif timestamp:
+            # User uchun burchakda vaqt
+            meta_row = ctk.CTkFrame(container, fg_color="transparent")
+            meta_row.pack(fill="x", pady=(0, 2))
+            ctk.CTkLabel(
+                meta_row,
                 text=timestamp,
                 font=Fonts.TINY,
-                text_color=Colors.TEXT_MUTED,
+                text_color=time_color,
                 anchor="e",
-            )
-            self.time_label.pack(side="right")
+            ).pack(side="right")
 
+        # Xabar matni
         self.text_label = ctk.CTkLabel(
-            self,
+            container,
             text=text,
             font=Fonts.BODY,
-            text_color=Colors.TEXT_PRIMARY,
+            text_color=text_color,
             wraplength=520,
             justify="left",
             anchor="w",
         )
-        self.text_label.pack(fill="x", padx=12, pady=(0, 8))
+        self.text_label.pack(fill="x")
+
+
+class TypingBubble(ctk.CTkFrame):
+    """
+    Apple Intelligence uslubidagi animatsion pufakcha.
+    AI o'ylayotgan yoki javob yozayotgan paytda ko'rsatiladi:
+    'yozyapti .', 'yozyapti . .', 'yozyapti . . .'
+    """
+
+    def __init__(self, master, prefix="yozyapti", **kwargs):
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_SURFACE
+
+        super().__init__(
+            master,
+            fg_color=Colors.BG_CARD,
+            corner_radius=16,
+            border_width=1,
+            border_color=Colors.BORDER,
+            **kwargs,
+        )
+        self._prefix = prefix
+        self._step = 0
+        self._anim_id = None
+        self._is_running = True
+
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(padx=14, pady=10)
+
+        # Sparkle ikonka
+        self.icon_label = ctk.CTkLabel(
+            body,
+            text="✦",
+            font=(Fonts.FAMILY, 14, "bold"),
+            text_color=Colors.PRIMARY,
+        )
+        self.icon_label.pack(side="left", padx=(0, 8))
+
+        # Matn va nuqtalar
+        self.text_label = ctk.CTkLabel(
+            body,
+            text=f"{self._prefix} .",
+            font=Fonts.BODY,
+            text_color=Colors.TEXT_SECONDARY,
+        )
+        self.text_label.pack(side="left")
+
+        self._animate()
+
+    def set_prefix(self, prefix):
+        self._prefix = prefix
+        try:
+            if self.winfo_exists():
+                self.text_label.configure(text=f"{self._prefix} .")
+        except Exception:
+            pass
+
+    def _animate(self):
+        if not self._is_running:
+            return
+        dots = [" .", " . .", " . . ."]
+        self._step = (self._step + 1) % len(dots)
+        try:
+            if self.winfo_exists():
+                self.text_label.configure(text=f"{self._prefix}{dots[self._step]}")
+                self._anim_id = self.after(350, self._animate)
+        except Exception:
+            pass
+
+    def stop(self):
+        self._is_running = False
+        if self._anim_id:
+            try:
+                self.after_cancel(self._anim_id)
+            except Exception:
+                pass
+            self._anim_id = None
+
+    def destroy(self):
+        self.stop()
+        super().destroy()
 
 
 class NavItem(ctk.CTkFrame):
