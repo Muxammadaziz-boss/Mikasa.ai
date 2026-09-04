@@ -3,7 +3,7 @@
 
 import customtkinter as ctk
 from gui.theme import Colors, Fonts
-from gui.components import EmptyState, GlassCard, InfoChip, PageHero, SearchBar
+from gui.components import EmptyState, GlassButton, GlassCard, InfoChip, PageHero, SearchBar
 
 
 class CommandsPage(ctk.CTkFrame):
@@ -265,11 +265,15 @@ class CommandsPage(ctk.CTkFrame):
             text_color=Colors.TEXT_MUTED,
         ).pack(side="left")
 
-        ctk.CTkLabel(
+        GlassButton(
             footer,
-            text="Foydalanish →",
-            font=Fonts.SMALL_BOLD,
-            text_color=tool["color"],
+            text="Foydalanish",
+            icon="→",
+            font=Fonts.SMALL,
+            height=28,
+            width=90,
+            corner_radius=14,
+            command=lambda t=tool["name"]: self._on_tool_click(t),
         ).pack(side="right")
 
         def on_enter(event=None):

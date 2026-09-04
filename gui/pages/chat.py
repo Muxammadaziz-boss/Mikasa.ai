@@ -6,7 +6,14 @@ import datetime
 from tkinter import filedialog
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassCard, GlowButton, MessageBubble, TypingBubble
+from gui.components import (
+    CircleIconButton,
+    GlassButton,
+    GlassCard,
+    GlowButton,
+    MessageBubble,
+    TypingBubble,
+)
 
 
 class ChatPage(ctk.CTkFrame):
@@ -57,15 +64,13 @@ class ChatPage(ctk.CTkFrame):
         ).pack(side="left")
 
         # Suhbatni tozalash
-        ctk.CTkButton(
+        GlassButton(
             header,
-            text="🗑️ Tozalash",
+            text="Tozalash",
+            icon="🗑️",
             font=Fonts.SMALL,
-            fg_color="transparent",
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_MUTED,
-            width=100,
-            height=30,
+            width=105,
+            height=32,
             command=self._clear_chat,
         ).pack(side="right")
 
@@ -182,18 +187,12 @@ class ChatPage(ctk.CTkFrame):
         ]
 
         for suggestion in suggestions:
-            btn = ctk.CTkButton(
+            btn = GlassButton(
                 suggestions_frame,
                 text=suggestion,
                 font=Fonts.SMALL,
-                fg_color=Colors.BG_CARD,
-                hover_color=Colors.BG_HOVER,
-                text_color=Colors.TEXT_SECONDARY,
-                border_width=1,
-                border_color=Colors.BORDER,
-                corner_radius=20,
+                corner_radius=16,
                 height=32,
-                bg_color=Colors.BG_CARD,
                 command=lambda s=suggestion: self._send_suggestion(s),
             )
             btn.pack(side="left", padx=4)
@@ -230,16 +229,11 @@ class ChatPage(ctk.CTkFrame):
         )
         self.attachment_label.pack(side="left", padx=12, fill="x", expand=True)
 
-        ctk.CTkButton(
+        CircleIconButton(
             self.attachment_bar,
-            text="✕",
+            icon="✕",
+            size=26,
             font=Fonts.TINY,
-            fg_color="transparent",
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_MUTED,
-            width=26,
-            height=26,
-            corner_radius=13,
             command=self._remove_attached_file,
         ).pack(side="right", padx=6)
 
@@ -257,22 +251,19 @@ class ChatPage(ctk.CTkFrame):
 
         # Chap tomonda skripka (📎) tugmasi — fayl/hujjat/rasm biriktirish
         # Aniq ko'rinadigan, zamonaviy Apple/Telegram circular tugma
-        self.attach_btn = ctk.CTkButton(
+        self.attach_btn = CircleIconButton(
             self.input_frame,
-            text="📎",
+            icon="📎",
+            size=38,
             font=(Fonts.FAMILY, 16),
-            fg_color="#262634",
-            hover_color="#343446",
-            border_width=1,
-            border_color="#3C3C50",
+            fg_color=Colors.GLASS_BG,
+            hover_color=Colors.GLASS_BG_HOVER,
+            border_color=Colors.GLASS_BORDER,
+            border_hover_color=Colors.GLASS_BORDER_HOVER,
             text_color="#C8C8DC",
-            width=38,
-            height=38,
-            corner_radius=19,
             command=self._on_attach_file,
         )
         self.attach_btn.pack(side="left", padx=(7, 0), pady=7)
-        self._center_button_content(self.attach_btn)
 
         # Matn kiritish maydoni (StringVar orqali dinamik kuzatuv)
         self._input_var = ctk.StringVar()
@@ -294,22 +285,19 @@ class ChatPage(ctk.CTkFrame):
 
         # O'ng tomondagi Telegram uslubidagi dinamik tugma (🎙️ <-> ➤)
         # Matn bo'sh bo'lsa mikrofon, biron belgi yozilsa yuborish belgisiga aylanadi
-        self.action_btn = ctk.CTkButton(
+        self.action_btn = CircleIconButton(
             self.input_frame,
-            text="🎙️",
+            icon="🎙️",
+            size=38,
             font=(Fonts.FAMILY, 15),
-            fg_color="#262634",
-            hover_color="#343446",
-            border_width=1,
-            border_color="#3C3C50",
+            fg_color=Colors.GLASS_BG,
+            hover_color=Colors.GLASS_BG_HOVER,
+            border_color=Colors.GLASS_BORDER,
+            border_hover_color=Colors.GLASS_BORDER_HOVER,
             text_color=Colors.PRIMARY,
-            width=38,
-            height=38,
-            corner_radius=19,
             command=self._on_action_button_click,
         )
         self.action_btn.pack(side="right", padx=(0, 7), pady=7)
-        self._center_button_content(self.action_btn)
 
         # Mavjud kodlar bilan moslik uchun alias
         self.send_btn = self.action_btn
@@ -386,27 +374,24 @@ class ChatPage(ctk.CTkFrame):
             if self._action_mode != "send":
                 self._action_mode = "send"
                 self.action_btn.configure(
-                    text="➤",
+                    icon="➤",
                     font=(Fonts.FAMILY, 15, "bold"),
-                    fg_color=Colors.PRIMARY,
-                    hover_color=Colors.PRIMARY_HOVER,
-                    border_width=0,
+                    fg_color=Colors.GLASS_HERO_BG,
+                    hover_color=Colors.GLASS_HERO_HOVER,
+                    border_color=Colors.GLASS_HERO_BORDER,
                     text_color="#FFFFFF",
                 )
-                self._center_button_content(self.action_btn)
         else:
             if self._action_mode != "mic":
                 self._action_mode = "mic"
                 self.action_btn.configure(
-                    text="🎙️",
+                    icon="🎙️",
                     font=(Fonts.FAMILY, 15),
-                    fg_color="#262634",
-                    hover_color="#343446",
-                    border_width=1,
-                    border_color="#3C3C50",
+                    fg_color=Colors.GLASS_BG,
+                    hover_color=Colors.GLASS_BG_HOVER,
+                    border_color=Colors.GLASS_BORDER,
                     text_color=Colors.PRIMARY,
                 )
-                self._center_button_content(self.action_btn)
 
     def _on_action_button_click(self):
         """O'ngdagi tugma bosilganda: matn bo'lsa yuboradi, bo'sh bo'lsa ovozli tinglaydi"""

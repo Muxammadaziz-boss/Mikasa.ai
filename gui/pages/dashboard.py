@@ -5,7 +5,7 @@
 import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassCard, StatWidget, StatusBadge
+from gui.components import GlassButton, GlassCard, GlowButton, StatWidget, StatusBadge
 
 
 class DashboardPage(ctk.CTkFrame):
@@ -236,32 +236,23 @@ class DashboardPage(ctk.CTkFrame):
 
         for i, (icon, text, is_hero, cmd) in enumerate(actions):
             if is_hero:
-                # Apple Signature Blue Button
-                btn = ctk.CTkButton(
+                # Apple Hero Glow Button
+                btn = GlowButton(
                     btn_frame,
-                    text=f"{icon}  {text}",
-                    font=(Fonts.FAMILY, 13, "bold"),
-                    fg_color=Colors.PRIMARY,
-                    hover_color=Colors.PRIMARY_DARK,
-                    text_color="#FFFFFF",
-                    corner_radius=12,
+                    text=text,
+                    icon=icon,
                     height=46,
-                    border_width=0,
+                    corner_radius=12,
                     command=cmd,
                 )
             else:
                 # Apple Dark Glass Capsule Button
-                btn = ctk.CTkButton(
+                btn = GlassButton(
                     btn_frame,
-                    text=f"{icon}  {text}",
-                    font=Fonts.BODY,
-                    fg_color=Colors.BG_CARD,
-                    hover_color=Colors.BG_HOVER,
-                    text_color=Colors.TEXT_PRIMARY,
-                    corner_radius=12,
+                    text=text,
+                    icon=icon,
                     height=46,
-                    border_width=1,
-                    border_color=Colors.BORDER,
+                    corner_radius=12,
                     command=cmd,
                 )
             btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")

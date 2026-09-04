@@ -47,6 +47,15 @@ class Colors:
         "SIDEBAR_HOVER": "#14141C",
         "SIDEBAR_INDICATOR": "#0A84FF",
         "STATUSBAR_BG": "#070709",
+        # Glassmorphism tokens
+        "GLASS_BG": "#20202C",
+        "GLASS_BG_HOVER": "#2C2C3E",
+        "GLASS_BORDER": "#38384C",
+        "GLASS_BORDER_HOVER": "#555575",
+        "GLASS_TEXT": "#F0F0F8",
+        "GLASS_HERO_BG": "#0A84FF",
+        "GLASS_HERO_HOVER": "#0071E3",
+        "GLASS_HERO_BORDER": "#3399FF",
     }
 
     _LIGHT = {
@@ -89,6 +98,15 @@ class Colors:
         "SIDEBAR_HOVER": "#DCE8F5",
         "SIDEBAR_INDICATOR": "#0284C7",
         "STATUSBAR_BG": "#E7EEF7",
+        # Glassmorphism tokens
+        "GLASS_BG": "#E8EFF7",
+        "GLASS_BG_HOVER": "#DCE7F3",
+        "GLASS_BORDER": "#CBD8E7",
+        "GLASS_BORDER_HOVER": "#A6BCD4",
+        "GLASS_TEXT": "#0F172A",
+        "GLASS_HERO_BG": "#0284C7",
+        "GLASS_HERO_HOVER": "#0369A1",
+        "GLASS_HERO_BORDER": "#38BDF8",
     }
 
     CURRENT_THEME = "dark"
@@ -132,6 +150,15 @@ class Colors:
     SIDEBAR_HOVER = _DARK["SIDEBAR_HOVER"]
     SIDEBAR_INDICATOR = _DARK["SIDEBAR_INDICATOR"]
     STATUSBAR_BG = _DARK["STATUSBAR_BG"]
+    # Glassmorphism tokens
+    GLASS_BG = _DARK["GLASS_BG"]
+    GLASS_BG_HOVER = _DARK["GLASS_BG_HOVER"]
+    GLASS_BORDER = _DARK["GLASS_BORDER"]
+    GLASS_BORDER_HOVER = _DARK["GLASS_BORDER_HOVER"]
+    GLASS_TEXT = _DARK["GLASS_TEXT"]
+    GLASS_HERO_BG = _DARK["GLASS_HERO_BG"]
+    GLASS_HERO_HOVER = _DARK["GLASS_HERO_HOVER"]
+    GLASS_HERO_BORDER = _DARK["GLASS_HERO_BORDER"]
 
     @classmethod
     def apply_theme(cls, theme="dark"):

@@ -5,7 +5,7 @@ import datetime
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts
-from gui.components import EmptyState, GlassCard, GlowButton, InfoChip, PageHero
+from gui.components import EmptyState, GlassButton, GlassCard, GlowButton, InfoChip, PageHero
 
 
 class SchedulerPage(ctk.CTkFrame):
@@ -313,17 +313,19 @@ class SchedulerPage(ctk.CTkFrame):
                 text_color=Colors.TEXT_MUTED,
             ).pack(side="left")
 
-            ctk.CTkButton(
+            GlassButton(
                 footer,
                 text="Bekor qilish",
+                icon="🗑️",
                 font=Fonts.SMALL,
-                fg_color="transparent",
+                fg_color=Colors.GLASS_BG,
                 hover_color=Colors.DANGER_SOFT,
-                text_color=Colors.DANGER,
-                border_width=1,
                 border_color=Colors.BORDER,
-                corner_radius=999,
+                border_hover_color=Colors.DANGER,
+                text_color=Colors.DANGER,
+                corner_radius=15,
                 height=30,
+                width=110,
                 command=lambda tid=task["id"]: self._remove_task(tid),
             ).pack(side="right")
 

@@ -136,10 +136,12 @@ class VoicePage(ctk.CTkFrame):
             mic_frame,
             text="🎙️  Tinglashni boshlash",
             font=Fonts.HEADING_3,
-            fg_color=Colors.PRIMARY,
-            hover_color=Colors.PRIMARY_HOVER,
+            fg_color=Colors.GLASS_HERO_BG,
+            hover_color=Colors.GLASS_HERO_HOVER,
+            border_width=2,
+            border_color=Colors.GLASS_HERO_BORDER,
             text_color=Colors.TEXT_PRIMARY,
-            corner_radius=25,
+            corner_radius=28,
             height=56,
             width=280,
             bg_color=Colors.BG_DARK,
@@ -264,7 +266,10 @@ class VoicePage(ctk.CTkFrame):
 
         if self._is_listening:
             self.mic_btn.configure(
-                text="⏹  To'xtatish", fg_color=Colors.DANGER, hover_color="#DC2626"
+                text="⏹  To'xtatish",
+                fg_color=Colors.DANGER,
+                hover_color="#DC2626",
+                border_color="#FF6961",
             )
             self.orb_container.configure(border_color=Colors.PRIMARY)
             self.orb_text.configure(text="Tinglayapman...", text_color=Colors.PRIMARY)
@@ -280,8 +285,9 @@ class VoicePage(ctk.CTkFrame):
         else:
             self.mic_btn.configure(
                 text="🎙️  Tinglashni boshlash",
-                fg_color=Colors.PRIMARY_DARK,
-                hover_color=Colors.PRIMARY,
+                fg_color=Colors.GLASS_HERO_BG,
+                hover_color=Colors.GLASS_HERO_HOVER,
+                border_color=Colors.GLASS_HERO_BORDER,
             )
             self.orb_container.configure(border_color=Colors.BORDER)
             self.orb_text.configure(text="Tayyor", text_color=Colors.TEXT_SECONDARY)

@@ -6,7 +6,14 @@ from unittest.mock import MagicMock
 import customtkinter as ctk
 
 from gui.theme import Colors, Fonts
-from gui.components import MessageBubble, TypingBubble
+from gui.components import (
+    CircleIconButton,
+    GlassButton,
+    GlowButton,
+    MessageBubble,
+    SecondaryButton,
+    TypingBubble,
+)
 from gui.pages.chat import ChatPage
 from gui.backend import BackendBridge
 
@@ -113,8 +120,9 @@ class TestV6ChatUI(unittest.TestCase):
         page._input_var.set("Salom Mikasa")
         self.assertEqual(page.action_btn.cget("text"), "➤")
         self.assertEqual(page._action_mode, "send")
-        self.assertEqual(page.action_btn.cget("fg_color"), Colors.PRIMARY)
-        self.assertEqual(page.action_btn.cget("border_width"), 0)
+        self.assertEqual(page.action_btn.cget("fg_color"), Colors.GLASS_HERO_BG)
+        self.assertEqual(page.action_btn.cget("border_width"), 1)
+        self.assertEqual(page.action_btn.cget("border_color"), Colors.GLASS_HERO_BORDER)
 
         # 4. Matn o'chirilganda -> avtomatik mikrofon (🎙️) ga qaytadi
         page._input_var.set("")
@@ -137,6 +145,57 @@ class TestV6ChatUI(unittest.TestCase):
         self.assertNotEqual(page.attach_btn.cget("fg_color"), Colors.PRIMARY)
 
         page.destroy()
+
+    def test_glass_button_styling_and_centering(self):
+        """GlassButton Apple Frosted Glass xususiyatlari va markazlash tekshiruvi"""
+        btn = GlassButton(self.root, text="Test", icon="⚡", width=120, height=40)
+        self.assertEqual(btn.cget("fg_color"), Colors.GLASS_BG)
+        self.assertEqual(btn.cget("border_width"), 1)
+        self.assertEqual(btn.cget("border_color"), Colors.GLASS_BORDER)
+        self.assertEqual(btn.cget("text"), "⚡  Test")
+
+        # Centering tekshiruvi: _text_label grid rowspan/columnspan to'liq 5x5 bo'lishi kerak
+        if hasattr(btn, "_text_label") and btn._text_label is not None:
+            info = btn._text_label.grid_info()
+            self.assertEqual(int(info.get("row", -1)), 0)
+            self.assertEqual(int(info.get("column", -1)), 0)
+            self.assertEqual(int(info.get("rowspan", -1)), 5)
+            self.assertEqual(int(info.get("columnspan", -1)), 5)
+
+        # Hover effekti
+        btn._on_enter()
+        self.assertEqual(btn.cget("border_color"), Colors.GLASS_BORDER_HOVER)
+        btn._on_leave()
+        self.assertEqual(btn.cget("border_color"), Colors.GLASS_BORDER)
+
+        btn.destroy()
+
+    def test_circle_icon_button_properties(self):
+        """CircleIconButton dumaloq shisha tugma xususiyatlari"""
+        cbtn = CircleIconButton(self.root, icon="📎", size=38)
+        self.assertEqual(cbtn.cget("corner_radius"), 19)
+        self.assertEqual(cbtn.cget("width"), 38)
+        self.assertEqual(cbtn.cget("height"), 38)
+        self.assertEqual(cbtn.cget("text"), "📎")
+
+        # Configure orqali icon o'zgarishi
+        cbtn.configure(icon="🎙️")
+        self.assertEqual(cbtn.cget("text"), "🎙️")
+        cbtn.destroy()
+
+    def test_glow_and_secondary_button_glass_inheritance(self):
+        """SecondaryButton va GlowButton yangi Glass tizimiga to'liq mosligi"""
+        sec = SecondaryButton(self.root, text="Bekor", icon="✕")
+        self.assertIsInstance(sec, GlassButton)
+        self.assertEqual(sec.cget("fg_color"), Colors.GLASS_BG)
+        self.assertEqual(sec.cget("border_width"), 1)
+        sec.destroy()
+
+        glow = GlowButton(self.root, text="Boshlash", icon="🚀")
+        self.assertEqual(glow.cget("fg_color"), Colors.GLASS_HERO_BG)
+        self.assertEqual(glow.cget("border_width"), 1)
+        self.assertEqual(glow.cget("border_color"), Colors.GLASS_HERO_BORDER)
+        glow.destroy()
 
 
 class TestV6BackendRouting(unittest.TestCase):

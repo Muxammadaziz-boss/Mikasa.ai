@@ -301,64 +301,194 @@ class StatusBadge(ctk.CTkFrame):
         }.get(status, Colors.TEXT_MUTED)
 
 
-class IconButton(ctk.CTkButton):
-    """Icon tugma — toolbar uchun"""
+class GlassButton(ctk.CTkButton):
+    """Apple Glassmorphism tugma — frosted shisha fon, 1px hoshiya va yorug'lik hoveri"""
 
-    def __init__(self, master, icon="", tooltip="", size=40, **kwargs):
+    def __init__(
+        self,
+        master,
+        text="",
+        icon="",
+        size=None,
+        fg_color=None,
+        hover_color=None,
+        border_color=None,
+        border_hover_color=None,
+        border_width=1,
+        corner_radius=None,
+        **kwargs,
+    ):
+        display = f"{icon}  {text}".strip() if icon and text else (icon or text)
+        fg_col = fg_color or Colors.GLASS_BG
+        h_col = hover_color or Colors.GLASS_BG_HOVER
+        b_col = border_color or Colors.GLASS_BORDER
+        b_hover = border_hover_color or Colors.GLASS_BORDER_HOVER
+        radius = corner_radius if corner_radius is not None else Sizing.BUTTON_RADIUS
+        height = size if size else kwargs.pop("height", Sizing.BUTTON_HEIGHT)
+        width = size if size else kwargs.pop("width", 100)
+
         super().__init__(
             master,
-            text=icon,
-            width=size,
-            height=size,
-            font=(Fonts.FAMILY, 16),
-            fg_color=Colors.BG_PANEL,
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_SECONDARY,
-            corner_radius=Sizing.BUTTON_RADIUS,
-            border_width=1,
-            border_color=Colors.BORDER,
+            text=display,
+            font=kwargs.pop("font", Fonts.BODY),
+            fg_color=fg_col,
+            hover_color=h_col,
+            text_color=kwargs.pop("text_color", Colors.GLASS_TEXT),
+            border_width=border_width,
+            border_color=b_col,
+            corner_radius=radius,
+            height=height,
+            width=width,
+            **kwargs,
+        )
+
+        self._normal_border = b_col
+        self._hover_border = b_hover
+        self._current_icon = icon
+        self._current_text = text
+        self._ensure_centering()
+
+        # Dynamic frosted glass border highlight on hover
+        self.bind("<Enter>", self._on_enter, add="+")
+        self.bind("<Leave>", self._on_leave, add="+")
+
+    def _ensure_centering(self):
+        try:
+            if hasattr(self, "_text_label") and self._text_label is not None:
+                self._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
+                for r in range(5):
+                    self.grid_rowconfigure(r, weight=1)
+                for c in range(5):
+                    self.grid_columnconfigure(c, weight=1)
+        except Exception:
+            pass
+
+    def configure(self, require_redraw=False, **kwargs):
+        if "icon" in kwargs or "text" in kwargs:
+            icon = kwargs.pop("icon", getattr(self, "_current_icon", ""))
+            text = kwargs.pop("text", getattr(self, "_current_text", ""))
+            self._current_icon = icon
+            self._current_text = text
+            kwargs["text"] = f"{icon}  {text}".strip() if icon and text else (icon or text)
+        if "border_color" in kwargs:
+            self._normal_border = kwargs["border_color"]
+        super().configure(require_redraw=require_redraw, **kwargs)
+        self._ensure_centering()
+
+    def _on_enter(self, event=None):
+        try:
+            super().configure(border_color=self._hover_border)
+        except Exception:
+            pass
+
+    def _on_leave(self, event=None):
+        try:
+            super().configure(border_color=self._normal_border)
+        except Exception:
+            pass
+
+
+class CircleIconButton(GlassButton):
+    """Apple dumaloq shisha icon tugma (Action / Attach / Mic / Toolbar)"""
+
+    def __init__(
+        self,
+        master,
+        icon="",
+        size=38,
+        tooltip="",
+        fg_color=None,
+        hover_color=None,
+        border_color=None,
+        border_hover_color=None,
+        text_color=None,
+        **kwargs,
+    ):
+        radius = size // 2
+        font = kwargs.pop("font", (Fonts.FAMILY, 15))
+        super().__init__(
+            master,
+            text="",
+            icon=icon,
+            size=size,
+            corner_radius=radius,
+            font=font,
+            fg_color=fg_color,
+            hover_color=hover_color,
+            border_color=border_color,
+            border_hover_color=border_hover_color,
+            text_color=text_color,
             **kwargs,
         )
         self._tooltip = tooltip
 
 
 class GlowButton(ctk.CTkButton):
-    """Asosiy CTA tugma — Apple Blue Hero Action"""
+    """Asosiy CTA tugma — Apple Blue Hero Action with subtle glass border"""
 
     def __init__(self, master, text="", icon="", **kwargs):
-        display = f"{icon}  {text}" if icon else text
+        display = f"{icon}  {text}".strip() if icon and text else (icon or text)
+        fg_col = kwargs.pop("fg_color", Colors.GLASS_HERO_BG)
+        h_col = kwargs.pop("hover_color", Colors.GLASS_HERO_HOVER)
+        b_col = kwargs.pop("border_color", Colors.GLASS_HERO_BORDER)
         super().__init__(
             master,
             text=display,
-            font=Fonts.BODY_BOLD,
-            fg_color=Colors.PRIMARY,
-            hover_color=Colors.PRIMARY_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            border_width=0,
-            corner_radius=Sizing.BUTTON_RADIUS,
-            height=Sizing.BUTTON_HEIGHT,
+            font=kwargs.pop("font", Fonts.BODY_BOLD),
+            fg_color=fg_col,
+            hover_color=h_col,
+            text_color=kwargs.pop("text_color", Colors.TEXT_PRIMARY),
+            border_width=kwargs.pop("border_width", 1),
+            border_color=b_col,
+            corner_radius=kwargs.pop("corner_radius", Sizing.BUTTON_RADIUS),
+            height=kwargs.pop("height", Sizing.BUTTON_HEIGHT),
             **kwargs,
         )
+        self._ensure_centering()
+
+    def _ensure_centering(self):
+        try:
+            if hasattr(self, "_text_label") and self._text_label is not None:
+                self._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
+                for r in range(5):
+                    self.grid_rowconfigure(r, weight=1)
+                for c in range(5):
+                    self.grid_columnconfigure(c, weight=1)
+        except Exception:
+            pass
+
+    def configure(self, require_redraw=False, **kwargs):
+        super().configure(require_redraw=require_redraw, **kwargs)
+        self._ensure_centering()
 
 
-class SecondaryButton(ctk.CTkButton):
+class SecondaryButton(GlassButton):
     """Ikkinchi darajali tugma — Apple Glass Capsule"""
 
     def __init__(self, master, text="", icon="", **kwargs):
-        display = f"{icon}  {text}" if icon else text
         super().__init__(
             master,
-            text=display,
-            font=Fonts.BODY,
-            fg_color=Colors.BG_CARD,
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            border_width=1,
-            border_color=Colors.BORDER,
-            corner_radius=Sizing.BUTTON_RADIUS,
-            height=Sizing.BUTTON_HEIGHT,
+            text=text,
+            icon=icon,
+            font=kwargs.pop("font", Fonts.BODY),
             **kwargs,
         )
+
+
+class IconButton(GlassButton):
+    """Icon tugma — toolbar va kartalar uchun shisha tugma"""
+
+    def __init__(self, master, icon="", tooltip="", size=38, **kwargs):
+        font = kwargs.pop("font", (Fonts.FAMILY, 15))
+        super().__init__(
+            master,
+            icon=icon,
+            size=size,
+            font=font,
+            corner_radius=kwargs.pop("corner_radius", Sizing.BUTTON_RADIUS),
+            **kwargs,
+        )
+        self._tooltip = tooltip
 
 
 class SearchBar(ctk.CTkFrame):
