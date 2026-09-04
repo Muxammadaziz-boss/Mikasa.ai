@@ -19,6 +19,7 @@ class Colors:
         "BG_ACCENT": "#0F1E33",
         "PRIMARY": "#0A84FF",
         "PRIMARY_DARK": "#0066CC",
+        "PRIMARY_HOVER": "#0071E3",
         "PRIMARY_GLOW": "#2997FF",
         "PRIMARY_SOFT": "#12253E",
         "SECONDARY": "#5E5CE6",
@@ -60,6 +61,7 @@ class Colors:
         "BG_ACCENT": "#E1F2FF",
         "PRIMARY": "#0284C7",
         "PRIMARY_DARK": "#0369A1",
+        "PRIMARY_HOVER": "#0369A1",
         "PRIMARY_GLOW": "#38BDF8",
         "PRIMARY_SOFT": "#D7EDF9",
         "SECONDARY": "#7C3AED",
@@ -102,6 +104,7 @@ class Colors:
     BG_ACCENT = _DARK["BG_ACCENT"]
     PRIMARY = _DARK["PRIMARY"]
     PRIMARY_DARK = _DARK["PRIMARY_DARK"]
+    PRIMARY_HOVER = _DARK["PRIMARY_HOVER"]
     PRIMARY_GLOW = _DARK["PRIMARY_GLOW"]
     PRIMARY_SOFT = _DARK["PRIMARY_SOFT"]
     SECONDARY = _DARK["SECONDARY"]
