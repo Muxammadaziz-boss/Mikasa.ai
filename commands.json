@@ -23,6 +23,8 @@
   "bugun": "date",
   "eslatma": "reminder",
   "eslatmalar": "reminders",
+  "eslatmani o'chir": "delete_reminder",
+  "eslatma o'chir": "delete_reminder",
   "o'chir": "shutdown",
   "yangila": "restart",
   "qulufla": "lock",

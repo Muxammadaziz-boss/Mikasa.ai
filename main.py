@@ -23,11 +23,12 @@ import psutil
 import keyboard
 from dotenv import load_dotenv
 import google.generativeai as genai
+import re
 
 load_dotenv()
 
 # ========== Versiya ==========
-VERSION = "1.3.0"
+VERSION = "2.0.0"
 GITHUB_REPO = "https://api.github.com/repos/Muxammadaziz_boss/ovozli-yordamchi/releases/latest"
 
 # ========== Global o'zgaruvchilar ==========
@@ -35,8 +36,27 @@ buyruq_bajarilmoqda = False
 so_ngi_natija = ""
 oyin_rejimi = False
 ovoz_turi_global = "erkak"
+gui_callback = None
+youtube_ochiq = False
+brauzer_turi = "chrome"  # chrome, brave, firefox
 
-# ========== pyttsx3 engine (global, xatolikni oldini oladi) ==========
+# ========== GUI bilan integratsiya ==========
+def gui_bilan_integratsiya(callback_func):
+    """GUI dan kelgan callback funksiyasini saqlash"""
+    global gui_callback
+    gui_callback = callback_func
+
+def gui_ga_xabar_yuborish(xabar):
+    """GUI ga xabar yuborish"""
+    if gui_callback:
+        try:
+            gui_callback(xabar)
+        except:
+            print(xabar)
+    else:
+        print(xabar)
+
+# ========== pyttsx3 engine ==========
 _tts_engine = None
 
 def get_tts_engine():
@@ -48,7 +68,7 @@ def get_tts_engine():
 
 # ========== Parolni olish ==========
 def parolni_olish():
-    return os.getenv("ADMIN_PAROL", "1234")
+    return os.getenv("ADMIN_PAROL", "4881")
 
 def parolni_tekshir():
     to_gri_parol = parolni_olish()
@@ -64,6 +84,8 @@ def ovoz_chiqar(text, ovoz_turi="erkak", kechikish=0):
     def _ijro_et():
         global so_ngi_natija
         try:
+            gui_ga_xabar_yuborish(text)
+            
             engine = get_tts_engine()
             voices = engine.getProperty('voices')
             if ovoz_turi == "ayol" and len(voices) > 1:
@@ -75,6 +97,7 @@ def ovoz_chiqar(text, ovoz_turi="erkak", kechikish=0):
             so_ngi_natija = text
         except Exception as e:
             print(f"Ovoz chiqarishda xatolik: {e}")
+            gui_ga_xabar_yuborish(f"Xatolik: {e}")
     
     threading.Thread(target=_ijro_et, daemon=True).start()
     if kechikish > 0:
@@ -116,54 +139,33 @@ def buyruqlar_json_ol():
     default_commands = {
         "yutub": "open_youtube",
         "youtube": "open_youtube",
-        "yutub och": "open_youtube",
         "birinchi video": "youtube_first_video",
         "musiqa": "music_search",
-        "muzika": "music_search",
         "qo'shiq": "music_search",
         "telegram": "open_telegram",
         "vs code": "open_code",
-        "visual studio code": "open_code",
         "chrome": "open_chrome",
         "brave": "open_brave",
         "discord": "open_discord",
-        "tanla": "select_next_item",
-        "enter": "enter",
         "havo": "weather",
-        "ob-havo": "weather",
         "qidir": "search",
         "vaqt": "time",
-        "soat": "time",
         "sana": "date",
-        "bugun": "date",
         "eslatma": "reminder",
         "eslatmalar": "reminders",
+        "eslatmani o'chir": "delete_reminder",
         "o'chir": "shutdown",
         "yangila": "restart",
         "qulufla": "lock",
-        "ish stoli": "desktop",
-        "task menejr": "taskmgr",
-        "xotira": "memory",
-        "ekran rasmi": "screenshot",
-        "yangi fayl": "new_file",
-        "katta harf": "caps_lock",
-        "backspace": "backspace",
-        "tab": "tab",
-        "oynani o'tkaz": "switch_window",
-        "ovozni ko'tar": "volume_up",
-        "ovozni pasaytir": "volume_down",
-        "ovozni o'chir": "volume_mute",
-        "ovozni yoq": "volume_unmute",
-        "o'yin rejimini yoq": "game_mode_on",
-        "o'yin rejimini o'chir": "game_mode_off",
-        "youtube qidir": "youtube_search",
-        "video qidir": "youtube_search",
-        "yutubda qidir": "youtube_search",
-        "discord xabar yubor": "discord_xabar",
-        "do'stga xabar": "discord_xabar",
+        "ovozni ko'tar": "volume_up_nircmd",
+        "ovozni pasaytir": "volume_down_nircmd",
+        "ovozni o'chir": "volume_mute_nircmd",
+        "ovozni och": "volume_unmute_nircmd",
+        "video qo'y": "play_video",
+        "to'xtat": "pause_video",
+        "pauza": "pause_video",
         "ai": "chat_mode",
-        "suhbat qil": "chat_mode",
-        "so'rayman": "chat_mode"
+        "suhbat qil": "chat_mode"
     }
 
     if os.path.exists("commands.json"):
@@ -185,269 +187,389 @@ def tingla():
     try:
         r = sr.Recognizer()
         with sr.Microphone() as source:
-            print("...")
+            gui_ga_xabar_yuborish("🎤 Tinglanmoqda...")
             audio = r.listen(source, timeout=5, phrase_time_limit=5)
             try:
                 text = r.recognize_google(audio, language="uz-UZ")
+                gui_ga_xabar_yuborish(f"🗣️ Siz aytdingiz: {text}")
                 return text
             except sr.UnknownValueError:
                 return None
             except sr.RequestError as e:
-                print(f"Google API xatosi: {e}")
+                gui_ga_xabar_yuborish(f"❌ Google API xatosi: {e}")
                 return None
             except sr.WaitTimeoutError:
                 return None
     except Exception as e:
-        print("Mikrofon ishlamayapti, so'z kiriting")
-        return input("So'zni kiriting: ")
+        gui_ga_xabar_yuborish(f"❌ Mikrofon xatosi: {e}")
+        return None
+
+# ========== NirCmd orqali ovoz boshqaruvi ==========
+def nircmd_ovoz_sozlash(level):
+    """NirCmd orqali ovoz sozlash (0-100%)"""
+    try:
+        # 0-100% ni 0-65535 ga aylantirish
+        volume = int((level / 100) * 65535)
+        subprocess.run(["nircmd.exe", "setsysvolume", str(volume)], 
+                      shell=True, check=False, capture_output=True)
+        gui_ga_xabar_yuborish(f"🔊 Ovoz {level}% ga o'rnatildi")
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ NirCmd xatolik: {e}")
+        return False
+
+def nircmd_ovoz_oshir(miqdor=5):
+    """Ovozni belgilangan miqdorda oshirish"""
+    try:
+        change = int((miqdor / 100) * 65535)
+        subprocess.run(["nircmd.exe", "changesysvolume", str(change)], 
+                      shell=True, check=False, capture_output=True)
+        gui_ga_xabar_yuborish(f"🔊 Ovoz {miqdor}% oshirildi")
+        ovoz_chiqar(f"Ovoz {miqdor} foizga oshirildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ NirCmd xatolik: {e}")
+        return False
+
+def nircmd_ovoz_pasaytir(miqdor=5):
+    """Ovozni belgilangan miqdorda pasaytirish"""
+    try:
+        change = int((miqdor / 100) * 65535)
+        subprocess.run(["nircmd.exe", "changesysvolume", f"-{change}"], 
+                      shell=True, check=False, capture_output=True)
+        gui_ga_xabar_yuborish(f"🔉 Ovoz {miqdor}% pasaytirildi")
+        ovoz_chiqar(f"Ovoz {miqdor} foizga pasaytirildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ NirCmd xatolik: {e}")
+        return False
+
+def nircmd_ovoz_ochir():
+    """Ovozni mute qilish"""
+    try:
+        subprocess.run(["nircmd.exe", "mutesysvolume", "1"], 
+                      shell=True, check=False, capture_output=True)
+        gui_ga_xabar_yuborish("🔇 Ovoz o'chirildi (mute)")
+        ovoz_chiqar("Ovoz o'chirildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ NirCmd xatolik: {e}")
+        return False
+
+def nircmd_ovoz_och():
+    """Ovozni unmute qilish"""
+    try:
+        subprocess.run(["nircmd.exe", "mutesysvolume", "0"], 
+                      shell=True, check=False, capture_output=True)
+        gui_ga_xabar_yuborish("🔊 Ovoz ochildi (unmute)")
+        ovoz_chiqar("Ovoz ochildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ NirCmd xatolik: {e}")
+        return False
+
+# ========== YouTube video boshqaruvi ==========
+def youtube_video_play_pause():
+    """YouTube videoni play/pause qilish (K tugmasi)"""
+    try:
+        pyautogui.press('k')
+        gui_ga_xabar_yuborish("▶️ Video play/pause")
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
+        return False
+
+def youtube_video_play():
+    """YouTube videoni play qilish"""
+    try:
+        pyautogui.press('k')
+        gui_ga_xabar_yuborish("▶️ Video ijro etilmoqda")
+        ovoz_chiqar("Video qo'yildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        return False
+
+def youtube_video_pause():
+    """YouTube videoni pause qilish"""
+    try:
+        pyautogui.press('k')
+        gui_ga_xabar_yuborish("⏸️ Video to'xtatildi")
+        ovoz_chiqar("Video to'xtatildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        return False
+
+def youtube_video_boshla_koordinata(video_raqam=1):
+    """YouTube'da video raqami bo'yicha ochish"""
+    global youtube_ochiq
+    try:
+        if not youtube_ochiq:
+            gui_ga_xabar_yuborish("❌ Avval YouTube'ni oching")
+            ovoz_chiqar("Avval YouTube'ni oching", ovoz_turi_global)
+            return False
+        
+        time.sleep(1)
+        
+        # Ekran o'lchamiga qarab koordinatalarni sozlash
+        screen_width, screen_height = pyautogui.size()
+        
+        # Video joylashuvini hisoblash (qatorlar bo'yicha)
+        if video_raqam == 1:
+            x, y = screen_width // 4, screen_height // 4
+        elif video_raqam == 2:
+            x, y = screen_width // 2, screen_height // 4
+        elif video_raqam == 3:
+            x, y = 3 * screen_width // 4, screen_height // 4
+        elif video_raqam == 4:
+            x, y = screen_width // 4, screen_height // 2
+        elif video_raqam == 5:
+            x, y = screen_width // 2, screen_height // 2
+        else:
+            x, y = 3 * screen_width // 4, screen_height // 2
+        
+        pyautogui.click(x, y)
+        gui_ga_xabar_yuborish(f"✅ {video_raqam}-video ochilyapti")
+        ovoz_chiqar(f"{video_raqam}-video ochilyapti", ovoz_turi_global)
+        return True
+        
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
+        return False
+
+# ========== Musiqa platformalari ==========
+def musiqa_platform_tanlash():
+    """Foydalanuvchiga musiqa platformasini tanlash imkonini berish"""
+    ovoz_chiqar("Qaysi platformadan musiqa qidiraylik? YouTube, Yandex Music yoki Spotify?", ovoz_turi_global)
+    javob = tingla()
+    
+    if not javob:
+        return "youtube"  # default
+    
+    javob = javob.lower()
+    if "yandex" in javob:
+        return "yandex"
+    elif "spotify" in javob:
+        return "spotify"
+    else:
+        return "youtube"
+
+def musiqa_qidir(query, platform="youtube"):
+    """Turli platformalarda musiqa qidirish"""
+    try:
+        if platform == "youtube":
+            url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}+music"
+            ovoz_chiqar(f"YouTube'da {query} qidirilmoqda", ovoz_turi_global)
+        elif platform == "yandex":
+            url = f"https://music.yandex.ru/search?text={query.replace(' ', '%20')}"
+            ovoz_chiqar(f"Yandex Music'da {query} qidirilmoqda", ovoz_turi_global)
+        elif platform == "spotify":
+            url = f"https://open.spotify.com/search/{query.replace(' ', '%20')}"
+            ovoz_chiqar(f"Spotify'da {query} qidirilmoqda", ovoz_turi_global)
+        else:
+            url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}+music"
+        
+        subprocess.run(["start", url], shell=True)
+        gui_ga_xabar_yuborish(f"🎵 {platform.upper()}'da musiqa qidirildi")
+        time.sleep(1)
+        ovoz_chiqar("Musiqa topildi va ochildi", ovoz_turi_global)
+        return True
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
+        return False
 
 # ========== Qoidalarga asoslangan aniqlash ==========
 def buyruqni_aniqla(matn):
     matn_lower = matn.lower()
+    
+    # Ovoz boshqaruvi (raqamli)
+    if "ovoz" in matn_lower:
+        # "ovozni 50 qil" yoki "ovoz 50"
+        match = re.search(r'ovoz(?:ni)?\s+(\d+)', matn_lower)
+        if match:
+            level = int(match.group(1))
+            return ("volume_set", level)
+        
+        # "ovozni oshir 5" yoki "ovozni ko'tar 10"
+        match = re.search(r'ovoz(?:ni)?\s+(?:oshir|ko\'tar)\s+(\d+)', matn_lower)
+        if match:
+            amount = int(match.group(1))
+            return ("volume_up", amount)
+        
+        # "ovozni pasaytir 5"
+        match = re.search(r'ovoz(?:ni)?\s+pasaytir\s+(\d+)', matn_lower)
+        if match:
+            amount = int(match.group(1))
+            return ("volume_down", amount)
+    
+    # Video raqami
+    match = re.search(r'(\d+)\s*(?:-)?video', matn_lower)
+    if match:
+        num = int(match.group(1))
+        return ("video_number", num)
+    
+    # Oddiy buyruqlar
     for soz, buyruq in buyruqlar_json.items():
         if soz in matn_lower:
             return buyruq
+    
     return "unknown"
 
-# ========== Ovoz boshqaruvi ==========
-def ovozni_soza(action):
-    if os.name != 'nt':
-        return
-    try:
-        from comtypes import CLSCTX_ALL
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-        from ctypes import cast, POINTER
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-        if action == "up":
-            volume.VolumeStepUp(None)
-        elif action == "down":
-            volume.VolumeStepDown(None)
-        elif action == "mute":
-            volume.SetMute(1, None)
-        elif action == "unmute":
-            volume.SetMute(0, None)
-    except Exception as e:
-        print(f"Ovoz sozlamasida xatolik: {e}")
-
-def ovoz_oshir(): ovozni_soza("up")
-def ovoz_pasaytir(): ovozni_soza("down")
-def ovoz_ochir(): ovozni_soza("mute")
-def ovoz_och(): ovozni_soza("unmute")
-
-# ========== O'yin rejimi ==========
-def oyin_rejimini_oshir():
-    global oyin_rejimi
-    if os.name == 'nt':
-        try:
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-            from comtypes import CLSCTX_ALL
-            from ctypes import cast, POINTER
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMasterScalarVolume(0.3, None)
-        except:
-            pass
-    oyin_rejimi = True
-    ovoz_chiqar("O'yin rejimi yoqildi", ovoz_turi_global)
-
-def oyin_rejimini_yop():
-    global oyin_rejimi
-    if os.name == 'nt':
-        try:
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-            from comtypes import CLSCTX_ALL
-            from ctypes import cast, POINTER
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMasterScalarVolume(1.0, None)
-        except:
-            pass
-    oyin_rejimi = False
-    ovoz_chiqar("O'yin rejimi o'chirildi", ovoz_turi_global)
-
-# ========== AI bilan suhbat ==========
-def ai_bilan_suhbat(matn, ovoz_turi):
-    api_key = os.getenv("GOOGLE_API_KEY")
+# ========== OpenRouter AI ==========
+def openrouter_ai_suhbat(matn, ovoz_turi):
+    """OpenRouter API orqali GPT bilan suhbat"""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo-instruct")
+    
     if not api_key:
-        ovoz_chiqar("AI kaliti .env faylida yo'q", ovoz_turi)
+        ovoz_chiqar("OpenRouter API kaliti topilmadi", ovoz_turi)
         return
+    
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(
-            f"Foydalanuvchi: {matn}",
-            safety_settings={
-                genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-                genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            },
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=150,
-                temperature=0.7
-            )
-        )
-        javob = response.text.strip()
-        ovoz_chiqar(javob, ovoz_turi)
+        gui_ga_xabar_yuborish(f"🤖 AI ishlamoqda...")
+        
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "Siz yordamchi assistentsiz. Qisqa va aniq javob bering."},
+                {"role": "user", "content": matn}
+            ],
+            "max_tokens": 200,
+            "temperature": 0.7
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            javob = data['choices'][0]['message']['content'].strip()
+            gui_ga_xabar_yuborish(f"🤖 AI: {javob}")
+            ovoz_chiqar(javob, ovoz_turi)
+        else:
+            ovoz_chiqar("AI javob berishda xatolik", ovoz_turi)
+            
     except Exception as e:
-        print(f"AI xatolik: {e}")
-        ovoz_chiqar("AI javob berishda xatolik yuz berdi", ovoz_turi)
-
-# ========== YouTube qidiruv ==========
-def youtube_qidir(query, ovoz_turi):
-    if query:
-        url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
-        subprocess.run(["start", url], shell=True)
-        ovoz_chiqar(f"YouTube’da {query} bo‘yicha natijalar ochildi", ovoz_turi)
-    else:
-        ovoz_chiqar("Qidirish so'zi aniqlanmadi", ovoz_turi)
+        gui_ga_xabar_yuborish(f"❌ AI xatolik: {e}")
+        ovoz_chiqar("AI bilan suhbatda xatolik", ovoz_turi)
 
 # ========== Tarix saqlash ==========
 def buyruqni_saqla(matn):
     with open("buyruqlar_tarixi.txt", "a", encoding="utf-8") as f:
-        f.write(f"{datetime.datetime.now()}: {matn}\n")
+        f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {matn}\n")
 
-# ========== Google AI orqali tushunish ==========
-def ai_orqali_tushun(matn):
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("GOOGLE_API_KEY .env faylida yo'q")
-        return "unknown"
+# ========== Eslatmalar ==========
+def eslatma_qoshish(eslatma_matni, ovoz_turi):
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-
-        ruxsat_etilgan = [
-            "open_youtube", "youtube_first_video", "music_search", "greeting", "time", "date", "weather",
-            "reminder", "reminders", "shutdown", "restart", "lock", "desktop", "taskmgr", "memory",
-            "screenshot", "new_file", "caps_lock", "enter", "backspace", "tab", "switch_window",
-            "volume_up", "volume_down", "volume_mute", "volume_unmute", "search", "open_discord",
-            "open_telegram", "open_code", "open_chrome", "open_brave", "select_next_item", "unknown",
-            "game_mode_on", "game_mode_off", "youtube_search", "discord_xabar", "chat_mode"
-        ]
-
-        prompt = f"""Siz faqat quyidagi buyruqlardan birini qaytarishingiz kerak:
-{', '.join(ruxsat_etilgan)}
-Foydalanuvchi so'zi: "{matn}"
-Javob:"""
-        
-        response = model.generate_content(prompt, safety_settings={
-            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-        }, generation_config=genai.types.GenerationConfig(
-            max_output_tokens=10,
-            temperature=0.1
-        ))
-        
-        javob = response.text.strip().lower()
-        javob = ''.join(ch for ch in javob if ch.isalnum() or ch == '_')
-        return javob if javob in ruxsat_etilgan else "unknown"
+        sana = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open("eslatmalar.txt", "a", encoding="utf-8") as f:
+            f.write(f"[{sana}] {eslatma_matni}\n")
+        ovoz_chiqar(f"Eslatma saqlandi", ovoz_turi)
+        gui_ga_xabar_yuborish(f"✅ Eslatma saqlandi: {eslatma_matni}")
     except Exception as e:
-        print(f"AI xatolik: {e}")
-        return "unknown"
+        gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
+
+def eslatmalarni_o_qish(ovoz_turi):
+    try:
+        if not os.path.exists("eslatmalar.txt"):
+            ovoz_chiqar("Eslatmalar yo'q", ovoz_turi)
+            return
+        
+        with open("eslatmalar.txt", "r", encoding="utf-8") as f:
+            eslatmalar = f.readlines()
+        
+        if not eslatmalar:
+            ovoz_chiqar("Eslatmalar yo'q", ovoz_turi)
+            return
+        
+        ovoz_chiqar(f"Sizda {len(eslatmalar)} ta eslatma bor", ovoz_turi)
+        for idx, eslatma in enumerate(eslatmalar, 1):
+            if eslatma.strip():
+                gui_ga_xabar_yuborish(f"{idx}. {eslatma.strip()}")
+                
+    except Exception as e:
+        gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
 
 # ========== Buyruqni bajarish ==========
 def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
-    global buyruq_bajarilmoqda, ovoz_turi_global
+    global buyruq_bajarilmoqda, ovoz_turi_global, youtube_ochiq
     ovoz_turi_global = ovoz_turi
     buyruq_bajarilmoqda = True
     buyruqni_saqla(matn)
     
     intent = buyruqni_aniqla(matn)
-    if intent == "unknown":
-        intent = ai_orqali_tushun(matn)
-
-    ovoz_chiqar(f"Buyruq aniqlandi: {intent.replace('_', ' ')}", ovoz_turi)
     
-    if intent == "greeting":
-        ovoz_chiqar(f"Salom, {foydalanuvchi_ismi}! Sizga qanday yordam bera olaman?", ovoz_turi)
-
-    elif intent == "open_youtube":
+    # Tuple (buyruq, qiymat)
+    if isinstance(intent, tuple):
+        buyruq, qiymat = intent
+        
+        if buyruq == "volume_set":
+            nircmd_ovoz_sozlash(qiymat)
+            ovoz_chiqar(f"Ovoz {qiymat} foizga o'rnatildi", ovoz_turi)
+        
+        elif buyruq == "volume_up":
+            nircmd_ovoz_oshir(qiymat)
+        
+        elif buyruq == "volume_down":
+            nircmd_ovoz_pasaytir(qiymat)
+        
+        elif buyruq == "video_number":
+            youtube_video_boshla_koordinata(qiymat)
+        
+        buyruq_bajarilmoqda = False
+        gui_ga_xabar_yuborish("✅ Buyruq bajarildi!")
+        ovoz_chiqar("Bajarildi", ovoz_turi)
+        return
+    
+    gui_ga_xabar_yuborish(f"🎯 Buyruq: {intent}")
+    
+    if intent == "open_youtube":
         subprocess.run(["start", "https://www.youtube.com"], shell=True)
-        ovoz_chiqar(f"{foydalanuvchi_ismi}, YouTube ochilyapti", ovoz_turi)
+        youtube_ochiq = True
+        ovoz_chiqar("YouTube ochilyapti", ovoz_turi)
+        gui_ga_xabar_yuborish("✅ YouTube ochildi")
 
     elif intent == "youtube_first_video":
         subprocess.run(["start", "https://www.youtube.com"], shell=True)
+        youtube_ochiq = True
         time.sleep(3)
-        pyautogui.press('tab')
-        pyautogui.press('tab')
-        pyautogui.press('enter')
-        ovoz_chiqar(f"{foydalanuvchi_ismi}, birinchi video ochilyapti", ovoz_turi)
+        youtube_video_boshla_koordinata(1)
 
     elif intent == "music_search":
+        platform = musiqa_platform_tanlash()
         ovoz_chiqar("Qaysi musiqani qidiraylik?", ovoz_turi)
         query = tingla()
         if query:
-            url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}+music"
-            subprocess.run(["start", url], shell=True)
-            ovoz_chiqar(f"{query} bo'yicha musiqa topildi", ovoz_turi)
+            musiqa_qidir(query, platform)
         else:
-            subprocess.run(["start", "https://www.youtube.com/results?search_query=lofi+music"], shell=True)
-            ovoz_chiqar("Lofi musiqa qidirildi", ovoz_turi)
+            musiqa_qidir("lofi music", platform)
 
-    elif intent == "youtube_search":
-        ovoz_chiqar("Nima qidiraylik YouTube’da?", ovoz_turi)
-        query = tingla()
-        youtube_qidir(query, ovoz_turi)
-
-    elif intent == "open_discord":
-        subprocess.run(["start", "discord"], shell=True)
-        ovoz_chiqar("Discord ochilyapti", ovoz_turi)
-
-    elif intent == "discord_xabar":
-        ovoz_chiqar("Discord ochilmoqda. Do'stingizga xabar yozishingiz mumkin.", ovoz_turi)
-        subprocess.run(["start", "discord"], shell=True)
-
-    elif intent == "open_telegram":
-        subprocess.run(["start", "telegram"], shell=True)
-        ovoz_chiqar("Telegram ochilyapti", ovoz_turi)
-
-    elif intent == "open_code":
-        subprocess.run(["start", "code"], shell=True)
-        ovoz_chiqar("VS Code ochilyapti", ovoz_turi)
-
-    elif intent == "open_chrome":
-        subprocess.run(["start", "chrome"], shell=True)
-        ovoz_chiqar("Chrome ochilyapti", ovoz_turi)
-
-    elif intent == "open_brave":
-        subprocess.run(["start", "brave"], shell=True)
-        ovoz_chiqar("Brave ochilyapti", ovoz_turi)
-
-    elif intent == "select_next_item":
-        pyautogui.press('tab')
-        ovoz_chiqar("Tanlandi", ovoz_turi)
-
-    elif intent == "weather":
-        api_key = os.getenv("OPENWEATHER_API_KEY")
-        if not api_key:
-            ovoz_chiqar("Ob-havo kaliti yo'q", ovoz_turi)
-            return
-        city = "Tashkent"
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=uz"
-        try:
-            data = requests.get(url).json()
-            temp = data["main"]["temp"]
-            ovoz_chiqar(f"Hozir {city}da {temp} gradus", ovoz_turi)
-        except:
-            ovoz_chiqar("Ob-havo ma'lumoti olinmadi", ovoz_turi)
-
-    elif intent == "search":
-        ovoz_chiqar("Nima qidiraylik?", ovoz_turi)
-        query = tingla()
-        if query:
-            url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-            subprocess.run(["start", url], shell=True)
-            ovoz_chiqar("Natija topildi", ovoz_turi)
+    elif intent == "volume_up_nircmd":
+        nircmd_ovoz_oshir(5)
+    
+    elif intent == "volume_down_nircmd":
+        nircmd_ovoz_pasaytir(5)
+    
+    elif intent == "volume_mute_nircmd":
+        nircmd_ovoz_ochir()
+    
+    elif intent == "volume_unmute_nircmd":
+        nircmd_ovoz_och()
+    
+    elif intent == "play_video":
+        youtube_video_play()
+    
+    elif intent == "pause_video":
+        youtube_video_pause()
 
     elif intent == "time":
         ovoz_chiqar(f"Hozir soat {time.strftime('%H:%M')}", ovoz_turi)
+    
     elif intent == "date":
         ovoz_chiqar(f"Bugun {time.strftime('%Y-%m-%d')}", ovoz_turi)
 
@@ -455,302 +577,49 @@ def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
         ovoz_chiqar("Nima eslataylik?", ovoz_turi)
         reminder = tingla()
         if reminder:
-            with open("eslatmalar.txt", "a", encoding="utf-8") as f:
-                f.write(reminder + "\n")
-            ovoz_chiqar(f"Eslatma saqlandi: {reminder}", ovoz_turi)
+            eslatma_qoshish(reminder, ovoz_turi)
 
     elif intent == "reminders":
-        try:
-            with open("eslatmalar.txt", "r", encoding="utf-8") as f:
-                reminders = f.read()
-            if reminders.strip():
-                ovoz_chiqar("Sizning eslatmalaringiz:", ovoz_turi)
-                ovoz_chiqar(reminders, ovoz_turi)
-            else:
-                ovoz_chiqar("Eslatmalar yo'q", ovoz_turi)
-        except FileNotFoundError:
-            ovoz_chiqar("Eslatmalar fayli yo'q", ovoz_turi)
-
-    elif intent == "shutdown":
-        if parolni_tekshir():
-            ovoz_chiqar("Kompyuter o'chirilmoqda", ovoz_turi)
-            subprocess.run(["shutdown", "/s", "/t", "1"], shell=True)
-        else:
-            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
-
-    elif intent == "restart":
-        if parolni_tekshir():
-            ovoz_chiqar("Kompyuter yangilanmoqda", ovoz_turi)
-            subprocess.run(["shutdown", "/r", "/t", "1"], shell=True)
-        else:
-            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
-
-    elif intent == "lock":
-        if parolni_tekshir():
-            ovoz_chiqar("Qulflanyapti", ovoz_turi)
-            os.system("rundll32.exe user32.dll,LockWorkStation")
-        else:
-            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
-
-    elif intent == "desktop":
-        pyautogui.hotkey('win', 'd')
-        ovoz_chiqar("Ish stoli", ovoz_turi)
-
-    elif intent == "taskmgr":
-        os.system("taskmgr")
-        ovoz_chiqar("Vazifalar menejeri", ovoz_turi)
-
-    elif intent == "memory":
-        cpu = psutil.cpu_percent()
-        ram = psutil.virtual_memory().percent
-        ovoz_chiqar(f"CPU: {cpu}%, RAM: {ram}%", ovoz_turi)
-
-    elif intent == "screenshot":
-        path = f"screenshot_{int(time.time())}.png"
-        pyautogui.screenshot(path)
-        ovoz_chiqar("Rasm saqlandi", ovoz_turi)
-
-    elif intent == "new_file":
-        pyautogui.hotkey('ctrl', 'n')
-        ovoz_chiqar("Yangi fayl", ovoz_turi)
-
-    elif intent == "caps_lock":
-        keyboard.press_and_release('caps lock')
-
-    elif intent == "enter":
-        pyautogui.press('enter')
-        ovoz_chiqar("Enter bosildi", ovoz_turi)
-
-    elif intent == "backspace":
-        pyautogui.press('backspace')
-
-    elif intent == "tab":
-        pyautogui.press('tab')
-
-    elif intent == "switch_window":
-        pyautogui.hotkey('alt', 'tab')
-        ovoz_chiqar("Oyna almashtirildi", ovoz_turi)
-
-    elif intent == "volume_up":
-        ovoz_oshir()
-        ovoz_chiqar("Ovoz oshirildi", ovoz_turi)
-
-    elif intent == "volume_down":
-        ovoz_pasaytir()
-        ovoz_chiqar("Ovoz pasaytirildi", ovoz_turi)
-
-    elif intent == "volume_mute":
-        ovoz_ochir()
-        ovoz_chiqar("Ovoz o'chirildi", ovoz_turi)
-
-    elif intent == "volume_unmute":
-        ovoz_och()
-        ovoz_chiqar("Ovoz ochildi", ovoz_turi)
-
-    elif intent == "game_mode_on":
-        oyin_rejimini_oshir()
-
-    elif intent == "game_mode_off":
-        oyin_rejimini_yop()
+        eslatmalarni_o_qish(ovoz_turi)
 
     elif intent == "chat_mode":
-        ovoz_chiqar("AI rejimiga o'tildi. Nima so'rashingiz mumkin?", ovoz_turi)
+        ovoz_chiqar("AI rejimi. Nima so'rashingiz mumkin?", ovoz_turi)
         savol = tingla()
         if savol:
-            ai_bilan_suhbat(savol, ovoz_turi)
+            openrouter_ai_suhbat(savol, ovoz_turi)
 
     else:
-        ovoz_chiqar(f"{foydalanuvchi_ismi}, buyruq tushunilmadi", ovoz_turi)
+        ovoz_chiqar("Buyruq tushunilmadi", ovoz_turi)
     
     buyruq_bajarilmoqda = False
-    ovoz_chiqar("Buyruq bajarildi", ovoz_turi)
+    gui_ga_xabar_yuborish("✅ Buyruq bajarildi!")
+    ovoz_chiqar("Bajarildi", ovoz_turi)
 
 # ========== Orqa fon ==========
-def fon_xizmat(foydalanuvchi_ismi, ovoz_turi):
-    ovoz_chiqar(f"Salom, {foydalanuvchi_ismi}! Men — Yordamchingiz. Nima buyurasiz?", ovoz_turi)
+def fon_xizmat(foydalanuvchi_ismi, ovoz_turi, gui_callback_func=None):
+    ovoz_chiqar(f"Salom, {foydalanuvchi_ismi}! Men — Yordamchingiz.", ovoz_turi)
     while True:
         try:
             buyruq = tingla()
             if buyruq:
-                ovoz_chiqar("Buyruq qabul qilindi", ovoz_turi, kechikish=0.5)
+                gui_ga_xabar_yuborish(f"📝 Buyruq: {buyruq}")
                 buyruqni_tushun(buyruq, foydalanuvchi_ismi, ovoz_turi)
         except KeyboardInterrupt:
-            print("Dastur to'xtatildi")
             break
         except Exception as e:
-            print(f"Xatolik yuz berdi: {e}")
+            gui_ga_xabar_yuborish(f"❌ Xatolik: {e}")
             time.sleep(1)
 
-# ========== Haqida va yangilanish ==========
-def haqida_oynasi():
-    about_win = tk.Toplevel()
-    about_win.title("ℹ️ Haqida")
-    about_win.geometry("400x250")
-    about_win.configure(bg="#2c2f33")
-    tk.Label(about_win, text="🎙️ Ovozli Yordamchi", font=("Segoe UI", 16, "bold"),
-             fg="#e0e0e0", bg="#2c2f33").pack(pady=10)
-    tk.Label(about_win, text=f"Versiya: v{VERSION}", font=("Segoe UI", 11),
-             fg="#bbbbbb", bg="#2c2f33").pack()
-    tk.Label(about_win, text="Muallif: Muxammadaziz", font=("Segoe UI", 10),
-             fg="#999999", bg="#2c2f33").pack(pady=5)
-    tk.Label(about_win, text="Bu dastur — ovoz orqali boshqariladigan\nyordamchi vositasi.\nYouTube, Discord, AI, tizim boshqaruvi va boshqalar.",
-             font=("Segoe UI", 10), fg="#cccccc", bg="#2c2f33", justify="center").pack(pady=10)
-    ttk.Button(about_win, text="GitHub", command=lambda: subprocess.run(["start", "https://github.com/Muxammadaziz-boss/Yordamchi"], shell=True)).pack(pady=5)
-
-def yangilanishni_tekshir():
-    try:
-        response = requests.get(GITHUB_REPO, timeout=5)
-        if response.status_code == 200:
-            latest = response.json()
-            latest_version = latest["tag_name"].lstrip("v")
-            current = VERSION
-            if latest_version != current:
-                ovoz_chiqar(f"Yangi versiya mavjud: {latest_version}. Yangilash tavsiya etiladi.", ovoz_turi_global)
-                messagebox.showinfo("Yangilanish", f"Yangi versiya: v{latest_version}\n\n{latest['html_url']}")
-            else:
-                ovoz_chiqar("Sizning dasturingiz eng so'nggi versiyada", ovoz_turi_global)
-        else:
-            print("Yangilanish tekshiruvi: server javob bermadi")
-    except Exception as e:
-        print(f"Yangilanish tekshiruvida xatolik: {e}")
-
-# ========== Chiroyli GUI ==========
+# ========== GUI ==========
 def gui_ishga_tushir():
     foydalanuvchi_ismi = foydalanuvchi_ismi_ol()
     ovoz_turi = ovoz_turi_ol()
-
-    root = tk.Tk()
-    root.title("🎙️ Ovozli Yordamchi")
-    root.geometry("700x600")
-    root.configure(bg="#2c2f33")
-    root.resizable(True, True)
-
+    
     try:
-        root.iconbitmap('icon.ico')
-    except:
-        pass
+        import gui
+        gui.gui_ishga_tushir(foydalanuvchi_ismi, ovoz_turi, fon_xizmat)
+    except ImportError:
+        messagebox.showerror("Xatolik", "gui.py fayli topilmadi!")
 
-    style = ttk.Style()
-    style.theme_use("clam")
-    style.configure("TButton", font=("Segoe UI", 10), padding=6)
-    style.map("TButton",
-              foreground=[('pressed', 'white'), ('active', 'white')],
-              background=[('pressed', '!disabled', '#5c6bc0'), ('active', '#3949ab')],
-              )
-
-    title_label = tk.Label(
-        root, text="🎙️ Ovozli Yordamchi", font=("Segoe UI", 20, "bold"),
-        fg="#e0e0e0", bg="#2c2f33"
-    )
-    title_label.pack(pady=15)
-
-    description = tk.Label(
-        root, text=f"Salom {foydalanuvchi_ismi}! Gapirish tugmasini bosing va buyruq bering.",
-        font=("Segoe UI", 12), fg="#bbbbbb", bg="#2c2f33"
-    )
-    description.pack(pady=5)
-
-    text_area = scrolledtext.ScrolledText(
-        root, width=80, height=20, font=("Consolas", 10),
-        bg="#1e1e1e", fg="#00ff00", insertbackground="white", relief="flat"
-    )
-    text_area.pack(padx=20, pady=10, fill=tk.BOTH, expand=True)
-
-    def tinglashni_boshla():
-        threading.Thread(target=fon_xizmat, args=(foydalanuvchi_ismi, ovoz_turi), daemon=True).start()
-        ovoz_chiqar("Yordamchi ishga tushdi!", ovoz_turi)
-
-    def tarix_ko_rsat():
-        try:
-            with open("buyruqlar_tarixi.txt", "r", encoding="utf-8") as f:
-                history = f.read()
-            text_area.delete(1.0, tk.END)
-            text_area.insert(tk.END, history if history else "Tarix bo'sh.")
-        except FileNotFoundError:
-            text_area.delete(1.0, tk.END)
-            text_area.insert(tk.END, "Tarix fayli topilmadi.")
-
-    def eslatmalar_ko_rsat():
-        try:
-            with open("eslatmalar.txt", "r", encoding="utf-8") as f:
-                reminders = f.read()
-            text_area.delete(1.0, tk.END)
-            text_area.insert(tk.END, reminders if reminders else "Eslatmalar yo'q.")
-        except FileNotFoundError:
-            text_area.delete(1.0, tk.END)
-            text_area.insert(tk.END, "Eslatmalar fayli yo'q.")
-
-    def sozlamalar():
-        settings_win = tk.Toplevel(root)
-        settings_win.title("Sozlamalar")
-        settings_win.geometry("400x420")
-        settings_win.configure(bg="#2c2f33")
-        
-        tk.Label(settings_win, text="Sozlamalar", font=("Segoe UI", 16, "bold"), 
-                fg="#e0e0e0", bg="#2c2f33").pack(pady=10)
-        
-        def ismni_ozgartir():
-            new_name = simpledialog.askstring("Ism", "Yangi ismingizni kiriting:")
-            if new_name:
-                with open("foydalanuvchi_ismi.txt", "w", encoding="utf-8") as f:
-                    f.write(new_name)
-                messagebox.showinfo("Bajarildi", f"Ism {new_name} ga o'zgartirildi!")
-                settings_win.destroy()
-                root.destroy()
-                gui_ishga_tushir()
-        
-        def ovozni_ozgartir():
-            current_voice = ovoz_turi_ol()
-            new_voice = "ayol" if current_voice == "erkak" else "erkak"
-            with open("ovoz_turi.txt", "w", encoding="utf-8") as f:
-                f.write(new_voice)
-            messagebox.showinfo("Bajarildi", f"Ovoz {new_voice} ga o'zgartirildi!")
-            settings_win.destroy()
-            root.destroy()
-            gui_ishga_tushir()
-        
-        def parolni_ozgartir():
-            new_pass = simpledialog.askstring("Parol", "Yangi parolni kiriting:", show='*')
-            if new_pass:
-                from dotenv import set_key
-                set_key(".env", "ADMIN_PAROL", new_pass)
-                messagebox.showinfo("Bajarildi", "Parol yangilandi!")
-        
-        tk.Button(settings_win, text="Ismni o'zgartirish", command=ismni_ozgartir,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
-        tk.Button(settings_win, text="Ovoz turini o'zgartirish", command=ovozni_ozgartir,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
-        tk.Button(settings_win, text="Parolni o'zgartirish", command=parolni_ozgartir,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
-        tk.Button(settings_win, text="ℹ️ Haqida", command=haqida_oynasi,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
-        tk.Button(settings_win, text="🔄 Yangilanishni tekshir", 
-                 command=lambda: threading.Thread(target=yangilanishni_tekshir, daemon=True).start(),
-                 bg="#4caf50", fg="white", font=("Segoe UI", 10)).pack(pady=8)
-        
-        def fayllarni_tozala():
-            for file in ["buyruqlar_tarixi.txt", "eslatmalar.txt"]:
-                if os.path.exists(file):
-                    open(file, 'w').close()
-            messagebox.showinfo("Bajarildi", "Tarix va eslatmalar tozalandi!")
-
-        tk.Button(settings_win, text="Tarix va eslatmalarni tozalash", command=fayllarni_tozala,
-                 bg="#e53935", fg="white", font=("Segoe UI", 10)).pack(pady=10)
-
-    button_frame = tk.Frame(root, bg="#2c2f33")
-    button_frame.pack(pady=15)
-
-    ttk.Button(button_frame, text="▶️ Boshlash", command=tinglashni_boshla).grid(row=0, column=0, padx=10)
-    ttk.Button(button_frame, text="📜 Tarix", command=tarix_ko_rsat).grid(row=0, column=1, padx=10)
-    ttk.Button(button_frame, text="📌 Eslatmalar", command=eslatmalar_ko_rsat).grid(row=0, column=2, padx=10)
-    ttk.Button(button_frame, text="⚙️ Sozlamalar", command=sozlamalar).grid(row=0, column=3, padx=10)
-
-    status_label = tk.Label(root, text="Tayyor", font=("Segoe UI", 9), 
-                           fg="#bbbbbb", bg="#2c2f33")
-    status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
-
-    root.mainloop()
-
-# ========== Asosiy qism ==========
 if __name__ == "__main__":
     gui_ishga_tushir()
