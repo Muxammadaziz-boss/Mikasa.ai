@@ -1,0 +1,49 @@
+# Maxfiy fayllar va kalitlar
+.env
+*.env
+*.key
+.vault.key
+*token*.txt
+*api*.txt
+Google_AI
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+
+# Loglar
+debug.log
+*.log
+logs/
+
+# Foydalanuvchi ma'lumotlari
+foydalanuvchi_ismi.txt
+ovoz_turi.txt
+buyruqlar_tarixi.txt
+eslatmalar.txt
+
+# Arxiv va vaqtinchalik
+*.rar
+*.zip
+*.tmp
+*.mp3
+output/
+nul
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
