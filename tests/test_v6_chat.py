@@ -94,6 +94,40 @@ class TestV6ChatUI(unittest.TestCase):
 
         page.destroy()
 
+    def test_telegram_style_dynamic_button_and_attachment(self):
+        page = ChatPage(self.root)
+
+        # 1. Chapdagi skripka tugmasi mavjudligi
+        self.assertEqual(page.attach_btn.cget("text"), "📎")
+
+        # 2. Boshlang'ich holat: matn yo'q -> mikrofon icon (🎙️)
+        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        self.assertEqual(page._action_mode, "mic")
+
+        # 3. Matn yozilganda -> avtomatik yuborish (➤) tugmasiga aylanadi
+        page._input_var.set("Salom Mikasa")
+        self.assertEqual(page.action_btn.cget("text"), "➤")
+        self.assertEqual(page._action_mode, "send")
+        self.assertEqual(page.action_btn.cget("fg_color"), Colors.PRIMARY)
+
+        # 4. Matn o'chirilganda -> avtomatik mikrofon (🎙️) ga qaytadi
+        page._input_var.set("")
+        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        self.assertEqual(page._action_mode, "mic")
+
+        # 5. Fayl biriktirilganda -> tugma ➤ ga aylanadi
+        page._attached_file = "test_document.pdf"
+        page._update_action_button()
+        self.assertEqual(page.action_btn.cget("text"), "➤")
+        self.assertEqual(page._action_mode, "send")
+
+        # 6. Fayl olib tashlanganda -> tugma yana 🎙️ ga qaytadi
+        page._remove_attached_file()
+        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        self.assertEqual(page._action_mode, "mic")
+
+        page.destroy()
+
 
 class TestV6BackendRouting(unittest.TestCase):
     """BackendBridge xabarlarni filtrlash va to'g'ri yo'naltirish testlari"""

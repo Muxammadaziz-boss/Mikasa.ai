@@ -1,8 +1,10 @@
 # ========== chat.py ==========
 # AI Chat sahifasi — suhbat interfeysi + ReAct agent panel
 
-import customtkinter as ctk
+import os
 import datetime
+from tkinter import filedialog
+import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing, Icons
 from gui.components import GlassCard, GlowButton, MessageBubble, TypingBubble
 
@@ -20,6 +22,9 @@ class ChatPage(ctk.CTkFrame):
         self._typing_bubble = None
         self._typing_row = None
         self._agent_step_count = 0
+        # Biriktirilgan fayl va Telegram uslubidagi dinamik tugma holati
+        self._attached_file = None
+        self._action_mode = "mic"
         self._build_ui()
 
     def _on_mode_change(self, value):
@@ -194,8 +199,40 @@ class ChatPage(ctk.CTkFrame):
             btn.pack(side="left", padx=4)
 
     def _build_input_bar(self, parent):
-        """Matn kiritish paneli — Apple uslubidagi minimalist dizayn"""
-        input_frame = ctk.CTkFrame(
+        """Matn kiritish paneli — Telegram / Apple uslubidagi minimalist dizayn"""
+        # Biriktirilgan fayl preview paneli (fayl tanlanganda input_frame ustida chiqadi)
+        self.attachment_bar = ctk.CTkFrame(
+            parent,
+            fg_color=Colors.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=Colors.BORDER,
+            height=34,
+        )
+        self.attachment_label = ctk.CTkLabel(
+            self.attachment_bar,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.PRIMARY,
+            anchor="w",
+        )
+        self.attachment_label.pack(side="left", padx=12, fill="x", expand=True)
+
+        ctk.CTkButton(
+            self.attachment_bar,
+            text="✕",
+            font=Fonts.TINY,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            text_color=Colors.TEXT_MUTED,
+            width=26,
+            height=26,
+            corner_radius=13,
+            command=self._remove_attached_file,
+        ).pack(side="right", padx=6)
+
+        # Asosiy input kapsulasi
+        self.input_frame = ctk.CTkFrame(
             parent,
             fg_color=Colors.BG_CARD,
             corner_radius=16,
@@ -203,27 +240,31 @@ class ChatPage(ctk.CTkFrame):
             border_color=Colors.BORDER,
             height=54,
         )
-        input_frame.pack(fill="x", pady=(0, 8))
-        input_frame.pack_propagate(False)
+        self.input_frame.pack(fill="x", pady=(0, 8))
+        self.input_frame.pack_propagate(False)
 
-        # Mikrofon tugma
-        ctk.CTkButton(
-            input_frame,
-            text="🎙️",
-            font=(Fonts.FAMILY, 15),
+        # Chap tomonda skripka (📎) tugmasi — fayl/hujjat/rasm biriktirish
+        self.attach_btn = ctk.CTkButton(
+            self.input_frame,
+            text="📎",
+            font=(Fonts.FAMILY, 16),
             fg_color="transparent",
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_MUTED,
             width=38,
             height=38,
             corner_radius=19,
-            bg_color=Colors.BG_CARD,
-            command=lambda: self.app.navigate_to("voice") if self.app else None,
-        ).pack(side="left", padx=(8, 0))
+            command=self._on_attach_file,
+        )
+        self.attach_btn.pack(side="left", padx=(8, 0))
 
-        # Matn input
+        # Matn kiritish maydoni (StringVar orqali dinamik kuzatuv)
+        self._input_var = ctk.StringVar()
+        self._input_var.trace_add("write", lambda *args: self._update_action_button())
+
         self.input_entry = ctk.CTkEntry(
-            input_frame,
+            self.input_frame,
+            textvariable=self._input_var,
             placeholder_text="Mikasa ga xabar yozing...",
             font=Fonts.BODY,
             fg_color="transparent",
@@ -232,24 +273,27 @@ class ChatPage(ctk.CTkFrame):
             placeholder_text_color=Colors.TEXT_MUTED,
             height=46,
         )
-        self.input_entry.pack(side="left", fill="x", expand=True, padx=10)
-        self.input_entry.bind("<Return>", self._on_send)
+        self.input_entry.pack(side="left", fill="x", expand=True, padx=8)
+        self.input_entry.bind("<Return>", self._on_enter_pressed)
 
-        # Send tugma — Apple ko'k tugmasi
-        self.send_btn = ctk.CTkButton(
-            input_frame,
-            text="➤",
-            font=(Fonts.FAMILY, 15, "bold"),
-            fg_color=Colors.PRIMARY,
-            hover_color=Colors.PRIMARY_HOVER,
-            text_color="#FFFFFF",
+        # O'ng tomondagi Telegram uslubidagi dinamik tugma (🎙️ <-> ➤)
+        # Matn bo'sh bo'lsa mikrofon, biron belgi yozilsa yuborish belgisiga aylanadi
+        self.action_btn = ctk.CTkButton(
+            self.input_frame,
+            text="🎙️",
+            font=(Fonts.FAMILY, 15),
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            text_color=Colors.TEXT_MUTED,
             width=38,
             height=38,
             corner_radius=19,
-            bg_color=Colors.BG_CARD,
-            command=self._on_send,
+            command=self._on_action_button_click,
         )
-        self.send_btn.pack(side="right", padx=8)
+        self.action_btn.pack(side="right", padx=8)
+
+        # Mavjud kodlar bilan moslik uchun alias
+        self.send_btn = self.action_btn
 
     def _build_agent_panel(self, parent):
         """Agent thinking paneli — jarayon qadamlari"""
@@ -314,33 +358,151 @@ class ChatPage(ctk.CTkFrame):
 
     # ========== FUNKSIYALAR ==========
 
-    def _on_send(self, event=None):
-        """Xabar yuborish"""
-        text = self.input_entry.get().strip()
-        if not text:
+    def _update_action_button(self):
+        """Telegram uslubida: matn bo'sh bo'lsa 🎙️ (Mikrofon), matn yozilsa yoki fayl bo'lsa ➤ (Yuborish)"""
+        has_text = bool(self._input_var.get().strip())
+        has_attachment = bool(self._attached_file)
+
+        if has_text or has_attachment:
+            if self._action_mode != "send":
+                self._action_mode = "send"
+                self.action_btn.configure(
+                    text="➤",
+                    font=(Fonts.FAMILY, 15, "bold"),
+                    fg_color=Colors.PRIMARY,
+                    hover_color=Colors.PRIMARY_HOVER,
+                    text_color="#FFFFFF",
+                )
+        else:
+            if self._action_mode != "mic":
+                self._action_mode = "mic"
+                self.action_btn.configure(
+                    text="🎙️",
+                    font=(Fonts.FAMILY, 15),
+                    fg_color="transparent",
+                    hover_color=Colors.BG_HOVER,
+                    text_color=Colors.TEXT_MUTED,
+                )
+
+    def _on_action_button_click(self):
+        """O'ngdagi tugma bosilganda: matn bo'lsa yuboradi, bo'sh bo'lsa ovozli tinglaydi"""
+        if self._action_mode == "send":
+            self._on_send()
+        else:
+            self._on_mic_click()
+
+    def _on_enter_pressed(self, event=None):
+        """Enter bosilganda xabar yuborish"""
+        if self._input_var.get().strip() or self._attached_file:
+            self._on_send()
+
+    def _on_mic_click(self):
+        """Mikrofon bosilganda ovozli tinglashni boshlash yoki to'xtatish"""
+        if self.app and hasattr(self.app, "bridge"):
+            bridge = self.app.bridge
+            if getattr(bridge, "is_listening", False):
+                bridge.stop_listening()
+            else:
+                bridge.start_listening()
+        else:
+            if self.app and hasattr(self.app, "navigate_to"):
+                self.app.navigate_to("voice")
+
+    def _on_attach_file(self):
+        """Fayl biriktirish (skripka belgisi bosilganda)"""
+        file_path = filedialog.askopenfilename(
+            title="Fayl yoki rasm biriktirish",
+            filetypes=[
+                (
+                    "Barcha qo'llab-quvvatlanadigan fayllar",
+                    "*.png;*.jpg;*.jpeg;*.webp;*.pdf;*.txt;*.docx;*.csv;*.py;*.json;*.md",
+                ),
+                ("Rasmlar", "*.png;*.jpg;*.jpeg;*.webp;*.bmp"),
+                ("Hujjatlar", "*.pdf;*.txt;*.docx;*.csv;*.json;*.md"),
+                ("Barcha fayllar", "*.*"),
+            ],
+        )
+        if not file_path:
             return
 
-        self.input_entry.delete(0, "end")
+        self._attached_file = file_path
+        self._show_attachment_preview(file_path)
+        self._update_action_button()
 
-        # Duplikat himoya — shu matn callback dan qaytmasligini belgilash
-        self._last_user_text = text
+    def _show_attachment_preview(self, file_path):
+        """Biriktirilgan fayl nishonini ko'rsatish"""
+        filename = os.path.basename(file_path)
+        ext = os.path.splitext(filename)[1].lower()
+        icon = "🖼️" if ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp") else "📄"
 
-        self.add_message(text, "user")
+        try:
+            size_bytes = os.path.getsize(file_path)
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.1f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+        except Exception:
+            size_str = ""
+
+        disp_text = f"{icon} {filename}" + (f" ({size_str})" if size_str else "")
+        self.attachment_label.configure(text=disp_text)
+        self.attachment_bar.pack(fill="x", pady=(0, 4), before=self.input_frame)
+
+    def _remove_attached_file(self):
+        """Biriktirilgan faylni olib tashlash"""
+        self._attached_file = None
+        if hasattr(self, "attachment_bar") and self.attachment_bar.winfo_ismapped():
+            self.attachment_bar.pack_forget()
+        self._update_action_button()
+
+    def _on_send(self, event=None):
+        """Xabar yuborish (matn + biriktirilgan fayl)"""
+        text = self._input_var.get().strip()
+        attached = self._attached_file
+
+        if not text and not attached:
+            return
+
+        # Matn va biriktirilgan faylni tozalash
+        self._input_var.set("")
+        self._attached_file = None
+        if hasattr(self, "attachment_bar") and self.attachment_bar.winfo_ismapped():
+            self.attachment_bar.pack_forget()
+
+        self._update_action_button()
+
+        # Chatda ko'rinadigan xabar matni
+        display_text = text
+        if attached:
+            fname = os.path.basename(attached)
+            display_text = f"📎 [{fname}]\n{text}" if text else f"📎 [{fname}]"
+
+        # Backend ga uzatiladigan buyruq matni
+        command_text = text
+        if attached:
+            command_text = f"[Fayl: {attached}] {text}".strip()
+
+        # Duplikat himoya
+        self._last_user_text = display_text
+
+        self.add_message(display_text, "user")
         self.show_typing("yozyapti")
 
         # Backend ga buyruq yuborish
         if self.app and hasattr(self.app, "bridge"):
-            self.app.bridge.send_text_command(text)
+            self.app.bridge.send_text_command(command_text)
 
     def _send_suggestion(self, text):
         """Tezkor taklif yuborish"""
-        self.input_entry.delete(0, "end")
-        self.input_entry.insert(0, text)
+        self._input_var.set(text)
         self._on_send()
 
     def _clear_chat(self):
         """Suhbatni tozalash"""
         self.hide_typing()
+        self._remove_attached_file()
         for widget in self.chat_scroll.winfo_children():
             widget.destroy()
         self._messages.clear()
