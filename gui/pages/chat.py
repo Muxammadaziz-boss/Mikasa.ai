@@ -154,45 +154,45 @@ class ChatPage(ctk.CTkFrame):
         info_row = ctk.CTkFrame(welcome_frame, fg_color="transparent")
         info_row.pack(pady=(10, 0))
 
-        for text, color in [
-            ("⚡ Tez javob", Colors.BG_PANEL),
-            ("🎙️ Ovozli rejim", Colors.BG_PANEL),
-            ("🤖 Agent panel", Colors.BG_PANEL),
+        for text, icon in [
+            ("Tez javob", "⚡"),
+            ("Ovozli rejim", "🎙️"),
+            ("Agent panel", "🤖"),
         ]:
             chip = ctk.CTkFrame(
                 info_row,
-                fg_color=color,
+                fg_color=Colors.GLASS_BG,
                 corner_radius=999,
                 border_width=1,
-                border_color=Colors.BORDER,
+                border_color=Colors.GLASS_BORDER,
                 bg_color=Colors.BG_CARD,
             )
             chip.pack(side="left", padx=4)
             ctk.CTkLabel(
                 chip,
-                text=text,
+                text=f"{icon} {text}",
                 font=Fonts.TINY,
                 text_color=Colors.TEXT_SECONDARY,
-            ).pack(padx=10, pady=4)
+            ).pack(padx=12, pady=5)
 
         # Tezkor savollar
         suggestions_frame = ctk.CTkFrame(welcome_frame, fg_color="transparent")
         suggestions_frame.pack(pady=(16, 0))
 
         suggestions = [
-            "Havo qanday?",
-            "Dollar kursi necha?",
-            "Musiqa qo'y",
-            "Soat necha?",
+            ("🌤️", "Havo qanday?"),
+            ("💰", "Dollar kursi necha?"),
+            ("🎵", "Musiqa qo'y"),
+            ("⏰", "Soat necha?"),
         ]
 
-        for suggestion in suggestions:
+        for icon, suggestion in suggestions:
             btn = GlassButton(
                 suggestions_frame,
-                text=suggestion,
+                text=f"{icon}  {suggestion}",
                 font=Fonts.SMALL,
                 corner_radius=16,
-                height=32,
+                height=34,
                 command=lambda s=suggestion: self._send_suggestion(s),
             )
             btn.pack(side="left", padx=4)
@@ -237,14 +237,14 @@ class ChatPage(ctk.CTkFrame):
             command=self._remove_attached_file,
         ).pack(side="right", padx=6)
 
-        # Asosiy input kapsulasi
+        # Asosiy input kapsulasi — Apple Floating Island
         self.input_frame = ctk.CTkFrame(
             parent,
-            fg_color=Colors.BG_CARD,
-            corner_radius=26,
+            fg_color=Colors.BG_INPUT,
+            corner_radius=27,
             border_width=1,
-            border_color="#2E2E3E",
-            height=52,
+            border_color=Colors.BORDER,
+            height=54,
         )
         self.input_frame.pack(fill="x", pady=(0, 8))
         self.input_frame.pack_propagate(False)
@@ -254,13 +254,13 @@ class ChatPage(ctk.CTkFrame):
         self.attach_btn = CircleIconButton(
             self.input_frame,
             icon="📎",
-            size=38,
+            size=40,
             font=(Fonts.FAMILY, 16),
             fg_color=Colors.GLASS_BG,
             hover_color=Colors.GLASS_BG_HOVER,
             border_color=Colors.GLASS_BORDER,
             border_hover_color=Colors.GLASS_BORDER_HOVER,
-            text_color="#C8C8DC",
+            text_color="#FFFFFF",
             command=self._on_attach_file,
         )
         self.attach_btn.pack(side="left", padx=(7, 0), pady=7)
@@ -278,7 +278,7 @@ class ChatPage(ctk.CTkFrame):
             border_width=0,
             text_color=Colors.TEXT_PRIMARY,
             placeholder_text_color=Colors.TEXT_MUTED,
-            height=38,
+            height=40,
         )
         self.input_entry.pack(side="left", fill="x", expand=True, padx=8, pady=7)
         self.input_entry.bind("<Return>", self._on_enter_pressed)
@@ -288,7 +288,7 @@ class ChatPage(ctk.CTkFrame):
         self.action_btn = CircleIconButton(
             self.input_frame,
             icon="🎙️",
-            size=38,
+            size=40,
             font=(Fonts.FAMILY, 15),
             fg_color=Colors.GLASS_BG,
             hover_color=Colors.GLASS_BG_HOVER,
@@ -472,11 +472,11 @@ class ChatPage(ctk.CTkFrame):
         if hasattr(self, "attachment_bar") and self.attachment_bar.winfo_ismapped():
             self.attachment_bar.pack_forget()
         self.attach_btn.configure(
-            fg_color="#262634",
-            hover_color="#343446",
+            fg_color=Colors.GLASS_BG,
+            hover_color=Colors.GLASS_BG_HOVER,
             border_width=1,
-            border_color="#3C3C50",
-            text_color="#C8C8DC",
+            border_color=Colors.GLASS_BORDER,
+            text_color="#FFFFFF",
         )
         self._center_button_content(self.attach_btn)
         self._update_action_button()

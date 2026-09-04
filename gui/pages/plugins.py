@@ -29,11 +29,11 @@ class PluginsPage(ctk.CTkFrame):
             icon="🔌",
             accent_color=Colors.INFO,
             chips=[
-                ("JSON + Python", "🧩", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("JSON + Python", "🧩", Colors.GLASS_BG, Colors.TEXT_SECONDARY),
                 (
                     "Qayta ishga tushganda faollashadi",
                     "♻️",
-                    Colors.BG_PANEL,
+                    Colors.GLASS_BG,
                     Colors.TEXT_SECONDARY,
                 ),
             ],
@@ -111,21 +111,21 @@ class PluginsPage(ctk.CTkFrame):
             chip_row,
             text="JSON plugin",
             icon="📄",
-            fg_color=Colors.BG_PANEL,
+            fg_color=Colors.GLASS_BG,
             text_color=Colors.INFO,
         ).pack(side="left", padx=(0, 8))
         InfoChip(
             chip_row,
             text="Python plugin",
             icon="🐍",
-            fg_color=Colors.BG_PANEL,
+            fg_color=Colors.GLASS_BG,
             text_color=Colors.SUCCESS,
         ).pack(side="left", padx=(0, 8))
         InfoChip(
             chip_row,
             text="Explorer orqali boshqarish",
             icon="🗂️",
-            fg_color=Colors.BG_PANEL,
+            fg_color=Colors.GLASS_BG,
             text_color=Colors.TEXT_SECONDARY,
         ).pack(side="left")
 
@@ -174,10 +174,10 @@ class PluginsPage(ctk.CTkFrame):
         ):
             row = ctk.CTkFrame(
                 self.installed_list,
-                fg_color=Colors.BG_INPUT,
+                fg_color=Colors.GLASS_BG,
                 corner_radius=12,
                 border_width=1,
-                border_color=Colors.BORDER if enabled else Colors.BG_DARK,
+                border_color=Colors.GLASS_BORDER if enabled else Colors.BORDER,
             )
             row.pack(fill="x", pady=4)
 
@@ -201,7 +201,7 @@ class PluginsPage(ctk.CTkFrame):
             InfoChip(
                 head,
                 text="Faol" if enabled else "Nofaol",
-                fg_color=Colors.SUCCESS_SOFT if enabled else Colors.BG_PANEL,
+                fg_color=Colors.SUCCESS_SOFT if enabled else Colors.GLASS_BG,
                 text_color=Colors.SUCCESS if enabled else Colors.TEXT_MUTED,
             ).pack(side="right")
 

@@ -159,22 +159,22 @@ class DashboardPage(ctk.CTkFrame):
         for icon, chip_text in chips:
             chip = ctk.CTkFrame(
                 badges_row,
-                fg_color=Colors.BG_SOFT,
+                fg_color=Colors.GLASS_BG,
                 corner_radius=12,
                 border_width=1,
-                border_color=Colors.BORDER,
+                border_color=Colors.GLASS_BORDER,
                 bg_color=Colors.BG_CARD,
             )
             chip.pack(side="left", padx=(0, 10))
 
             inner_chip = ctk.CTkFrame(chip, fg_color="transparent")
-            inner_chip.pack(padx=12, pady=5)
+            inner_chip.pack(padx=12, pady=6)
 
             ctk.CTkLabel(
                 inner_chip,
                 text=f"{icon}  {chip_text}",
-                font=Fonts.TINY,
-                text_color=Colors.TEXT_SECONDARY,
+                font=Fonts.SMALL_BOLD,
+                text_color="#E2E2EC",
             ).pack()
 
     def _build_quick_actions(self):
@@ -241,8 +241,8 @@ class DashboardPage(ctk.CTkFrame):
                     btn_frame,
                     text=text,
                     icon=icon,
-                    height=46,
-                    corner_radius=12,
+                    height=48,
+                    corner_radius=14,
                     command=cmd,
                 )
             else:
@@ -251,8 +251,8 @@ class DashboardPage(ctk.CTkFrame):
                     btn_frame,
                     text=text,
                     icon=icon,
-                    height=46,
-                    corner_radius=12,
+                    height=48,
+                    corner_radius=14,
                     command=cmd,
                 )
             btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")

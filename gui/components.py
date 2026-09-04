@@ -1,6 +1,8 @@
 # ========== components.py ==========
 # Mikasa AI — qayta ishlatiladigan UI komponentlar
 
+import math
+import tkinter as tk
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
 
@@ -82,8 +84,142 @@ class GlassCard(ctk.CTkFrame):
         self.content.pack(fill="both", expand=True, padx=padding, pady=(0, padding))
 
 
+class AppleSiriOrb(ctk.CTkFrame):
+    """
+    Apple Siri / Apple Intelligence animatsion glowing orb.
+    Ko'p qatlamli dinamik neon to'lqinlar va nurli markaz bilan professional vizualizatsiya.
+    """
+
+    def __init__(self, master, size=210, **kwargs):
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_DARK
+
+        super().__init__(
+            master,
+            fg_color="transparent",
+            width=size,
+            height=size,
+            **kwargs,
+        )
+        self.pack_propagate(False)
+
+        self._size = size
+        self._center = size // 2
+        self._state = "idle"  # idle, listening, speaking
+        self._tick = 0
+        self._anim_job = None
+        self._is_active = True
+
+        self.canvas = tk.Canvas(
+            self,
+            width=size,
+            height=size,
+            bg=Colors.BG_DARK,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.canvas.pack(fill="both", expand=True)
+
+        self._draw_orb()
+        self._animate()
+
+    def set_state(self, state: str):
+        """Orb holatini o'zgartirish: 'idle', 'listening', 'speaking'"""
+        self._state = state
+        self._draw_orb()
+
+    def _draw_orb(self):
+        if not self.winfo_exists():
+            return
+
+        self.canvas.delete("all")
+        cx = self._center
+        cy = self._center
+
+        if self._state == "listening":
+            wave = math.sin(self._tick * 0.28) * 8
+            core_r = 50 + wave
+            colors = [
+                (cx, cy, 96 + wave * 1.2, "#0D2545"),
+                (cx, cy, 80 + wave, "#113A6E"),
+                (cx, cy, 65 + wave * 0.7, "#17529E"),
+                (cx, cy, core_r, "#0A84FF"),
+                (cx, cy, 35, "#5AC8FA"),
+            ]
+            icon = "🎙️"
+            icon_color = "#FFFFFF"
+            icon_size = 28
+        elif self._state == "speaking":
+            wave = math.sin(self._tick * 0.2) * 6
+            core_r = 48 + wave
+            colors = [
+                (cx, cy, 92 + wave, "#22113A"),
+                (cx, cy, 78 + wave * 0.8, "#3D1A6E"),
+                (cx, cy, 64 + wave * 0.6, "#5E5CE6"),
+                (cx, cy, core_r, "#AF52DE"),
+                (cx, cy, 34, "#BF5AF2"),
+            ]
+            icon = "✦"
+            icon_color = "#FFFFFF"
+            icon_size = 30
+        else:
+            # Idle gentle breathing pulse
+            wave = math.sin(self._tick * 0.08) * 4
+            core_r = 46 + wave
+            colors = [
+                (cx, cy, 86 + wave * 0.8, "#0F1728"),
+                (cx, cy, 72 + wave * 0.6, "#152646"),
+                (cx, cy, 58 + wave * 0.4, "#1C3C6E"),
+                (cx, cy, core_r, "#0A84FF"),
+                (cx, cy, 34, "#389BFF"),
+            ]
+            icon = "✦"
+            icon_color = "#FFFFFF"
+            icon_size = 30
+
+        for x, y, r, col in colors:
+            r = max(4, r)
+            self.canvas.create_oval(
+                x - r, y - r, x + r, y + r,
+                fill=col,
+                outline="",
+            )
+
+        self.canvas.create_text(
+            cx, cy,
+            text=icon,
+            font=(Fonts.FAMILY, icon_size, "bold"),
+            fill=icon_color,
+        )
+
+    def _animate(self):
+        if not self._is_active:
+            return
+        self._tick += 1
+        try:
+            if self.winfo_exists():
+                self._draw_orb()
+                delay = 40 if self._state in ("listening", "speaking") else 65
+                self._anim_job = self.after(delay, self._animate)
+        except Exception:
+            pass
+
+    def stop(self):
+        self._is_active = False
+        if self._anim_job:
+            try:
+                self.after_cancel(self._anim_job)
+            except Exception:
+                pass
+            self._anim_job = None
+
+    def destroy(self):
+        self.stop()
+        super().destroy()
+
+
 class InfoChip(ctk.CTkFrame):
-    """Kichik pill badge"""
+    """Kichik shisha pill badge"""
 
     def __init__(
         self,
@@ -98,19 +234,26 @@ class InfoChip(ctk.CTkFrame):
         text_color = text_color or Colors.TEXT_SECONDARY
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = Colors.BG_CARD
-        super().__init__(master, fg_color=fg_color, corner_radius=12, **kwargs)
+        super().__init__(
+            master,
+            fg_color=fg_color,
+            corner_radius=12,
+            border_width=1,
+            border_color=Colors.BORDER,
+            **kwargs,
+        )
 
         self._icon = icon
         self.label = ctk.CTkLabel(
             self,
-            text=f"{icon} {text}" if icon else text,
-            font=Fonts.TINY,
+            text=f"{icon}  {text}".strip() if icon else text,
+            font=Fonts.SMALL,
             text_color=text_color,
         )
         self.label.pack(padx=10, pady=5)
 
     def set_text(self, text):
-        self.label.configure(text=f"{self._icon} {text}" if self._icon else text)
+        self.label.configure(text=f"{self._icon}  {text}".strip() if self._icon else text)
 
 
 class PageHero(GlassCard):
@@ -217,33 +360,45 @@ class PageHero(GlassCard):
 
 
 class EmptyState(ctk.CTkFrame):
-    """Bo'sh holatni bir xil ko'rsatish"""
+    """Bo'sh holatni bir xil ko'rsatish — Apple minimal glass empty state"""
 
     def __init__(self, master, icon="✨", title="", description="", **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
 
-        ctk.CTkLabel(
+        icon_frame = ctk.CTkFrame(
             self,
+            fg_color=Colors.GLASS_BG,
+            border_width=1,
+            border_color=Colors.GLASS_BORDER,
+            corner_radius=28,
+            width=56,
+            height=56,
+        )
+        icon_frame.pack(pady=(16, 8))
+        icon_frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            icon_frame,
             text=icon,
-            font=(Fonts.FAMILY, 34),
-            text_color=Colors.TEXT_MUTED,
-        ).pack(pady=(12, 6))
+            font=(Fonts.FAMILY, 24),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(expand=True)
 
         ctk.CTkLabel(
             self,
             text=title,
             font=Fonts.BODY_BOLD,
             text_color=Colors.TEXT_PRIMARY,
-        ).pack()
+        ).pack(pady=(4, 0))
 
         ctk.CTkLabel(
             self,
             text=description,
             font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
+            text_color=Colors.TEXT_SECONDARY,
             justify="center",
             wraplength=480,
-        ).pack(pady=(6, 0))
+        ).pack(pady=(6, 12))
 
 
 class StatusBadge(ctk.CTkFrame):
@@ -571,32 +726,43 @@ class StatWidget(ctk.CTkFrame):
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=16, pady=(14, 6))
 
-        self.icon_label = ctk.CTkLabel(
+        self.icon_box = ctk.CTkFrame(
             top,
+            fg_color=Colors.BG_PANEL,
+            corner_radius=10,
+            width=36,
+            height=36,
+            border_width=1,
+            border_color=Colors.BORDER,
+        )
+        self.icon_box.pack(side="left")
+        self.icon_box.pack_propagate(False)
+
+        self.icon_label = ctk.CTkLabel(
+            self.icon_box,
             text=icon,
             font=(Fonts.FAMILY, 18),
             text_color=color,
-            width=24,
         )
-        self.icon_label.pack(side="left")
+        self.icon_label.pack(expand=True)
 
         self.desc_label = ctk.CTkLabel(
             top,
             text=label.upper(),
-            font=(Fonts.FAMILY, 10, "bold"),
+            font=(Fonts.FAMILY, 11, "bold"),
             text_color=Colors.TEXT_MUTED,
             anchor="w",
         )
-        self.desc_label.pack(side="left", padx=(8, 0), fill="x", expand=True)
+        self.desc_label.pack(side="left", padx=(10, 0), fill="x", expand=True)
 
         self.value_label = ctk.CTkLabel(
             self,
             text=str(value),
-            font=(Fonts.FAMILY, 24, "bold"),
+            font=(Fonts.FAMILY, 28, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         )
-        self.value_label.pack(fill="x", padx=16, pady=(0, 14))
+        self.value_label.pack(fill="x", padx=16, pady=(4, 14))
 
         self._color = color
 
@@ -787,8 +953,10 @@ class NavItem(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=8 if active else 0,
-            height=42,
+            corner_radius=10 if active else 0,
+            border_width=1 if active else 0,
+            border_color="#33334A" if active else "transparent",
+            height=44,
             cursor="hand2",
             **kwargs,
         )
@@ -803,11 +971,11 @@ class NavItem(ctk.CTkFrame):
             self,
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent",
             width=3,
-            corner_radius=0,
+            corner_radius=2,
         )
-        self.indicator.pack(side="left", fill="y", padx=(2, 6), pady=6)
+        self.indicator.pack(side="left", fill="y", padx=(4, 6), pady=8)
 
-        # To'g'ridan-to'g'ri toza ikonka (ortiqcha kvadrat konteynerlarsiz)
+        # To'g'ridan-to'g'ri toza ikonka
         self.icon_label = ctk.CTkLabel(
             self,
             text=icon,
@@ -845,19 +1013,21 @@ class NavItem(ctk.CTkFrame):
 
     def _on_enter(self, event=None):
         if not self._active:
-            self.configure(fg_color=Colors.SIDEBAR_HOVER, corner_radius=8)
+            self.configure(fg_color=Colors.SIDEBAR_HOVER, corner_radius=10, border_width=1, border_color="#262638")
             self.text_label.configure(text_color=Colors.TEXT_PRIMARY)
 
     def _on_leave(self, event=None):
         if not self._active:
-            self.configure(fg_color="transparent", corner_radius=0)
+            self.configure(fg_color="transparent", corner_radius=0, border_width=0, border_color="transparent")
             self.text_label.configure(text_color=Colors.TEXT_SECONDARY)
 
     def set_active(self, active):
         self._active = active
         self.configure(
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=8 if active else 0,
+            corner_radius=10 if active else 0,
+            border_width=1 if active else 0,
+            border_color="#33334A" if active else "transparent",
         )
         self.indicator.configure(
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent"
@@ -871,7 +1041,7 @@ class NavItem(ctk.CTkFrame):
 
     def set_compact(self, compact):
         self._compact = compact
-        self.configure(height=38 if compact else 42)
+        self.configure(height=38 if compact else 44)
         if compact:
             self.text_label.pack_forget()
             self.indicator.pack_configure(padx=(1, 2))

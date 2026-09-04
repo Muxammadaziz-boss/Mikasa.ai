@@ -4,7 +4,7 @@
 import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassCard, GlowButton, SecondaryButton
+from gui.components import AppleSiriOrb, GlassButton, GlassCard, GlowButton, SecondaryButton
 
 
 class VoicePage(ctk.CTkFrame):
@@ -66,45 +66,27 @@ class VoicePage(ctk.CTkFrame):
         self._build_recent_commands(right)
 
     def _build_orb(self, parent):
-        """Markaziy AI Orb"""
+        """Markaziy AI Orb — Apple Siri / Apple Intelligence glowing aura"""
         orb_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        orb_frame.pack(pady=(20, 10))
+        orb_frame.pack(pady=(16, 8))
 
-        # Orb konteyner (border bilan)
-        self.orb_container = ctk.CTkFrame(
-            orb_frame,
-            fg_color=Colors.BG_CARD,
-            corner_radius=150,
-            width=200,
-            height=200,
-            border_width=1,
-            border_color=Colors.BORDER,
-            bg_color=Colors.BG_DARK,
-        )
-        self.orb_container.pack()
-        self.orb_container.pack_propagate(False)
-
-        # Orb emoji
-        self.orb_emoji = ctk.CTkLabel(
-            self.orb_container,
-            text="🔵",
-            font=(Fonts.FAMILY, 72),
-            text_color=Colors.PRIMARY,
-        )
-        self.orb_emoji.place(relx=0.5, rely=0.5, anchor="center")
+        # Dynamic Apple Siri Orb
+        self.apple_orb = AppleSiriOrb(orb_frame, size=210)
+        self.apple_orb.pack()
+        self.orb_container = self.apple_orb  # Backwards compatibility alias
 
         # Status matni
         self.orb_text = ctk.CTkLabel(
             orb_frame,
-            text="Tayyor",
-            font=Fonts.BODY_BOLD,
-            text_color=Colors.TEXT_SECONDARY,
+            text="Mikasa AI Tayyor",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
         )
         self.orb_text.pack(pady=(10, 0))
 
         self.orb_hint = ctk.CTkLabel(
             orb_frame,
-            text="Ovozli buyruq berish uchun tugmani bosing",
+            text="Ovozli buyruq berish uchun pastdagi tugmani bosing",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         )
@@ -120,7 +102,9 @@ class VoicePage(ctk.CTkFrame):
             font=Fonts.BODY,
             fg_color=Colors.BG_INPUT,
             text_color=Colors.TEXT_PRIMARY,
-            corner_radius=8,
+            corner_radius=10,
+            border_width=1,
+            border_color=Colors.BORDER,
             height=100,
             wrap="word",
             state="disabled",
@@ -128,9 +112,9 @@ class VoicePage(ctk.CTkFrame):
         self.transcript_text.pack(fill="x")
 
     def _build_mic_button(self, parent):
-        """Mikrofon tugmasi"""
+        """Mikrofon tugmasi va boshqaruv paneli"""
         mic_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        mic_frame.pack(pady=16)
+        mic_frame.pack(pady=(12, 16))
 
         self.mic_btn = ctk.CTkButton(
             mic_frame,
@@ -149,12 +133,19 @@ class VoicePage(ctk.CTkFrame):
         )
         self.mic_btn.pack()
 
-        # Qo'shimcha tugmalar
+        # Qo'shimcha tozalash tugmasi
         btn_row = ctk.CTkFrame(mic_frame, fg_color="transparent")
         btn_row.pack(pady=(10, 0))
 
-        SecondaryButton(
-            btn_row, text="Tozalash", icon="🗑️", command=self._clear_transcript
+        GlassButton(
+            btn_row,
+            text="Transkripsiyani tozalash",
+            icon="🗑️",
+            font=Fonts.SMALL,
+            height=32,
+            width=190,
+            corner_radius=16,
+            command=self._clear_transcript,
         ).pack(side="left", padx=4)
 
     def _build_voice_settings(self, parent):
@@ -253,10 +244,11 @@ class VoicePage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.recent_list,
-            text="Hali buyruq berilmagan",
+            text="Hali buyruq berilmagan.\n💡 Masalan: 'Bugun havo qanday?', 'Musiqa qo\\'y', 'Dollar kursi'",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
-        ).pack(pady=20)
+            justify="center",
+        ).pack(pady=24)
 
     # ========== FUNKSIYALAR ==========
 
@@ -271,7 +263,8 @@ class VoicePage(ctk.CTkFrame):
                 hover_color="#DC2626",
                 border_color="#FF6961",
             )
-            self.orb_container.configure(border_color=Colors.PRIMARY)
+            if hasattr(self, "apple_orb"):
+                self.apple_orb.set_state("listening")
             self.orb_text.configure(text="Tinglayapman...", text_color=Colors.PRIMARY)
             self.voice_status.configure(
                 text="● Tinglayapman", text_color=Colors.SUCCESS
@@ -289,10 +282,11 @@ class VoicePage(ctk.CTkFrame):
                 hover_color=Colors.GLASS_HERO_HOVER,
                 border_color=Colors.GLASS_HERO_BORDER,
             )
-            self.orb_container.configure(border_color=Colors.BORDER)
-            self.orb_text.configure(text="Tayyor", text_color=Colors.TEXT_SECONDARY)
+            if hasattr(self, "apple_orb"):
+                self.apple_orb.set_state("idle")
+            self.orb_text.configure(text="Mikasa AI Tayyor", text_color=Colors.TEXT_PRIMARY)
             self.voice_status.configure(text="● Kutmoqda", text_color=Colors.TEXT_MUTED)
-            self.orb_hint.configure(text="Ovozli buyruq berish uchun tugmani bosing")
+            self.orb_hint.configure(text="Ovozli buyruq berish uchun pastdagi tugmani bosing")
             if self.app:
                 self.app.set_status("online", "Tayyor")
                 # Backend orqali tinglashni to'xtatish
