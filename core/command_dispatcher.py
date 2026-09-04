@@ -58,6 +58,10 @@ class CommandDispatcher:
             return True, javob
 
         # 2. YouTube va Musiqa
+        # Agar musiqa/qo'shiq ijrosi so'ralgan bo'lsa, asosiy musiqa pipelineiga o'tkazish
+        if any(w in clean_text for w in ["qo'shiq", "qoshiq", "musiqa", "trek", "ashula", "qo'y", "qoy", "ijro", "eshit"]):
+            return False, ""
+
         if re.search(r"^(youtube|yutub|yutubni och|youtubeni och)$", clean_text):
             webbrowser.open("https://www.youtube.com")
             return True, "YouTube ochilmoqda."

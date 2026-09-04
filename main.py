@@ -8,6 +8,7 @@ APP_NAME = "Mikasa AI"
 import os
 import logging
 import webbrowser
+import urllib.request
 from urllib.parse import quote_plus
 from config import get_config, get_logger
 
@@ -1308,51 +1309,76 @@ def musiqa_qidir(query, platform="youtube"):
             if desktop_result:
                 return True
 
-        # ===== 2-QADAM: Browser fallback =====
+        # ===== 2-QADAM: Browser fallback & To'g'ridan-to'g'ri ijro =====
         if platform == "youtube":
-            url = f"https://www.youtube.com/results?search_query={quote_plus(query)}+music"
-            gui_ga_xabar_yuborish(f"🎵 YouTube'da qidirilmoqda")
+            watch_url = None
+            try:
+                # YouTube qidiruv natijalaridan to'g'ridan-to'g'ri birinchi video URL-ini olish
+                search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+                req = urllib.request.Request(
+                    search_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=3.5) as resp:
+                    html = resp.read().decode("utf-8", errors="ignore")
+                    vids = re.findall(r'/watch\?v=([a-zA-Z0-9_-]{11})', html)
+                    if vids:
+                        watch_url = f"https://www.youtube.com/watch?v={vids[0]}"
+            except Exception as e:
+                logging.debug(f"Direct YouTube video topishda xatolik: {e}")
+
+            url = watch_url or f"https://www.youtube.com/results?search_query={quote_plus(query)}+music"
+            gui_ga_xabar_yuborish(f"🎵 '{query}' YouTube'da ijro etilmoqda...")
+            webbrowser.open(url)
+            ovoz_chiqar_tez(f"{query} qo'yilmoqda")
+            return True
+
         elif platform == "yandex":
             url = f"https://music.yandex.ru/search?text={quote_plus(query)}"
             gui_ga_xabar_yuborish(f"🎵 Yandex Music'da qidirilmoqda (web)")
-        elif platform == "spotify":
-            url = f"https://open.spotify.com/search/{quote_plus(query)}"
-            gui_ga_xabar_yuborish(f"🎵 Spotify'da qidirilmoqda (web)")
-        else:
-            url = f"https://www.youtube.com/results?search_query={quote_plus(query)}+music"
+            webbrowser.open(url)
+            ovoz_chiqar_tez(f"{query} qidirildi")
 
-        webbrowser.open(url)
-        ovoz_chiqar_tez(f"{query} qidirildi")
-
-        # Auto-play: sahifa yuklangandan keyin birinchi natijani bosish
-        def _auto_play_music():
-            if platform == "yandex":
+            def _auto_play_yandex():
                 time.sleep(8)
                 try:
                     for i in range(3):
                         pyautogui.press("space")
-                        logging.debug(
-                            f"Auto-play: Yandex Music Space bosildi (urinish {i + 1})"
-                        )
+                        logging.debug(f"Auto-play: Yandex Music Space bosildi ({i + 1})")
                         time.sleep(3)
                 except Exception as e:
                     logging.warning(f"Auto-play xatolik: {e}")
-            else:
+
+            threading.Thread(target=_auto_play_yandex, daemon=True).start()
+            return True
+
+        elif platform == "spotify":
+            url = f"https://open.spotify.com/search/{quote_plus(query)}"
+            gui_ga_xabar_yuborish(f"🎵 Spotify'da qidirilmoqda (web)")
+            webbrowser.open(url)
+            ovoz_chiqar_tez(f"{query} qidirildi")
+
+            def _auto_play_spotify():
                 time.sleep(4)
                 try:
-                    if platform == "youtube":
-                        screen_width, screen_height = pyautogui.size()
-                        pyautogui.click(screen_width // 3, int(screen_height * 0.45))
-                        logging.debug("Auto-play: YouTube birinchi video bosildi")
-                    elif platform == "spotify":
-                        pyautogui.press("enter")
-                        logging.debug("Auto-play: Spotify Enter bosildi")
+                    pyautogui.press("enter")
+                    logging.debug("Auto-play: Spotify Enter bosildi")
                 except Exception as e:
                     logging.warning(f"Auto-play xatolik: {e}")
 
-        threading.Thread(target=_auto_play_music, daemon=True).start()
+            threading.Thread(target=_auto_play_spotify, daemon=True).start()
+            return True
 
-        return True
+        else:
+            url = f"https://www.youtube.com/results?search_query={quote_plus(query)}+music"
+            gui_ga_xabar_yuborish(f"🎵 '{query}' qidirilmoqda...")
+            webbrowser.open(url)
+            ovoz_chiqar_tez(f"{query} qidirildi")
+            return True
+
     except Exception as e:
         logging.error(f"Musiqa qidirish xatolik: {e}")
         return False
@@ -1584,6 +1610,66 @@ def buyruqni_aniqla(matn):
         if soz in matn_toza and "video" in matn_toza:
             return ("video_number", raqam)
 
+    # ===== Media va Musiqa boshqaruvi / qidiruvi (Yuqori ustunlik) =====
+    # 1. Pauza / To'xtatish
+    if any(s in matn_toza for s in ["musiqani toxtat", "musiqa toxtat", "videoni toxtat", "video toxtat", "pauza"]):
+        if any(s in matn_toza for s in ["video", "videoni"]):
+            return "pause_video"
+        return "music_pause"
+    if matn_toza in ["toxtat", "stop"]:
+        return "music_pause"
+
+    # 2. Davom ettirish (faqat aniq resume buyruqlari)
+    pure_resume = [
+        "davom ettir",
+        "davom et",
+        "musiqani qoy",
+        "musiqani davom ettir",
+        "musiqani davom et",
+        "videoni davom et",
+        "videoni davom ettir",
+        "ijro et",
+    ]
+    if matn_toza in pure_resume:
+        if "video" in matn_toza:
+            return "play_video"
+        return "music_play"
+
+    # 3. Qayta boshlash
+    if any(s in matn_toza for s in ["boshidan boshla", "qayta boshla"]):
+        return "music_restart"
+
+    # 4. Musiqa / Qo'shiq qidirish va ijro etish
+    musiqa_kalitlar = ["qoshiq", "qoshig", "musiqa", "ashula", "trek", "klip"]
+    ijro_feillar = [
+        "qoy",
+        "eshit",
+        "tingla",
+        "ijro",
+        "play",
+        "qoyib ber",
+        "eshitaylik",
+        "tinglaylik",
+        "eshitmoqchiman",
+        "tinglamoqchiman",
+    ]
+    platformalar = ["youtube", "yutub", "yutuq", "spotify", "yandex", "yandeks"]
+
+    musiqa_bor = any(k in matn_toza for k in musiqa_kalitlar)
+    ijro_bor = any(k in matn_toza for k in ijro_feillar)
+    platforma_bor = any(k in matn_toza for k in platformalar)
+
+    # Agar musiqa kalit so'zlari bor bo'lsa yoki platforma + ijro so'zi bo'lsa -> music_search
+    if musiqa_bor or (platforma_bor and ijro_bor):
+        return "music_search"
+
+    # 5. YouTube / Yandex / Spotify faqat dastur/sayt ochish
+    if platforma_bor and any(s in matn_toza for s in ["youtube", "yutub", "yutuq"]):
+        ochish_sozlari = ["och", "kir", "sayt", "ilova", "dastur", "bosh sahifa", "sahifa"]
+        words = matn_toza.split()
+        if len(words) <= 3 and (any(s in matn_toza for s in ochish_sozlari) or matn_toza in ["youtube", "yutub", "yutuq"]):
+            return "open_youtube"
+
     # ===== Oddiy buyruqlar — tozalangan matn bilan ham tekshirish =====
     sorted_commands = sorted(
         buyruqlar_json.items(), key=lambda x: len(x[0]), reverse=True
@@ -1615,6 +1701,8 @@ def buyruqni_aniqla(matn):
             kalitlar = AGENT_GA_YUBORISH_KALITLAR.get(buyruq, [])
             if kalitlar and any(k in matn_lower for k in kalitlar):
                 continue  # Bu match noto'g'ri — keyingisini tekshir
+            if buyruq == "open_youtube" and (musiqa_bor or ijro_bor):
+                return "music_search"
             return buyruq
 
     # ===== O'zak solishtirish (stem matching) =====
@@ -1624,6 +1712,8 @@ def buyruqni_aniqla(matn):
         if len(soz_toza) >= 4:
             ozak = soz_toza[: len(soz_toza) - 1]  # oxirgi harfni olib tashlash
             if ozak in matn_toza:
+                if buyruq == "open_youtube" and (musiqa_bor or ijro_bor):
+                    return "music_search"
                 return buyruq
 
     return "unknown"
@@ -2203,6 +2293,48 @@ def _intent_bajar(intent, params=None, matn="", foydalanuvchi_ismi=""):
         return True  # Xato bo'lsa ham, buyruq tanildi — Agent ga yuborish shart emas
 
 
+def toza_musiqa_nomi(matn):
+    """Buyruq matnidan toza qo'shiq/trek nomini ajratib olish"""
+    text = matn.strip()
+
+    # Boshidagi undov va platforma prefikslarini tozalash:
+    patterns_head = [
+        r"^(?:(?:hey|salom|iltimos|menga|bitta|biror|bir|mikasajon|mikasa)\s+)+",
+        r"^(?:youtube|youtub|yutub|yutuq|yandex|yandeks|яндекс|spotify)(?:\s*music)?(?:\s*(?:dan|da|dagi|ga))?\s*",
+        r"^(?:menga|iltimos|bitta|biror|bir)\s+",
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for p in patterns_head:
+            new_text = re.sub(p, "", text, flags=re.IGNORECASE).strip()
+            if new_text != text:
+                text = new_text
+                changed = True
+
+    # Oxiridagi fe'l va media so'zlarni tozalash:
+    patterns_tail = [
+        r"\s*(?:qo['‘`ʼʻ]?shig['‘`ʼʻ]?(?:ini|i|ni)?|qoshig(?:ini|i|ni)?|qo['‘`ʼʻ]?shiq(?:ni)?|qoshiq(?:ni)?)\s*$",
+        r"\s*(?:musiqa(?:si|sini|ni)?|trek(?:i|ini|ni)?|ashula(?:si|sini|ni)?|klip(?:i|ini|ni)?|video(?:si|sini|ni)?)\s*$",
+        r"\s*(?:qo['‘`ʼʻ]?yib\s*ber(?:ing)?|qoyib\s*ber(?:ing)?|qo['‘`ʼʻ]?y(?:ing)?|qoy(?:ing)?|ijro\s*et(?:ing)?)\s*$",
+        r"\s*(?:eshitaylik|eshitay|tinglaylik|tinglay|eshitamiz|tinglaymiz|eshitmoqchiman|tinglamoqchiman)\s*$",
+        r"\s*(?:ochib\s*ber|och|ber|play|ijro)\s*$",
+        r"\s*(?:qo['‘`ʼʻ]?shig['‘`ʼʻ]?(?:ini|i|ni)?|qoshig(?:ini|i|ni)?|qo['‘`ʼʻ]?shiq|qoshiq)\s*$",
+        r"\s*(?:musiqasi|musiqasini|musiqa|treki|trek|ashulasi|ashula)\s*$",
+        r"\s*(?:qo['‘`ʼʻ]?yib|qoyib|qo['‘`ʼʻ]?y|qoy)\s*$",
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for p in patterns_tail:
+            new_text = re.sub(p, "", text, flags=re.IGNORECASE).strip()
+            if new_text != text:
+                text = new_text
+                changed = True
+
+    return text.strip(' .,!?"\'')
+
+
 def _musiqa_search_matn(matn):
     """Regex pipeline uchun musiqa qidirish — matndan qo'shiq nomini ajratish"""
     matn_l = matn.lower()
@@ -2288,70 +2420,22 @@ def _musiqa_search_matn(matn):
         platform = "youtube"
 
     # Qo'shiq nomini buyruqdan ajratib olish
-    query = None
-    tozalangan = matn_toza
-    filtr_sozlar = [
-        "musiqa",
-        "qoshiq",
-        "qoy",
-        "ijro",
-        "et",
-        "play",
-        "youtube",
-        "yutub",
-        "yutuq",
-        "yandex",
-        "yandeks",
-        "spotify",
-        "eshit",
-        "eshitaylik",
-        "eshitamiz",
-        "esla",
-        "eslaylik",
-        "tingla",
-        "tinglaylik",
-        "tinglaymiz",
-        "qoyaylik",
-        "qoyamiz",
-        "dan",
-        "da",
-        "ni",
-        "ga",
-        "qidir",
-        "och",
-        "yoq",
-        "salom",
-        "menga",
-        "yangi",
-        "mening",
-        "mikasa",
-        "ber",
-        "kerak",
-        "iltimos",
-        "bir",
-    ]
-    for soz in filtr_sozlar:
-        tozalangan = tozalangan.replace(soz, "")
-    tozalangan = " ".join(tozalangan.split())
+    query = toza_musiqa_nomi(matn)
 
-    feil_qoshimchalari = ("aylik", "amiz", "ylik", "laylik", "laymiz")
-    if tozalangan.endswith(feil_qoshimchalari):
-        tozalangan = ""
-
-    if 2 <= len(tozalangan) <= 40:
-        query = tozalangan
-    else:
+    if not query or len(query) < 2:
         ovoz_chiqar_tez("Qaysi qo'shiqni qo'yay?")
         query = tingla()
+        if query:
+            query = toza_musiqa_nomi(query) or query.strip()
 
     if query:
-        musiqa_qidir(query, platform)
         platform_nomi = {
             "youtube": "YouTube",
             "yandex": "Yandex Music",
             "spotify": "Spotify",
         }
-        gui_ga_xabar_yuborish(f"🎵 '{query}' {platform_nomi[platform]}da qidirilmoqda")
+        gui_ga_xabar_yuborish(f"🎵 '{query}' {platform_nomi.get(platform, 'YouTube')}da qo'yilmoqda...")
+        musiqa_qidir(query, platform)
     else:
         ovoz_chiqar_tez("Qo'shiq nomini eshitmadim. Qaytadan aytib ko'ring.")
 

@@ -195,5 +195,66 @@ class TestV6BackendRouting(unittest.TestCase):
         )
 
 
+class TestV6MediaAndMusicPlayback(unittest.TestCase):
+    """Musiqa qidirish va ijro etish intentlari testi"""
+
+    def test_youtube_music_intent_priority(self):
+        from main import buyruqni_aniqla
+
+        cases = [
+            ("youtubdan rose funk qo'shig'ini qo'yib ber", "music_search"),
+            ("youtube dan sevara nazarkhan qo'shig'ini qo'y", "music_search"),
+            ("rose funk musiqasini qo'y", "music_search"),
+            ("yutubdan sherik qo'shig'ini eshitaylik", "music_search"),
+            ("yutubdan rose funk qo'y", "music_search"),
+            ("spotifydan lola qo'shig'ini qo'y", "music_search"),
+            ("yandex music dan rayhon ijro et", "music_search"),
+            ("bitta rose funk trekini qo'yib ber", "music_search"),
+            ("musiqa qo'y", "music_search"),
+            ("qo'shiq eshitaylik", "music_search"),
+        ]
+        for text, expected in cases:
+            with self.subTest(text=text):
+                self.assertEqual(buyruqni_aniqla(text), expected)
+
+    def test_open_youtube_not_conflicted(self):
+        from main import buyruqni_aniqla
+
+        open_yt_cases = [
+            "youtube",
+            "yutub",
+            "youtubeni och",
+            "yutubni och",
+            "yutubga kir",
+        ]
+        for text in open_yt_cases:
+            with self.subTest(text=text):
+                self.assertEqual(buyruqni_aniqla(text), "open_youtube")
+
+    def test_toza_musiqa_nomi_extraction(self):
+        from main import toza_musiqa_nomi
+
+        cases = [
+            ("youtubdan rose funk qo'shig'ini qo'yib ber", "rose funk"),
+            ("youtube dan sevara nazarkhan qo'shig'ini qo'y", "sevara nazarkhan"),
+            ("rose funk musiqasini qo'y", "rose funk"),
+            ("spotifydan lola qo'shig'ini qo'y", "lola"),
+            ("yandex music dan rayhon ijro et", "rayhon"),
+            ("bitta rose funk trekini qo'yib ber", "rose funk"),
+            ("yutubdan rose funk qo'y", "rose funk"),
+            ("musiqa qo'y", ""),
+        ]
+        for text, expected in cases:
+            with self.subTest(text=text):
+                self.assertEqual(toza_musiqa_nomi(text), expected)
+
+    def test_media_controls(self):
+        from main import buyruqni_aniqla
+
+        self.assertEqual(buyruqni_aniqla("musiqani to'xtat"), "music_pause")
+        self.assertEqual(buyruqni_aniqla("davom ettir"), "music_play")
+        self.assertEqual(buyruqni_aniqla("musiqani qo'y"), "music_play")
+
+
 if __name__ == "__main__":
     unittest.main()
