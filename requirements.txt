@@ -1,0 +1,10 @@
+speechrecognition
+pyttsx3
+pyautogui
+psutil
+keyboard
+python-dotenv
+google-generativeai
+requests
+pycaw
+comtypes

@@ -22,22 +22,37 @@ import psutil
 import keyboard
 from dotenv import load_dotenv
 import google.generativeai as genai
+import asyncio
+import concurrent.futures
 
 load_dotenv()
 
+# ========== Global o'zgaruvchilar ==========
+buyruq_bajarilmoqda = False
+so_ngi_natija = ""
+
 # ========== Ovozli javob berish ==========
-def ovoz_chiqar(text, ovoz_turi="erkak"):
-    try:
-        engine = pyttsx3.init()
-        voices = engine.getProperty('voices')
-        if ovoz_turi == "ayol" and len(voices) > 1:
-            engine.setProperty('voice', voices[1].id)
-        else:
-            engine.setProperty('voice', voices[0].id)
-        engine.say(text)
-        engine.runAndWait()
-    except Exception as e:
-        print(f"Ovoz chiqarishda xatolik: {e}")
+def ovoz_chiqar(text, ovoz_turi="erkak", kechikish=0):
+    def _ijro_et():
+        global so_ngi_natija
+        try:
+            engine = pyttsx3.init()
+            voices = engine.getProperty('voices')
+            if ovoz_turi == "ayol" and len(voices) > 1:
+                engine.setProperty('voice', voices[1].id)
+            else:
+                engine.setProperty('voice', voices[0].id)
+            engine.setProperty('rate', 200)  # Ovoz tezligini oshirish
+            engine.say(text)
+            engine.runAndWait()
+            so_ngi_natija = text
+        except Exception as e:
+            print(f"Ovoz chiqarishda xatolik: {e}")
+    
+    # Ovoz chiqarishni alohida threadda bajarish
+    threading.Thread(target=_ijro_et, daemon=True).start()
+    if kechikish > 0:
+        time.sleep(kechikish)
 
 # ========== Foydalanuvchi ma'lumotlarini olish ==========
 def foydalanuvchi_ismi_ol():
@@ -131,7 +146,7 @@ def tingla():
         r = sr.Recognizer()
         with sr.Microphone() as source:
             print("...")
-            audio = r.listen(source)
+            audio = r.listen(source, timeout=5, phrase_time_limit=5)
             try:
                 text = r.recognize_google(audio, language="uz-UZ")
                 return text
@@ -139,6 +154,8 @@ def tingla():
                 return None
             except sr.RequestError as e:
                 print(f"Google API xatosi: {e}")
+                return None
+            except sr.WaitTimeoutError:
                 return None
     except Exception as e:
         print("Mikrofon ishlamayapti, so'z kiriting")
@@ -182,7 +199,7 @@ def buyruqni_saqla(matn):
     with open("buyruqlar_tarixi.txt", "a", encoding="utf-8") as f:
         f.write(f"{datetime.datetime.now()}: {matn}\n")
 
-# ========== Google AI orqali tushunish ==========
+# ========== Google AI orqali tushunish (tezroq versiya) ==========
 def ai_orqali_tushun(matn):
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -204,12 +221,18 @@ def ai_orqali_tushun(matn):
 {', '.join(ruxsat_etilgan)}
 Foydalanuvchi so'zi: "{matn}"
 Javob:"""
+        
+        # AI javobini kutish vaqti
         response = model.generate_content(prompt, safety_settings={
             genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
             genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
             genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
             genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-        })
+        }, generation_config=genai.types.GenerationConfig(
+            max_output_tokens=10,
+            temperature=0.1
+        ))
+        
         javob = response.text.strip().lower()
         javob = ''.join(ch for ch in javob if ch.isalnum() or ch == '_')
         return javob if javob in ruxsat_etilgan else "unknown"
@@ -219,11 +242,20 @@ Javob:"""
 
 # ========== Buyruqni bajarish ==========
 def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
+    global buyruq_bajarilmoqda
+    buyruq_bajarilmoqda = True
     buyruqni_saqla(matn)
+    
+    # Avval oddiy qoidalarga tekshiramiz
     intent = buyruqni_aniqla(matn)
+    
+    # Agar aniqlanmasa, AI dan foydalanamiz
     if intent == "unknown":
         intent = ai_orqali_tushun(matn)
 
+    # Buyruq bajarilishini ovozli xabar qilish
+    ovoz_chiqar(f"Buyruq aniqlandi: {intent.replace('_', ' ')}", ovoz_turi)
+    
     if intent == "greeting":
         ovoz_chiqar(f"Salom, {foydalanuvchi_ismi}! Sizga qanday yordam bera olaman?", ovoz_turi)
 
@@ -454,6 +486,10 @@ def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
 
     else:
         ovoz_chiqar(f"{foydalanuvchi_ismi}, buyruq tushunilmadi", ovoz_turi)
+    
+    # Bajarilishni tugatish
+    buyruq_bajarilmoqda = False
+    ovoz_chiqar("Buyruq bajarildi", ovoz_turi)
 
 # ========== Orqa fon ==========
 def fon_xizmat(foydalanuvchi_ismi, ovoz_turi):
@@ -462,6 +498,8 @@ def fon_xizmat(foydalanuvchi_ismi, ovoz_turi):
         try:
             buyruq = tingla()
             if buyruq:
+                # Buyruq aniqlanganini darhol aytish
+                ovoz_chiqar("Buyruq qabul qilindi", ovoz_turi, kechikish=0.5)
                 buyruqni_tushun(buyruq, foydalanuvchi_ismi, ovoz_turi)
         except KeyboardInterrupt:
             print("Dastur to'xtatildi")

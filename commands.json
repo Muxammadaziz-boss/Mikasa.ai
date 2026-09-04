@@ -34,5 +34,9 @@
   "katta harf": "caps_lock",
   "backspace": "backspace",
   "tab": "tab",
-  "oynani o'tkaz": "switch_window"
+  "oynani o'tkaz": "switch_window",
+  "ovozni ko'tar": "volume_up",
+  "ovozni pasaytir": "volume_down",
+  "ovozni o'chir": "volume_mute",
+  "ovozni yoq": "volume_unmute"
 }
