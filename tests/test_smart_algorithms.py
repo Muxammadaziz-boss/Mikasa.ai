@@ -5,6 +5,7 @@ import unittest
 import time
 import os
 import sys
+from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # Loyiha ildizi
 
@@ -200,11 +201,13 @@ class TestMarkovChain(unittest.TestCase):
     
     def setUp(self):
         self.bashorat = BuyruqBashorat()
-        # Test uchun faylni o'chirish
+        # Test uchun faylni alohida qilish va xotirani tozalash
         self.bashorat._fayl = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), 
             "test_markov_data.json"
         )
+        self.bashorat._transitions = defaultdict(lambda: defaultdict(int))
+        self.bashorat._jami_soni = defaultdict(int)
     
     def tearDown(self):
         """Test faylini tozalash"""

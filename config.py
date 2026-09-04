@@ -21,7 +21,7 @@ class Config:
 
         # Standart konfiguratsiya
         self.default_config = {
-            "app": {"version": "5.0.0", "name": "Mikasa AI", "debug": False},
+            "app": {"version": "6.0.0", "name": "Mikasa AI", "debug": False},
             "audio": {
                 "sample_rate": 16000,
                 "duration": 5,
@@ -29,6 +29,9 @@ class Config:
                 "tts_voice_male": "uz-UZ-SardorNeural",
                 "tts_voice_female": "uz-UZ-MadinaNeural",
                 "tts_rate": 200,
+                "vad_enabled": True,
+                "vad_threshold": 0.015,
+                "silence_duration": 1.2,
             },
             "gui": {
                 "theme": "dark",

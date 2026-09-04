@@ -708,3 +708,97 @@ class ProgressRing(ctk.CTkFrame):
         ratio = value / self._max if self._max > 0 else 0
         self.progress.set(ratio)
         self.value_label.configure(text=f"{value}/{self._max}")
+
+
+class ToastNotification(ctk.CTkFrame):
+    """
+    Silliq paydo bo'luvchi va avtomatik yo'qoluvchi proaktiv bildirishnoma (Toast).
+    """
+
+    def __init__(
+        self,
+        master,
+        message: str,
+        title: str = "Mikasa AI",
+        duration: int = 4500,
+        accent_color: str = None,
+        **kwargs,
+    ):
+        accent_color = accent_color or Colors.PRIMARY
+        super().__init__(
+            master,
+            fg_color=Colors.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=accent_color,
+            **kwargs,
+        )
+
+        self._duration = duration
+
+        # Content frame
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=14, pady=10)
+
+        # Header row
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 4))
+
+        ctk.CTkLabel(
+            header,
+            text="✨",
+            font=(Fonts.FAMILY, 12),
+            text_color=accent_color,
+            width=18,
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            header,
+            text=title,
+            font=Fonts.SUBTITLE,
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left", padx=4)
+
+        close_btn = ctk.CTkButton(
+            header,
+            text="✕",
+            font=(Fonts.FAMILY, 10),
+            width=20,
+            height=20,
+            fg_color="transparent",
+            hover_color=Colors.BG_DARK,
+            text_color=Colors.TEXT_MUTED,
+            command=self.dismiss,
+        )
+        close_btn.pack(side="right")
+
+        # Message
+        msg_label = ctk.CTkLabel(
+            inner,
+            text=message,
+            font=Fonts.BODY,
+            text_color=Colors.TEXT_SECONDARY,
+            wraplength=280,
+            justify="left",
+        )
+        msg_label.pack(fill="x")
+
+        # Joylashtirish va avtomatik yopilish
+        self.place(relx=0.98, rely=0.96, anchor="se")
+        self.after(self._duration, self.dismiss)
+
+    def dismiss(self):
+        """Bildirishnomani yopish"""
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
+
+def show_toast(root_widget, message: str, title: str = "Mikasa AI", duration: int = 4500):
+    """Xavfsiz Toast chiqarish funksiyasi"""
+    try:
+        root_widget.after(0, lambda: ToastNotification(root_widget, message, title=title, duration=duration))
+    except Exception as e:
+        pass
+

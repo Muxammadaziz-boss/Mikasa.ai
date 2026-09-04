@@ -1,9 +1,9 @@
 # ========== main.py ===============================
 # Mikasa AI — Shaxsiy sun'iy intellekt yordamchi
-# Versiya: 5.0.0
+# Versiya: 6.0.0
 # ========== Ogohlantirishlarni yashirish ==========
 
-VERSION = "5.0.0"
+VERSION = "6.0.0"
 APP_NAME = "Mikasa AI"
 import os
 import logging
@@ -64,11 +64,27 @@ import json
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, simpledialog, ttk
 import datetime
-import pyautogui
-import psutil
-import keyboard
+try:
+    import pyautogui
+except ImportError:
+    pyautogui = None
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
+    import keyboard
+except ImportError:
+    keyboard = None
+
 import uuid
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 try:
     from core.ai_engine import (
@@ -119,16 +135,38 @@ try:
 except ImportError:
     AGENT_AVAILABLE = False
     print("WARNING: Agent modullari topilmadi. Oddiy AI ishlaydi.")
+
+# ========== v6.0.0 Audio Service va Command Dispatcher ==========
+try:
+    from core.audio_service import get_audio_service, AudioService
+    AUDIO_SERVICE_AVAILABLE = True
+except ImportError:
+    AUDIO_SERVICE_AVAILABLE = False
+
+try:
+    from core.command_dispatcher import CommandDispatcher
+    COMMAND_DISPATCHER_AVAILABLE = True
+    command_dispatcher = CommandDispatcher()
+except ImportError:
+    COMMAND_DISPATCHER_AVAILABLE = False
+    command_dispatcher = None
 import tempfile
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
+try:
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+    from ctypes import cast, POINTER
+    from comtypes import CLSCTX_ALL
+    PYCAW_AVAILABLE = True
+except ImportError:
+    AudioUtilities = None
+    IAudioEndpointVolume = None
+    cast = None
+    POINTER = None
+    CLSCTX_ALL = None
+    PYCAW_AVAILABLE = False
 # logging allaqachon 9-qatorda import qilingan
 
 # Logging config.py da boshqariladi (Config.setup_logging())
 # Qo'shimcha handler qo'shish shart emas
-
-load_dotenv()
 
 # ========== Versiya ==========
 # VERSION allaqachon 6-qatorda belgilangan ("3.1.0")
@@ -712,8 +750,20 @@ def tingla():
         time.sleep(1)
         return None
 
+    # v6.0.0 Tezkor VAD Audio Xizmati
+    if AUDIO_SERVICE_AVAILABLE:
+        try:
+            audio_svc = get_audio_service()
+            text = audio_svc.listen_and_transcribe(language="uz-UZ", timeout=4.0)
+            if text:
+                gui_ga_xabar_yuborish(f"🗣️ Siz: {text}")
+                return text.lower()
+            return None
+        except Exception as e:
+            logging.debug(f"AudioService fallback ga o'tish: {e}")
+
     try:
-        # Record audio
+        # Fallback: Record audio
         samplerate = 16000
         duration = 5
         audio_data = sd.rec(
@@ -2402,6 +2452,16 @@ def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
         with global_state.buyruq_bajarilmoqda_lock:
             global_state.ovoz_turi_global = ovoz_turi
             buyruqni_saqla(matn)
+
+        # v6.0.0: Tezkor Mahalliy Buyruqlar (Command Dispatcher)
+        if COMMAND_DISPATCHER_AVAILABLE and command_dispatcher:
+            try:
+                handled, result_msg = command_dispatcher.dispatch_local(matn)
+                if handled and result_msg:
+                    gui_ga_xabar_yuborish(f"✨ {result_msg}", ovoz=True)
+                    return
+            except Exception as e:
+                logging.debug(f"Dispatcher xatosi: {e}")
 
         # 1-QADAM: TEZKOR BUYRUQLAR (regex faqat aniq patternlar uchun)
         intent = buyruqni_aniqla(matn)

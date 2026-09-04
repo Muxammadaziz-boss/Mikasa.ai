@@ -1,7 +1,7 @@
 {
   "app": {
-    "version": "2.2.5",
-    "name": "Ovozli Yordamchi Pro",
+    "version": "6.0.0",
+    "name": "Mikasa AI",
     "debug": false
   },
   "audio": {

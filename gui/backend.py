@@ -7,6 +7,7 @@ import logging
 import datetime
 import re
 import queue
+from gui.components import show_toast
 
 logger = logging.getLogger(__name__)
 
@@ -395,6 +396,9 @@ class BackendBridge:
 
                 # Status bar yangilash
                 self.app.set_status("info", "Taklif keldi")
+
+                # Silliq Toast bildirishnomasini ko'rsatish
+                show_toast(self.app, suggestion, title="Mikasa AI Taklifi", duration=5000)
 
             except Exception as e:
                 logger.debug(f"Proactive suggestion display error: {e}")

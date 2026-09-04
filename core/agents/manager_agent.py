@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional, Callable
 from .base_agent import BaseAgent
 from .coder_agent import CoderAgent
 from .research_agent import ResearchAgent
+from .system_agent import SystemAgent
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class ManagerAgent(BaseAgent):
         try:
             self._sub_agents["coder"] = CoderAgent(ai_call_func)
             self._sub_agents["research"] = ResearchAgent(ai_call_func)
-            logger.info("Sub-agents initialized: coder, research")
+            self._sub_agents["system"] = SystemAgent(ai_call_func)
+            logger.info("Sub-agents initialized: coder, research, system")
         except Exception as e:
             logger.error(f"Sub-agents init xatolik: {e}")
 
@@ -59,6 +61,7 @@ Senning vazifang:
 Mavjud sub-agentlar:
 - CoderAgent: kod tahlili va yozish
 - ResearchAgent: web qidiruv va tadqiqot
+- SystemAgent: kompyuter tizimi (RAM, CPU, disk, optimallashtirish) monitoringi
 
 Qoidalaring:
 - Har bir vazifa uchun eng mos agentni tanla
@@ -86,6 +89,7 @@ Muloqot tili: O'zbekcha (Asalim uchun)
             "debug",
         ]
         research_keywords = ["qidir", "search", "web", "internet", "youtube", "github"]
+        system_keywords = ["tizim", "sistema", "ram", "cpu", "xotira", "tozala", "temp", "monitoring", "nagruzka"]
 
         task_lower = task.lower()
 
@@ -94,6 +98,9 @@ Muloqot tili: O'zbekcha (Asalim uchun)
 
         if any(k in task_lower for k in research_keywords):
             return self._delegate_to_agent("research", task, context)
+
+        if any(k in task_lower for k in system_keywords):
+            return self._delegate_to_agent("system", task, context)
 
         return self._direct_execute(task, context)
 
