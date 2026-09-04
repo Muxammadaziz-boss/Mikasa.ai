@@ -12,7 +12,7 @@ class Config:
     
     def __init__(self):
         self.project_dir = Path(__file__).parent
-        self.config_file = self.project_dir / "config.json"
+        self.config_file = self.project_dir / "data" / "config.json"
         self.logs_dir = self.project_dir / "logs"
         
         # Loglarni yaratish
@@ -21,8 +21,8 @@ class Config:
         # Standart konfiguratsiya
         self.default_config = {
             "app": {
-                "version": "2.2.5",
-                "name": "Ovozli Yordamchi Pro",
+                "version": "3.1.0",
+                "name": "Mikasa AI",
                 "debug": False
             },
             "audio": {
@@ -156,11 +156,12 @@ class Config:
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         
-        # Root logger sozlash
+        # Root logger sozlash (dublikatsiya oldini olish)
         root_logger = logging.getLogger()
         root_logger.setLevel(getattr(logging, log_config['level']))
-        root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
+        if not root_logger.handlers:  # Faqat bo'sh bo'lsagina qo'shish
+            root_logger.addHandler(file_handler)
+            root_logger.addHandler(console_handler)
         
         # Kutubxona loglarini o'chirish
         logging.getLogger('absl').setLevel(logging.ERROR)

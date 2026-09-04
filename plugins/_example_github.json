@@ -1,0 +1,13 @@
+{
+  "name": "github_search",
+  "description": "GitHub da kod qidirish",
+  "category": "development",
+  "type": "url",
+  "url": "https://github.com/search?q={query}&type=repositories",
+  "parameters": {
+    "query": {
+      "type": "string",
+      "description": "Qidiruv so'rovi"
+    }
+  }
+}

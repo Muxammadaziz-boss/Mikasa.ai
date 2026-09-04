@@ -1,0 +1,28 @@
+{
+  "transitions": {
+    "music_search": {
+      "music_play": 1,
+      "close_window": 1
+    },
+    "music_play": {
+      "music_search": 1
+    },
+    "close_window": {
+      "close_window": 1,
+      "shutdown": 1
+    },
+    "shutdown": {
+      "identity": 1
+    },
+    "identity": {
+      "identity": 1,
+      "open_youtube": 1
+    },
+    "open_youtube": {
+      "video_number": 1
+    },
+    "video_number": {
+      "music_pause": 1
+    }
+  }
+}

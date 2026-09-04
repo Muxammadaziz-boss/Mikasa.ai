@@ -1,0 +1,102 @@
+[
+  {
+    "user": "ayolgramni och",
+    "agent": "Telegram ilovasi ochildi!",
+    "time": "2026-03-05T03:18:30.531677"
+  },
+  {
+    "user": "videostudioni och",
+    "agent": "Kechirasiz, men VideoStudio ilovasini ocholmadim. Mening imkoniyatlarim orasida bu ilova mavjud emas ekan.",
+    "time": "2026-03-05T03:19:08.392358"
+  },
+  {
+    "user": "visual studioni och",
+    "agent": "Kechirasiz, men Visual Studio ilovasini ocholmadim. Mening imkoniyatlarim orasida bu ilova mavjud emas ekan. Faqatgina Visual Studio Code (VS Code) ni ochishim mumkin.",
+    "time": "2026-03-05T03:19:28.628758"
+  },
+  {
+    "user": "veskoda och",
+    "agent": "VS Code ilovasi ochildi!",
+    "time": "2026-03-05T03:20:00.763231"
+  },
+  {
+    "user": "endi bu yerda ip konflik buyruqini tek",
+    "agent": "Siz \"ip conflict\" buyrug'ini VS Code ichida tekshirmoqchi bo'lgansiz, lekin bu buyruq VS Code uchun emas. \"IP conflict\" (IP manzillar to'qnashuvi) buyrug'i o'z-o'zidan mavjud emas. IP manzillar to'qnashuvini tekshirish uchun odatda terminalda yoki buyruq satrida `ipconfig /all` kabi buyruqlardan foydalaniladi. Siz hozirgi Command Prompt oynasida bu buyruqni ishlatishingiz mumkin.",
+    "time": "2026-03-05T03:21:10.995511"
+  },
+  {
+    "user": "ha beshik mard 2016 yozgan",
+    "agent": "Google'da \"beshik mard 2016\" so'rovi bo'yicha qidiruv amalga oshirildi. Natijalarni ko'rish uchun brauzeringizni tekshirishingiz mumkin.",
+    "time": "2026-03-05T03:34:04.908123"
+  },
+  {
+    "user": "amalga oshirildi natijalarni ko'rish uchun",
+    "agent": "Ha, qidiruv amalga oshirildi. Natijalarni ko'rish uchun brauzeringizni tekshirishingiz mumkin.",
+    "time": "2026-03-05T03:34:18.190692"
+  },
+  {
+    "user": "amalga oshirildi natijalarni ko'rish uchun",
+    "agent": "Ha, qidiruv amalga oshirildi. Endi brauzeringizda qidiruv natijalarini ko'rishingiz mumkin. Yana qanday yordam bera olaman?",
+    "time": "2026-03-05T03:34:18.432428"
+  },
+  {
+    "user": "sevning och",
+    "agent": "Kechirasiz, Steam ilovasini ochish imkoniyatim yo'q ekan. Faqatgina YouTube, Telegram, Chrome, Discord, VS Code, Explorer va Command Prompt ilovalarini ochishim mumkin.",
+    "time": "2026-03-05T03:35:17.110351"
+  },
+  {
+    "user": "boylani hamyod",
+    "agent": "'boylani hamyod' so'rovi bo'yicha Google'da qidiruv amalga oshirildi. Natijalarni brauzeringizda ko'rishingiz mumkin.",
+    "time": "2026-03-05T03:36:21.940112"
+  },
+  {
+    "user": "Men 'ro'moynasini yop' orqali 'close_window' qilmoqchi bo'ldim. Bu xavfli. Mendan ask_user orqali rostdan ham 'close_window' ni bajarishni xohlayotganimni tasdiqlashimni so'ra va ha desa bajar, yo'q desa bekor qil.",
+    "agent": "Foydalanuvchi javob bermagani uchun oynani yopish amali bekor qilindi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-10T01:49:30.447922"
+  },
+  {
+    "user": "Men 'xirom oynasining yop' orqali 'close_window' qilmoqchi bo'ldim. Bu xavfli. Mendan ask_user orqali rostdan ham 'close_window' ni bajarishni xohlayotganimni tasdiqlashimni so'ra va ha desa bajar, yo'q desa bekor qil.",
+    "agent": "Foydalanuvchi javob bermagani uchun oynani yopish amali bekor qilindi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-10T01:49:50.716156"
+  },
+  {
+    "user": "xurmo",
+    "agent": "Ha, 'xurmo' so'rovi bo'yicha Google'da qidiruv amalga oshirildi. Natijalarni brauzeringizda ko'rishingiz mumkin. Yana qanday yordam bera olaman?",
+    "time": "2026-03-10T01:50:10.462644"
+  },
+  {
+    "user": "Men 'kompyuterni o'chir' orqali 'shutdown' qilmoqchi bo'ldim. Bu xavfli. Mendan ask_user orqali rostdan ham 'shutdown' ni bajarishni xohlayotganimni tasdiqlashimni so'ra va ha desa bajar, yo'q desa bekor qil.",
+    "agent": "Foydalanuvchi javob bermagani uchun kompyuterni o'chirish amali bekor qilindi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-10T01:50:33.787147"
+  },
+  {
+    "user": "yuzni och",
+    "agent": "'yuzni och' so'rovi bo'yicha Google'da qidiruv amalga oshirildi. Natijalarni brauzeringizda ko'rishingiz mumkin. Yana qanday yordam bera olaman?",
+    "time": "2026-03-10T01:52:30.324352"
+  },
+  {
+    "user": "menga aytchi o'zmir va mi",
+    "agent": "'o'zmir va mi' so'rovi bo'yicha Google'da qidiruv amalga oshirildi. Natijalarni brauzeringizda ko'rishingiz mumkin. Yana qanday yordam bera olaman?",
+    "time": "2026-03-12T01:16:44.340199"
+  },
+  {
+    "user": "Men 'oynani yop' orqali 'close_window' qilmoqchi bo'ldim. Bu xavfli. Mendan ask_user orqali rostdan ham 'close_window' ni bajarishni xohlayotganimni tasdiqlashimni so'ra va ha desa bajar, yo'q desa bekor qil.",
+    "agent": "Foydalanuvchi javob bermagani uchun oynani yopish amali bekor qilindi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-12T04:00:56.092156"
+  },
+  {
+    "user": "Men 'kompyuterni o'chir' orqali 'shutdown' qilmoqchi bo'ldim. Bu xavfli. Mendan ask_user orqali rostdan ham 'shutdown' ni bajarishni xohlayotganimni tasdiqlashimni so'ra va ha desa bajar, yo'q desa bekor qil.",
+    "agent": "Foydalanuvchi javob bermagani uchun kompyuterni o'chirish amali bekor qilindi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-12T04:01:17.594783"
+  },
+  {
+    "user": "ilon mask kim?",
+    "agent": "Elon Musk — Tesla va SpaceX kompaniyalarining asoschisi va bosh direktori. U shuningdek, Neuralink va The Boring Company kabi boshqa kompaniyalarga ham asos solgan. U dunyodagi eng boy odamlardan biri hisoblanadi.",
+    "time": "2026-03-12T04:02:38.141144"
+  },
+  {
+    "user": "efil minorasi qayerda?",
+    "agent": "Eyfel minorasi Fransiyaning poytaxti Parij shahrida joylashgan.",
+    "time": "2026-03-12T04:03:37.395549"
+  }
+]

@@ -1,13 +1,56 @@
-# 📝 O'zgarishlar Jurnali - v2.2.5
+# 📝 O'zgarishlar Jurnali
 
-## 🎉 Asosiy yaxshiliklar
+---
+
+## 🚀 v3.0.0 — "Aqlli Yordamchi" (2026-03-05)
+
+### ⭐ Asosiy yangiliklar
+
+#### 🤖 AI Agent tizimi
+
+- **AI Engine** (`ai_engine.py`): Google Gemini va OpenRouter integratsiya
+- **ReAct Agent** (`core/agent_planner.py`): Fikrlash → Harakat → Kuzatish sikli
+- **14 ta Tool**: calculator, weather, web_search, translator, currency, scheduler, rag_reader, reminder, knowledge, datetime, app_control, system_info, screen_analyze, note
+- **Agent Memory** (`core/agent_memory.py`): Qisqa, o'rta va uzoq muddatli xotira
+- **Agent Scheduler** (`core/agent_scheduler.py`): Vaqtli vazifalar va eslatmalar
+- **Plugin tizimi** (`core/agent_plugins.py`): JSON va Python plugin yuklash
+- **Proactive Agent**: Salomlash va kontekstga asoslangan takliflar
+
+#### 🧠 Aqlli algoritmlar (`core/smart_algorithms.py`)
+
+- **Levenshtein Distance**: Noto'g'ri yozilgan buyruqlarni aniqlash
+- **TF-IDF Matcher**: Matnli buyruqlarni tahlil qilish
+- **Markov Chain**: Keyingi buyruqni bashorat qilish
+- **LRU Cache**: Natijalarni keshlash
+- **Rate Limiter**: API chaqiruvlarni cheklash
+- **Priority Queue**: Buyruqlarni ustuvorlik bo'yicha bajarish
+
+#### 🗂️ Loyiha strukturasi
+
+- **`core/`**: 7 ta modul (agent_tools, agent_planner, agent_memory, agent_scheduler, agent_plugins, smart_algorithms, tts_manager)
+- **`tests/`**: 5 ta test fayl, **108 ta unit test**
+- **`data/`**: Ma'lumot fayllar (commands.json, config.json, foydalanuvchi_ismi.txt, ovoz_turi.txt)
+- **`plugins/`**: Kengaytmalar uchun papka
+
+#### 🧪 Testlash
+
+- **108 ta unit test** — barcha modullar uchun
+- **test_agent.py**: Tool, Registry, ReAct Agent, Memory testlari
+- **test_agent_v2.py**: Scheduler, RAG Reader, yangi toollar testlari
+- **test_agent_v3.py**: Async, Retry, Plugin, Proactive agent testlari
+- **test_smart_algorithms.py**: Barcha algoritmlar uchun testlar
+- **test_main.py**: Asosiy funksiyalar, config, audio testlari
+
+---
+
+## 🔧 v2.2.5 — "Zamonaviy Platforma" (2026-02)
 
 ### 🔊 Audio tizimi
 
-- **PyAudio → sounddevice**: Mikrofon yozib olish uchun zamonaviy kutubxona
+- **PyAudio → sounddevice**: Zamonaviy mikrofon kutubxonasi
 - **pyttsx3 → edge-tts**: Tabiiy ovoz sintezi (Microsoft Edge TTS)
-- **NirCmd → Windows Audio API**: Tashqi dastur kerak emas
-- **pygame**: TTS audio pleyeri uchun qo'shilmoqda
+- **NirCmd → Windows Audio API (pycaw)**: Tashqi dastur kerak emas
+- **pygame**: TTS audio pleyeri
 
 ### 🖥️ GUI modernizatsiyasi
 
@@ -19,139 +62,43 @@
 ### 🔧 Konfiguratsiya tizimi
 
 - **config.py**: Barcha sozlamalar birlashtirilgan
-- **JSON format**: O'qish oson, o'qib oson
+- **JSON format**: O'qish va tahrirlash oson
 - **Logging**: Avtomatik log fayllari aylanishi
-- **Thread-safety**: Xavfsiz ko'p thread ishlashi
-
-### 🧪 Testlash
-
-- **Unit testlar**: `test_main.py` fayli
-- **Coverage**: Asosiy funksiyalar uchun testlar
-- **Mocking**: Tashqi bog'liqliksiz testlash
-- **CI/CD**: GitHub Actions uchun tayyor
-
-## 🐛 Tuzatilgan xatolar
-
-### ❌ Eski muammolar
-
-- **PyAudio DLL xatolari**: Python 3.15 da ishlamadi
-- **pyttsx3 DLL xatolari**: comtypes muammolari
-- **NirCmd topilmasligi**: Tashqi dastur kerak edi
-- **Global variables**: Thread-safety muammolari
-- **Hardcoded settings**: Konfiguratsiya yo'q
-
-### ✅ Yechimlar
-
-- **Python 3.11 venv**: To'g'ri versiya va muhit
-- **Windows Audio API**: O'rnatishsiz ishlaydi
-- **edge-tts**: Internet orqali ishlaydi
-- **sounddevice**: Cross-platform yechim
-- **Thread-safe**: GlobalState klassi
-
-## 📊 Performance yaxshiliklari
-
-### ⚡ Tezlik
-
-- **Async TTS**: Bloklamasiz ovoz chiqarish
-- **Optimized imports**: Keraksiz importlar olib tashlandi
-- **Memory management**: To'g'ri resurslarni boshqarish
+- **Thread-safety**: `GlobalState` klassi
 
 ### 🛡️ Xavfsizlik
 
-- **Error handling**: Barcha xatolarni to'g'ri qaytarish
 - **Input validation**: Kiruvchi ma'lumotlarni tekshirish
-- **Resource cleanup**: To'g'ri yopish va tozalash
+- **Safe eval**: `_calculator` da xavfsiz hisoblash
+- **shell=False**: `subprocess` xavfsizligi
+- **Error handling**: Barcha xatolarni to'g'ri qaytarish
 
-## 🔧 Texnik yaxshiliklar
+---
 
-### 📦 Kutubxonalar
+## 📊 Versiyalar solishtiruvi
 
-```
-Eski:                     Yangi:
-PyAudio          →         sounddevice
-pyttsx3          →         edge-tts
-NirCmd (tashqi) →         pycaw
-Tkinter           →         CustomTkinter
-pygame (yangi)    →         pygame
-```
-
-### 🗂️ Fayl tuzilishi
-
-```
-Yangi fayllar:
-├── config.py           # Konfiguratsiya boshqaruvi
-├── test_main.py        # Unit testlar
-├── logs/               # Log fayllari (avtomatik)
-├── README.md           # To'liq hujjat
-└── CHANGELOG.md        # O'zgarishlar jurnali
-
-Eski fayllar (saqlangan):
-├── gui_old.py         # Eski Tkinter GUI
-└── SETUP.md (yangilandi)
-```
-
-## 🎯 Funksional yaxshiliklar
-
-### 🎵 Audio
-
-- **Yuqori sifatli mikrofon**: 16kHz, 5 soniya
-- **Tabiiy TTS ovozi**: Erkak/ayol tanlovi
-- **Aniq ovoz boshqaruvi**: 0-100% aniqlikda
-
-### 🖥️ GUI
-
-- **Zamonaviy ko'rinish**: CustomTkinter dizayni
-- **Qulay foydalanish**: Tugmalar va interfeys
-- **Ma'lumot ko'rsatish**: Real-time statistika
-
-### 🔧 Konfiguratsiya
-
-- **Markazlashtirilgan**: Barcha sozlamalar bir joyda
-- **Oson o'zgartirish**: JSON orqali
-- **Avtomatik saqlash**: O'zgarishlar saqlanadi
-
-## 🚀 Deployment yaxshiliklari
-
-### 📦 O'rnatish
-
-- **Oddiyroq**: `pip install -r requirements.txt`
-- **Venv qo'llab-masa**: Python 3.11 talab qilinmaydi
-- **Xatolarni oldindan olish**: Yaxshi error messages
-
-### 🧪 Testlash
-
-- **Avtomatik testlar**: `python test_main.py`
-- **Integratsion testlar**: Asosiy funksiyalar
-- **Continuous Integration**: GitHub Actions tayyor
-
-## 📈 Kelajak rejalari
-
-### v2.1.0 (rejalashtirilgan)
-
-- **Web interfeys**: FastAPI + React varianti
-- **Mobile qo'llab-masa**: PWA yoki mobil ilova
-- **Cloud integratsiya**: Google Drive/OneDrive
-- **Plugin tizimi**: Qo'shimcha funksiyalar
-
-### v2.2.0 (rejalashtirilgan)
-
-- **Machine Learning**: O'zbek NLP modellari
-- **Multi-platform**: Linux/macOS qo'llab-masi
-- **API integratsiya**: Ko'proq xizmatlar
-- **Voice cloning**: Foydalanuvchi ovozini o'rganish
+| Xususiyat       | v2.2.5 | v3.0.0                         |
+| --------------- | ------ | ------------------------------ |
+| Fayl soni       | ~5     | **20+**                        |
+| AI integratsiya | ❌     | ✅ Gemini + OpenRouter         |
+| Agent tizimi    | ❌     | ✅ ReAct Agent                 |
+| Tool soni       | 0      | **14 ta**                      |
+| Xotira tizimi   | ❌     | ✅ 3 darajali                  |
+| Plugin tizimi   | ❌     | ✅ JSON + Python               |
+| Algoritmlar     | regex  | ✅ Levenshtein, TF-IDF, Markov |
+| Test soni       | ~10    | **108 ta**                     |
+| Papka struktura | tekis  | ✅ core/, tests/, data/        |
 
 ---
 
 ## 🎊 Muvaffaqiyat
 
-**v2.2.5** - O'zbek tilida ishlaydigan zamonaviy, xavfsiz va funksional ovozli yordamchi.
+**v3.0.0** — O'zbek tilida ishlaydigan **aqlli, AI-quvvatli, zamonaviy** ovozli yordamchi!
 
-**Asosiy yutuqlar:**
+**🎯 Asosiy yutuqlar:**
 
-- ✅ Barcha eski muammolar hal qilindi
-- ✅ Zamonaviy texnologiyalar o'rnatildi
-- ✅ Xavfsizlik va performance yaxshilandi
-- ✅ Testlar va hujjatlar to'liq landi
-- ✅ Cross-platform qo'llab-masa yaxshilandi
-
-**🎯 Maqsadga erishildi**: O'zbekiston uchun yuqori sifatli ovozli assistent!
+- ✅ AI agent tizimi to'liq ishlaydi
+- ✅ 14 ta tool mavjud
+- ✅ 108 ta test muvaffaqiyatli o'tdi
+- ✅ Loyiha toza va tartibli
+- ✅ Plugin tizimi kengaytirish uchun tayyor
