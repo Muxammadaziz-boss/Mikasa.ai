@@ -955,7 +955,7 @@ class NavItem(ctk.CTkFrame):
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
             corner_radius=10 if active else 0,
             border_width=1 if active else 0,
-            border_color="#33334A" if active else "transparent",
+            border_color="#33334A",
             height=44,
             cursor="hand2",
             **kwargs,
@@ -1018,7 +1018,7 @@ class NavItem(ctk.CTkFrame):
 
     def _on_leave(self, event=None):
         if not self._active:
-            self.configure(fg_color="transparent", corner_radius=0, border_width=0, border_color="transparent")
+            self.configure(fg_color="transparent", corner_radius=0, border_width=0)
             self.text_label.configure(text_color=Colors.TEXT_SECONDARY)
 
     def set_active(self, active):
@@ -1027,7 +1027,7 @@ class NavItem(ctk.CTkFrame):
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
             corner_radius=10 if active else 0,
             border_width=1 if active else 0,
-            border_color="#33334A" if active else "transparent",
+            border_color="#33334A",
         )
         self.indicator.configure(
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent"
