@@ -495,11 +495,23 @@ class ReActAgent:
         """AI ni chaqirish — 2 marta urinish"""
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                response = self.ai_call(
-                    prompt=self._build_prompt(history, steps),
-                    system_prompt=system_prompt,
-                    history=history,
-                )
+                try:
+                    response = self.ai_call(
+                        prompt=self._build_prompt(history, steps),
+                        system_prompt=system_prompt,
+                        history=history,
+                    )
+                except TypeError as te:
+                    if "unexpected keyword argument" in str(te) or "positional argument" in str(te) or "takes" in str(te):
+                        try:
+                            response = self.ai_call(
+                                prompt=self._build_prompt(history, steps),
+                                system_prompt=system_prompt,
+                            )
+                        except TypeError:
+                            response = self.ai_call(self._build_prompt(history, steps))
+                    else:
+                        raise
                 if response:
                     return response
             except Exception as e:

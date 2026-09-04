@@ -286,10 +286,15 @@ class MikasaApp(ctk.CTk):
         self.titlebar.pack(fill="x", side="top")
         self.titlebar.pack_propagate(False)
 
-        # Logo va nom
+        # Logo va nom (vector sparkles bilan)
+        from gui.icons import get_vector_icon
+        logo_icon = get_vector_icon("sparkles", size=15, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
+
         self.logo_label = ctk.CTkLabel(
             self.titlebar,
             text="  MIKASA" if self._compact_mode else "  MIKASA AI",
+            image=logo_icon,
+            compound="left",
             font=(Fonts.FAMILY, 13, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
@@ -301,7 +306,7 @@ class MikasaApp(ctk.CTk):
             self.version_badge = ctk.CTkFrame(
                 self.titlebar,
                 fg_color=Colors.BG_CARD,
-                corner_radius=6,
+                corner_radius=Sizing.RADIUS_PILL,
                 border_width=1,
                 border_color=Colors.BORDER,
                 bg_color=Colors.BG_DARKEST,
@@ -313,7 +318,7 @@ class MikasaApp(ctk.CTk):
                 font=Fonts.TINY,
                 text_color=Colors.TEXT_MUTED,
             )
-            self.version_label.pack(padx=6, pady=1)
+            self.version_label.pack(padx=8, pady=2)
 
         # Status badge
         self.status_badge = StatusBadge(
@@ -390,37 +395,62 @@ class MikasaApp(ctk.CTk):
         self.content_frame.pack(side="left", fill="both", expand=True)
 
     def _build_sidebar(self):
-        """Sidebar navigatsiya"""
-        # Nav elementlar konfiguratsiya
-        nav_config = [
-            ("dashboard", Icons.DASHBOARD, "Dashboard"),
-            ("voice", Icons.VOICE, "Ovozli dialog"),
-            ("chat", Icons.CHAT, "AI Suhbat"),
-            ("commands", Icons.COMMANDS, "Buyruqlar"),
-            ("memory", Icons.MEMORY, "Xotira"),
-            ("scheduler", Icons.SCHEDULER, "Rejalashtiruvchi"),
-            ("plugins", Icons.PLUGINS, "Plaginlar"),
-        ]
-
+        """Sidebar navigatsiya — Command Center hierarchy"""
         # Navigatsiya paneli
         self.nav_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         self.nav_frame.pack(fill="both", expand=True, padx=8, pady=8)
 
-        # Nav elementlarni yaratish
-        for page_id, icon, label in nav_config:
-            nav_item = NavItem(
-                self.nav_frame,
-                icon=icon,
-                label=label,
-                compact=self._compact_mode,
-                command=lambda pid=page_id: self.navigate_to(pid),
-            )
-            nav_item.pack(fill="x", pady=2)
-            self._nav_items[page_id] = nav_item
+        # Nav elementlar bo'limlari
+        nav_sections = [
+            (
+                "ASOSIY",
+                [
+                    ("dashboard", Icons.DASHBOARD, "Dashboard"),
+                    ("chat", Icons.CHAT, "AI Suhbat"),
+                    ("voice", Icons.VOICE, "Ovozli muloqot"),
+                ],
+            ),
+            (
+                "INTELLIGENCE",
+                [
+                    ("commands", Icons.COMMANDS, "Buyruqlar"),
+                    ("memory", Icons.MEMORY, "Xotira"),
+                ],
+            ),
+            (
+                "TIZIM",
+                [
+                    ("scheduler", Icons.SCHEDULER, "Rejalashtiruvchi"),
+                    ("plugins", Icons.PLUGINS, "Plaginlar"),
+                ],
+            ),
+        ]
+
+        for sec_idx, (section_title, items) in enumerate(nav_sections):
+            if not self._compact_mode and section_title:
+                sec_header = ctk.CTkLabel(
+                    self.nav_frame,
+                    text=section_title,
+                    font=(Fonts.FAMILY, 9, "bold"),
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w",
+                )
+                sec_header.pack(fill="x", padx=12, pady=(10 if sec_idx > 0 else 4, 4))
+
+            for page_id, icon, label in items:
+                nav_item = NavItem(
+                    self.nav_frame,
+                    icon=icon,
+                    label=label,
+                    compact=self._compact_mode,
+                    command=lambda pid=page_id: self.navigate_to(pid),
+                )
+                nav_item.pack(fill="x", pady=2)
+                self._nav_items[page_id] = nav_item
 
         # Ajratgich
         separator = ctk.CTkFrame(self.nav_frame, fg_color=Colors.BORDER, height=1)
-        separator.pack(fill="x", padx=12, pady=8)
+        separator.pack(fill="x", padx=12, pady=(12, 6))
 
         # Sozlamalar (pastda)
         settings_item = NavItem(

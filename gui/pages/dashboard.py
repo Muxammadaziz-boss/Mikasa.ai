@@ -6,10 +6,11 @@ import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
 from gui.components import GlassButton, GlassCard, GlowButton, StatWidget, StatusBadge
+from gui.icons import get_vector_icon
 
 
 class DashboardPage(ctk.CTkFrame):
-    """Bosh sahifa — Apple uslubidagi minimalist boshqaruv paneli"""
+    """Bosh sahifa — Apple Intelligence & Linear uslubidagi minimalist boshqaruv markazi"""
 
     def __init__(self, master, app=None, **kwargs):
         super().__init__(master, fg_color=Colors.BG_DARK, **kwargs)
@@ -25,7 +26,7 @@ class DashboardPage(ctk.CTkFrame):
             scrollbar_button_color=Colors.BG_CARD,
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
-        self.scroll.pack(fill="both", expand=True, padx=60, pady=20)
+        self.scroll.pack(fill="both", expand=True, padx=40, pady=20)
 
         # ===== GREETING BANNER =====
         self._build_greeting()
@@ -44,7 +45,7 @@ class DashboardPage(ctk.CTkFrame):
 
     def _build_greeting(self):
         """Salomlashuv sarlavhasi"""
-        greeting, emoji = self._get_greeting()
+        greeting, icon = self._get_greeting()
         name = self._get_user_name()
 
         self.greeting_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
@@ -53,7 +54,7 @@ class DashboardPage(ctk.CTkFrame):
         # Katta salomlashuv
         self.greeting_label = ctk.CTkLabel(
             self.greeting_frame,
-            text=f"{emoji}  {greeting}, {name}!",
+            text=f"{greeting}, {name}!",
             font=(Fonts.FAMILY, 24, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
@@ -94,11 +95,11 @@ class DashboardPage(ctk.CTkFrame):
         emblem_frame.pack(side="left")
         emblem_frame.pack_propagate(False)
 
+        sparkle_icon = get_vector_icon("sparkles", size=22, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
         self.emblem_label = ctk.CTkLabel(
             emblem_frame,
-            text="✦",
-            font=(Fonts.FAMILY, 22),
-            text_color=Colors.PRIMARY,
+            image=sparkle_icon,
+            text="",
         )
         self.emblem_label.pack(expand=True)
 
@@ -139,7 +140,7 @@ class DashboardPage(ctk.CTkFrame):
         # Ajratuvchi chiziq
         ctk.CTkFrame(hero_inner, fg_color=Colors.BORDER, height=1).pack(fill="x", pady=12)
 
-        # Pastki qism: 3 ta toza pill badge
+        # Pastki qism: 4 ta toza pill badge (Vektor belgilar bilan)
         badges_row = ctk.CTkFrame(hero_inner, fg_color="transparent")
         badges_row.pack(fill="x")
 
@@ -150,17 +151,17 @@ class DashboardPage(ctk.CTkFrame):
             tool_count = 29
 
         chips = [
-            ("⚡", "Gemini 2.5 Flash"),
-            ("🛠️", f"{tool_count} ta Vosita"),
-            ("🧠", "Vektor Xotira Faol"),
-            ("🎙️", "Tezkor VAD Oqim"),
+            ("sparkles", "Gemini 2.5 Flash"),
+            ("commands", f"{tool_count} ta Vosita"),
+            ("memory", "Vektor Xotira Faol"),
+            ("voice", "Tezkor VAD Oqim"),
         ]
 
-        for icon, chip_text in chips:
+        for icon_key, chip_text in chips:
             chip = ctk.CTkFrame(
                 badges_row,
                 fg_color=Colors.GLASS_BG,
-                corner_radius=999,
+                corner_radius=Sizing.RADIUS_PILL,
                 border_width=1,
                 border_color=Colors.GLASS_BORDER,
                 bg_color=Colors.BG_CARD,
@@ -168,14 +169,18 @@ class DashboardPage(ctk.CTkFrame):
             chip.pack(side="left", padx=(0, 10))
 
             inner_chip = ctk.CTkFrame(chip, fg_color="transparent")
-            inner_chip.pack(padx=14, pady=6)
+            inner_chip.pack(padx=12, pady=5)
+
+            v_icon = get_vector_icon(icon_key, size=13, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
+            if v_icon:
+                ctk.CTkLabel(inner_chip, image=v_icon, text="").pack(side="left", padx=(0, 6))
 
             ctk.CTkLabel(
                 inner_chip,
-                text=f"{icon}  {chip_text}",
+                text=chip_text,
                 font=Fonts.SMALL_BOLD,
-                text_color="#E2E2EC",
-            ).pack()
+                text_color=Colors.TEXT_PRIMARY,
+            ).pack(side="left")
 
     def _build_quick_actions(self):
         """Tezkor harakatlar tugmalari — Apple Capsule uslubida"""
@@ -197,62 +202,60 @@ class DashboardPage(ctk.CTkFrame):
 
         actions = [
             (
-                "🎙️",
+                "voice",
                 "Tinglash",
-                True,  # Primary Hero Action
+                True,  # Primary Hero Action (GlowButton)
                 lambda: self.app.navigate_to("voice") if self.app else None,
             ),
             (
-                "💬",
+                "chat",
                 "AI Suhbat",
-                False,
+                False, # GlassButton
                 lambda: self.app.navigate_to("chat") if self.app else None,
             ),
             (
-                "🌤️",
+                "sparkles",
                 "Ob-havo",
                 False,
                 lambda: self._quick_command("Toshkentda havo qanday?"),
             ),
             (
-                "🎵",
+                "play",
                 "Musiqa",
                 False,
                 lambda: self._quick_command("musiqa qo'y"),
             ),
             (
-                "💱",
+                "refresh",
                 "Valyuta",
                 False,
                 lambda: self._quick_command("bugungi dollar kursi"),
             ),
             (
-                "👁️",
+                "eye",
                 "Ekran tahlil",
                 False,
                 lambda: self._quick_command("ekranda nima bor"),
             ),
         ]
 
-        for i, (icon, text, is_hero, cmd) in enumerate(actions):
+        for i, (icon_name, text, is_hero, cmd) in enumerate(actions):
             if is_hero:
-                # Apple Hero Glow Button — Full Pill Capsule (zero boxiness!)
                 btn = GlowButton(
                     btn_frame,
                     text=text,
-                    icon=icon,
-                    height=46,
-                    corner_radius=23,
+                    icon=icon_name,
+                    height=44,
+                    corner_radius=Sizing.RADIUS_BUTTON,
                     command=cmd,
                 )
             else:
-                # Apple Dark Glass Capsule Button — Full Pill Capsule (zero boxiness!)
                 btn = GlassButton(
                     btn_frame,
                     text=text,
-                    icon=icon,
-                    height=46,
-                    corner_radius=23,
+                    icon=icon_name,
+                    height=44,
+                    corner_radius=Sizing.RADIUS_BUTTON,
                     command=cmd,
                 )
             btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
@@ -301,11 +304,11 @@ class DashboardPage(ctk.CTkFrame):
         row = ctk.CTkFrame(
             self._activity_list,
             fg_color=Colors.GLASS_BG,
-            corner_radius=10,
+            corner_radius=Sizing.RADIUS_CARD_SM,
             border_width=1,
             border_color=Colors.GLASS_BORDER,
         )
-        row.pack(fill="x", pady=2)
+        row.pack(fill="x", pady=3)
 
         accent_bar = ctk.CTkFrame(
             row,
@@ -314,15 +317,15 @@ class DashboardPage(ctk.CTkFrame):
             fg_color=Colors.SUCCESS,
             corner_radius=2,
         )
-        accent_bar.pack(side="left", padx=(4, 0), pady=4)
+        accent_bar.pack(side="left", padx=(6, 0), pady=6)
         accent_bar.pack_propagate(False)
 
         inner = ctk.CTkFrame(row, fg_color="transparent")
-        inner.pack(side="left", fill="x", expand=True, padx=(6, 12), pady=5)
+        inner.pack(side="left", fill="x", expand=True, padx=(8, 12), pady=6)
 
-        ctk.CTkLabel(
-            inner, text="✨", font=(Fonts.FAMILY, 11), text_color=Colors.SUCCESS, width=16
-        ).pack(side="left", padx=(0, 8))
+        sparkle_img = get_vector_icon("sparkles", size=14, color_dark=Colors.SUCCESS, color_light=Colors.SUCCESS)
+        if sparkle_img:
+            ctk.CTkLabel(inner, image=sparkle_img, text="").pack(side="left", padx=(0, 8))
 
         ctk.CTkLabel(
             inner,
@@ -343,9 +346,9 @@ class DashboardPage(ctk.CTkFrame):
 
     def on_show(self):
         """Sahifa ko'rsatilganda yangilanish"""
-        greeting, emoji = self._get_greeting()
+        greeting, icon = self._get_greeting()
         self.greeting_label.configure(
-            text=f"{emoji}  {greeting}, {self._get_user_name()}!"
+            text=f"{greeting}, {self._get_user_name()}!"
         )
 
         for value, label, icon, color in self._get_stats():
@@ -370,12 +373,12 @@ class DashboardPage(ctk.CTkFrame):
     def _get_greeting(self):
         hour = datetime.datetime.now().hour
         if hour < 6:
-            return "Xayrli tun", "🌙"
+            return "Xayrli tun", "sparkles"
         if hour < 12:
-            return "Xayrli tong", "☀️"
+            return "Xayrli tong", "sparkles"
         if hour < 18:
-            return "Xayrli kun", "🌤️"
-        return "Xayrli kech", "🌆"
+            return "Xayrli kun", "sparkles"
+        return "Xayrli kech", "sparkles"
 
     def _get_stats(self):
         tool_count = 29
@@ -401,8 +404,9 @@ class DashboardPage(ctk.CTkFrame):
                 pass
 
         return [
-            (str(tool_count), "Agent Tools", "🛠️", Colors.PRIMARY),
-            (str(conversation_count), "Suhbatlar", "💬", Colors.SECONDARY),
-            (str(knowledge_count), "Bilimlar", "🧠", Colors.SUCCESS),
-            (str(task_count), "Rejalar", "⏰", Colors.WARNING),
+            (str(tool_count), "Agent Tools", "commands", Colors.PRIMARY),
+            (str(conversation_count), "Suhbatlar", "chat", Colors.SECONDARY),
+            (str(knowledge_count), "Bilimlar", "memory", Colors.SUCCESS),
+            (str(task_count), "Rejalar", "scheduler", Colors.WARNING),
         ]
+
