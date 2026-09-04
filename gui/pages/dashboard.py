@@ -160,7 +160,7 @@ class DashboardPage(ctk.CTkFrame):
             chip = ctk.CTkFrame(
                 badges_row,
                 fg_color=Colors.GLASS_BG,
-                corner_radius=12,
+                corner_radius=999,
                 border_width=1,
                 border_color=Colors.GLASS_BORDER,
                 bg_color=Colors.BG_CARD,
@@ -168,7 +168,7 @@ class DashboardPage(ctk.CTkFrame):
             chip.pack(side="left", padx=(0, 10))
 
             inner_chip = ctk.CTkFrame(chip, fg_color="transparent")
-            inner_chip.pack(padx=12, pady=6)
+            inner_chip.pack(padx=14, pady=6)
 
             ctk.CTkLabel(
                 inner_chip,
@@ -178,7 +178,7 @@ class DashboardPage(ctk.CTkFrame):
             ).pack()
 
     def _build_quick_actions(self):
-        """Tezkor harakatlar tugmalari — Apple minimal uslubida"""
+        """Tezkor harakatlar tugmalari — Apple Capsule uslubida"""
         actions_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         actions_frame.pack(fill="x", pady=(0, 20))
 
@@ -236,26 +236,26 @@ class DashboardPage(ctk.CTkFrame):
 
         for i, (icon, text, is_hero, cmd) in enumerate(actions):
             if is_hero:
-                # Apple Hero Glow Button
+                # Apple Hero Glow Button — Full Pill Capsule (zero boxiness!)
                 btn = GlowButton(
                     btn_frame,
                     text=text,
                     icon=icon,
                     height=48,
-                    corner_radius=14,
+                    corner_radius=24,
                     command=cmd,
                 )
             else:
-                # Apple Dark Glass Capsule Button
+                # Apple Dark Glass Capsule Button — Full Pill Capsule (zero boxiness!)
                 btn = GlassButton(
                     btn_frame,
                     text=text,
                     icon=icon,
                     height=48,
-                    corner_radius=14,
+                    corner_radius=24,
                     command=cmd,
                 )
-            btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
+            btn.grid(row=0, column=i, padx=6, pady=4, sticky="ew")
 
         for i in range(len(actions)):
             btn_frame.columnconfigure(i, weight=1)
@@ -298,23 +298,32 @@ class DashboardPage(ctk.CTkFrame):
 
         now = datetime.datetime.now().strftime("%H:%M:%S")
 
-        row = ctk.CTkFrame(self._activity_list, fg_color="transparent")
-        row.pack(fill="x", pady=4)
+        row = ctk.CTkFrame(
+            self._activity_list,
+            fg_color=Colors.GLASS_BG,
+            corner_radius=10,
+            border_width=1,
+            border_color=Colors.GLASS_BORDER,
+        )
+        row.pack(fill="x", pady=2)
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=12, pady=7)
 
         ctk.CTkLabel(
-            row, text="●", font=(Fonts.FAMILY, 8), text_color=Colors.SUCCESS, width=14
+            inner, text="✨", font=(Fonts.FAMILY, 11), text_color=Colors.SUCCESS, width=16
         ).pack(side="left", padx=(0, 8))
 
         ctk.CTkLabel(
-            row,
+            inner,
             text="Mikasa AI v6.0.0 muvaffaqiyatli ishga tushdi",
-            font=Fonts.BODY,
+            font=Fonts.SMALL,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         ).pack(side="left", fill="x", expand=True)
 
         ctk.CTkLabel(
-            row, text=now, font=Fonts.TINY, text_color=Colors.TEXT_MUTED
+            inner, text=now, font=Fonts.TINY, text_color=Colors.TEXT_MUTED
         ).pack(side="right")
 
     def _quick_command(self, text):

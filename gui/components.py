@@ -135,62 +135,142 @@ class AppleSiriOrb(ctk.CTkFrame):
         self.canvas.delete("all")
         cx = self._center
         cy = self._center
+        t = self._tick
 
         if self._state == "listening":
-            wave = math.sin(self._tick * 0.28) * 8
-            core_r = 50 + wave
-            colors = [
-                (cx, cy, 96 + wave * 1.2, "#0D2545"),
-                (cx, cy, 80 + wave, "#113A6E"),
-                (cx, cy, 65 + wave * 0.7, "#17529E"),
-                (cx, cy, core_r, "#0A84FF"),
-                (cx, cy, 35, "#5AC8FA"),
+            # ===== 1. Silliq Ko'p Qatlamli Gradient Aura (uzluksiz nurli halqalar) =====
+            breath = math.sin(t * 0.22) * 6
+            glow_rings = [
+                (102 + breath, "#111A30"),
+                (96 + breath, "#132140"),
+                (90 + breath, "#162B54"),
+                (84 + breath, "#19376C"),
+                (78 + breath, "#1D4586"),
+                (72 + breath, "#2155A2"),
+                (66 + breath, "#2668C0"),
+                (60 + breath, "#1A7AE8"),
+                (54 + breath, "#0A84FF"),
+                (48 + breath * 0.8, "#0099FF"),
+                (42 + breath * 0.6, "#00B4D8"),
+                (36 + breath * 0.4, "#00C7FF"),
+                (30, "#38BDF8"),
             ]
-            icon = "🎙️"
-            icon_color = "#FFFFFF"
-            icon_size = 28
-        elif self._state == "speaking":
-            wave = math.sin(self._tick * 0.2) * 6
-            core_r = 48 + wave
-            colors = [
-                (cx, cy, 92 + wave, "#22113A"),
-                (cx, cy, 78 + wave * 0.8, "#3D1A6E"),
-                (cx, cy, 64 + wave * 0.6, "#5E5CE6"),
-                (cx, cy, core_r, "#AF52DE"),
-                (cx, cy, 34, "#BF5AF2"),
-            ]
-            icon = "✦"
-            icon_color = "#FFFFFF"
-            icon_size = 30
-        else:
-            # Idle gentle breathing pulse
-            wave = math.sin(self._tick * 0.08) * 4
-            core_r = 46 + wave
-            colors = [
-                (cx, cy, 86 + wave * 0.8, "#0F1728"),
-                (cx, cy, 72 + wave * 0.6, "#152646"),
-                (cx, cy, 58 + wave * 0.4, "#1C3C6E"),
-                (cx, cy, core_r, "#0A84FF"),
-                (cx, cy, 34, "#389BFF"),
-            ]
-            icon = "✦"
-            icon_color = "#FFFFFF"
-            icon_size = 30
+            for r, col in glow_rings:
+                r = max(4, r)
+                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
 
-        for x, y, r, col in colors:
-            r = max(4, r)
+            # ===== 2. Organik Suyuq Siri To'lqin Blobi (Liquid Morphing Spline) =====
+            pts = []
+            for i in range(24):
+                ang = i * (2 * math.pi / 24)
+                r = 46 + math.sin(2 * ang + t * 0.2) * 6 + math.cos(3 * ang - t * 0.16) * 4
+                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
+            self.canvas.create_polygon(pts, smooth=True, fill="#00E5FF", outline="")
+
+            # ===== 3. Jonli Ovoz Ekvalayzer To'lqinlari (Dynamic Equalizer Audio Waves) =====
+            wave_configs = [
+                ("#D946EF", 2.0, 0.22, 10),
+                ("#00F5FF", 3.0, 0.32, 15),
+                ("#FFFFFF", 2.2, 0.44, 12),
+            ]
+            for color, width, speed, amp in wave_configs:
+                wpts = []
+                for x in range(cx - 36, cx + 37, 3):
+                    norm = (x - (cx - 36)) / 72.0
+                    env = math.sin(norm * math.pi)
+                    y = cy + math.sin((x - cx) * 0.14 + t * speed) * amp * env
+                    wpts.extend([x, y])
+                self.canvas.create_line(wpts, smooth=True, width=width, fill=color)
+
+            # ===== 4. Markaziy Shisha Kapsula va Mikrofon Nishoni =====
+            center_r = 22
             self.canvas.create_oval(
-                x - r, y - r, x + r, y + r,
-                fill=col,
-                outline="",
+                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
+                fill="#0D1F3C",
+                outline="#5AC8FA",
+                width=1.5,
             )
+            self.canvas.create_text(
+                cx, cy,
+                text="🎙️",
+                font=(Fonts.FAMILY, 15, "bold"),
+                fill="#FFFFFF",
+            )
+        elif self._state == "speaking":
+            breath = math.sin(t * 0.2) * 5
+            glow_rings = [
+                (98 + breath, "#1A102E"),
+                (91 + breath, "#241340"),
+                (84 + breath, "#321758"),
+                (77 + breath, "#421C72"),
+                (70 + breath, "#552190"),
+                (63 + breath, "#6C26B0"),
+                (56 + breath, "#852CD4"),
+                (48 + breath, "#9D4EDD"),
+                (40 + breath * 0.8, "#AF52DE"),
+                (32, "#BF5AF2"),
+            ]
+            for r, col in glow_rings:
+                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
 
-        self.canvas.create_text(
-            cx, cy,
-            text=icon,
-            font=(Fonts.FAMILY, icon_size, "bold"),
-            fill=icon_color,
-        )
+            pts = []
+            for i in range(24):
+                ang = i * (2 * math.pi / 24)
+                r = 44 + math.sin(2 * ang + t * 0.18) * 5 + math.cos(3 * ang - t * 0.14) * 4
+                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
+            self.canvas.create_polygon(pts, smooth=True, fill="#BF5AF2", outline="")
+
+            center_r = 22
+            self.canvas.create_oval(
+                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
+                fill="#201138",
+                outline="#E0A8FF",
+                width=1.5,
+            )
+            self.canvas.create_text(
+                cx, cy,
+                text="✦",
+                font=(Fonts.FAMILY, 18, "bold"),
+                fill="#FFFFFF",
+            )
+        else:
+            # Idle — mayin, xotirjam Apple Intelligence nafas olish auralari
+            breath = math.sin(t * 0.08) * 4
+            glow_rings = [
+                (92 + breath, "#101626"),
+                (85 + breath, "#121C32"),
+                (78 + breath, "#152442"),
+                (71 + breath, "#182E55"),
+                (64 + breath, "#1C3A6B"),
+                (57 + breath, "#204884"),
+                (50 + breath * 0.8, "#2557A0"),
+                (43 + breath * 0.6, "#1E68C4"),
+                (36 + breath * 0.4, "#0A84FF"),
+                (28, "#38BDF8"),
+            ]
+            for r, col in glow_rings:
+                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
+
+            pts = []
+            for i in range(24):
+                ang = i * (2 * math.pi / 24)
+                r = 38 + math.sin(2 * ang + t * 0.09) * 4 + math.cos(3 * ang - t * 0.07) * 3
+                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
+            self.canvas.create_polygon(pts, smooth=True, fill="#0A84FF", outline="")
+
+            center_r = 22
+            self.canvas.create_oval(
+                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
+                fill="#0F1F38",
+                outline="#64D2FF",
+                width=1.5,
+            )
+            self.canvas.create_text(
+                cx, cy,
+                text="✦",
+                font=(Fonts.FAMILY, 18, "bold"),
+                fill="#FFFFFF",
+            )
 
     def _animate(self):
         if not self._is_active:
@@ -707,7 +787,7 @@ class SearchBar(ctk.CTkFrame):
 
 
 class StatWidget(ctk.CTkFrame):
-    """Statistika widget — Apple uslubidagi nafis raqamli karta"""
+    """Statistika widget — Apple Squircle Glass karta"""
 
     def __init__(self, master, value="0", label="", icon="", color=None, **kwargs):
         color = color or Colors.PRIMARY
@@ -716,24 +796,27 @@ class StatWidget(ctk.CTkFrame):
 
         super().__init__(
             master,
-            fg_color=Colors.BG_CARD,
-            corner_radius=Sizing.CARD_RADIUS,
+            fg_color=Colors.GLASS_BG,
+            corner_radius=20,
             border_width=1,
-            border_color=Colors.BORDER,
+            border_color=Colors.GLASS_BORDER,
             **kwargs,
         )
+
+        self._color = color
+        self._normal_border = Colors.GLASS_BORDER
 
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=16, pady=(14, 6))
 
         self.icon_box = ctk.CTkFrame(
             top,
-            fg_color=Colors.BG_PANEL,
-            corner_radius=10,
-            width=36,
-            height=36,
+            fg_color=Colors.BG_INPUT,
+            corner_radius=13,
+            width=42,
+            height=42,
             border_width=1,
-            border_color=Colors.BORDER,
+            border_color=Colors.GLASS_BORDER,
         )
         self.icon_box.pack(side="left")
         self.icon_box.pack_propagate(False)
@@ -741,30 +824,57 @@ class StatWidget(ctk.CTkFrame):
         self.icon_label = ctk.CTkLabel(
             self.icon_box,
             text=icon,
-            font=(Fonts.FAMILY, 18),
+            font=(Fonts.FAMILY, 20),
             text_color=color,
         )
         self.icon_label.pack(expand=True)
 
+        text_col = ctk.CTkFrame(top, fg_color="transparent")
+        text_col.pack(side="left", padx=(12, 0), fill="x", expand=True)
+
         self.desc_label = ctk.CTkLabel(
-            top,
+            text_col,
             text=label.upper(),
-            font=(Fonts.FAMILY, 11, "bold"),
-            text_color=Colors.TEXT_MUTED,
+            font=Fonts.SMALL_BOLD,
+            text_color=Colors.TEXT_SECONDARY,
             anchor="w",
         )
-        self.desc_label.pack(side="left", padx=(10, 0), fill="x", expand=True)
+        self.desc_label.pack(fill="x")
+
+        # O'ng tomonda Apple status pill (keng ekranni chiroyli to'ldiradi)
+        self.badge = ctk.CTkFrame(
+            top,
+            fg_color=Colors.BG_INPUT,
+            corner_radius=999,
+            border_width=1,
+            border_color=Colors.GLASS_BORDER,
+        )
+        self.badge.pack(side="right")
+        self.badge_label = ctk.CTkLabel(
+            self.badge,
+            text="● Faol",
+            font=Fonts.TINY,
+            text_color=color,
+        )
+        self.badge_label.pack(padx=8, pady=3)
 
         self.value_label = ctk.CTkLabel(
             self,
             text=str(value),
-            font=(Fonts.FAMILY, 28, "bold"),
-            text_color=Colors.TEXT_PRIMARY,
+            font=(Fonts.FAMILY, 32, "bold"),
+            text_color="#FFFFFF",
             anchor="w",
         )
-        self.value_label.pack(fill="x", padx=16, pady=(4, 14))
+        self.value_label.pack(fill="x", padx=18, pady=(4, 14))
 
-        self._color = color
+        self.bind("<Enter>", self._on_enter, add="+")
+        self.bind("<Leave>", self._on_leave, add="+")
+
+    def _on_enter(self, event=None):
+        self.configure(border_color=self._color)
+
+    def _on_leave(self, event=None):
+        self.configure(border_color=self._normal_border)
 
     def set_value(self, value):
         self.value_label.configure(text=str(value))

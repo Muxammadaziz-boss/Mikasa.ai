@@ -416,19 +416,28 @@ class BackendBridge:
 
             # Yangi elementlar
             for act in self._activities[:8]:
-                row = ctk.CTkFrame(dashboard._activity_list, fg_color="transparent")
+                row = ctk.CTkFrame(
+                    dashboard._activity_list,
+                    fg_color=Colors.GLASS_BG,
+                    corner_radius=10,
+                    border_width=1,
+                    border_color=Colors.GLASS_BORDER,
+                )
                 row.pack(fill="x", pady=2)
 
+                inner = ctk.CTkFrame(row, fg_color="transparent")
+                inner.pack(fill="x", padx=12, pady=7)
+
                 ctk.CTkLabel(
-                    row,
+                    inner,
                     text="●",
-                    font=(Fonts.FAMILY, 8),
+                    font=(Fonts.FAMILY, 9),
                     text_color=act["color"],
                     width=14,
                 ).pack(side="left", padx=(0, 6))
 
                 ctk.CTkLabel(
-                    row,
+                    inner,
                     text=act["text"],
                     font=Fonts.SMALL,
                     text_color=Colors.TEXT_PRIMARY,
@@ -436,7 +445,7 @@ class BackendBridge:
                 ).pack(side="left", fill="x", expand=True)
 
                 ctk.CTkLabel(
-                    row, text=act["time"], font=Fonts.TINY, text_color=Colors.TEXT_MUTED
+                    inner, text=act["time"], font=Fonts.TINY, text_color=Colors.TEXT_MUTED
                 ).pack(side="right")
 
         except Exception as e:
