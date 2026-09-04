@@ -141,170 +141,116 @@ class AppleSiriOrb(ctk.CTkFrame):
         try:
             from PIL import Image, ImageDraw, ImageFilter, ImageTk
         except ImportError:
-            # PIL mavjud bo'lmasa oddiy doira chizamiz
             self.canvas.create_oval(cx-40, cy-40, cx+40, cy+40, fill="#0A84FF", outline="")
             return
 
         img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
+
+        def draw_glow_blob(base_img, bx, by, radius, color_rgb, max_alpha=200):
+            blob_img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+            d = ImageDraw.Draw(blob_img)
+            step = 2
+            for r in range(int(radius), 0, -step):
+                frac = r / radius
+                alpha = int(max_alpha * (1.0 - frac * frac))
+                d.ellipse([bx - r, by - r, bx + r, by + r], fill=(*color_rgb, alpha))
+            return Image.alpha_composite(base_img, blob_img)
 
         if self._state == "listening":
-            # ===== LISTENING: Ko'k-cyan gradient aura =====
-            breath = math.sin(t * 0.22) * 6
-            max_r = 100 + breath
-            # Radial gradient — 80 ta konsentrik doira bilan silliq gradient
-            colors_stops = [
-                (0.0, (17, 26, 48, 20)),     # Tashqi — juda shaffof to'q ko'k
-                (0.2, (25, 55, 108, 60)),     # O'rta-tashqi
-                (0.4, (33, 85, 160, 100)),    # O'rta
-                (0.55, (26, 122, 232, 160)),   # O'rta-ichki
-                (0.7, (10, 132, 255, 200)),    # Ichki — yorqin ko'k
-                (0.85, (0, 180, 255, 230)),    # Ichki nurli
-                (1.0, (56, 189, 248, 255)),    # Markaz — eng yorqin
-            ]
-            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
+            # ===== LISTENING: Multi-layer Organic Fluid Siri Glow =====
+            breath = math.sin(t * 0.18) * 8
 
-            # Organik breathing pulse — nozik yorug'lik halqasi
-            pulse_r = 52 + math.sin(t * 0.3) * 4
-            pulse_alpha = int(80 + math.sin(t * 0.25) * 40)
-            for pr in range(int(pulse_r), int(pulse_r) + 6):
-                a = max(0, pulse_alpha - (pr - int(pulse_r)) * 15)
-                draw.ellipse([cx-pr, cy-pr, cx+pr, cy+pr], outline=(0, 229, 255, a), width=1)
+            # Asosiy ko'k aura
+            img = draw_glow_blob(img, cx, cy, 96 + breath, (10, 132, 255), 180)
 
-            # Ovoz ekvalayzer barlari — markazda 7 ta vertikal bar
+            # Aylanuvchi Neon Cyan to'lqin
+            bx1 = cx + math.sin(t * 0.22) * 16
+            by1 = cy + math.cos(t * 0.22) * 12
+            img = draw_glow_blob(img, bx1, by1, 82, (0, 245, 255), 190)
+
+            # Aylanuvchi Siri Magenta / Pink to'lqin
+            bx2 = cx - math.sin(t * 0.19) * 14
+            by2 = cy - math.cos(t * 0.19) * 16
+            img = draw_glow_blob(img, bx2, by2, 76, (255, 45, 120), 170)
+
+            # Binafsha / Violet to'lqin
+            bx3 = cx + math.cos(t * 0.26) * 12
+            by3 = cy - math.sin(t * 0.26) * 10
+            img = draw_glow_blob(img, bx3, by3, 70, (175, 82, 222), 160)
+
+            # Markaziy nurli yorqin yadrosi (Radiant Cyan / White Core)
+            img = draw_glow_blob(img, cx, cy, 44, (200, 245, 255), 230)
+            img = draw_glow_blob(img, cx, cy, 24, (255, 255, 255), 255)
+
+            # Gaussian blur bilan silliq suyuq qorishish
+            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+
+            # Ustiga silliq ekvalayzer ovoz to'lqinlari barlari
+            draw = ImageDraw.Draw(img)
             bar_count = 7
-            bar_width = 4
+            bar_w = 4
             bar_gap = 3
-            total_w = bar_count * bar_width + (bar_count - 1) * bar_gap
-            start_x = cx - total_w // 2
-            for bi in range(bar_count):
-                # Har bir barning balandligi animatsiyaga qarab o'zgaradi
-                phase = bi * 0.7 + t * 0.35
-                bar_h = int(8 + abs(math.sin(phase)) * 18 + abs(math.cos(phase * 0.6)) * 8)
-                bx = start_x + bi * (bar_width + bar_gap)
-                by1 = cy - bar_h // 2
-                by2 = cy + bar_h // 2
-                # Bar rangi — markazga yaqinlari yorqinroq
-                dist = abs(bi - bar_count // 2) / (bar_count // 2)
-                r_c = int(0 + dist * 20)
-                g_c = int(229 - dist * 40)
-                b_c = int(255 - dist * 10)
-                bar_alpha = int(220 - dist * 60)
-                for dx in range(bar_width):
-                    draw.line([(bx + dx, by1), (bx + dx, by2)], fill=(r_c, g_c, b_c, bar_alpha))
-
-            # Markaziy shisha doira
-            center_r = 20
-            draw.ellipse(
-                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
-                fill=(13, 31, 60, 200),
-                outline=(90, 200, 250, 180),
-                width=2,
-            )
+            total_w = bar_count * bar_w + (bar_count - 1) * bar_gap
+            sx = cx - total_w // 2
+            for i in range(bar_count):
+                phase = i * 0.8 + t * 0.4
+                h = int(10 + abs(math.sin(phase)) * 22 + abs(math.cos(phase * 0.7)) * 12)
+                x = sx + i * (bar_w + bar_gap)
+                draw.rounded_rectangle([x, cy - h // 2, x + bar_w, cy + h // 2], radius=2, fill=(255, 255, 255, 240))
 
         elif self._state == "speaking":
-            # ===== SPEAKING: Binafsha-pushti gradient aura =====
-            breath = math.sin(t * 0.2) * 5
-            max_r = 96 + breath
-            colors_stops = [
-                (0.0, (26, 16, 46, 20)),
-                (0.2, (50, 23, 88, 60)),
-                (0.4, (82, 33, 144, 100)),
-                (0.55, (108, 38, 176, 160)),
-                (0.7, (157, 78, 221, 200)),
-                (0.85, (175, 82, 222, 230)),
-                (1.0, (191, 90, 242, 255)),
-            ]
-            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
+            # ===== SPEAKING: Radiant Violet-Magenta Blooming Aura =====
+            breath = math.sin(t * 0.2) * 7
 
-            # Nozik pulse
-            pulse_r = 48 + math.sin(t * 0.28) * 3
-            pulse_alpha = int(70 + math.sin(t * 0.22) * 30)
-            for pr in range(int(pulse_r), int(pulse_r) + 5):
-                a = max(0, pulse_alpha - (pr - int(pulse_r)) * 14)
-                draw.ellipse([cx-pr, cy-pr, cx+pr, cy+pr], outline=(191, 90, 242, a), width=1)
+            # Deep Purple base
+            img = draw_glow_blob(img, cx, cy, 95 + breath, (80, 20, 160), 180)
 
-            # Markaziy doira
-            center_r = 20
-            draw.ellipse(
-                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
-                fill=(32, 17, 56, 200),
-                outline=(224, 168, 255, 180),
-                width=2,
-            )
-            # Sparkle belgi — Canvas text orqali
+            # Radiant Magenta
+            bx1 = cx + math.sin(t * 0.24) * 14
+            by1 = cy + math.cos(t * 0.24) * 10
+            img = draw_glow_blob(img, bx1, by1, 80, (220, 40, 180), 190)
+
+            # Violet pulse
+            bx2 = cx - math.sin(t * 0.2) * 12
+            by2 = cy - math.cos(t * 0.2) * 12
+            img = draw_glow_blob(img, bx2, by2, 72, (160, 60, 240), 170)
+
+            # Bright Lilac / White Core
+            img = draw_glow_blob(img, cx, cy, 42, (240, 210, 255), 230)
+            img = draw_glow_blob(img, cx, cy, 22, (255, 255, 255), 255)
+
+            img = img.filter(ImageFilter.GaussianBlur(radius=4))
 
         else:
-            # ===== IDLE: Tinch ko'k nafas olish auralari =====
-            breath = math.sin(t * 0.08) * 4
-            max_r = 88 + breath
-            colors_stops = [
-                (0.0, (16, 22, 38, 15)),
-                (0.2, (21, 36, 66, 45)),
-                (0.4, (28, 58, 107, 80)),
-                (0.55, (32, 72, 132, 120)),
-                (0.7, (37, 87, 160, 160)),
-                (0.85, (10, 104, 196, 200)),
-                (1.0, (10, 132, 255, 240)),
-            ]
-            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
+            # ===== IDLE: Radiant, Breathing Siri Deep Blue & Electric Cyan =====
+            breath = math.sin(t * 0.1) * 6
 
-            # Markaziy doira
-            center_r = 20
-            draw.ellipse(
-                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
-                fill=(15, 31, 56, 200),
-                outline=(100, 210, 255, 160),
-                width=2,
-            )
+            # Katta chuqur neon ko'k aura (radiusi 92px)
+            img = draw_glow_blob(img, cx, cy, 92 + breath, (10, 132, 255), 180)
 
-        # Gaussian Blur bilan silliqlashtirish
-        img = img.filter(ImageFilter.GaussianBlur(radius=2))
+            # Nafas oluvchi elektr sian to'lqini
+            bx1 = cx + math.sin(t * 0.12) * 8
+            by1 = cy + math.cos(t * 0.12) * 6
+            img = draw_glow_blob(img, bx1, by1, 76 + breath * 0.8, (0, 210, 255), 190)
+
+            # Yumshoq indigo-safir ichki qatlam
+            img = draw_glow_blob(img, cx, cy, 60 + breath * 0.5, (30, 100, 240), 200)
+
+            # Yorqin nurlanuvchi yadro (Bright Glowing Core)
+            img = draw_glow_blob(img, cx, cy, 38, (180, 240, 255), 230)
+            img = draw_glow_blob(img, cx, cy, 20, (255, 255, 255), 255)
+
+            img = img.filter(ImageFilter.GaussianBlur(radius=4))
 
         # Canvas ga joylashtirish
         self._photo = ImageTk.PhotoImage(img)
         self.canvas.create_image(cx, cy, image=self._photo)
 
-        # Speaking/Idle uchun sparkle belgi (Canvas text — PIL dan tashqarida)
-        if self._state == "speaking":
-            self.canvas.create_text(cx, cy, text="\u2726", font=("Segoe UI", 16, "bold"), fill="#FFFFFF")
-        elif self._state == "idle":
-            self.canvas.create_text(cx, cy, text="\u2726", font=("Segoe UI", 16, "bold"), fill="#FFFFFF")
-
-    def _draw_radial_gradient(self, draw, cx, cy, max_r, color_stops):
-        """Silliq radial gradient chizish — color_stops: [(t, (r,g,b,a)), ...]"""
-        rings = 80
-        for i in range(rings, -1, -1):
-            t = i / rings  # 1.0 = tashqi, 0.0 = ichki
-            inv_t = 1.0 - t  # 0.0 = tashqi, 1.0 = ichki
-            r = max_r * t
-            if r < 1:
-                continue
-
-            # Rangni interpolatsiya qilish
-            color = self._interpolate_color(inv_t, color_stops)
-            draw.ellipse(
-                [cx - r, cy - r, cx + r, cy + r],
-                fill=color,
-            )
-
-    @staticmethod
-    def _interpolate_color(t, stops):
-        """Color stops orasida lineer interpolatsiya"""
-        t = max(0.0, min(1.0, t))
-        if t <= stops[0][0]:
-            return stops[0][1]
-        if t >= stops[-1][0]:
-            return stops[-1][1]
-
-        for i in range(len(stops) - 1):
-            t0, c0 = stops[i]
-            t1, c1 = stops[i + 1]
-            if t0 <= t <= t1:
-                local_t = (t - t0) / (t1 - t0) if t1 != t0 else 0
-                return tuple(int(c0[j] + (c1[j] - c0[j]) * local_t) for j in range(4))
-
-        return stops[-1][1]
+        # Idle va speaking uchun nozik markaziy AI ramzi
+        if self._state == "idle":
+            self.canvas.create_text(cx, cy, text="✦", font=("Segoe UI", 16, "bold"), fill="#0A2540")
+        elif self._state == "speaking":
+            self.canvas.create_text(cx, cy, text="✦", font=("Segoe UI", 16, "bold"), fill="#2E0854")
 
 
     def _animate(self):
@@ -480,9 +426,20 @@ class EmptyState(ctk.CTkFrame):
     def __init__(self, master, icon="✨", title="", description="", **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
 
+        # Haqiqiy fon rangini aniqlash (burchak artefaktlarini yo'qotish)
+        curr = master
+        effective_bg = Colors.BG_CARD
+        while curr:
+            c = getattr(curr, "_fg_color", None) or getattr(curr, "fg_color", None)
+            if c and c != "transparent":
+                effective_bg = c
+                break
+            curr = getattr(curr, "master", None)
+
         icon_frame = ctk.CTkFrame(
             self,
             fg_color=Colors.GLASS_BG,
+            bg_color=effective_bg,
             border_width=1,
             border_color=Colors.GLASS_BORDER,
             corner_radius=28,
@@ -959,7 +916,7 @@ class MessageBubble(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 meta_row,
-                text="✦ Mikasa",
+                text="✨ Mikasa",
                 font=Fonts.SMALL_BOLD,
                 text_color=Colors.PRIMARY,
                 anchor="w",

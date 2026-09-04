@@ -251,20 +251,40 @@ class ChatPage(ctk.CTkFrame):
         self.input_frame.pack_propagate(False)
 
         # Chap tomonda skripka (📎) tugmasi — fayl/hujjat/rasm biriktirish
-        # Aniq ko'rinadigan, zamonaviy Apple/Telegram circular tugma
+        # Zamonaviy Apple/Telegram minimalist circular tugma
         self.attach_btn = CircleIconButton(
             self.input_frame,
             icon="📎",
-            size=40,
+            size=38,
             font=(Fonts.FAMILY, 16),
             fg_color=Colors.GLASS_BG,
             hover_color=Colors.GLASS_BG_HOVER,
             border_color=Colors.GLASS_BORDER,
             border_hover_color=Colors.GLASS_BORDER_HOVER,
+            border_width=1,
+            bg_color=Colors.BG_INPUT,
             text_color="#FFFFFF",
             command=self._on_attach_file,
         )
-        self.attach_btn.pack(side="left", padx=(7, 0), pady=7)
+        self.attach_btn.pack(side="left", padx=(8, 4), pady=8)
+
+        # O'ng tomondagi Telegram uslubidagi dinamik tugma (🎙️ <-> ➤)
+        # MUHIM: action_btn ni input_entry dan oldin pack qilish tugma siqilib ketishining oldini oladi
+        self.action_btn = CircleIconButton(
+            self.input_frame,
+            icon="🎙️",
+            size=38,
+            font=(Fonts.FAMILY, 15),
+            fg_color=Colors.GLASS_BG,
+            hover_color=Colors.GLASS_BG_HOVER,
+            border_color=Colors.GLASS_BORDER,
+            border_hover_color=Colors.GLASS_BORDER_HOVER,
+            border_width=1,
+            bg_color=Colors.BG_INPUT,
+            text_color=Colors.PRIMARY,
+            command=self._on_action_button_click,
+        )
+        self.action_btn.pack(side="right", padx=(4, 8), pady=8)
 
         # Matn kiritish maydoni (StringVar orqali dinamik kuzatuv)
         self._input_var = ctk.StringVar()
@@ -279,26 +299,10 @@ class ChatPage(ctk.CTkFrame):
             border_width=0,
             text_color=Colors.TEXT_PRIMARY,
             placeholder_text_color=Colors.TEXT_MUTED,
-            height=40,
+            height=38,
         )
-        self.input_entry.pack(side="left", fill="x", expand=True, padx=8, pady=7)
+        self.input_entry.pack(side="left", fill="x", expand=True, padx=4, pady=8)
         self.input_entry.bind("<Return>", self._on_enter_pressed)
-
-        # O'ng tomondagi Telegram uslubidagi dinamik tugma (🎙️ <-> ➤)
-        # Matn bo'sh bo'lsa mikrofon, biron belgi yozilsa yuborish belgisiga aylanadi
-        self.action_btn = CircleIconButton(
-            self.input_frame,
-            icon="🎙️",
-            size=40,
-            font=(Fonts.FAMILY, 15),
-            fg_color=Colors.GLASS_BG,
-            hover_color=Colors.GLASS_BG_HOVER,
-            border_color=Colors.GLASS_BORDER,
-            border_hover_color=Colors.GLASS_BORDER_HOVER,
-            text_color=Colors.PRIMARY,
-            command=self._on_action_button_click,
-        )
-        self.action_btn.pack(side="right", padx=(0, 7), pady=7)
 
         # Mavjud kodlar bilan moslik uchun alias
         self.send_btn = self.action_btn
@@ -380,6 +384,7 @@ class ChatPage(ctk.CTkFrame):
                     fg_color=Colors.GLASS_HERO_BG,
                     hover_color=Colors.GLASS_HERO_HOVER,
                     border_color=Colors.GLASS_HERO_BORDER,
+                    border_width=1,
                     text_color="#FFFFFF",
                 )
         else:
@@ -391,6 +396,7 @@ class ChatPage(ctk.CTkFrame):
                     fg_color=Colors.GLASS_BG,
                     hover_color=Colors.GLASS_BG_HOVER,
                     border_color=Colors.GLASS_BORDER,
+                    border_width=1,
                     text_color=Colors.PRIMARY,
                 )
 

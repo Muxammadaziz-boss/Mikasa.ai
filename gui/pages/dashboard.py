@@ -241,24 +241,24 @@ class DashboardPage(ctk.CTkFrame):
                     btn_frame,
                     text=text,
                     icon=icon,
-                    width=200,
-                    height=48,
-                    corner_radius=999,
+                    height=46,
+                    corner_radius=23,
                     command=cmd,
                 )
-                btn.grid(row=0, column=i, padx=6, pady=4)
             else:
                 # Apple Dark Glass Capsule Button — Full Pill Capsule (zero boxiness!)
                 btn = GlassButton(
                     btn_frame,
                     text=text,
                     icon=icon,
-                    width=140,
-                    height=48,
-                    corner_radius=999,
+                    height=46,
+                    corner_radius=23,
                     command=cmd,
                 )
-                btn.grid(row=0, column=i, padx=4, pady=4)
+            btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
+
+        for i in range(len(actions)):
+            btn_frame.columnconfigure(i, weight=1)
 
     def _build_stats(self):
         """Statistika kartalari — Apple minimal widgetlari"""
@@ -307,8 +307,18 @@ class DashboardPage(ctk.CTkFrame):
         )
         row.pack(fill="x", pady=2)
 
+        accent_bar = ctk.CTkFrame(
+            row,
+            width=3,
+            height=20,
+            fg_color=Colors.SUCCESS,
+            corner_radius=2,
+        )
+        accent_bar.pack(side="left", padx=(4, 0), pady=4)
+        accent_bar.pack_propagate(False)
+
         inner = ctk.CTkFrame(row, fg_color="transparent")
-        inner.pack(fill="x", padx=12, pady=7)
+        inner.pack(side="left", fill="x", expand=True, padx=(6, 12), pady=5)
 
         ctk.CTkLabel(
             inner, text="✨", font=(Fonts.FAMILY, 11), text_color=Colors.SUCCESS, width=16

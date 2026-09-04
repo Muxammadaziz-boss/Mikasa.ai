@@ -442,13 +442,15 @@ class BackendBridge:
                 accent_bar = ctk.CTkFrame(
                     row,
                     width=3,
+                    height=20,
                     fg_color=act_color,
                     corner_radius=2,
                 )
-                accent_bar.pack(side="left", fill="y", padx=(4, 0), pady=4)
+                accent_bar.pack(side="left", padx=(4, 0), pady=4)
+                accent_bar.pack_propagate(False)
 
                 inner = ctk.CTkFrame(row, fg_color="transparent")
-                inner.pack(side="left", fill="x", expand=True, padx=(8, 12), pady=7)
+                inner.pack(side="left", fill="x", expand=True, padx=(6, 12), pady=5)
 
                 # Activity type ga mos rangdagi ikonka
                 ctk.CTkLabel(

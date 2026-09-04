@@ -71,7 +71,7 @@ class VoicePage(ctk.CTkFrame):
         orb_frame.pack(pady=(16, 8))
 
         # Dynamic Apple Siri Orb
-        self.apple_orb = AppleSiriOrb(orb_frame, size=210)
+        self.apple_orb = AppleSiriOrb(orb_frame, size=220)
         self.apple_orb.pack()
         self.orb_container = self.apple_orb  # Backwards compatibility alias
 
