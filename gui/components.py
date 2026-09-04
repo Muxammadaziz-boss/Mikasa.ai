@@ -98,7 +98,7 @@ class InfoChip(ctk.CTkFrame):
         text_color = text_color or Colors.TEXT_SECONDARY
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = Colors.BG_CARD
-        super().__init__(master, fg_color=fg_color, corner_radius=999, **kwargs)
+        super().__init__(master, fg_color=fg_color, corner_radius=12, **kwargs)
 
         self._icon = icon
         self.label = ctk.CTkLabel(
@@ -553,7 +553,7 @@ class NavItem(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=8,
+            corner_radius=8 if active else 0,
             height=42,
             cursor="hand2",
             **kwargs,
@@ -569,7 +569,7 @@ class NavItem(ctk.CTkFrame):
             self,
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent",
             width=3,
-            corner_radius=2,
+            corner_radius=0,
         )
         self.indicator.pack(side="left", fill="y", padx=(2, 6), pady=6)
 
@@ -611,17 +611,20 @@ class NavItem(ctk.CTkFrame):
 
     def _on_enter(self, event=None):
         if not self._active:
-            self.configure(fg_color=Colors.SIDEBAR_HOVER)
+            self.configure(fg_color=Colors.SIDEBAR_HOVER, corner_radius=8)
             self.text_label.configure(text_color=Colors.TEXT_PRIMARY)
 
     def _on_leave(self, event=None):
         if not self._active:
-            self.configure(fg_color="transparent")
+            self.configure(fg_color="transparent", corner_radius=0)
             self.text_label.configure(text_color=Colors.TEXT_SECONDARY)
 
     def set_active(self, active):
         self._active = active
-        self.configure(fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent")
+        self.configure(
+            fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
+            corner_radius=8 if active else 0,
+        )
         self.indicator.configure(
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent"
         )

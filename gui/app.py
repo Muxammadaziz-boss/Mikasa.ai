@@ -3,6 +3,11 @@
 # Sidebar navigatsiya + Main content area + Status bar
 
 import customtkinter as ctk
+from customtkinter.windows.widgets.core_rendering import DrawEngine
+
+# Windows Tkinter font to'rtburchak/qavs qoldiqlarisiz toza geometriya
+DrawEngine.preferred_drawing_method = "circle_shapes"
+
 import os
 import datetime
 import psutil

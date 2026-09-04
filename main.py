@@ -2532,6 +2532,9 @@ def gui_ishga_tushir():
 
     # Yangi GUI ni ishlatish
     try:
+        from customtkinter.windows.widgets.core_rendering import DrawEngine
+        DrawEngine.preferred_drawing_method = "circle_shapes"
+
         from gui.app import MikasaApp
 
         print("🔷 MIKASA AI — Yangi GUI ishga tushmoqda...")

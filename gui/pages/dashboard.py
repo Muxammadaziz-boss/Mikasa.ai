@@ -86,9 +86,10 @@ class DashboardPage(ctk.CTkFrame):
         emblem_frame = ctk.CTkFrame(
             top_row,
             fg_color=Colors.PRIMARY_SOFT,
-            corner_radius=999,
+            corner_radius=24,
             width=48,
             height=48,
+            bg_color=Colors.BG_CARD,
         )
         emblem_frame.pack(side="left")
         emblem_frame.pack_propagate(False)
@@ -159,9 +160,10 @@ class DashboardPage(ctk.CTkFrame):
             chip = ctk.CTkFrame(
                 badges_row,
                 fg_color=Colors.BG_SOFT,
-                corner_radius=999,
+                corner_radius=12,
                 border_width=1,
                 border_color=Colors.BORDER,
+                bg_color=Colors.BG_CARD,
             )
             chip.pack(side="left", padx=(0, 10))
 
