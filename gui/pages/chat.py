@@ -199,16 +199,8 @@ class ChatPage(ctk.CTkFrame):
             btn.pack(side="left", padx=4)
 
     def _center_button_content(self, btn):
-        """CTkButton ichidagi text_label ni to'liq o'rtada (center) joylashtirish"""
-        try:
-            if hasattr(btn, "_text_label") and btn._text_label is not None:
-                btn._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
-                for r in range(5):
-                    btn.grid_rowconfigure(r, weight=1)
-                for c in range(5):
-                    btn.grid_columnconfigure(c, weight=1)
-        except Exception:
-            pass
+        """No-op: CTkButton default centering saqlanadi va to'rtburchak clipping oldi olinadi"""
+        pass
 
     def _build_input_bar(self, parent):
         """Matn kiritish paneli — Telegram / Apple uslubidagi minimalist dizayn"""
@@ -449,7 +441,6 @@ class ChatPage(ctk.CTkFrame):
             border_width=0,
             text_color="#FFFFFF",
         )
-        self._center_button_content(self.attach_btn)
         self._update_action_button()
 
     def _show_attachment_preview(self, file_path):
@@ -485,7 +476,6 @@ class ChatPage(ctk.CTkFrame):
             border_color=Colors.GLASS_BORDER,
             text_color="#FFFFFF",
         )
-        self._center_button_content(self.attach_btn)
         self._update_action_button()
 
     def _on_send(self, event=None):

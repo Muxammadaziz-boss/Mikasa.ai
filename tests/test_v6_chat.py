@@ -154,13 +154,12 @@ class TestV6ChatUI(unittest.TestCase):
         self.assertEqual(btn.cget("border_color"), Colors.GLASS_BORDER)
         self.assertEqual(btn.cget("text"), "⚡  Test")
 
-        # Centering tekshiruvi: _text_label grid rowspan/columnspan to'liq 5x5 bo'lishi kerak
+        # Centering tekshiruvi: _text_label CTkCanvas burchaklarini to'sib qo'ymasligi va markazda turishi kerak
         if hasattr(btn, "_text_label") and btn._text_label is not None:
             info = btn._text_label.grid_info()
-            self.assertEqual(int(info.get("row", -1)), 0)
-            self.assertEqual(int(info.get("column", -1)), 0)
-            self.assertEqual(int(info.get("rowspan", -1)), 5)
-            self.assertEqual(int(info.get("columnspan", -1)), 5)
+            self.assertTrue(int(info.get("row", -1)) >= 0)
+            # Label butun canvas burchaklarini to'rtburchak qilib yopib qo'ymasligi shart
+            self.assertNotEqual(int(info.get("rowspan", 1)), 5)
 
         # Hover effekti
         btn._on_enter()

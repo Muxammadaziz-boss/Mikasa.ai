@@ -573,22 +573,10 @@ class GlassButton(ctk.CTkButton):
         self._hover_border = b_hover
         self._current_icon = icon
         self._current_text = text
-        self._ensure_centering()
 
         # Dynamic frosted glass border highlight on hover
         self.bind("<Enter>", self._on_enter, add="+")
         self.bind("<Leave>", self._on_leave, add="+")
-
-    def _ensure_centering(self):
-        try:
-            if hasattr(self, "_text_label") and self._text_label is not None:
-                self._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
-                for r in range(5):
-                    self.grid_rowconfigure(r, weight=1)
-                for c in range(5):
-                    self.grid_columnconfigure(c, weight=1)
-        except Exception:
-            pass
 
     def configure(self, require_redraw=False, **kwargs):
         if "icon" in kwargs or "text" in kwargs:
@@ -600,7 +588,6 @@ class GlassButton(ctk.CTkButton):
         if "border_color" in kwargs:
             self._normal_border = kwargs["border_color"]
         super().configure(require_redraw=require_redraw, **kwargs)
-        self._ensure_centering()
 
     def _on_enter(self, event=None):
         try:
@@ -648,6 +635,13 @@ class CircleIconButton(GlassButton):
             **kwargs,
         )
         self._tooltip = tooltip
+        self.grid_columnconfigure(0, minsize=0)
+        self.grid_columnconfigure(4, minsize=0)
+
+    def configure(self, require_redraw=False, **kwargs):
+        super().configure(require_redraw=require_redraw, **kwargs)
+        self.grid_columnconfigure(0, minsize=0)
+        self.grid_columnconfigure(4, minsize=0)
 
 
 class GlowButton(ctk.CTkButton):
@@ -671,22 +665,6 @@ class GlowButton(ctk.CTkButton):
             height=kwargs.pop("height", Sizing.BUTTON_HEIGHT),
             **kwargs,
         )
-        self._ensure_centering()
-
-    def _ensure_centering(self):
-        try:
-            if hasattr(self, "_text_label") and self._text_label is not None:
-                self._text_label.grid(row=0, column=0, rowspan=5, columnspan=5, sticky="nsew")
-                for r in range(5):
-                    self.grid_rowconfigure(r, weight=1)
-                for c in range(5):
-                    self.grid_columnconfigure(c, weight=1)
-        except Exception:
-            pass
-
-    def configure(self, require_redraw=False, **kwargs):
-        super().configure(require_redraw=require_redraw, **kwargs)
-        self._ensure_centering()
 
 
 class SecondaryButton(GlassButton):
