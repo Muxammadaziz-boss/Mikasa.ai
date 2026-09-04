@@ -38,5 +38,15 @@
   "ovozni ko'tar": "volume_up",
   "ovozni pasaytir": "volume_down",
   "ovozni o'chir": "volume_mute",
-  "ovozni yoq": "volume_unmute"
+  "ovozni yoq": "volume_unmute",
+  "o'yin rejimini yoq": "game_mode_on",
+  "o'yin rejimini o'chir": "game_mode_off",
+  "youtube qidir": "youtube_search",
+  "video qidir": "youtube_search",
+  "yutubda qidir": "youtube_search",
+  "discord xabar yubor": "discord_xabar",
+  "do'stga xabar": "discord_xabar",
+  "ai": "chat_mode",
+  "suhbat qil": "chat_mode",
+  "so'rayman": "chat_mode"
 }

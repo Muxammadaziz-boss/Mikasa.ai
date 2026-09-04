@@ -1,3 +1,4 @@
+# ========== main.py ===============================
 # ========== Ogohlantirishlarni yashirish ==========
 import os
 import logging
@@ -22,34 +23,59 @@ import psutil
 import keyboard
 from dotenv import load_dotenv
 import google.generativeai as genai
-import asyncio
-import concurrent.futures
 
 load_dotenv()
+
+# ========== Versiya ==========
+VERSION = "1.3.0"
+GITHUB_REPO = "https://api.github.com/repos/Muxammadaziz_boss/ovozli-yordamchi/releases/latest"
 
 # ========== Global o'zgaruvchilar ==========
 buyruq_bajarilmoqda = False
 so_ngi_natija = ""
+oyin_rejimi = False
+ovoz_turi_global = "erkak"
+
+# ========== pyttsx3 engine (global, xatolikni oldini oladi) ==========
+_tts_engine = None
+
+def get_tts_engine():
+    global _tts_engine
+    if _tts_engine is None:
+        _tts_engine = pyttsx3.init()
+        _tts_engine.setProperty('rate', 200)
+    return _tts_engine
+
+# ========== Parolni olish ==========
+def parolni_olish():
+    return os.getenv("ADMIN_PAROL", "1234")
+
+def parolni_tekshir():
+    to_gri_parol = parolni_olish()
+    ovoz_chiqar("Parolni ayting", ovoz_turi_global)
+    kiritilgan = tingla()
+    if kiritilgan and kiritilgan.replace(" ", "") == to_gri_parol:
+        return True
+    ovoz_chiqar("Noto'g'ri parol", ovoz_turi_global)
+    return False
 
 # ========== Ovozli javob berish ==========
 def ovoz_chiqar(text, ovoz_turi="erkak", kechikish=0):
     def _ijro_et():
         global so_ngi_natija
         try:
-            engine = pyttsx3.init()
+            engine = get_tts_engine()
             voices = engine.getProperty('voices')
             if ovoz_turi == "ayol" and len(voices) > 1:
                 engine.setProperty('voice', voices[1].id)
             else:
                 engine.setProperty('voice', voices[0].id)
-            engine.setProperty('rate', 200)  # Ovoz tezligini oshirish
             engine.say(text)
             engine.runAndWait()
             so_ngi_natija = text
         except Exception as e:
             print(f"Ovoz chiqarishda xatolik: {e}")
     
-    # Ovoz chiqarishni alohida threadda bajarish
     threading.Thread(target=_ijro_et, daemon=True).start()
     if kechikish > 0:
         time.sleep(kechikish)
@@ -87,53 +113,67 @@ def ovoz_turi_ol():
 
 # ========== Buyruqlarni yuklash ==========
 def buyruqlar_json_ol():
+    default_commands = {
+        "yutub": "open_youtube",
+        "youtube": "open_youtube",
+        "yutub och": "open_youtube",
+        "birinchi video": "youtube_first_video",
+        "musiqa": "music_search",
+        "muzika": "music_search",
+        "qo'shiq": "music_search",
+        "telegram": "open_telegram",
+        "vs code": "open_code",
+        "visual studio code": "open_code",
+        "chrome": "open_chrome",
+        "brave": "open_brave",
+        "discord": "open_discord",
+        "tanla": "select_next_item",
+        "enter": "enter",
+        "havo": "weather",
+        "ob-havo": "weather",
+        "qidir": "search",
+        "vaqt": "time",
+        "soat": "time",
+        "sana": "date",
+        "bugun": "date",
+        "eslatma": "reminder",
+        "eslatmalar": "reminders",
+        "o'chir": "shutdown",
+        "yangila": "restart",
+        "qulufla": "lock",
+        "ish stoli": "desktop",
+        "task menejr": "taskmgr",
+        "xotira": "memory",
+        "ekran rasmi": "screenshot",
+        "yangi fayl": "new_file",
+        "katta harf": "caps_lock",
+        "backspace": "backspace",
+        "tab": "tab",
+        "oynani o'tkaz": "switch_window",
+        "ovozni ko'tar": "volume_up",
+        "ovozni pasaytir": "volume_down",
+        "ovozni o'chir": "volume_mute",
+        "ovozni yoq": "volume_unmute",
+        "o'yin rejimini yoq": "game_mode_on",
+        "o'yin rejimini o'chir": "game_mode_off",
+        "youtube qidir": "youtube_search",
+        "video qidir": "youtube_search",
+        "yutubda qidir": "youtube_search",
+        "discord xabar yubor": "discord_xabar",
+        "do'stga xabar": "discord_xabar",
+        "ai": "chat_mode",
+        "suhbat qil": "chat_mode",
+        "so'rayman": "chat_mode"
+    }
+
     if os.path.exists("commands.json"):
         with open("commands.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+            existing = json.load(f)
+            for k, v in default_commands.items():
+                if k not in existing:
+                    existing[k] = v
+            return existing
     else:
-        # Standart buyruqlar
-        default_commands = {
-            "yutub": "open_youtube",
-            "youtube": "open_youtube",
-            "yutub och": "open_youtube",
-            "birinchi video": "youtube_first_video",
-            "musiqa": "music_search",
-            "muzika": "music_search",
-            "qo'shiq": "music_search",
-            "telegram": "open_telegram",
-            "vs code": "open_code",
-            "visual studio code": "open_code",
-            "chrome": "open_chrome",
-            "brave": "open_brave",
-            "discord": "open_discord",
-            "tanla": "select_next_item",
-            "enter": "enter",
-            "havo": "weather",
-            "ob-havo": "weather",
-            "qidir": "search",
-            "vaqt": "time",
-            "soat": "time",
-            "sana": "date",
-            "bugun": "date",
-            "eslatma": "reminder",
-            "eslatmalar": "reminders",
-            "o'chir": "shutdown",
-            "yangila": "restart",
-            "qulufla": "lock",
-            "ish stoli": "desktop",
-            "task menejr": "taskmgr",
-            "xotira": "memory",
-            "ekran rasmi": "screenshot",
-            "yangi fayl": "new_file",
-            "katta harf": "caps_lock",
-            "backspace": "backspace",
-            "tab": "tab",
-            "oynani o'tkaz": "switch_window",
-            "ovozni ko'tar": "volume_up",
-            "ovozni pasaytir": "volume_down",
-            "ovozni o'chir": "volume_mute",
-            "ovozni yoq": "volume_unmute"
-        }
         with open("commands.json", "w", encoding="utf-8") as f:
             json.dump(default_commands, f, ensure_ascii=False, indent=2)
         return default_commands
@@ -171,6 +211,8 @@ def buyruqni_aniqla(matn):
 
 # ========== Ovoz boshqaruvi ==========
 def ovozni_soza(action):
+    if os.name != 'nt':
+        return
     try:
         from comtypes import CLSCTX_ALL
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
@@ -194,12 +236,82 @@ def ovoz_pasaytir(): ovozni_soza("down")
 def ovoz_ochir(): ovozni_soza("mute")
 def ovoz_och(): ovozni_soza("unmute")
 
+# ========== O'yin rejimi ==========
+def oyin_rejimini_oshir():
+    global oyin_rejimi
+    if os.name == 'nt':
+        try:
+            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+            from comtypes import CLSCTX_ALL
+            from ctypes import cast, POINTER
+            devices = AudioUtilities.GetSpeakers()
+            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            volume.SetMasterScalarVolume(0.3, None)
+        except:
+            pass
+    oyin_rejimi = True
+    ovoz_chiqar("O'yin rejimi yoqildi", ovoz_turi_global)
+
+def oyin_rejimini_yop():
+    global oyin_rejimi
+    if os.name == 'nt':
+        try:
+            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+            from comtypes import CLSCTX_ALL
+            from ctypes import cast, POINTER
+            devices = AudioUtilities.GetSpeakers()
+            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            volume.SetMasterScalarVolume(1.0, None)
+        except:
+            pass
+    oyin_rejimi = False
+    ovoz_chiqar("O'yin rejimi o'chirildi", ovoz_turi_global)
+
+# ========== AI bilan suhbat ==========
+def ai_bilan_suhbat(matn, ovoz_turi):
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        ovoz_chiqar("AI kaliti .env faylida yo'q", ovoz_turi)
+        return
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(
+            f"Foydalanuvchi: {matn}",
+            safety_settings={
+                genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            },
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=150,
+                temperature=0.7
+            )
+        )
+        javob = response.text.strip()
+        ovoz_chiqar(javob, ovoz_turi)
+    except Exception as e:
+        print(f"AI xatolik: {e}")
+        ovoz_chiqar("AI javob berishda xatolik yuz berdi", ovoz_turi)
+
+# ========== YouTube qidiruv ==========
+def youtube_qidir(query, ovoz_turi):
+    if query:
+        url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
+        subprocess.run(["start", url], shell=True)
+        ovoz_chiqar(f"YouTube’da {query} bo‘yicha natijalar ochildi", ovoz_turi)
+    else:
+        ovoz_chiqar("Qidirish so'zi aniqlanmadi", ovoz_turi)
+
 # ========== Tarix saqlash ==========
 def buyruqni_saqla(matn):
     with open("buyruqlar_tarixi.txt", "a", encoding="utf-8") as f:
         f.write(f"{datetime.datetime.now()}: {matn}\n")
 
-# ========== Google AI orqali tushunish (tezroq versiya) ==========
+# ========== Google AI orqali tushunish ==========
 def ai_orqali_tushun(matn):
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -207,14 +319,15 @@ def ai_orqali_tushun(matn):
         return "unknown"
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         ruxsat_etilgan = [
             "open_youtube", "youtube_first_video", "music_search", "greeting", "time", "date", "weather",
             "reminder", "reminders", "shutdown", "restart", "lock", "desktop", "taskmgr", "memory",
             "screenshot", "new_file", "caps_lock", "enter", "backspace", "tab", "switch_window",
             "volume_up", "volume_down", "volume_mute", "volume_unmute", "search", "open_discord",
-            "open_telegram", "open_code", "open_chrome", "open_brave", "select_next_item", "unknown"
+            "open_telegram", "open_code", "open_chrome", "open_brave", "select_next_item", "unknown",
+            "game_mode_on", "game_mode_off", "youtube_search", "discord_xabar", "chat_mode"
         ]
 
         prompt = f"""Siz faqat quyidagi buyruqlardan birini qaytarishingiz kerak:
@@ -222,7 +335,6 @@ def ai_orqali_tushun(matn):
 Foydalanuvchi so'zi: "{matn}"
 Javob:"""
         
-        # AI javobini kutish vaqti
         response = model.generate_content(prompt, safety_settings={
             genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
             genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
@@ -242,108 +354,88 @@ Javob:"""
 
 # ========== Buyruqni bajarish ==========
 def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
-    global buyruq_bajarilmoqda
+    global buyruq_bajarilmoqda, ovoz_turi_global
+    ovoz_turi_global = ovoz_turi
     buyruq_bajarilmoqda = True
     buyruqni_saqla(matn)
     
-    # Avval oddiy qoidalarga tekshiramiz
     intent = buyruqni_aniqla(matn)
-    
-    # Agar aniqlanmasa, AI dan foydalanamiz
     if intent == "unknown":
         intent = ai_orqali_tushun(matn)
 
-    # Buyruq bajarilishini ovozli xabar qilish
     ovoz_chiqar(f"Buyruq aniqlandi: {intent.replace('_', ' ')}", ovoz_turi)
     
     if intent == "greeting":
         ovoz_chiqar(f"Salom, {foydalanuvchi_ismi}! Sizga qanday yordam bera olaman?", ovoz_turi)
 
     elif intent == "open_youtube":
-        try:
-            subprocess.run(["start", "https://www.youtube.com"], shell=True)
-            ovoz_chiqar(f"{foydalanuvchi_ismi}, YouTube ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("YouTube ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "https://www.youtube.com"], shell=True)
+        ovoz_chiqar(f"{foydalanuvchi_ismi}, YouTube ochilyapti", ovoz_turi)
 
     elif intent == "youtube_first_video":
-        try:
-            subprocess.run(["start", "https://www.youtube.com"], shell=True)
-            time.sleep(3)
-            pyautogui.press('tab')
-            pyautogui.press('tab')
-            pyautogui.press('enter')
-            ovoz_chiqar(f"{foydalanuvchi_ismi}, birinchi video ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Video ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "https://www.youtube.com"], shell=True)
+        time.sleep(3)
+        pyautogui.press('tab')
+        pyautogui.press('tab')
+        pyautogui.press('enter')
+        ovoz_chiqar(f"{foydalanuvchi_ismi}, birinchi video ochilyapti", ovoz_turi)
 
     elif intent == "music_search":
         ovoz_chiqar("Qaysi musiqani qidiraylik?", ovoz_turi)
         query = tingla()
         if query:
             url = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}+music"
-            try:
-                subprocess.run(["start", url], shell=True)
-                ovoz_chiqar(f"{query} bo'yicha musiqa topildi", ovoz_turi)
-            except Exception as e:
-                ovoz_chiqar("Musiqa qidirishda xatolik yuz berdi", ovoz_turi)
+            subprocess.run(["start", url], shell=True)
+            ovoz_chiqar(f"{query} bo'yicha musiqa topildi", ovoz_turi)
         else:
-            try:
-                subprocess.run(["start", "https://www.youtube.com/results?search_query=lofi+music"], shell=True)
-                ovoz_chiqar("Lofi musiqa qidirildi", ovoz_turi)
-            except Exception as e:
-                ovoz_chiqar("Musiqa qidirishda xatolik yuz berdi", ovoz_turi)
+            subprocess.run(["start", "https://www.youtube.com/results?search_query=lofi+music"], shell=True)
+            ovoz_chiqar("Lofi musiqa qidirildi", ovoz_turi)
+
+    elif intent == "youtube_search":
+        ovoz_chiqar("Nima qidiraylik YouTube’da?", ovoz_turi)
+        query = tingla()
+        youtube_qidir(query, ovoz_turi)
 
     elif intent == "open_discord":
-        try:
-            subprocess.run(["start", "https://discord.com"], shell=True)
-            ovoz_chiqar("Discord ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Discord ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "discord"], shell=True)
+        ovoz_chiqar("Discord ochilyapti", ovoz_turi)
+
+    elif intent == "discord_xabar":
+        ovoz_chiqar("Discord ochilmoqda. Do'stingizga xabar yozishingiz mumkin.", ovoz_turi)
+        subprocess.run(["start", "discord"], shell=True)
+
     elif intent == "open_telegram":
-        try:
-            subprocess.run(["start", "telegram"], shell=True)
-            ovoz_chiqar("Telegram ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Telegram ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "telegram"], shell=True)
+        ovoz_chiqar("Telegram ochilyapti", ovoz_turi)
+
     elif intent == "open_code":
-        try:
-            subprocess.run(["start", "code"], shell=True)
-            ovoz_chiqar("VS Code ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("VS Code ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "code"], shell=True)
+        ovoz_chiqar("VS Code ochilyapti", ovoz_turi)
+
     elif intent == "open_chrome":
-        try:
-            subprocess.run(["start", "chrome"], shell=True)
-            ovoz_chiqar("Chrome ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Chrome ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "chrome"], shell=True)
+        ovoz_chiqar("Chrome ochilyapti", ovoz_turi)
+
     elif intent == "open_brave":
-        try:
-            subprocess.run(["start", "brave"], shell=True)
-            ovoz_chiqar("Brave ochilyapti", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Brave ochishda xatolik yuz berdi", ovoz_turi)
+        subprocess.run(["start", "brave"], shell=True)
+        ovoz_chiqar("Brave ochilyapti", ovoz_turi)
 
     elif intent == "select_next_item":
-        try:
-            pyautogui.press('tab')
-            ovoz_chiqar("Tanlandi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Tanlashda xatolik yuz berdi", ovoz_turi)
+        pyautogui.press('tab')
+        ovoz_chiqar("Tanlandi", ovoz_turi)
 
     elif intent == "weather":
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            ovoz_chiqar("Ob-havo kaliti yo'q", ovoz_turi)
+            return
+        city = "Tashkent"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=uz"
         try:
-            api_key = os.getenv("OPENWEATHER_API_KEY")
-            if not api_key:
-                ovoz_chiqar("Ob-havo kaliti yo'q", ovoz_turi)
-                return
-            city = "Tashkent"
-            url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=uz"
             data = requests.get(url).json()
             temp = data["main"]["temp"]
             ovoz_chiqar(f"Hozir {city}da {temp} gradus", ovoz_turi)
-        except Exception as e:
+        except:
             ovoz_chiqar("Ob-havo ma'lumoti olinmadi", ovoz_turi)
 
     elif intent == "search":
@@ -351,11 +443,8 @@ def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
         query = tingla()
         if query:
             url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-            try:
-                subprocess.run(["start", url], shell=True)
-                ovoz_chiqar("Natija topildi", ovoz_turi)
-            except Exception as e:
-                ovoz_chiqar("Qidiruvda xatolik yuz berdi", ovoz_turi)
+            subprocess.run(["start", url], shell=True)
+            ovoz_chiqar("Natija topildi", ovoz_turi)
 
     elif intent == "time":
         ovoz_chiqar(f"Hozir soat {time.strftime('%H:%M')}", ovoz_turi)
@@ -383,111 +472,96 @@ def buyruqni_tushun(matn, foydalanuvchi_ismi, ovoz_turi):
             ovoz_chiqar("Eslatmalar fayli yo'q", ovoz_turi)
 
     elif intent == "shutdown":
-        ovoz_chiqar("Kompyuter o'chirilmoqda", ovoz_turi)
-        try:
+        if parolni_tekshir():
+            ovoz_chiqar("Kompyuter o'chirilmoqda", ovoz_turi)
             subprocess.run(["shutdown", "/s", "/t", "1"], shell=True)
-        except Exception as e:
-            ovoz_chiqar("Kompyuterni o'chirishda xatolik yuz berdi", ovoz_turi)
+        else:
+            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
+
     elif intent == "restart":
-        ovoz_chiqar("Kompyuter yangilanmoqda", ovoz_turi)
-        try:
+        if parolni_tekshir():
+            ovoz_chiqar("Kompyuter yangilanmoqda", ovoz_turi)
             subprocess.run(["shutdown", "/r", "/t", "1"], shell=True)
-        except Exception as e:
-            ovoz_chiqar("Kompyuterni yangilashda xatolik yuz berdi", ovoz_turi)
+        else:
+            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
+
     elif intent == "lock":
-        ovoz_chiqar("Qulflanyapti", ovoz_turi)
-        try:
+        if parolni_tekshir():
+            ovoz_chiqar("Qulflanyapti", ovoz_turi)
             os.system("rundll32.exe user32.dll,LockWorkStation")
-        except Exception as e:
-            ovoz_chiqar("Kompyuterni qulflashda xatolik yuz berdi", ovoz_turi)
+        else:
+            ovoz_chiqar("Buyruq bekor qilindi", ovoz_turi)
+
     elif intent == "desktop":
-        try:
-            pyautogui.hotkey('win', 'd')
-            ovoz_chiqar("Ish stoli", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ish stoliga o'tishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.hotkey('win', 'd')
+        ovoz_chiqar("Ish stoli", ovoz_turi)
+
     elif intent == "taskmgr":
-        try:
-            os.system("taskmgr")
-            ovoz_chiqar("Vazifalar menejeri", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Task Manager ochishda xatolik yuz berdi", ovoz_turi)
+        os.system("taskmgr")
+        ovoz_chiqar("Vazifalar menejeri", ovoz_turi)
+
     elif intent == "memory":
-        try:
-            cpu = psutil.cpu_percent()
-            ram = psutil.virtual_memory().percent
-            ovoz_chiqar(f"CPU: {cpu}%, RAM: {ram}%", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Tizim resurslarini olishda xatolik yuz berdi", ovoz_turi)
+        cpu = psutil.cpu_percent()
+        ram = psutil.virtual_memory().percent
+        ovoz_chiqar(f"CPU: {cpu}%, RAM: {ram}%", ovoz_turi)
+
     elif intent == "screenshot":
-        try:
-            path = f"screenshot_{int(time.time())}.png"
-            pyautogui.screenshot(path)
-            ovoz_chiqar("Rasm saqlandi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ekran rasmini olishda xatolik yuz berdi", ovoz_turi)
+        path = f"screenshot_{int(time.time())}.png"
+        pyautogui.screenshot(path)
+        ovoz_chiqar("Rasm saqlandi", ovoz_turi)
+
     elif intent == "new_file":
-        try:
-            pyautogui.hotkey('ctrl', 'n')
-            ovoz_chiqar("Yangi fayl", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Yangi fayl yaratishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.hotkey('ctrl', 'n')
+        ovoz_chiqar("Yangi fayl", ovoz_turi)
+
     elif intent == "caps_lock":
-        try:
-            keyboard.press_and_release('caps lock')
-        except Exception as e:
-            ovoz_chiqar("Caps Lockni o'zgartirishda xatolik yuz berdi", ovoz_turi)
+        keyboard.press_and_release('caps lock')
+
     elif intent == "enter":
-        try:
-            pyautogui.press('enter')
-            ovoz_chiqar("Enter bosildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Enter bosishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.press('enter')
+        ovoz_chiqar("Enter bosildi", ovoz_turi)
+
     elif intent == "backspace":
-        try:
-            pyautogui.press('backspace')
-        except Exception as e:
-            ovoz_chiqar("Backspace bosishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.press('backspace')
+
     elif intent == "tab":
-        try:
-            pyautogui.press('tab')
-        except Exception as e:
-            ovoz_chiqar("Tab bosishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.press('tab')
+
     elif intent == "switch_window":
-        try:
-            pyautogui.hotkey('alt', 'tab')
-            ovoz_chiqar("Oyna almashtirildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Oyna almashtirishda xatolik yuz berdi", ovoz_turi)
+        pyautogui.hotkey('alt', 'tab')
+        ovoz_chiqar("Oyna almashtirildi", ovoz_turi)
+
     elif intent == "volume_up":
-        try:
-            ovoz_oshir()
-            ovoz_chiqar("Ovoz oshirildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ovozni oshirishda xatolik yuz berdi", ovoz_turi)
+        ovoz_oshir()
+        ovoz_chiqar("Ovoz oshirildi", ovoz_turi)
+
     elif intent == "volume_down":
-        try:
-            ovoz_pasaytir()
-            ovoz_chiqar("Ovoz pasaytirildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ovozni pasaytirishda xatolik yuz berdi", ovoz_turi)
+        ovoz_pasaytir()
+        ovoz_chiqar("Ovoz pasaytirildi", ovoz_turi)
+
     elif intent == "volume_mute":
-        try:
-            ovoz_ochir()
-            ovoz_chiqar("Ovoz o'chirildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ovozni o'chirishda xatolik yuz berdi", ovoz_turi)
+        ovoz_ochir()
+        ovoz_chiqar("Ovoz o'chirildi", ovoz_turi)
+
     elif intent == "volume_unmute":
-        try:
-            ovoz_och()
-            ovoz_chiqar("Ovoz ochildi", ovoz_turi)
-        except Exception as e:
-            ovoz_chiqar("Ovozni yoqishda xatolik yuz berdi", ovoz_turi)
+        ovoz_och()
+        ovoz_chiqar("Ovoz ochildi", ovoz_turi)
+
+    elif intent == "game_mode_on":
+        oyin_rejimini_oshir()
+
+    elif intent == "game_mode_off":
+        oyin_rejimini_yop()
+
+    elif intent == "chat_mode":
+        ovoz_chiqar("AI rejimiga o'tildi. Nima so'rashingiz mumkin?", ovoz_turi)
+        savol = tingla()
+        if savol:
+            ai_bilan_suhbat(savol, ovoz_turi)
 
     else:
         ovoz_chiqar(f"{foydalanuvchi_ismi}, buyruq tushunilmadi", ovoz_turi)
     
-    # Bajarilishni tugatish
     buyruq_bajarilmoqda = False
     ovoz_chiqar("Buyruq bajarildi", ovoz_turi)
 
@@ -498,7 +572,6 @@ def fon_xizmat(foydalanuvchi_ismi, ovoz_turi):
         try:
             buyruq = tingla()
             if buyruq:
-                # Buyruq aniqlanganini darhol aytish
                 ovoz_chiqar("Buyruq qabul qilindi", ovoz_turi, kechikish=0.5)
                 buyruqni_tushun(buyruq, foydalanuvchi_ismi, ovoz_turi)
         except KeyboardInterrupt:
@@ -507,6 +580,39 @@ def fon_xizmat(foydalanuvchi_ismi, ovoz_turi):
         except Exception as e:
             print(f"Xatolik yuz berdi: {e}")
             time.sleep(1)
+
+# ========== Haqida va yangilanish ==========
+def haqida_oynasi():
+    about_win = tk.Toplevel()
+    about_win.title("ℹ️ Haqida")
+    about_win.geometry("400x250")
+    about_win.configure(bg="#2c2f33")
+    tk.Label(about_win, text="🎙️ Ovozli Yordamchi", font=("Segoe UI", 16, "bold"),
+             fg="#e0e0e0", bg="#2c2f33").pack(pady=10)
+    tk.Label(about_win, text=f"Versiya: v{VERSION}", font=("Segoe UI", 11),
+             fg="#bbbbbb", bg="#2c2f33").pack()
+    tk.Label(about_win, text="Muallif: Muxammadaziz", font=("Segoe UI", 10),
+             fg="#999999", bg="#2c2f33").pack(pady=5)
+    tk.Label(about_win, text="Bu dastur — ovoz orqali boshqariladigan\nyordamchi vositasi.\nYouTube, Discord, AI, tizim boshqaruvi va boshqalar.",
+             font=("Segoe UI", 10), fg="#cccccc", bg="#2c2f33", justify="center").pack(pady=10)
+    ttk.Button(about_win, text="GitHub", command=lambda: subprocess.run(["start", "https://github.com/Muxammadaziz-boss/Yordamchi"], shell=True)).pack(pady=5)
+
+def yangilanishni_tekshir():
+    try:
+        response = requests.get(GITHUB_REPO, timeout=5)
+        if response.status_code == 200:
+            latest = response.json()
+            latest_version = latest["tag_name"].lstrip("v")
+            current = VERSION
+            if latest_version != current:
+                ovoz_chiqar(f"Yangi versiya mavjud: {latest_version}. Yangilash tavsiya etiladi.", ovoz_turi_global)
+                messagebox.showinfo("Yangilanish", f"Yangi versiya: v{latest_version}\n\n{latest['html_url']}")
+            else:
+                ovoz_chiqar("Sizning dasturingiz eng so'nggi versiyada", ovoz_turi_global)
+        else:
+            print("Yangilanish tekshiruvi: server javob bermadi")
+    except Exception as e:
+        print(f"Yangilanish tekshiruvida xatolik: {e}")
 
 # ========== Chiroyli GUI ==========
 def gui_ishga_tushir():
@@ -519,7 +625,6 @@ def gui_ishga_tushir():
     root.configure(bg="#2c2f33")
     root.resizable(True, True)
 
-    # Icon (agar mavjud bo'lsa)
     try:
         root.iconbitmap('icon.ico')
     except:
@@ -539,7 +644,6 @@ def gui_ishga_tushir():
     )
     title_label.pack(pady=15)
 
-    # Tavsif matni
     description = tk.Label(
         root, text=f"Salom {foydalanuvchi_ismi}! Gapirish tugmasini bosing va buyruq bering.",
         font=("Segoe UI", 12), fg="#bbbbbb", bg="#2c2f33"
@@ -577,16 +681,14 @@ def gui_ishga_tushir():
             text_area.insert(tk.END, "Eslatmalar fayli yo'q.")
 
     def sozlamalar():
-        # Yangi oynada sozlamalarni ko'rsatish
         settings_win = tk.Toplevel(root)
         settings_win.title("Sozlamalar")
-        settings_win.geometry("400x300")
+        settings_win.geometry("400x420")
         settings_win.configure(bg="#2c2f33")
         
         tk.Label(settings_win, text="Sozlamalar", font=("Segoe UI", 16, "bold"), 
                 fg="#e0e0e0", bg="#2c2f33").pack(pady=10)
         
-        # Foydalanuvchi ismini o'zgartirish
         def ismni_ozgartir():
             new_name = simpledialog.askstring("Ism", "Yangi ismingizni kiriting:")
             if new_name:
@@ -595,9 +697,8 @@ def gui_ishga_tushir():
                 messagebox.showinfo("Bajarildi", f"Ism {new_name} ga o'zgartirildi!")
                 settings_win.destroy()
                 root.destroy()
-                gui_ishga_tushir()  # Dasturni qayta ishga tushirish
+                gui_ishga_tushir()
         
-        # Ovoz turini o'zgartirish
         def ovozni_ozgartir():
             current_voice = ovoz_turi_ol()
             new_voice = "ayol" if current_voice == "erkak" else "erkak"
@@ -606,15 +707,27 @@ def gui_ishga_tushir():
             messagebox.showinfo("Bajarildi", f"Ovoz {new_voice} ga o'zgartirildi!")
             settings_win.destroy()
             root.destroy()
-            gui_ishga_tushir()  # Dasturni qayta ishga tushirish
+            gui_ishga_tushir()
+        
+        def parolni_ozgartir():
+            new_pass = simpledialog.askstring("Parol", "Yangi parolni kiriting:", show='*')
+            if new_pass:
+                from dotenv import set_key
+                set_key(".env", "ADMIN_PAROL", new_pass)
+                messagebox.showinfo("Bajarildi", "Parol yangilandi!")
         
         tk.Button(settings_win, text="Ismni o'zgartirish", command=ismni_ozgartir,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=10)
-        
+                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
         tk.Button(settings_win, text="Ovoz turini o'zgartirish", command=ovozni_ozgartir,
-                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=10)
+                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
+        tk.Button(settings_win, text="Parolni o'zgartirish", command=parolni_ozgartir,
+                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
+        tk.Button(settings_win, text="ℹ️ Haqida", command=haqida_oynasi,
+                 bg="#3949ab", fg="white", font=("Segoe UI", 10)).pack(pady=8)
+        tk.Button(settings_win, text="🔄 Yangilanishni tekshir", 
+                 command=lambda: threading.Thread(target=yangilanishni_tekshir, daemon=True).start(),
+                 bg="#4caf50", fg="white", font=("Segoe UI", 10)).pack(pady=8)
         
-        # Fayllarni tozalash
         def fayllarni_tozala():
             for file in ["buyruqlar_tarixi.txt", "eslatmalar.txt"]:
                 if os.path.exists(file):
@@ -627,19 +740,11 @@ def gui_ishga_tushir():
     button_frame = tk.Frame(root, bg="#2c2f33")
     button_frame.pack(pady=15)
 
-    btn_start = ttk.Button(button_frame, text="▶️ Boshlash", command=tinglashni_boshla)
-    btn_start.grid(row=0, column=0, padx=10)
+    ttk.Button(button_frame, text="▶️ Boshlash", command=tinglashni_boshla).grid(row=0, column=0, padx=10)
+    ttk.Button(button_frame, text="📜 Tarix", command=tarix_ko_rsat).grid(row=0, column=1, padx=10)
+    ttk.Button(button_frame, text="📌 Eslatmalar", command=eslatmalar_ko_rsat).grid(row=0, column=2, padx=10)
+    ttk.Button(button_frame, text="⚙️ Sozlamalar", command=sozlamalar).grid(row=0, column=3, padx=10)
 
-    btn_history = ttk.Button(button_frame, text="📜 Tarix", command=tarix_ko_rsat)
-    btn_history.grid(row=0, column=1, padx=10)
-
-    btn_reminders = ttk.Button(button_frame, text="📌 Eslatmalar", command=eslatmalar_ko_rsat)
-    btn_reminders.grid(row=0, column=2, padx=10)
-
-    btn_settings = ttk.Button(button_frame, text="⚙️ Sozlamalar", command=sozlamalar)
-    btn_settings.grid(row=0, column=3, padx=10)
-
-    # Status qatori
     status_label = tk.Label(root, text="Tayyor", font=("Segoe UI", 9), 
                            fg="#bbbbbb", bg="#2c2f33")
     status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
