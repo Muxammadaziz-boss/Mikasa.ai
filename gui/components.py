@@ -6,7 +6,7 @@ from gui.theme import Colors, Fonts, Sizing
 
 
 class GlassCard(ctk.CTkFrame):
-    """Premium ko'rinishdagi umumiy karta"""
+    """Apple uslubidagi zamonaviy minimal karta"""
 
     def __init__(
         self,
@@ -18,7 +18,11 @@ class GlassCard(ctk.CTkFrame):
         **kwargs,
     ):
         padding = Sizing.CARD_PADDING if padding is None else padding
-        accent_color = accent_color or Colors.BORDER_ACCENT
+        accent_color = accent_color or Colors.PRIMARY
+        
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_DARK
+
         super().__init__(
             master,
             fg_color=Colors.BG_CARD,
@@ -32,16 +36,8 @@ class GlassCard(ctk.CTkFrame):
         self._accent_color = accent_color
 
         if title or subtitle:
-            self.accent_strip = ctk.CTkFrame(
-                self,
-                fg_color=accent_color,
-                height=3,
-                corner_radius=999,
-            )
-            self.accent_strip.pack(fill="x", padx=padding, pady=(padding, 8))
-
             self.header = ctk.CTkFrame(self, fg_color="transparent")
-            self.header.pack(fill="x", padx=padding, pady=(0, 8))
+            self.header.pack(fill="x", padx=padding, pady=(padding, 8))
 
             title_row = ctk.CTkFrame(self.header, fg_color="transparent")
             title_row.pack(fill="x")
@@ -50,9 +46,9 @@ class GlassCard(ctk.CTkFrame):
                 ctk.CTkLabel(
                     title_row,
                     text="●",
-                    font=(Fonts.FAMILY, 10),
+                    font=(Fonts.FAMILY, 8),
                     text_color=accent_color,
-                    width=14,
+                    width=12,
                 ).pack(side="left")
 
                 self.title_label = ctk.CTkLabel(
@@ -74,7 +70,7 @@ class GlassCard(ctk.CTkFrame):
                     justify="left",
                     wraplength=900,
                 )
-                self.subtitle_label.pack(fill="x", pady=(6, 0))
+                self.subtitle_label.pack(fill="x", pady=(4, 0))
 
             ctk.CTkFrame(
                 self,
@@ -100,6 +96,8 @@ class InfoChip(ctk.CTkFrame):
     ):
         fg_color = fg_color or Colors.BG_PANEL
         text_color = text_color or Colors.TEXT_SECONDARY
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_CARD
         super().__init__(master, fg_color=fg_color, corner_radius=999, **kwargs)
 
         self._icon = icon
@@ -153,6 +151,7 @@ class PageHero(GlassCard):
             height=50 if Sizing.SIDEBAR_WIDTH_EXPANDED < 120 else 58,
             border_width=1,
             border_color=accent_color,
+            bg_color=Colors.BG_CARD,
         )
         icon_wrap.pack(side="left", padx=(0, 14))
         icon_wrap.pack_propagate(False)
@@ -248,12 +247,14 @@ class EmptyState(ctk.CTkFrame):
 
 
 class StatusBadge(ctk.CTkFrame):
-    """Holat ko'rsatgich — dot + text"""
+    """Holat ko'rsatgich — dot + text (Apple capsule badge)"""
 
     def __init__(self, master, status="online", text="", **kwargs):
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_DARKEST
         super().__init__(
             master,
-            fg_color=Colors.BG_SOFT,
+            fg_color=Colors.BG_CARD,
             corner_radius=999,
             border_width=1,
             border_color=Colors.BORDER,
@@ -322,7 +323,7 @@ class IconButton(ctk.CTkButton):
 
 
 class GlowButton(ctk.CTkButton):
-    """Asosiy CTA tugma"""
+    """Asosiy CTA tugma — Apple Blue Hero Action"""
 
     def __init__(self, master, text="", icon="", **kwargs):
         display = f"{icon}  {text}" if icon else text
@@ -330,11 +331,10 @@ class GlowButton(ctk.CTkButton):
             master,
             text=display,
             font=Fonts.BODY_BOLD,
-            fg_color=Colors.PRIMARY_DARK,
-            hover_color=Colors.PRIMARY,
+            fg_color=Colors.PRIMARY,
+            hover_color=Colors.PRIMARY_HOVER,
             text_color=Colors.TEXT_PRIMARY,
-            border_width=1,
-            border_color=Colors.PRIMARY,
+            border_width=0,
             corner_radius=Sizing.BUTTON_RADIUS,
             height=Sizing.BUTTON_HEIGHT,
             **kwargs,
@@ -342,7 +342,7 @@ class GlowButton(ctk.CTkButton):
 
 
 class SecondaryButton(ctk.CTkButton):
-    """Ikkinchi darajali tugma"""
+    """Ikkinchi darajali tugma — Apple Glass Capsule"""
 
     def __init__(self, master, text="", icon="", **kwargs):
         display = f"{icon}  {text}" if icon else text
@@ -350,7 +350,7 @@ class SecondaryButton(ctk.CTkButton):
             master,
             text=display,
             font=Fonts.BODY,
-            fg_color=Colors.BG_PANEL,
+            fg_color=Colors.BG_CARD,
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
             border_width=1,
@@ -422,10 +422,13 @@ class SearchBar(ctk.CTkFrame):
 
 
 class StatWidget(ctk.CTkFrame):
-    """Statistika widget — raqam + tavsif"""
+    """Statistika widget — Apple uslubidagi nafis raqamli karta"""
 
     def __init__(self, master, value="0", label="", icon="", color=None, **kwargs):
         color = color or Colors.PRIMARY
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.BG_DARK
+
         super().__init__(
             master,
             fg_color=Colors.BG_CARD,
@@ -436,43 +439,34 @@ class StatWidget(ctk.CTkFrame):
         )
 
         top = ctk.CTkFrame(self, fg_color="transparent")
-        top.pack(fill="x", padx=14, pady=(14, 10))
-
-        self.icon_wrap = ctk.CTkFrame(
-            top,
-            fg_color=Colors.BG_SOFT,
-            corner_radius=10,
-            width=34,
-            height=34,
-        )
-        self.icon_wrap.pack(side="left")
-        self.icon_wrap.pack_propagate(False)
+        top.pack(fill="x", padx=16, pady=(14, 6))
 
         self.icon_label = ctk.CTkLabel(
-            self.icon_wrap,
+            top,
             text=icon,
             font=(Fonts.FAMILY, 18),
             text_color=color,
+            width=24,
         )
-        self.icon_label.pack(expand=True)
+        self.icon_label.pack(side="left")
 
         self.desc_label = ctk.CTkLabel(
             top,
-            text=label,
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_SECONDARY,
+            text=label.upper(),
+            font=(Fonts.FAMILY, 10, "bold"),
+            text_color=Colors.TEXT_MUTED,
             anchor="w",
         )
-        self.desc_label.pack(side="left", padx=(10, 0), fill="x", expand=True)
+        self.desc_label.pack(side="left", padx=(8, 0), fill="x", expand=True)
 
         self.value_label = ctk.CTkLabel(
             self,
             text=str(value),
-            font=(Fonts.FAMILY, 22, "bold"),
+            font=(Fonts.FAMILY, 24, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         )
-        self.value_label.pack(fill="x", padx=14, pady=(0, 14))
+        self.value_label.pack(fill="x", padx=16, pady=(0, 14))
 
         self._color = color
 
@@ -541,7 +535,7 @@ class MessageBubble(ctk.CTkFrame):
 
 
 class NavItem(ctk.CTkFrame):
-    """Sidebar navigatsiya elementi"""
+    """Apple macOS uslubidagi sidebar navigatsiya elementi"""
 
     def __init__(
         self,
@@ -553,11 +547,14 @@ class NavItem(ctk.CTkFrame):
         compact=False,
         **kwargs,
     ):
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.SIDEBAR_BG
+
         super().__init__(
             master,
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=10,
-            height=50,
+            corner_radius=8,
+            height=42,
             cursor="hand2",
             **kwargs,
         )
@@ -567,32 +564,24 @@ class NavItem(ctk.CTkFrame):
         self._active = active
         self._compact = compact
 
+        # Chap tomondagi nozik vertikal indikator
         self.indicator = ctk.CTkFrame(
             self,
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent",
             width=3,
             corner_radius=2,
         )
-        self.indicator.pack(side="left", fill="y", padx=(0, 4))
+        self.indicator.pack(side="left", fill="y", padx=(2, 6), pady=6)
 
-        self.icon_container = ctk.CTkFrame(
-            self,
-            fg_color=Colors.SIDEBAR_ACTIVE if active else Colors.BG_DARK,
-            width=34,
-            height=34,
-            corner_radius=10,
-        )
-        self.icon_container.pack(side="left", padx=(8, 6))
-        self.icon_container.pack_propagate(False)
-
+        # To'g'ridan-to'g'ri toza ikonka (ortiqcha kvadrat konteynerlarsiz)
         self.icon_label = ctk.CTkLabel(
-            self.icon_container,
+            self,
             text=icon,
             font=Fonts.NAV_ICON,
-            text_color=Colors.PRIMARY if active else Colors.TEXT_MUTED,
-            width=24,
+            text_color=Colors.PRIMARY if active else Colors.TEXT_SECONDARY,
+            width=28,
         )
-        self.icon_label.pack(expand=True)
+        self.icon_label.pack(side="left", padx=(2, 6))
 
         self.text_label = ctk.CTkLabel(
             self,
@@ -606,7 +595,6 @@ class NavItem(ctk.CTkFrame):
 
         for widget in [
             self,
-            self.icon_container,
             self.icon_label,
             self.text_label,
             self.indicator,
@@ -624,24 +612,21 @@ class NavItem(ctk.CTkFrame):
     def _on_enter(self, event=None):
         if not self._active:
             self.configure(fg_color=Colors.SIDEBAR_HOVER)
-            self.icon_container.configure(fg_color=Colors.BG_PANEL)
+            self.text_label.configure(text_color=Colors.TEXT_PRIMARY)
 
     def _on_leave(self, event=None):
         if not self._active:
             self.configure(fg_color="transparent")
-            self.icon_container.configure(fg_color=Colors.BG_DARK)
+            self.text_label.configure(text_color=Colors.TEXT_SECONDARY)
 
     def set_active(self, active):
         self._active = active
         self.configure(fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent")
-        self.icon_container.configure(
-            fg_color=Colors.SIDEBAR_ACTIVE if active else Colors.BG_DARK
-        )
         self.indicator.configure(
             fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent"
         )
         self.icon_label.configure(
-            text_color=Colors.PRIMARY if active else Colors.TEXT_MUTED
+            text_color=Colors.PRIMARY if active else Colors.TEXT_SECONDARY
         )
         self.text_label.configure(
             text_color=Colors.TEXT_PRIMARY if active else Colors.TEXT_SECONDARY
@@ -649,19 +634,14 @@ class NavItem(ctk.CTkFrame):
 
     def set_compact(self, compact):
         self._compact = compact
-        self.configure(height=44 if compact else 50)
-        self.icon_container.configure(
-            width=30 if compact else 34, height=30 if compact else 34
-        )
+        self.configure(height=38 if compact else 42)
         if compact:
             self.text_label.pack_forget()
-            self.indicator.pack_configure(padx=(0, 2))
-            self.icon_container.pack_configure(padx=(6, 6))
+            self.indicator.pack_configure(padx=(1, 2))
         else:
             if not self.text_label.winfo_manager():
                 self.text_label.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.indicator.pack_configure(padx=(0, 4))
-            self.icon_container.pack_configure(padx=(8, 6))
+            self.indicator.pack_configure(padx=(2, 6))
 
 
 class ProgressRing(ctk.CTkFrame):

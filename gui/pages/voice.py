@@ -77,8 +77,9 @@ class VoicePage(ctk.CTkFrame):
             corner_radius=150,
             width=200,
             height=200,
-            border_width=2,
+            border_width=1,
             border_color=Colors.BORDER,
+            bg_color=Colors.BG_DARK,
         )
         self.orb_container.pack()
         self.orb_container.pack_propagate(False)
@@ -135,12 +136,13 @@ class VoicePage(ctk.CTkFrame):
             mic_frame,
             text="🎙️  Tinglashni boshlash",
             font=Fonts.HEADING_3,
-            fg_color=Colors.PRIMARY_DARK,
-            hover_color=Colors.PRIMARY,
+            fg_color=Colors.PRIMARY,
+            hover_color=Colors.PRIMARY_HOVER,
             text_color=Colors.TEXT_PRIMARY,
             corner_radius=25,
             height=56,
             width=280,
+            bg_color=Colors.BG_DARK,
             command=self._toggle_listening,
         )
         self.mic_btn.pack()

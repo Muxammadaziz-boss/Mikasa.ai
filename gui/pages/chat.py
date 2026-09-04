@@ -141,17 +141,24 @@ class ChatPage(ctk.CTkFrame):
         info_row.pack(pady=(10, 0))
 
         for text, color in [
-            ("Tez javob", Colors.PRIMARY_DARK),
-            ("Ovozli rejim", Colors.SECONDARY_DARK),
-            ("Agent panel", Colors.SUCCESS),
+            ("⚡ Tez javob", Colors.BG_PANEL),
+            ("🎙️ Ovozli rejim", Colors.BG_PANEL),
+            ("🤖 Agent panel", Colors.BG_PANEL),
         ]:
-            chip = ctk.CTkFrame(info_row, fg_color=color, corner_radius=999)
+            chip = ctk.CTkFrame(
+                info_row,
+                fg_color=color,
+                corner_radius=999,
+                border_width=1,
+                border_color=Colors.BORDER,
+                bg_color=Colors.BG_CARD,
+            )
             chip.pack(side="left", padx=4)
             ctk.CTkLabel(
                 chip,
                 text=text,
                 font=Fonts.TINY,
-                text_color=Colors.TEXT_PRIMARY,
+                text_color=Colors.TEXT_SECONDARY,
             ).pack(padx=10, pady=4)
 
         # Tezkor savollar
@@ -177,6 +184,7 @@ class ChatPage(ctk.CTkFrame):
                 border_color=Colors.BORDER,
                 corner_radius=20,
                 height=32,
+                bg_color=Colors.BG_CARD,
                 command=lambda s=suggestion: self._send_suggestion(s),
             )
             btn.pack(side="left", padx=4)
@@ -202,11 +210,12 @@ class ChatPage(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_MUTED,
-            width=40,
-            height=40,
-            corner_radius=20,
+            width=36,
+            height=36,
+            corner_radius=18,
+            bg_color=Colors.BG_CARD,
             command=lambda: self.app.navigate_to("voice") if self.app else None,
-        ).pack(side="left", padx=(4, 0))
+        ).pack(side="left", padx=(6, 0))
 
         # Matn input
         self.input_entry = ctk.CTkEntry(
@@ -226,16 +235,17 @@ class ChatPage(ctk.CTkFrame):
         self.send_btn = ctk.CTkButton(
             input_frame,
             text="➤",
-            font=(Fonts.FAMILY, 18),
-            fg_color=Colors.PRIMARY_DARK,
-            hover_color=Colors.PRIMARY,
+            font=(Fonts.FAMILY, 16),
+            fg_color=Colors.PRIMARY,
+            hover_color=Colors.PRIMARY_HOVER,
             text_color=Colors.TEXT_PRIMARY,
-            width=40,
-            height=40,
-            corner_radius=20,
+            width=36,
+            height=36,
+            corner_radius=18,
+            bg_color=Colors.BG_CARD,
             command=self._on_send,
         )
-        self.send_btn.pack(side="right", padx=4)
+        self.send_btn.pack(side="right", padx=6)
 
     def _build_agent_panel(self, parent):
         """Agent thinking paneli"""

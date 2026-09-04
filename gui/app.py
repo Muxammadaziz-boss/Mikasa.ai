@@ -131,9 +131,9 @@ class MikasaApp(ctk.CTk):
 
     def _build_shell(self, page_id="dashboard", page_states=None):
         self._build_titlebar()
+        self._build_statusbar()
         self._build_layout()
         self._build_sidebar()
-        self._build_statusbar()
         self._init_pages()
         if page_states:
             self._restore_page_states(page_states)
@@ -155,7 +155,14 @@ class MikasaApp(ctk.CTk):
         self._pages = {}
         self._nav_items = {}
 
-        for attr in ["titlebar", "main_container", "statusbar"]:
+        for attr in [
+            "titlebar",
+            "titlebar_divider",
+            "sidebar_divider",
+            "main_container",
+            "statusbar_divider",
+            "statusbar",
+        ]:
             widget = getattr(self, attr, None)
             if widget is not None:
                 try:
@@ -236,7 +243,7 @@ class MikasaApp(ctk.CTk):
         self.tts_label.configure(text=f"TTS: {label}")
 
     def _build_titlebar(self):
-        """Dastur sarlavha paneli"""
+        """Dastur sarlavha paneli — Apple Dark minimal"""
         self.titlebar = ctk.CTkFrame(
             self,
             fg_color=Colors.BG_DARKEST,
@@ -249,31 +256,40 @@ class MikasaApp(ctk.CTk):
         # Logo va nom
         self.logo_label = ctk.CTkLabel(
             self.titlebar,
-            text="  🔷  MIKASA" if self._compact_mode else "  🔷  MIKASA AI",
-            font=(Fonts.FAMILY, 14, "bold"),
-            text_color=Colors.PRIMARY,
+            text="  MIKASA" if self._compact_mode else "  MIKASA AI",
+            font=(Fonts.FAMILY, 13, "bold"),
+            text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         )
-        self.logo_label.pack(side="left", padx=12)
+        self.logo_label.pack(side="left", padx=(14, 6))
 
-        # Versiya
-        self.version_label = ctk.CTkLabel(
-            self.titlebar,
-            text=f"v{VERSION}",
-            font=Fonts.TINY,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        )
+        # Versiya pill badge
         if not self._compact_mode:
-            self.version_label.pack(side="left", padx=(0, 16))
+            self.version_badge = ctk.CTkFrame(
+                self.titlebar,
+                fg_color=Colors.BG_CARD,
+                corner_radius=6,
+                border_width=1,
+                border_color=Colors.BORDER,
+                bg_color=Colors.BG_DARKEST,
+            )
+            self.version_badge.pack(side="left", padx=(0, 10))
+            self.version_label = ctk.CTkLabel(
+                self.version_badge,
+                text=f"v{VERSION}",
+                font=Fonts.TINY,
+                text_color=Colors.TEXT_MUTED,
+            )
+            self.version_label.pack(padx=6, pady=1)
 
         # Status badge
         self.status_badge = StatusBadge(
             self.titlebar,
             status=self._status_state["status"],
             text=self._status_state["text"],
+            bg_color=Colors.BG_DARKEST,
         )
-        self.status_badge.pack(side="left", padx=8)
+        self.status_badge.pack(side="left", padx=6)
 
         self.page_label = ctk.CTkLabel(
             self.titlebar,
@@ -285,7 +301,7 @@ class MikasaApp(ctk.CTk):
 
         self.user_label = ctk.CTkLabel(
             self.titlebar,
-            text=f"User: {self._get_user_name()}",
+            text=f"{self._get_user_name()}",
             font=Fonts.STATUS,
             text_color=Colors.TEXT_MUTED,
         )
@@ -297,9 +313,18 @@ class MikasaApp(ctk.CTk):
             self.titlebar,
             text="--:--",
             font=(Fonts.FAMILY, 12),
-            text_color=Colors.TEXT_SECONDARY,
+            text_color=Colors.TEXT_MUTED,
         )
         self.clock_label.pack(side="right", padx=16)
+
+        # 1px hairline border below titlebar
+        self.titlebar_divider = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BORDER,
+            height=1,
+            corner_radius=0,
+        )
+        self.titlebar_divider.pack(fill="x", side="top")
 
     def _build_layout(self):
         """Asosiy layout — sidebar + content"""
@@ -315,6 +340,15 @@ class MikasaApp(ctk.CTk):
         )
         self.sidebar_frame.pack(side="left", fill="y")
         self.sidebar_frame.pack_propagate(False)
+
+        # 1px vertical hairline divider
+        self.sidebar_divider = ctk.CTkFrame(
+            self.main_container,
+            fg_color=Colors.BORDER,
+            width=1,
+            corner_radius=0,
+        )
+        self.sidebar_divider.pack(side="left", fill="y")
 
         # Main content area
         self.content_frame = ctk.CTkFrame(
@@ -367,7 +401,16 @@ class MikasaApp(ctk.CTk):
         self._nav_items["settings"] = settings_item
 
     def _build_statusbar(self):
-        """Pastki status bar"""
+        """Pastki status bar — Apple hairline border + muted stats"""
+        # 1px hairline border above statusbar
+        self.statusbar_divider = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BORDER,
+            height=1,
+            corner_radius=0,
+        )
+        self.statusbar_divider.pack(fill="x", side="bottom")
+
         self.statusbar = ctk.CTkFrame(
             self,
             fg_color=Colors.STATUSBAR_BG,

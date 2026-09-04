@@ -1,17 +1,18 @@
 # ========== dashboard.py ==========
-# Dashboard sahifasi — AI holati, widget'lar, tezkor buyruqlar
+# Mikasa AI v6.0.0 — Apple Dark Minimal Dashboard
+# Toza, zamonaviy va nafis interfeys
 
 import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassCard, StatWidget, GlowButton, StatusBadge
+from gui.components import GlassCard, StatWidget, StatusBadge
 
 
 class DashboardPage(ctk.CTkFrame):
-    """Bosh sahifa — markaziy boshqaruv paneli"""
+    """Bosh sahifa — Apple uslubidagi minimalist boshqaruv paneli"""
 
     def __init__(self, master, app=None, **kwargs):
-        super().__init__(master, fg_color="transparent", **kwargs)
+        super().__init__(master, fg_color=Colors.BG_DARK, **kwargs)
         self.app = app
         self._stat_widgets = {}
         self._build_ui()
@@ -20,17 +21,17 @@ class DashboardPage(ctk.CTkFrame):
         # ===== SCROLLABLE FRAME =====
         self.scroll = ctk.CTkScrollableFrame(
             self,
-            fg_color="transparent",
+            fg_color=Colors.BG_DARK,
             scrollbar_button_color=Colors.BG_CARD,
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
-        self.scroll.pack(fill="both", expand=True, padx=20, pady=16)
+        self.scroll.pack(fill="both", expand=True, padx=24, pady=20)
 
         # ===== GREETING BANNER =====
         self._build_greeting()
 
-        # ===== AI STATUS ORB =====
-        self._build_ai_orb()
+        # ===== AI STATUS HERO CARD (Apple Intelligence style) =====
+        self._build_ai_hero()
 
         # ===== QUICK ACTIONS =====
         self._build_quick_actions()
@@ -42,18 +43,18 @@ class DashboardPage(ctk.CTkFrame):
         self._build_activity()
 
     def _build_greeting(self):
-        """Salomlashuv banneri"""
+        """Salomlashuv sarlavhasi"""
         greeting, emoji = self._get_greeting()
         name = self._get_user_name()
 
         self.greeting_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        self.greeting_frame.pack(fill="x", pady=(0, 16))
+        self.greeting_frame.pack(fill="x", pady=(0, 20))
 
         # Katta salomlashuv
         self.greeting_label = ctk.CTkLabel(
             self.greeting_frame,
-            text=f"{emoji} {greeting}, {name}!",
-            font=Fonts.HEADING_1,
+            text=f"{emoji}  {greeting}, {name}!",
+            font=(Fonts.FAMILY, 24, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         )
@@ -62,140 +63,223 @@ class DashboardPage(ctk.CTkFrame):
         # Subtitle
         self.subtitle_label = ctk.CTkLabel(
             self.greeting_frame,
-            text="Mikasa AI sizga xizmat qilishga tayyor 🤖",
+            text="Mikasa AI shaxsiy assistenti barcha vazifalarga tayyor",
             font=Fonts.BODY,
             text_color=Colors.TEXT_SECONDARY,
             anchor="w",
         )
-        self.subtitle_label.pack(fill="x", pady=(2, 0))
+        self.subtitle_label.pack(fill="x", pady=(4, 0))
 
-    def _build_ai_orb(self):
-        """AI Status Orb — markaziy holat ko'rsatgich"""
-        self.orb_card = GlassCard(self.scroll)
-        self.orb_card.pack(fill="x", pady=(0, 16))
+    def _build_ai_hero(self):
+        """Apple Intelligence uslubidagi markaziy holat kartasi"""
+        self.orb_card = GlassCard(self.scroll, padding=20)
+        self.orb_card.pack(fill="x", pady=(0, 20))
 
-        # Orb konteyner
-        orb_container = ctk.CTkFrame(self.orb_card.content, fg_color="transparent")
-        orb_container.pack(pady=20)
+        hero_inner = ctk.CTkFrame(self.orb_card.content, fg_color="transparent")
+        hero_inner.pack(fill="x")
 
-        # AI Orb (katta emoji)
-        self.orb_label = ctk.CTkLabel(
-            orb_container, text="🔵", font=(Fonts.FAMILY, 64), text_color=Colors.PRIMARY
+        # Yuqori qism: Holat + Emblem
+        top_row = ctk.CTkFrame(hero_inner, fg_color="transparent")
+        top_row.pack(fill="x", pady=(4, 12))
+
+        # Chap tomonda Siri/Intelligence uslubidagi nafis doira
+        emblem_frame = ctk.CTkFrame(
+            top_row,
+            fg_color=Colors.PRIMARY_SOFT,
+            corner_radius=999,
+            width=48,
+            height=48,
         )
-        self.orb_label.pack()
+        emblem_frame.pack(side="left")
+        emblem_frame.pack_propagate(False)
 
-        # Holat matni
-        self.orb_status = ctk.CTkLabel(
-            orb_container,
-            text="● Tayyor va kutmoqda",
-            font=Fonts.BODY_BOLD,
+        self.emblem_label = ctk.CTkLabel(
+            emblem_frame,
+            text="✦",
+            font=(Fonts.FAMILY, 22),
+            text_color=Colors.PRIMARY,
+        )
+        self.emblem_label.pack(expand=True)
+
+        # Matn bloki
+        text_block = ctk.CTkFrame(top_row, fg_color="transparent")
+        text_block.pack(side="left", padx=16, fill="x", expand=True)
+
+        status_row = ctk.CTkFrame(text_block, fg_color="transparent")
+        status_row.pack(fill="x")
+
+        # Yashil nuqta
+        ctk.CTkLabel(
+            status_row,
+            text="●",
+            font=(Fonts.FAMILY, 10),
             text_color=Colors.SUCCESS,
+            width=14,
+        ).pack(side="left")
+
+        self.orb_status = ctk.CTkLabel(
+            status_row,
+            text="Mikasa AI tayyor va kutmoqda",
+            font=(Fonts.FAMILY, 14, "bold"),
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
         )
-        self.orb_status.pack(pady=(8, 0))
+        self.orb_status.pack(side="left", padx=4)
 
-        # AI engine info — dinamik tool soni
-        try:
-            from core.agent_tools import get_registry
-
-            tool_count = get_registry().count
-        except Exception:
-            tool_count = 20
-        self.engine_label = ctk.CTkLabel(
-            orb_container,
-            text=f"Engine: Gemini + Silero TTS  |  Tools: {tool_count} ta  |  Xotira: Faol",
+        self.desc_label = ctk.CTkLabel(
+            text_block,
+            text="Ovozli va matnli buyruqlarni qabul qilishga to'liq shay holatda",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
+            anchor="w",
         )
-        self.engine_label.pack(pady=(4, 0))
+        self.desc_label.pack(fill="x", pady=(2, 0))
+
+        # Ajratuvchi chiziq
+        ctk.CTkFrame(hero_inner, fg_color=Colors.BORDER, height=1).pack(fill="x", pady=12)
+
+        # Pastki qism: 3 ta toza pill badge
+        badges_row = ctk.CTkFrame(hero_inner, fg_color="transparent")
+        badges_row.pack(fill="x")
+
+        try:
+            from core.agent_tools import get_registry
+            tool_count = get_registry().count
+        except Exception:
+            tool_count = 29
+
+        chips = [
+            ("⚡", "Gemini 2.5 Flash"),
+            ("🛠️", f"{tool_count} ta Vosita"),
+            ("🧠", "Vektor Xotira Faol"),
+            ("🎙️", "Tezkor VAD Oqim"),
+        ]
+
+        for icon, chip_text in chips:
+            chip = ctk.CTkFrame(
+                badges_row,
+                fg_color=Colors.BG_SOFT,
+                corner_radius=999,
+                border_width=1,
+                border_color=Colors.BORDER,
+            )
+            chip.pack(side="left", padx=(0, 10))
+
+            inner_chip = ctk.CTkFrame(chip, fg_color="transparent")
+            inner_chip.pack(padx=12, pady=5)
+
+            ctk.CTkLabel(
+                inner_chip,
+                text=f"{icon}  {chip_text}",
+                font=Fonts.TINY,
+                text_color=Colors.TEXT_SECONDARY,
+            ).pack()
 
     def _build_quick_actions(self):
-        """Tezkor harakatlar tugmalari"""
+        """Tezkor harakatlar tugmalari — Apple minimal uslubida"""
         actions_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        actions_frame.pack(fill="x", pady=(0, 16))
+        actions_frame.pack(fill="x", pady=(0, 20))
 
         # Sarlavha
         ctk.CTkLabel(
             actions_frame,
-            text="⚡  Tezkor harakatlar",
+            text="Tezkor harakatlar",
             font=Fonts.HEADING_3,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x", pady=(0, 10))
+        ).pack(fill="x", pady=(0, 12))
 
-        # Tugmalar grid
+        # Tugmalar konteyneri
         btn_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
         btn_frame.pack(fill="x")
 
         actions = [
             (
-                "🎤",
+                "🎙️",
                 "Tinglash",
-                Colors.PRIMARY_DARK,
+                True,  # Primary Hero Action
                 lambda: self.app.navigate_to("voice") if self.app else None,
             ),
             (
                 "💬",
                 "AI Suhbat",
-                Colors.SECONDARY_DARK,
+                False,
                 lambda: self.app.navigate_to("chat") if self.app else None,
             ),
             (
                 "🌤️",
                 "Ob-havo",
-                Colors.SUCCESS,
+                False,
                 lambda: self._quick_command("Toshkentda havo qanday?"),
             ),
             (
                 "🎵",
                 "Musiqa",
-                Colors.SECONDARY,
+                False,
                 lambda: self._quick_command("musiqa qo'y"),
             ),
             (
                 "💱",
                 "Valyuta",
-                Colors.WARNING,
+                False,
                 lambda: self._quick_command("bugungi dollar kursi"),
             ),
             (
-                "📸",
+                "👁️",
                 "Ekran tahlil",
-                Colors.INFO,
+                False,
                 lambda: self._quick_command("ekranda nima bor"),
             ),
         ]
 
-        for i, (icon, text, color, cmd) in enumerate(actions):
-            btn = ctk.CTkButton(
-                btn_frame,
-                text=f" {icon}  {text}",
-                font=Fonts.BODY_BOLD,
-                fg_color=color,
-                hover_color=Colors.BG_HOVER,
-                text_color=Colors.TEXT_PRIMARY,
-                corner_radius=10,
-                height=50,
-                command=cmd,
-            )
-            btn.grid(row=0, column=i, padx=4, pady=4, sticky="ew")
+        for i, (icon, text, is_hero, cmd) in enumerate(actions):
+            if is_hero:
+                # Apple Signature Blue Button
+                btn = ctk.CTkButton(
+                    btn_frame,
+                    text=f"{icon}  {text}",
+                    font=(Fonts.FAMILY, 13, "bold"),
+                    fg_color=Colors.PRIMARY,
+                    hover_color=Colors.PRIMARY_DARK,
+                    text_color="#FFFFFF",
+                    corner_radius=12,
+                    height=46,
+                    border_width=0,
+                    command=cmd,
+                )
+            else:
+                # Apple Dark Glass Capsule Button
+                btn = ctk.CTkButton(
+                    btn_frame,
+                    text=f"{icon}  {text}",
+                    font=Fonts.BODY,
+                    fg_color=Colors.BG_CARD,
+                    hover_color=Colors.BG_HOVER,
+                    text_color=Colors.TEXT_PRIMARY,
+                    corner_radius=12,
+                    height=46,
+                    border_width=1,
+                    border_color=Colors.BORDER,
+                    command=cmd,
+                )
+            btn.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
 
-        # Ustunlarni teng qilish
         for i in range(len(actions)):
             btn_frame.columnconfigure(i, weight=1)
 
     def _build_stats(self):
-        """Statistika widgetlari"""
+        """Statistika kartalari — Apple minimal widgetlari"""
         # Sarlavha
         ctk.CTkLabel(
             self.scroll,
-            text="📊  Tizim statistikasi",
+            text="Tizim statistikasi",
             font=Fonts.HEADING_3,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x", pady=(0, 10))
+        ).pack(fill="x", pady=(0, 12))
 
         stats_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        stats_frame.pack(fill="x", pady=(0, 16))
+        stats_frame.pack(fill="x", pady=(0, 20))
 
         stats = self._get_stats()
 
@@ -203,41 +287,42 @@ class DashboardPage(ctk.CTkFrame):
             widget = StatWidget(
                 stats_frame, value=value, label=label, icon=icon, color=color
             )
-            widget.grid(row=0, column=i, padx=6, pady=4, sticky="ew")
+            widget.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
             self._stat_widgets[label] = widget
 
         for i in range(4):
             stats_frame.columnconfigure(i, weight=1)
 
     def _build_activity(self):
-        """Oxirgi faoliyat ro'yxati — backend bridge tomonidan yangilanadi"""
-        activity_card = GlassCard(self.scroll, title="📋  Oxirgi faoliyat")
-        activity_card.pack(fill="x", pady=(0, 16))
+        """Oxirgi faoliyat ro'yxati — Apple uslubidagi toza timeline"""
+        activity_card = GlassCard(self.scroll, title="Oxirgi faoliyat")
+        activity_card.pack(fill="x", pady=(0, 20))
 
-        # Backend bridge shu frame ga yozadi
         self._activity_list = ctk.CTkFrame(
             activity_card.content, fg_color="transparent"
         )
         self._activity_list.pack(fill="x")
 
-        # Boshlang'ich xabar
         now = datetime.datetime.now().strftime("%H:%M:%S")
 
         row = ctk.CTkFrame(self._activity_list, fg_color="transparent")
-        row.pack(fill="x", pady=2)
+        row.pack(fill="x", pady=4)
+
         ctk.CTkLabel(
             row, text="●", font=(Fonts.FAMILY, 8), text_color=Colors.SUCCESS, width=14
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, 8))
+
         ctk.CTkLabel(
             row,
-            text="🟢 Dastur ishga tushdi",
-            font=Fonts.SMALL,
+            text="Mikasa AI v6.0.0 muvaffaqiyatli ishga tushdi",
+            font=Fonts.BODY,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         ).pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(row, text=now, font=Fonts.TINY, text_color=Colors.TEXT_MUTED).pack(
-            side="right"
-        )
+
+        ctk.CTkLabel(
+            row, text=now, font=Fonts.TINY, text_color=Colors.TEXT_MUTED
+        ).pack(side="right")
 
     def _quick_command(self, text):
         """Dashboard quick action — buyruqni backend ga yuborish"""
@@ -245,32 +330,30 @@ class DashboardPage(ctk.CTkFrame):
             self.app.bridge.send_text_command(text)
 
     def on_show(self):
-        """Sahifa ko'rsatilganda chaqiriladi"""
+        """Sahifa ko'rsatilganda yangilanish"""
         greeting, emoji = self._get_greeting()
         self.greeting_label.configure(
-            text=f"{emoji} {greeting}, {self._get_user_name()}!"
+            text=f"{emoji}  {greeting}, {self._get_user_name()}!"
         )
 
         for value, label, icon, color in self._get_stats():
             widget = self._stat_widgets.get(label)
             if widget:
                 widget.set_value(value)
-                if hasattr(widget, "icon_label"):
-                    widget.icon_label.configure(text_color=color)
 
         if self.app and hasattr(self.app, "bridge"):
             stats = self.app.bridge.get_memory_stats()
+            count = stats.get("suhbatlar_soni", 0)
             self.orb_status.configure(
-                text=f"● Tayyor va kutmoqda | Suhbatlar: {stats.get('suhbatlar_soni', 0)}"
+                text=f"Mikasa AI tayyor  |  {count} ta suhbat saqlangan"
             )
 
     def _get_user_name(self):
         try:
             from config import get_config
-
-            return get_config("user.name", "Foydalanuvchi")
+            return get_config("user.name", "Muxammadaziz")
         except Exception:
-            return "Foydalanuvchi"
+            return "Muxammadaziz"
 
     def _get_greeting(self):
         hour = datetime.datetime.now().hour
@@ -283,7 +366,7 @@ class DashboardPage(ctk.CTkFrame):
         return "Xayrli kech", "🌆"
 
     def _get_stats(self):
-        tool_count = 20
+        tool_count = 29
         conversation_count = 110
         knowledge_count = 3
         task_count = 0
