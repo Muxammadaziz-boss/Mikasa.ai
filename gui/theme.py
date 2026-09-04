@@ -48,10 +48,10 @@ class Colors:
         "SIDEBAR_INDICATOR": "#0A84FF",
         "STATUSBAR_BG": "#08080C",
         # Glassmorphism tokens
-        "GLASS_BG": "#222232",
-        "GLASS_BG_HOVER": "#303046",
-        "GLASS_BORDER": "#3E3E58",
-        "GLASS_BORDER_HOVER": "#666692",
+        "GLASS_BG": "#2A2A42",
+        "GLASS_BG_HOVER": "#383854",
+        "GLASS_BORDER": "#50506E",
+        "GLASS_BORDER_HOVER": "#7A7AA0",
         "GLASS_TEXT": "#FFFFFF",
         "GLASS_HERO_BG": "#0A84FF",
         "GLASS_HERO_HOVER": "#0071E3",
@@ -238,10 +238,10 @@ class Sizing:
         "SIDEBAR_WIDTH_COLLAPSED": 64,
         "SIDEBAR_WIDTH_EXPANDED": 200,
         "STATUSBAR_HEIGHT": 32,
-        "CARD_RADIUS": 20,
+        "CARD_RADIUS": 22,
         "CARD_PADDING": 18,
         "BUTTON_HEIGHT": 42,
-        "BUTTON_RADIUS": 16,
+        "BUTTON_RADIUS": 999,
         "BUTTON_PADDING_X": 16,
         "INPUT_HEIGHT": 44,
         "INPUT_RADIUS": 16,
@@ -291,47 +291,47 @@ class Icons:
     """Unicode ikonkalar (Emoji based — kengaytirish mumkin)"""
 
     # Navigatsiya
-    DASHBOARD = "🏠"
-    VOICE = "🎤"
-    CHAT = "💬"
+    DASHBOARD = "⬡"
+    VOICE = "◎"
+    CHAT = "◇"
     COMMANDS = "⚡"
-    MEMORY = "🧠"
-    SCHEDULER = "⏰"
-    PLUGINS = "🔌"
-    SETTINGS = "⚙️"
+    MEMORY = "◈"
+    SCHEDULER = "◷"
+    PLUGINS = "⬢"
+    SETTINGS = "⚙"
 
     # Holatlar
-    ONLINE = "🟢"
-    OFFLINE = "🔴"
-    BUSY = "🟡"
+    ONLINE = "●"
+    OFFLINE = "●"
+    BUSY = "●"
 
     # Harakatlar
     PLAY = "▶"
     PAUSE = "⏸"
     STOP = "⏹"
-    MIC = "🎙️"
-    MIC_OFF = "🔇"
+    MIC = "◉"
+    MIC_OFF = "○"
     SEND = "➤"
-    SEARCH = "🔍"
-    ADD = "➕"
-    DELETE = "🗑️"
-    EDIT = "✏️"
-    COPY = "📋"
+    SEARCH = "⌕"
+    ADD = "+"
+    DELETE = "✕"
+    EDIT = "✎"
+    COPY = "❐"
     CLOSE = "✕"
 
     # Tool kategoriyalar
-    INTERNET = "🌐"
-    CALCULATOR = "🔢"
-    SYSTEM = "💻"
-    MEDIA = "🎵"
-    WEATHER = "🌤️"
-    FILE = "📁"
-    KNOWLEDGE = "📚"
-    CLOCK = "🕐"
-    CURRENCY = "💱"
-    TRANSLATE = "🌍"
-    SCREEN = "👁️"
-    REMINDER = "📌"
+    INTERNET = "◎"
+    CALCULATOR = "#"
+    SYSTEM = "▣"
+    MEDIA = "♫"
+    WEATHER = "☁"
+    FILE = "▤"
+    KNOWLEDGE = "▥"
+    CLOCK = "◷"
+    CURRENCY = "¤"
+    TRANSLATE = "⊕"
+    SCREEN = "◱"
+    REMINDER = "◈"
 
 
 Colors.apply_theme("dark")

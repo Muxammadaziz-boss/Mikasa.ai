@@ -136,141 +136,176 @@ class AppleSiriOrb(ctk.CTkFrame):
         cx = self._center
         cy = self._center
         t = self._tick
+        size = self._size
+
+        try:
+            from PIL import Image, ImageDraw, ImageFilter, ImageTk
+        except ImportError:
+            # PIL mavjud bo'lmasa oddiy doira chizamiz
+            self.canvas.create_oval(cx-40, cy-40, cx+40, cy+40, fill="#0A84FF", outline="")
+            return
+
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
         if self._state == "listening":
-            # ===== 1. Silliq Ko'p Qatlamli Gradient Aura (uzluksiz nurli halqalar) =====
+            # ===== LISTENING: Ko'k-cyan gradient aura =====
             breath = math.sin(t * 0.22) * 6
-            glow_rings = [
-                (102 + breath, "#111A30"),
-                (96 + breath, "#132140"),
-                (90 + breath, "#162B54"),
-                (84 + breath, "#19376C"),
-                (78 + breath, "#1D4586"),
-                (72 + breath, "#2155A2"),
-                (66 + breath, "#2668C0"),
-                (60 + breath, "#1A7AE8"),
-                (54 + breath, "#0A84FF"),
-                (48 + breath * 0.8, "#0099FF"),
-                (42 + breath * 0.6, "#00B4D8"),
-                (36 + breath * 0.4, "#00C7FF"),
-                (30, "#38BDF8"),
+            max_r = 100 + breath
+            # Radial gradient — 80 ta konsentrik doira bilan silliq gradient
+            colors_stops = [
+                (0.0, (17, 26, 48, 20)),     # Tashqi — juda shaffof to'q ko'k
+                (0.2, (25, 55, 108, 60)),     # O'rta-tashqi
+                (0.4, (33, 85, 160, 100)),    # O'rta
+                (0.55, (26, 122, 232, 160)),   # O'rta-ichki
+                (0.7, (10, 132, 255, 200)),    # Ichki — yorqin ko'k
+                (0.85, (0, 180, 255, 230)),    # Ichki nurli
+                (1.0, (56, 189, 248, 255)),    # Markaz — eng yorqin
             ]
-            for r, col in glow_rings:
-                r = max(4, r)
-                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
+            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
 
-            # ===== 2. Organik Suyuq Siri To'lqin Blobi (Liquid Morphing Spline) =====
-            pts = []
-            for i in range(24):
-                ang = i * (2 * math.pi / 24)
-                r = 46 + math.sin(2 * ang + t * 0.2) * 6 + math.cos(3 * ang - t * 0.16) * 4
-                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
-            self.canvas.create_polygon(pts, smooth=True, fill="#00E5FF", outline="")
+            # Organik breathing pulse — nozik yorug'lik halqasi
+            pulse_r = 52 + math.sin(t * 0.3) * 4
+            pulse_alpha = int(80 + math.sin(t * 0.25) * 40)
+            for pr in range(int(pulse_r), int(pulse_r) + 6):
+                a = max(0, pulse_alpha - (pr - int(pulse_r)) * 15)
+                draw.ellipse([cx-pr, cy-pr, cx+pr, cy+pr], outline=(0, 229, 255, a), width=1)
 
-            # ===== 3. Jonli Ovoz Ekvalayzer To'lqinlari (Dynamic Equalizer Audio Waves) =====
-            wave_configs = [
-                ("#D946EF", 2.0, 0.22, 10),
-                ("#00F5FF", 3.0, 0.32, 15),
-                ("#FFFFFF", 2.2, 0.44, 12),
-            ]
-            for color, width, speed, amp in wave_configs:
-                wpts = []
-                for x in range(cx - 36, cx + 37, 3):
-                    norm = (x - (cx - 36)) / 72.0
-                    env = math.sin(norm * math.pi)
-                    y = cy + math.sin((x - cx) * 0.14 + t * speed) * amp * env
-                    wpts.extend([x, y])
-                self.canvas.create_line(wpts, smooth=True, width=width, fill=color)
+            # Ovoz ekvalayzer barlari — markazda 7 ta vertikal bar
+            bar_count = 7
+            bar_width = 4
+            bar_gap = 3
+            total_w = bar_count * bar_width + (bar_count - 1) * bar_gap
+            start_x = cx - total_w // 2
+            for bi in range(bar_count):
+                # Har bir barning balandligi animatsiyaga qarab o'zgaradi
+                phase = bi * 0.7 + t * 0.35
+                bar_h = int(8 + abs(math.sin(phase)) * 18 + abs(math.cos(phase * 0.6)) * 8)
+                bx = start_x + bi * (bar_width + bar_gap)
+                by1 = cy - bar_h // 2
+                by2 = cy + bar_h // 2
+                # Bar rangi — markazga yaqinlari yorqinroq
+                dist = abs(bi - bar_count // 2) / (bar_count // 2)
+                r_c = int(0 + dist * 20)
+                g_c = int(229 - dist * 40)
+                b_c = int(255 - dist * 10)
+                bar_alpha = int(220 - dist * 60)
+                for dx in range(bar_width):
+                    draw.line([(bx + dx, by1), (bx + dx, by2)], fill=(r_c, g_c, b_c, bar_alpha))
 
-            # ===== 4. Markaziy Shisha Kapsula va Mikrofon Nishoni =====
-            center_r = 22
-            self.canvas.create_oval(
-                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
-                fill="#0D1F3C",
-                outline="#5AC8FA",
-                width=1.5,
+            # Markaziy shisha doira
+            center_r = 20
+            draw.ellipse(
+                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
+                fill=(13, 31, 60, 200),
+                outline=(90, 200, 250, 180),
+                width=2,
             )
-            self.canvas.create_text(
-                cx, cy,
-                text="🎙️",
-                font=(Fonts.FAMILY, 15, "bold"),
-                fill="#FFFFFF",
-            )
+
         elif self._state == "speaking":
+            # ===== SPEAKING: Binafsha-pushti gradient aura =====
             breath = math.sin(t * 0.2) * 5
-            glow_rings = [
-                (98 + breath, "#1A102E"),
-                (91 + breath, "#241340"),
-                (84 + breath, "#321758"),
-                (77 + breath, "#421C72"),
-                (70 + breath, "#552190"),
-                (63 + breath, "#6C26B0"),
-                (56 + breath, "#852CD4"),
-                (48 + breath, "#9D4EDD"),
-                (40 + breath * 0.8, "#AF52DE"),
-                (32, "#BF5AF2"),
+            max_r = 96 + breath
+            colors_stops = [
+                (0.0, (26, 16, 46, 20)),
+                (0.2, (50, 23, 88, 60)),
+                (0.4, (82, 33, 144, 100)),
+                (0.55, (108, 38, 176, 160)),
+                (0.7, (157, 78, 221, 200)),
+                (0.85, (175, 82, 222, 230)),
+                (1.0, (191, 90, 242, 255)),
             ]
-            for r, col in glow_rings:
-                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
+            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
 
-            pts = []
-            for i in range(24):
-                ang = i * (2 * math.pi / 24)
-                r = 44 + math.sin(2 * ang + t * 0.18) * 5 + math.cos(3 * ang - t * 0.14) * 4
-                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
-            self.canvas.create_polygon(pts, smooth=True, fill="#BF5AF2", outline="")
+            # Nozik pulse
+            pulse_r = 48 + math.sin(t * 0.28) * 3
+            pulse_alpha = int(70 + math.sin(t * 0.22) * 30)
+            for pr in range(int(pulse_r), int(pulse_r) + 5):
+                a = max(0, pulse_alpha - (pr - int(pulse_r)) * 14)
+                draw.ellipse([cx-pr, cy-pr, cx+pr, cy+pr], outline=(191, 90, 242, a), width=1)
 
-            center_r = 22
-            self.canvas.create_oval(
-                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
-                fill="#201138",
-                outline="#E0A8FF",
-                width=1.5,
+            # Markaziy doira
+            center_r = 20
+            draw.ellipse(
+                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
+                fill=(32, 17, 56, 200),
+                outline=(224, 168, 255, 180),
+                width=2,
             )
-            self.canvas.create_text(
-                cx, cy,
-                text="✦",
-                font=(Fonts.FAMILY, 18, "bold"),
-                fill="#FFFFFF",
-            )
+            # Sparkle belgi — Canvas text orqali
+
         else:
-            # Idle — mayin, xotirjam Apple Intelligence nafas olish auralari
+            # ===== IDLE: Tinch ko'k nafas olish auralari =====
             breath = math.sin(t * 0.08) * 4
-            glow_rings = [
-                (92 + breath, "#101626"),
-                (85 + breath, "#121C32"),
-                (78 + breath, "#152442"),
-                (71 + breath, "#182E55"),
-                (64 + breath, "#1C3A6B"),
-                (57 + breath, "#204884"),
-                (50 + breath * 0.8, "#2557A0"),
-                (43 + breath * 0.6, "#1E68C4"),
-                (36 + breath * 0.4, "#0A84FF"),
-                (28, "#38BDF8"),
+            max_r = 88 + breath
+            colors_stops = [
+                (0.0, (16, 22, 38, 15)),
+                (0.2, (21, 36, 66, 45)),
+                (0.4, (28, 58, 107, 80)),
+                (0.55, (32, 72, 132, 120)),
+                (0.7, (37, 87, 160, 160)),
+                (0.85, (10, 104, 196, 200)),
+                (1.0, (10, 132, 255, 240)),
             ]
-            for r, col in glow_rings:
-                self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=col, outline="")
+            self._draw_radial_gradient(draw, cx, cy, max_r, colors_stops)
 
-            pts = []
-            for i in range(24):
-                ang = i * (2 * math.pi / 24)
-                r = 38 + math.sin(2 * ang + t * 0.09) * 4 + math.cos(3 * ang - t * 0.07) * 3
-                pts.extend([cx + r * math.cos(ang), cy + r * math.sin(ang)])
-            self.canvas.create_polygon(pts, smooth=True, fill="#0A84FF", outline="")
+            # Markaziy doira
+            center_r = 20
+            draw.ellipse(
+                [cx - center_r, cy - center_r, cx + center_r, cy + center_r],
+                fill=(15, 31, 56, 200),
+                outline=(100, 210, 255, 160),
+                width=2,
+            )
 
-            center_r = 22
-            self.canvas.create_oval(
-                cx - center_r, cy - center_r, cx + center_r, cy + center_r,
-                fill="#0F1F38",
-                outline="#64D2FF",
-                width=1.5,
+        # Gaussian Blur bilan silliqlashtirish
+        img = img.filter(ImageFilter.GaussianBlur(radius=2))
+
+        # Canvas ga joylashtirish
+        self._photo = ImageTk.PhotoImage(img)
+        self.canvas.create_image(cx, cy, image=self._photo)
+
+        # Speaking/Idle uchun sparkle belgi (Canvas text — PIL dan tashqarida)
+        if self._state == "speaking":
+            self.canvas.create_text(cx, cy, text="\u2726", font=("Segoe UI", 16, "bold"), fill="#FFFFFF")
+        elif self._state == "idle":
+            self.canvas.create_text(cx, cy, text="\u2726", font=("Segoe UI", 16, "bold"), fill="#FFFFFF")
+
+    def _draw_radial_gradient(self, draw, cx, cy, max_r, color_stops):
+        """Silliq radial gradient chizish — color_stops: [(t, (r,g,b,a)), ...]"""
+        rings = 80
+        for i in range(rings, -1, -1):
+            t = i / rings  # 1.0 = tashqi, 0.0 = ichki
+            inv_t = 1.0 - t  # 0.0 = tashqi, 1.0 = ichki
+            r = max_r * t
+            if r < 1:
+                continue
+
+            # Rangni interpolatsiya qilish
+            color = self._interpolate_color(inv_t, color_stops)
+            draw.ellipse(
+                [cx - r, cy - r, cx + r, cy + r],
+                fill=color,
             )
-            self.canvas.create_text(
-                cx, cy,
-                text="✦",
-                font=(Fonts.FAMILY, 18, "bold"),
-                fill="#FFFFFF",
-            )
+
+    @staticmethod
+    def _interpolate_color(t, stops):
+        """Color stops orasida lineer interpolatsiya"""
+        t = max(0.0, min(1.0, t))
+        if t <= stops[0][0]:
+            return stops[0][1]
+        if t >= stops[-1][0]:
+            return stops[-1][1]
+
+        for i in range(len(stops) - 1):
+            t0, c0 = stops[i]
+            t1, c1 = stops[i + 1]
+            if t0 <= t <= t1:
+                local_t = (t - t0) / (t1 - t0) if t1 != t0 else 0
+                return tuple(int(c0[j] + (c1[j] - c0[j]) * local_t) for j in range(4))
+
+        return stops[-1][1]
+
 
     def _animate(self):
         if not self._is_active:
@@ -807,7 +842,7 @@ class StatWidget(ctk.CTkFrame):
         self._normal_border = Colors.GLASS_BORDER
 
         top = ctk.CTkFrame(self, fg_color="transparent")
-        top.pack(fill="x", padx=16, pady=(14, 6))
+        top.pack(fill="x", padx=16, pady=(16, 8))
 
         self.icon_box = ctk.CTkFrame(
             top,
@@ -865,7 +900,7 @@ class StatWidget(ctk.CTkFrame):
             text_color="#FFFFFF",
             anchor="w",
         )
-        self.value_label.pack(fill="x", padx=18, pady=(4, 14))
+        self.value_label.pack(fill="x", padx=18, pady=(6, 18))
 
         self.bind("<Enter>", self._on_enter, add="+")
         self.bind("<Leave>", self._on_leave, add="+")

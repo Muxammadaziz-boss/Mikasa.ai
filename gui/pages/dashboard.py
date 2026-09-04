@@ -25,7 +25,7 @@ class DashboardPage(ctk.CTkFrame):
             scrollbar_button_color=Colors.BG_CARD,
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
-        self.scroll.pack(fill="both", expand=True, padx=24, pady=20)
+        self.scroll.pack(fill="both", expand=True, padx=60, pady=20)
 
         # ===== GREETING BANNER =====
         self._build_greeting()
@@ -241,24 +241,24 @@ class DashboardPage(ctk.CTkFrame):
                     btn_frame,
                     text=text,
                     icon=icon,
+                    width=200,
                     height=48,
-                    corner_radius=24,
+                    corner_radius=999,
                     command=cmd,
                 )
+                btn.grid(row=0, column=i, padx=6, pady=4)
             else:
                 # Apple Dark Glass Capsule Button — Full Pill Capsule (zero boxiness!)
                 btn = GlassButton(
                     btn_frame,
                     text=text,
                     icon=icon,
+                    width=140,
                     height=48,
-                    corner_radius=24,
+                    corner_radius=999,
                     command=cmd,
                 )
-            btn.grid(row=0, column=i, padx=6, pady=4, sticky="ew")
-
-        for i in range(len(actions)):
-            btn_frame.columnconfigure(i, weight=1)
+                btn.grid(row=0, column=i, padx=4, pady=4)
 
     def _build_stats(self):
         """Statistika kartalari — Apple minimal widgetlari"""
@@ -280,7 +280,7 @@ class DashboardPage(ctk.CTkFrame):
             widget = StatWidget(
                 stats_frame, value=value, label=label, icon=icon, color=color
             )
-            widget.grid(row=0, column=i, padx=5, pady=4, sticky="ew")
+            widget.grid(row=0, column=i, padx=8, pady=4, sticky="ew")
             self._stat_widgets[label] = widget
 
         for i in range(4):

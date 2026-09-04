@@ -71,6 +71,7 @@ class ChatPage(ctk.CTkFrame):
             font=Fonts.SMALL,
             width=105,
             height=32,
+            corner_radius=999,
             command=self._clear_chat,
         ).pack(side="right")
 
@@ -191,7 +192,7 @@ class ChatPage(ctk.CTkFrame):
                 suggestions_frame,
                 text=f"{icon}  {suggestion}",
                 font=Fonts.SMALL,
-                corner_radius=16,
+                corner_radius=999,
                 height=34,
                 command=lambda s=suggestion: self._send_suggestion(s),
             )

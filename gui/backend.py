@@ -388,6 +388,7 @@ class BackendBridge:
             "text": text[:80],
             "time": now,
             "color": color_map.get(category, "#9CA3AF"),
+            "category": category,
         }
 
         self._activities.insert(0, activity)
@@ -414,8 +415,20 @@ class BackendBridge:
             for w in dashboard._activity_list.winfo_children():
                 w.destroy()
 
+            # Activity type ga mos ranglar xaritasi
+            type_color_map = {
+                "success": getattr(Colors, "SUCCESS", "#10B981"),
+                "primary": getattr(Colors, "PRIMARY", "#00D4FF"),
+                "warning": getattr(Colors, "WARNING", "#F59E0B"),
+                "danger": getattr(Colors, "DANGER", "#EF4444"),
+                "info": getattr(Colors, "INFO", "#3B82F6"),
+            }
+
             # Yangi elementlar
             for act in self._activities[:8]:
+                cat = act.get("category", "info")
+                act_color = act.get("color") or type_color_map.get(cat, Colors.INFO)
+
                 row = ctk.CTkFrame(
                     dashboard._activity_list,
                     fg_color=Colors.GLASS_BG,
@@ -425,14 +438,24 @@ class BackendBridge:
                 )
                 row.pack(fill="x", pady=2)
 
-                inner = ctk.CTkFrame(row, fg_color="transparent")
-                inner.pack(fill="x", padx=12, pady=7)
+                # 3px chap aksent chegara (activity type rangi bilan)
+                accent_bar = ctk.CTkFrame(
+                    row,
+                    width=3,
+                    fg_color=act_color,
+                    corner_radius=2,
+                )
+                accent_bar.pack(side="left", fill="y", padx=(4, 0), pady=4)
 
+                inner = ctk.CTkFrame(row, fg_color="transparent")
+                inner.pack(side="left", fill="x", expand=True, padx=(8, 12), pady=7)
+
+                # Activity type ga mos rangdagi ikonka
                 ctk.CTkLabel(
                     inner,
                     text="●",
                     font=(Fonts.FAMILY, 9),
-                    text_color=act["color"],
+                    text_color=act_color,
                     width=14,
                 ).pack(side="left", padx=(0, 6))
 

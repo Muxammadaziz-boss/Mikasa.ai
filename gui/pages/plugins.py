@@ -53,6 +53,7 @@ class PluginsPage(ctk.CTkFrame):
             self.hero.actions,
             text="Papkani ochish",
             icon="📁",
+            corner_radius=999,
             command=self._open_plugins_folder,
         ).pack(anchor="e")
 
@@ -293,9 +294,13 @@ class PluginsPage(ctk.CTkFrame):
                 anchor="w",
             ).pack(fill="x", pady=(4, 0))
 
-            SecondaryButton(inner, text="Yaratish", icon="✨", command=cmd).pack(
-                side="right"
-            )
+            SecondaryButton(
+                inner,
+                text="Yaratish",
+                icon="✨",
+                corner_radius=999,
+                command=cmd,
+            ).pack(side="right")
 
     def _open_plugins_folder(self):
         if not os.path.exists(self.plugins_dir):
