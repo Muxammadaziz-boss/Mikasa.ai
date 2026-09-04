@@ -1,70 +1,10 @@
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import scrolledtext, messagebox, ttk
+from tkinter import scrolledtext, messagebox, simpledialog
 import threading
 import time
 import os
 from datetime import datetime
-
-class AnimatedButton(tk.Canvas):
-    """Animatsiyali tugma"""
-    def __init__(self, parent, text, command, bg_color, hover_color, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.command = command
-        self.bg_color = bg_color
-        self.hover_color = hover_color
-        self.current_color = bg_color
-        
-        # Tugma o'lchamlari
-        self.width = kwargs.get('width', 150)
-        self.height = kwargs.get('height', 45)
-        self.configure(width=self.width, height=self.height, highlightthickness=0)
-        
-        # Gradient fon
-        self.create_gradient()
-        
-        # Matn
-        self.text_id = self.create_text(
-            self.width // 2,
-            self.height // 2,
-            text=text,
-            fill="white",
-            font=("Segoe UI", 11, "bold")
-        )
-        
-        # Event'lar
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self.bind("<Button-1>", self.on_click)
-    
-    def create_gradient(self):
-        """Gradient fon yaratish"""
-        self.configure(bg=self.bg_color)
-        self.create_rectangle(0, 0, self.width, self.height, 
-                            fill=self.bg_color, outline="", tags="bg")
-    
-    def on_enter(self, event):
-        """Hover effekti"""
-        self.animate_color(self.hover_color)
-    
-    def on_leave(self, event):
-        """Hover tugashi"""
-        self.animate_color(self.bg_color)
-    
-    def on_click(self, event):
-        """Click effekti"""
-        self.scale(1.05)
-        self.after(100, lambda: self.scale(0.95))
-        self.after(200, lambda: self.scale(1.0))
-        self.after(250, self.command)
-    
-    def animate_color(self, target_color):
-        """Rang animatsiyasi"""
-        self.itemconfig("bg", fill=target_color)
-    
-    def scale(self, factor):
-        """Tugmani katta/kichik qilish"""
-        center_x, center_y = self.width // 2, self.height // 2
-        self.scale("all", center_x, center_y, factor, factor)
 
 class OvozliYordamchiGUI:
     def __init__(self, foydalanuvchi_ismi, ovoz_turi, fon_xizmat_func):
@@ -75,6 +15,7 @@ class OvozliYordamchiGUI:
         self.root = None
         self.xabarlar_tarixi = []
         self.animatsiya_aktiv = False
+        self.fon_thread = None
 
     def gui_qaytarish_funksiyasi(self, xabar):
         """Asosiy dasturdan xabarlarni qabul qilish"""
@@ -82,18 +23,24 @@ class OvozliYordamchiGUI:
             "vaqt": time.strftime('%H:%M:%S'),
             "xabar": xabar
         })
-        self.yangi_xabar(xabar)
+        # Thread-safe yangilanish
+        if self.root:
+            self.root.after(0, lambda: self.yangi_xabar(xabar))
 
-    def gui_ishga_tushir(self):
+    def gui_ishga_tushir(self, register_callback_func=None):
         # Asosiy dasturga qaytarish funksiyasini ro'yxatdan o'tkazish
-        import main
-        main.gui_bilan_integratsiya(self.gui_qaytarish_funksiyasi)
+        if register_callback_func:
+            register_callback_func(self.gui_qaytarish_funksiyasi)
         
-        self.root = tk.Tk()
+        # CustomTkinter sozlamalari
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        
+        self.root = ctk.CTk()
         self.root.title("🎙️ Ovozli Yordamchi Pro v2.0")
         self.root.geometry("1100x800")
-        self.root.configure(bg="#0a0e27")
         self.root.resizable(True, True)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         try:
             if os.path.exists('icon.ico'):
@@ -102,311 +49,321 @@ class OvozliYordamchiGUI:
             pass
 
         # Header
-        header_frame = tk.Frame(self.root, bg="#1e1b4b", height=120)
+        header_frame = ctk.CTkFrame(self.root, height=120, corner_radius=0)
         header_frame.pack(fill="x")
         header_frame.pack_propagate(False)
         
         # Logo va title
-        title_frame = tk.Frame(header_frame, bg="#1e1b4b")
-        title_frame.pack(expand=True)
+        title_frame = ctk.CTkFrame(header_frame)
+        title_frame.pack(expand=True, fill="both", padx=20, pady=20)
         
-        tk.Label(
+        ctk.CTkLabel(
             title_frame, 
             text="🎙️", 
-            font=("Segoe UI", 40),
-            fg="#a78bfa", 
-            bg="#1e1b4b"
+            font=ctk.CTkFont(size=40, weight="bold"),
+            text_color="#a78bfa"
         ).pack(side="left", padx=10)
         
-        title_label = tk.Label(
+        title_label = ctk.CTkLabel(
             title_frame, 
             text="Ovozli Yordamchi Pro", 
-            font=("Segoe UI", 26, "bold"),
-            fg="#a78bfa", 
-            bg="#1e1b4b"
+            font=ctk.CTkFont(size=26, weight="bold"),
+            text_color="#a78bfa"
         )
-        title_label.pack(side="left")
+        title_label.pack(side="left", padx=10)
         
-        tk.Label(
+        ctk.CTkLabel(
             title_frame, 
             text="v2.0", 
-            font=("Segoe UI", 12),
-            fg="#6366f1", 
-            bg="#1e1b4b"
+            font=ctk.CTkFont(size=12),
+            text_color="#6366f1"
         ).pack(side="left", padx=10)
 
         # User info panel
-        user_frame = tk.Frame(self.root, bg="#1e293b", height=70)
+        user_frame = ctk.CTkFrame(self.root, height=70)
         user_frame.pack(fill="x", padx=20, pady=10)
         user_frame.pack_propagate(False)
         
-        info_left = tk.Frame(user_frame, bg="#1e293b")
+        info_left = ctk.CTkFrame(user_frame, fg_color="transparent")
         info_left.pack(side="left", padx=20, pady=15)
         
-        tk.Label(
+        ctk.CTkLabel(
             info_left,
             text=f"👤 {self.foydalanuvchi_ismi}",
-            font=("Segoe UI", 12, "bold"),
-            fg="#e2e8f0",
-            bg="#1e293b"
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#e2e8f0"
         ).pack(side="left", padx=15)
         
-        tk.Label(
+        ctk.CTkLabel(
             info_left,
-            text=f"🔊 {self.ovoz_turi.capitalize()}",
-            font=("Segoe UI", 11),
-            fg="#cbd5e1",
-            bg="#1e293b"
+            text=f"📊 {self.ovoz_turi.capitalize()}",
+            font=ctk.CTkFont(size=11),
+            text_color="#cbd5e1"
         ).pack(side="left", padx=15)
         
         # Real-time clock
-        self.clock_label = tk.Label(
+        self.clock_label = ctk.CTkLabel(
             user_frame,
             text="",
-            font=("Segoe UI", 12, "bold"),
-            fg="#a78bfa",
-            bg="#1e293b"
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#a78bfa"
         )
         self.clock_label.pack(side="right", padx=20, pady=15)
         self.update_clock()
 
-        # Status panel with animation
-        status_frame = tk.Frame(self.root, bg="#0f172a", height=80)
+        # Status panel
+        status_frame = ctk.CTkFrame(self.root, height=80)
         status_frame.pack(fill="x", padx=20, pady=10)
         status_frame.pack_propagate(False)
         
-        # Status indicator (animated)
-        indicator_frame = tk.Frame(status_frame, bg="#0f172a")
+        # Status indicator
+        indicator_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
         indicator_frame.pack(side="left", padx=20, pady=20)
         
-        self.status_circle = tk.Canvas(indicator_frame, width=24, height=24, 
-                                       bg="#0f172a", highlightthickness=0)
-        self.status_circle.pack()
-        self.status_indicator = self.status_circle.create_oval(2, 2, 22, 22, 
-                                                                fill="#ef4444", outline="")
-        
-        self.status_label = tk.Label(
+        self.status_label = ctk.CTkLabel(
             status_frame,
             text="🔴 Tizim tayyor. 'Boshlash' tugmasini bosing",
-            font=("Segoe UI", 14, "bold"),
-            fg="#ef4444",
-            bg="#0f172a"
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#ef4444"
         )
         self.status_label.pack(side="left", padx=15, pady=20)
         
         # Asosiy maydon
-        main_frame = tk.Frame(self.root, bg="#0a0e27")
+        main_frame = ctk.CTkFrame(self.root)
         main_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
         # Text area
-        text_frame = tk.Frame(main_frame, bg="#1e293b", relief="flat", bd=2)
+        text_frame = ctk.CTkFrame(main_frame)
         text_frame.pack(fill="both", expand=True, pady=(0, 15))
         
-        tk.Label(
+        ctk.CTkLabel(
             text_frame,
-            text="📝 Faoliyat Jurnali",
-            font=("Segoe UI", 13, "bold"),
-            fg="#a78bfa",
-            bg="#1e293b"
+            text="📋 Faoliyat Jurnali",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#a78bfa"
         ).pack(anchor="w", padx=15, pady=12)
         
-        self.text_area = scrolledtext.ScrolledText(
+        self.text_area = ctk.CTkTextbox(
             text_frame, 
-            width=110, 
-            height=20, 
-            font=("Cascadia Code", 10),
-            bg="#0f172a", 
-            fg="#e2e8f0", 
-            insertbackground="#a78bfa", 
-            relief="flat",
-            padx=15,
-            pady=15,
-            wrap=tk.WORD
+            font=ctk.CTkFont(family="Consolas", size=10),
+            text_color="#e2e8f0",
+            fg_color="#0f172a",
+            border_width=0,
+            corner_radius=8
         )
         self.text_area.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
-        # Animatsiyali tugmalar paneli
-        button_frame = tk.Frame(main_frame, bg="#0a0e27")
+        # Text input area
+        input_frame = ctk.CTkFrame(main_frame)
+        input_frame.pack(fill="x", pady=(0, 10))
+        
+        self.entry_var = ctk.StringVar()
+        self.entry_field = ctk.CTkEntry(
+            input_frame,
+            textvariable=self.entry_var,
+            font=ctk.CTkFont(size=12),
+            fg_color="#1e293b",
+            text_color="white",
+            border_width=0,
+            corner_radius=8,
+            height=40
+        )
+        self.entry_field.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.entry_field.bind("<Return>", self.text_cmd_yubor)
+        
+        self.btn_send = ctk.CTkButton(
+            input_frame,
+            text="Yuborish",
+            command=self.text_cmd_yubor,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#6366f1",
+            hover_color="#4f46e5",
+            width=100,
+            height=40,
+            corner_radius=8
+        )
+        self.btn_send.pack(side="right")
+
+        # Tugmalar paneli
+        button_frame = ctk.CTkFrame(main_frame)
         button_frame.pack(fill="x", pady=10)
         
         # Birinchi qator - Asosiy boshqaruv
-        control_frame = tk.Frame(button_frame, bg="#0a0e27")
+        control_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
         control_frame.pack(pady=8)
         
-        self.btn_start = AnimatedButton(
+        self.btn_start = ctk.CTkButton(
             control_frame,
             text="▶️ Boshlash",
             command=self.tinglashni_boshla,
-            bg_color="#22c55e",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#22c55e",
             hover_color="#16a34a",
             width=180,
-            height=50
+            height=50,
+            corner_radius=8
         )
         self.btn_start.pack(side="left", padx=8)
         
-        self.btn_stop = AnimatedButton(
+        self.btn_stop = ctk.CTkButton(
             control_frame,
-            text="⏹️ To'xtatish",
+            text="⏹️ To'xtat",
             command=self.tinglashni_to_xtat,
-            bg_color="#ef4444",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#ef4444",
             hover_color="#dc2626",
             width=180,
-            height=50
+            height=50,
+            corner_radius=8
         )
         self.btn_stop.pack(side="left", padx=8)
         
-        # Ikkinchi qator - Ma'lumotlar
-        data_frame = tk.Frame(button_frame, bg="#0a0e27")
-        data_frame.pack(pady=8)
-        
-        AnimatedButton(
-            data_frame,
-            text="📜 Tarix",
-            command=self.tarix_ko_rsat,
-            bg_color="#3b82f6",
-            hover_color="#2563eb",
-            width=140,
-            height=45
-        ).pack(side="left", padx=5)
-        
-        AnimatedButton(
-            data_frame,
-            text="📌 Eslatmalar",
-            command=self.eslatmalar_ko_rsat,
-            bg_color="#8b5cf6",
-            hover_color="#7c3aed",
-            width=140,
-            height=45
-        ).pack(side="left", padx=5)
-        
-        AnimatedButton(
-            data_frame,
-            text="📊 Statistika",
-            command=self.statistika_ko_rsat,
-            bg_color="#06b6d4",
-            hover_color="#0891b2",
-            width=140,
-            height=45
-        ).pack(side="left", padx=5)
-        
-        AnimatedButton(
-            data_frame,
-            text="ℹ️ Yordam",
-            command=self.yordam_ko_rsat,
-            bg_color="#f59e0b",
-            hover_color="#d97706",
-            width=140,
-            height=45
-        ).pack(side="left", padx=5)
-        
-        # Uchinchi qator - Qo'shimcha
-        extra_frame = tk.Frame(button_frame, bg="#0a0e27")
-        extra_frame.pack(pady=8)
-        
-        AnimatedButton(
-            extra_frame,
+        self.btn_clear = ctk.CTkButton(
+            control_frame,
             text="🗑️ Tozalash",
             command=self.maydonni_tozala,
-            bg_color="#64748b",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#f59e0b",
+            hover_color="#d97706",
+            width=180,
+            height=50,
+            corner_radius=8
+        )
+        self.btn_clear.pack(side="left", padx=8)
+        
+        # Ikkinchi qator - Qo'shimcha funksiyalar
+        tools_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
+        tools_frame.pack(pady=8)
+        
+        self.btn_history = ctk.CTkButton(
+            tools_frame,
+            text="📊 Tarix",
+            command=self.tarix_ko_rsat,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#8b5cf6",
+            hover_color="#7c3aed",
+            width=140,
+            height=40,
+            corner_radius=8
+        )
+        self.btn_history.pack(side="left", padx=5)
+        
+        self.btn_reminders = ctk.CTkButton(
+            tools_frame,
+            text="📌 Eslatmalar",
+            command=self.eslatmalar_ko_rsat,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#ec4899",
+            hover_color="#db2777",
+            width=140,
+            height=40,
+            corner_radius=8
+        )
+        self.btn_reminders.pack(side="left", padx=5)
+        
+        self.btn_stats = ctk.CTkButton(
+            tools_frame,
+            text="📈 Statistika",
+            command=self.statistika_ko_rsat,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#06b6d4",
+            hover_color="#0891b2",
+            width=140,
+            height=40,
+            corner_radius=8
+        )
+        self.btn_stats.pack(side="left", padx=5)
+        
+        self.btn_help = ctk.CTkButton(
+            tools_frame,
+            text="❓ Yordam",
+            command=self.yordam_ko_rsat,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#64748b",
             hover_color="#475569",
             width=140,
-            height=45
-        ).pack(side="left", padx=5)
+            height=40,
+            corner_radius=8
+        )
+        self.btn_help.pack(side="left", padx=5)
         
-        AnimatedButton(
-            extra_frame,
-            text="⚙️ Sozlamalar",
-            command=self.sozlamalar_och,
-            bg_color="#6366f1",
-            hover_color="#4f46e5",
-            width=140,
-            height=45
-        ).pack(side="left", padx=5)
-
-        # Footer
-        footer_frame = tk.Frame(self.root, bg="#1e1b4b", height=55)
-        footer_frame.pack(fill="x")
-        footer_frame.pack_propagate(False)
-        
-        tk.Label(
-            footer_frame,
-            text="💻 Ovozli Yordamchi Pro v2.0 | NirCmd + OpenRouter AI | © 2024",
-            font=("Segoe UI", 9),
-            fg="#a78bfa",
-            bg="#1e1b4b"
-        ).pack(pady=18)
-
-        # Xush kelibsiz xabari
-        self.yangi_xabar("🎉 Ovozli Yordamchi Pro v2.0 ishga tayyor!")
-        self.yangi_xabar("✨ Yangi: NirCmd ovoz boshqaruvi, musiqa platformalari, video koordinatalari")
-        self.yangi_xabar("💡 'Boshlash' tugmasini bosing va ovozli buyruq bering")
-
+        # Dasturni ishga tushirish
         self.root.mainloop()
+
+    def on_closing(self):
+        """Dasturni yopishdan oldin"""
+        if self.ishga_tushgan:
+            self.tinglashni_to_xtat()
+        self.root.destroy()
 
     def update_clock(self):
         """Soatni yangilash"""
         if self.root:
-            current_time = datetime.now().strftime('%H:%M:%S')
-            self.clock_label.config(text=f"🕐 {current_time}")
-            self.root.after(1000, self.update_clock)
-
-    def animate_status(self):
-        """Status indikatori animatsiyasi (pulsatsiya)"""
-        if self.animatsiya_aktiv and self.ishga_tushgan:
-            colors = ['#22c55e', '#4ade80', '#86efac', '#4ade80']
-            for i, color in enumerate(colors):
-                if self.ishga_tushgan:
-                    self.status_circle.itemconfig(self.status_indicator, fill=color)
-                    # O'lchamni o'zgartirish (pulsatsiya)
-                    sizes = [2, 1, 0, 1]
-                    size = sizes[i]
-                    self.status_circle.coords(self.status_indicator, 
-                                             2-size, 2-size, 22+size, 22+size)
-                    self.root.update()
-                    time.sleep(0.2)
-            if self.ishga_tushgan:
-                self.root.after(100, self.animate_status)
+            try:
+                current_time = datetime.now().strftime('%H:%M:%S')
+                self.clock_label.configure(text=f"🕐 {current_time}")
+                self.root.after(1000, self.update_clock)
+            except:
+                pass
 
     def yangi_xabar(self, xabar):
         """GUI ga yangi xabar qo'shish"""
-        vaqt_belgisi = time.strftime('%H:%M:%S')
+        try:
+            vaqt_belgisi = time.strftime('%H:%M:%S')
+            
+            # Emoji va rang
+            if "xatolik" in xabar.lower() or "error" in xabar.lower() or "❌" in xabar:
+                color_tag = "error"
+            elif "bajarildi" in xabar.lower() or "✅" in xabar:
+                color_tag = "success"
+            elif "⚠️" in xabar:
+                color_tag = "warning"
+            else:
+                color_tag = "info"
+            
+            formatted_xabar = f"[{vaqt_belgisi}] {xabar}\n"
+            
+            # CustomTkinter da rangli text uchun
+            self.text_area.insert(tk.END, formatted_xabar)
+            self.text_area.see(tk.END)
+        except:
+            pass
+
+    def text_cmd_yubor(self, event=None):
+        text = self.entry_var.get().strip()
+        if not text:
+            return
         
-        # Emoji va rang
-        if "xatolik" in xabar.lower() or "error" in xabar.lower() or "❌" in xabar:
-            color_tag = "error"
-        elif "bajarildi" in xabar.lower() or "✅" in xabar:
-            color_tag = "success"
-        elif "⚠️" in xabar:
-            color_tag = "warning"
-        else:
-            color_tag = "info"
+        self.entry_var.set("")
+        self.yangi_xabar(f"⌨️ Siz: {text}")
         
-        formatted_xabar = f"[{vaqt_belgisi}] {xabar}\n"
-        
-        # Rang teglari
-        self.text_area.tag_config("error", foreground="#ef4444")
-        self.text_area.tag_config("success", foreground="#22c55e")
-        self.text_area.tag_config("warning", foreground="#f59e0b")
-        self.text_area.tag_config("info", foreground="#60a5fa")
-        
-        self.text_area.insert(tk.END, formatted_xabar, color_tag)
-        self.text_area.see(tk.END)
-        self.text_area.update()
+        # Asosiy funksiyaga yuborish
+        try:
+            import main
+            threading.Thread(target=main.buyruqni_tushun, 
+                             args=(text, self.foydalanuvchi_ismi, self.ovoz_turi),
+                             daemon=True).start()
+        except Exception as e:
+            self.yangi_xabar(f"❌ Xatolik: {e}")
 
     def tinglashni_boshla(self):
         if not self.ishga_tushgan:
             self.ishga_tushgan = True
             self.animatsiya_aktiv = True
             
-            # Status o'zgartirish
-            self.status_circle.itemconfig(self.status_indicator, fill="#22c55e")
-            self.status_label.config(text="🟢 Faol tinglanmoqda...", fg="#22c55e")
+            # Statusni yangilash
+            self.status_label.configure(text="🟢 Yordamchi ishlamoqda...", text_color="#22c55e")
             
-            # Animatsiyani boshlash
-            threading.Thread(target=self.animate_status, daemon=True).start()
+            # Tugmalarni yangilash
+            self.btn_start.configure(state="disabled")
+            self.btn_stop.configure(state="normal")
             
             # Fon xizmatini ishga tushirish
-            threading.Thread(target=self._fon_xizmat_ishga_tushir, daemon=True).start()
+            self.fon_thread = threading.Thread(
+                target=self._fon_xizmat_ishga_tushir,
+                daemon=True
+            )
+            self.fon_thread.start()
             
             self.yangi_xabar("🚀 Yordamchi ishga tushdi!")
             self.yangi_xabar("🎤 Gapiring: 'YouTube och', 'Musiqa', 'Ovozni 50 qil' va h.k.")
@@ -414,18 +371,25 @@ class OvozliYordamchiGUI:
     def _fon_xizmat_ishga_tushir(self):
         """Fon xizmatini ishga tushirish"""
         try:
-            self.fon_xizmat_func(self.foydalanuvchi_ismi, self.ovoz_turi, self.gui_qaytarish_funksiyasi)
+            self.fon_xizmat_func(
+                self.foydalanuvchi_ismi, 
+                self.ovoz_turi, 
+                self.gui_qaytarish_funksiyasi
+            )
         except Exception as e:
-            self.yangi_xabar(f"❌ Xatolik: {e}")
-            self.tinglashni_to_xtat()
+            self.root.after(0, lambda: self.yangi_xabar(f"❌ Xatolik: {e}"))
+            self.root.after(0, self.tinglashni_to_xtat)
 
     def tinglashni_to_xtat(self):
         self.ishga_tushgan = False
         self.animatsiya_aktiv = False
         
-        # Status o'zgartirish
-        self.status_circle.itemconfig(self.status_indicator, fill="#ef4444")
-        self.status_label.config(text="🔴 To'xtatildi", fg="#ef4444")
+        # Statusni yangilash
+        self.status_label.configure(text="🔴 Tizim to'xtatildi", text_color="#ef4444")
+        
+        # Tugmalarni yangilash
+        self.btn_start.configure(state="normal")
+        self.btn_stop.configure(state="disabled")
         
         self.yangi_xabar("⏹️ Yordamchi to'xtatildi")
 
@@ -433,32 +397,26 @@ class OvozliYordamchiGUI:
         try:
             with open("buyruqlar_tarixi.txt", "r", encoding="utf-8") as f:
                 history = f.read()
-            self.text_area.delete(1.0, tk.END)
+            self.text_area.delete("1.0", tk.END)
             if history.strip():
-                self.text_area.insert(tk.END, "═══════════════════════════════════════\n")
-                self.text_area.insert(tk.END, "           📜 BUYRUQLAR TARIXI\n")
-                self.text_area.insert(tk.END, "═══════════════════════════════════════\n\n")
                 self.text_area.insert(tk.END, history)
             else:
-                self.text_area.insert(tk.END, "📭 Tarix bo'sh.")
+                self.text_area.insert(tk.END, "🔭 Tarix bo'sh.")
         except FileNotFoundError:
-            self.text_area.delete(1.0, tk.END)
+            self.text_area.delete("1.0", tk.END)
             self.text_area.insert(tk.END, "❌ Tarix fayli topilmadi.")
 
     def eslatmalar_ko_rsat(self):
         try:
             with open("eslatmalar.txt", "r", encoding="utf-8") as f:
                 reminders = f.read()
-            self.text_area.delete(1.0, tk.END)
+            self.text_area.delete("1.0", tk.END)
             if reminders.strip():
-                self.text_area.insert(tk.END, "═══════════════════════════════════════\n")
-                self.text_area.insert(tk.END, "              📌 ESLATMALAR\n")
-                self.text_area.insert(tk.END, "═══════════════════════════════════════\n\n")
                 self.text_area.insert(tk.END, reminders)
             else:
-                self.text_area.insert(tk.END, "📭 Eslatmalar yo'q.")
+                self.text_area.insert(tk.END, "🔭 Eslatmalar yo'q.")
         except FileNotFoundError:
-            self.text_area.delete(1.0, tk.END)
+            self.text_area.delete("1.0", tk.END)
             self.text_area.insert(tk.END, "❌ Eslatmalar fayli yo'q.")
 
     def statistika_ko_rsat(self):
@@ -467,115 +425,82 @@ class OvozliYordamchiGUI:
             buyruqlar_soni = 0
             if os.path.exists("buyruqlar_tarixi.txt"):
                 with open("buyruqlar_tarixi.txt", "r", encoding="utf-8") as f:
-                    buyruqlar_soni = len(f.readlines())
+                    lines = f.readlines()
+                    buyruqlar_soni = len([line for line in lines if line.strip()])
             
             eslatmalar_soni = 0
             if os.path.exists("eslatmalar.txt"):
                 with open("eslatmalar.txt", "r", encoding="utf-8") as f:
-                    eslatmalar_soni = len([line for line in f if line.strip()])
+                    lines = f.readlines()
+                    eslatmalar_soni = len([line for line in lines if line.strip()])
             
-            xabarlar_soni = len(self.xabarlar_tarixi)
-            
-            self.text_area.delete(1.0, tk.END)
-            self.text_area.insert(tk.END, "═══════════════════════════════════════\n")
-            self.text_area.insert(tk.END, "              📊 STATISTIKA\n")
-            self.text_area.insert(tk.END, "═══════════════════════════════════════\n\n")
-            self.text_area.insert(tk.END, f"👤 Foydalanuvchi: {self.foydalanuvchi_ismi}\n")
-            self.text_area.insert(tk.END, f"🔊 Ovoz turi: {self.ovoz_turi.capitalize()}\n\n")
-            self.text_area.insert(tk.END, f"📝 Jami buyruqlar: {buyruqlar_soni}\n")
+            self.text_area.delete("1.0", tk.END)
+            self.text_area.insert(tk.END, "📊 STATISTIKA\n")
+            self.text_area.insert(tk.END, "=" * 40 + "\n\n")
+            self.text_area.insert(tk.END, f"🎯 Jami buyruqlar: {buyruqlar_soni}\n")
             self.text_area.insert(tk.END, f"📌 Eslatmalar: {eslatmalar_soni}\n")
-            self.text_area.insert(tk.END, f"💬 Joriy sessiya: {xabarlar_soni} xabar\n")
-            self.text_area.insert(tk.END, f"⏰ Vaqt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            self.text_area.insert(tk.END, f"\n🎯 Versiya: v2.0.0\n")
-            self.text_area.insert(tk.END, f"🔧 Yangi: NirCmd, Video koordinatalari, Platformalar\n")
+            self.text_area.insert(tk.END, f"👤 Foydalanuvchi: {self.foydalanuvchi_ismi}\n")
+            self.text_area.insert(tk.END, f"🎙️ Ovoz turi: {self.ovoz_turi}\n")
+            self.text_area.insert(tk.END, f"\n🎯 Versiya: v2.2.5\n")
+            self.text_area.insert(tk.END, f"🔧 Yangi: CustomTkinter, edge-tts, Windows Audio API\n")
             
         except Exception as e:
-            self.text_area.delete(1.0, tk.END)
+            self.text_area.delete("1.0", tk.END)
             self.text_area.insert(tk.END, f"❌ Xatolik: {e}")
 
     def yordam_ko_rsat(self):
         """Yordam oynasi"""
-        yordam_win = tk.Toplevel(self.root)
+        yordam_win = ctk.CTkToplevel(self.root)
         yordam_win.title("ℹ️ Yordam - Buyruqlar Ro'yxati")
-        yordam_win.geometry("700x600")
-        yordam_win.configure(bg="#0f172a")
+        yordam_win.geometry("600x500")
         
-        tk.Label(
-            yordam_win, 
-            text="📚 Buyruqlar Ro'yxati (v2.0)", 
-            font=("Segoe UI", 18, "bold"),
-            fg="#a78bfa", 
-            bg="#0f172a"
-        ).pack(pady=15)
-        
-        text = scrolledtext.ScrolledText(
-            yordam_win, 
-            width=80, 
-            height=30,
-            font=("Segoe UI", 10),
-            bg="#1e293b",
-            fg="#e2e8f0",
-            wrap=tk.WORD
-        )
-        text.pack(padx=20, pady=10, fill="both", expand=True)
+        # Scrollable text
+        text_area = ctk.CTkTextbox(yordam_win, font=ctk.CTkFont(size=11))
+        text_area.pack(fill="both", expand=True, padx=20, pady=20)
         
         buyruqlar = """
-🎬 YouTube:
-  • "yutub" - YouTube ochish
-  • "1-video" / "2-video" - Video raqami bo'yicha ochish
-  • "video qo'y" - Video ijro etish (play)
-  • "to'xtat" / "pauza" - Videoni to'xtatish
+🎵 MUSIQA VA MEDIA:
+  • "youtube" / "yutub" - YouTube ochish
+  • "musiqa" / "qo'shiq" - Musiqa qidirish
+  • "video qo'y" / "to'xtat" - Video boshqaruvi
 
-🎵 Musiqa (Yangi!):
-  • "musiqa" - Platform tanlash: YouTube, Yandex Music, Spotify
-  • Misol: "musiqa" → "Yandex" → "Sevinch Mo'minova"
+🔊 OVOZ BOSHQARUV:
+  • "ovozni 50 qil" - Ovoz darajasini o'rnatish
+  • "ovozni oshir" - Ovozni ko'tarish
+  • "ovozni pasaytir" - Ovozni pasaytirish
+  • "o'chir" / "och" - Ovozni o'chirish/ochish
 
-🔊 Ovoz Boshqaruvi (NirCmd - Yangi!):
-  • "ovozni 50 qil" - 50% ga o'rnatish
-  • "ovoz 30" - 30% ga o'rnatish
-  • "ovozni oshir 5" - 5% oshirish
-  • "ovozni pasaytir 10" - 10% kamaytirish
-  • "ovozni o'chir" - Mute
-  • "ovozni och" - Unmute
-
-💬 Messenjlar:
-  • "telegram" - Telegram
-  • "discord" - Discord
-
-🌤️ Ma'lumot:
+🌤️ MA'LUMOT:
   • "vaqt" / "soat" - Joriy vaqt
   • "sana" - Bugungi sana
 
-📌 Eslatmalar:
+📌 ESLATMALAR:
   • "eslatma" - Yangi eslatma
-  • "eslatmalar" - Eslatmalar ro'yxati
+  • "eslatmalar" - Barcha eslatmalarni ko'rsatish
 
-🤖 AI Suhbat:
-  • "ai" / "suhbat qil" - OpenRouter AI bilan suhbat
+🤖 AI SUHBAT:
+  • "ai" / "suhbat qil" - AI bilan suhbat
 
-💡 Maslahatlar:
-  • Aniq va ravon gapiring
-  • Raqamlarni to'g'ri talaffuz qiling
-  • "Bajarildi" ovozi eshitilsa, buyruq muvaffaqiyatli bajarildi
+🔧 SISTEMA:
+  • "kompyuterni o'chir" - Kompyuterni o'chirish
+  • "ekranni yop" - Ekranni qulflash
+
+📱 ILovalar:
+  • "telegram" - Telegram ochish
+  • "chrome" / "brave" - Brauzer ochish
+  • "vs code" - VS Code ochish
+  • "discord" - Discord ochish
         """
         
-        text.insert(tk.END, buyruqlar)
-        text.config(state="disabled")
+        text_area.insert("1.0", buyruqlar)
+        text_area.configure(state="disabled")
 
     def maydonni_tozala(self):
-        self.text_area.delete(1.0, tk.END)
+        self.text_area.delete("1.0", tk.END)
         self.yangi_xabar("🗑️ Maydon tozalandi")
 
-    def sozlamalar_och(self):
-        messagebox.showinfo(
-            "Sozlamalar", 
-            "⚙️ Sozlamalar:\n\n"
-            "✅ NirCmd o'rnatilganligini tekshiring\n"
-            "✅ .env faylidagi API kalitlarni tekshiring\n"
-            "✅ Mikrofonga ruxsat berilganligini tekshiring\n\n"
-            "Qo'shimcha sozlamalar keyingi versiyada!"
-        )
 
-def gui_ishga_tushir(foydalanuvchi_ismi, ovoz_turi, fon_xizmat_func):
+def gui_ishga_tushir(foydalanuvchi_ismi, ovoz_turi, fon_xizmat_func, register_callback_func):
+    """main.py dan chaqiriladigan wrapper funksiya"""
     app = OvozliYordamchiGUI(foydalanuvchi_ismi, ovoz_turi, fon_xizmat_func)
-    app.gui_ishga_tushir()
+    app.gui_ishga_tushir(register_callback_func)

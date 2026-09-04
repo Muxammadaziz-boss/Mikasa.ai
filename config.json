@@ -1,0 +1,42 @@
+{
+  "app": {
+    "version": "2.2.5",
+    "name": "Ovozli Yordamchi Pro",
+    "debug": false
+  },
+  "audio": {
+    "sample_rate": 16000,
+    "duration": 5,
+    "channels": 1,
+    "tts_voice_male": "uz-UZ-SardarNeural",
+    "tts_voice_female": "uz-UZ-MadinaNeural",
+    "tts_rate": 200
+  },
+  "gui": {
+    "theme": "dark",
+    "color_scheme": "blue",
+    "window_size": "1100x800",
+    "font_family": "Segoe UI",
+    "font_size": 12
+  },
+  "paths": {
+    "user_file": "foydalanuvchi_ismi.txt",
+    "voice_file": "ovoz_turi.txt",
+    "commands_file": "commands.json",
+    "history_file": "buyruqlar_tarixi.txt",
+    "reminders_file": "eslatmalar.txt",
+    "temp_dir": "C:\\Users\\MUXAMM~1\\AppData\\Local\\Temp"
+  },
+  "api": {
+    "openrouter_model": "openai/gpt-3.5-turbo",
+    "speech_language": "uz-UZ",
+    "timeout": 15
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_name": "yordamchi.log",
+    "max_file_size": 10485760,
+    "backup_count": 5
+  }
+}
