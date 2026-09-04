@@ -1,4 +1,4 @@
-# 🎙️ Ovozli Yordamchi Pro v2.2.5
+# 🎙️ MIKASA AI v5.0.0 - Ultimate Level 5 Assistant
 
 Zamonaviy ovozli yordamchi - O'zbek tilida so'zlash va buyruqlarni bajarish imkoniyati.
 

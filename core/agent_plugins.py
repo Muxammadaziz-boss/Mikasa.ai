@@ -105,12 +105,14 @@ class PluginManager:
             
             elif plugin_type == "command":
                 import subprocess
+                import shlex
                 cmd_template = config.get("command", "")
                 
                 def cmd_runner(cmd_tpl=cmd_template, **kwargs):
                     cmd = cmd_tpl
                     for key, value in kwargs.items():
-                        cmd = cmd.replace(f"{{{key}}}", str(value))
+                        # Xavfsizlik: parametr qiymatlarini sanitize qilish
+                        cmd = cmd.replace(f"{{{key}}}", shlex.quote(str(value)))
                     # Xavfsizlik: shell=False
                     result = subprocess.run(cmd.split(), capture_output=True, text=True, timeout=10)
                     return {"message": result.stdout[:500], "returncode": result.returncode}

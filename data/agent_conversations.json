@@ -98,5 +98,50 @@
     "user": "efil minorasi qayerda?",
     "agent": "Eyfel minorasi Fransiyaning poytaxti Parij shahrida joylashgan.",
     "time": "2026-03-12T04:03:37.395549"
+  },
+  {
+    "user": "s1mpl kim?",
+    "agent": "S1mple (Oleksandr Kostyliev) — ukrainalik professional Counter-Strike: Global Offensive (CS:GO) o'yinchisi. U dunyodagi eng yaxshi CS:GO o'yinchilaridan biri sifatida tan olingan va Natus Vincere (Na'Vi) jamoasida o'ynaydi.",
+    "time": "2026-03-16T23:24:57.172001"
+  },
+  {
+    "user": "yandex ilovasini o",
+    "agent": "Yandex ilovasi kompyuteringizda topilmadi. Uni ochishning iloji yo'q.",
+    "time": "2026-03-18T17:42:41.577235"
+  },
+  {
+    "user": "yangi",
+    "agent": "Kechirasiz, men sizning so'nggi so'zingizni tushunmadim. \"Yangi\" so'zi bilan nimani nazarda tutdingiz? Iltimos, aniqroq tushuntirsangiz, yordam bera olaman.",
+    "time": "2026-03-18T17:43:04.475521"
+  },
+  {
+    "user": "yandeks muzik ilovasini och",
+    "agent": "Yandex Music ilovasi kompyuteringizda topilmadi. Uni ochishning iloji yo'q.",
+    "time": "2026-03-18T17:43:30.592242"
+  },
+  {
+    "user": "yandex music ilovasini och",
+    "agent": "Yandex Music ilovasi kompyuteringizda topilmadi. Uni ochishning iloji yo'q.",
+    "time": "2026-03-21T21:18:20.945063"
+  },
+  {
+    "user": "screen_analyze tool ni ishlatib ko'rsat",
+    "agent": "Men `screen_analyze` tool'ini ishlatdim va natijada ekranda \"MIKASA AI v1.0.0\" nomli dastur oynasi borligi aniqlandi. Bu dastur sun'iy intellektga asoslangan chat ilovasi bo'lib, uning chap panelida \"Dashboard\", \"Ovozli dialog\", \"AI Suhbat\" kabi bo'limlar, markaziy panelda esa suhbat xabarlari ko'rinib turibdi. Men sizga bu tool qanday ishlashini ko'rsatdim.",
+    "time": "2026-03-29T22:22:01.066012"
+  },
+  {
+    "user": "open_my_website tool ni ishlatib ko'rsat",
+    "agent": "Men sizga `open_my_website` tool'ini qanday ishlatishni ko'rsatdim. U Google.com saytini ochdi. Yana qanday yordam bera olaman?",
+    "time": "2026-03-29T22:22:56.151973"
+  },
+  {
+    "user": "translator tool ni ishlatib ko'rsat",
+    "agent": "Men 'translator' tool'ini ishlatib, 'Salom, dunyo!' iborasini o'zbek tilidan ingliz tiliga 'Hello World!' deb tarjima qildim. Ko'rib turganingizdek, tool muvaffaqiyatli ishladi.",
+    "time": "2026-03-29T22:23:43.315897"
+  },
+  {
+    "user": "Dollar kursi necha?",
+    "agent": "Hozirgi kunda 1 AQSH dollari 12,179.87 O'zbekiston so'miga teng.",
+    "time": "2026-03-29T22:46:37.039835"
   }
 ]

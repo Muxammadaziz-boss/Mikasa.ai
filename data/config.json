@@ -5,27 +5,32 @@
     "debug": false
   },
   "audio": {
-    "sample_rate": 16000,
+    "sample_rate": 44100,
     "duration": 5,
     "channels": 1,
     "tts_voice_male": "uz-UZ-SardarNeural",
     "tts_voice_female": "uz-UZ-MadinaNeural",
-    "tts_rate": 200
+    "tts_rate": 200,
+    "tts_speed": 2.0,
+    "tts_engine": "silero"
   },
   "gui": {
     "theme": "dark",
-    "color_scheme": "blue",
+    "color_scheme": "dark-blue",
+    "compact_mode": false,
     "window_size": "1100x800",
     "font_family": "Segoe UI",
-    "font_size": 12
+    "font_size": 12,
+    "color": "dark-blue",
+    "animations": true
   },
   "paths": {
-    "user_file": "foydalanuvchi_ismi.txt",
-    "voice_file": "ovoz_turi.txt",
     "commands_file": "commands.json",
     "history_file": "buyruqlar_tarixi.txt",
     "reminders_file": "eslatmalar.txt",
-    "temp_dir": "C:\\Users\\MUXAMM~1\\AppData\\Local\\Temp"
+    "temp_dir": "C:\\Users\\MUXAMM~1\\AppData\\Local\\Temp",
+    "user_file": "foydalanuvchi_ismi.txt",
+    "voice_file": "ovoz_turi.txt"
   },
   "api": {
     "openrouter_model": "openai/gpt-3.5-turbo",
@@ -38,5 +43,19 @@
     "file_name": "yordamchi.log",
     "max_file_size": 10485760,
     "backup_count": 5
+  },
+  "user": {
+    "name": "Muxammadaziz",
+    "voice_type": "ayol"
+  },
+  "voice": {
+    "tts_engine": "silero",
+    "silero_model": "v4_uz",
+    "speed": 2.0,
+    "sample_rate": 44100
+  },
+  "ai": {
+    "model": "gemini",
+    "timeout": 15
   }
 }

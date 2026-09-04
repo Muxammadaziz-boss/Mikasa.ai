@@ -1,0 +1,13 @@
+{
+    "name": "open_my_website",
+    "description": "Mening sevimli saytimni ochish",
+    "category": "internet",
+    "type": "url",
+    "url": "https://example.com/search?q={query}",
+    "parameters": {
+        "query": {
+            "type": "string",
+            "description": "Qidiruv so'zi"
+        }
+    }
+}

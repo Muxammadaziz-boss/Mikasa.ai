@@ -1,104 +1,265 @@
 # ========== theme.py ==========
 # Mikasa AI — Dizayn tokenlari va rang palitralari
-# JARVIS-style dark cyberpunk + glassmorphism
+
+import customtkinter as ctk
+
 
 class Colors:
     """Rang palitralari"""
-    # Asosiy fonlar
-    BG_DARKEST = "#060A14"
-    BG_DARK = "#0A0E1A"
-    BG_SURFACE = "#111827"
-    BG_CARD = "#1A2332"
-    BG_HOVER = "#1F2B3D"
-    BG_INPUT = "#0D1321"
-    
-    # Accent ranglar
-    PRIMARY = "#00D4FF"        # Cyan — asosiy accent
-    PRIMARY_DARK = "#0099CC"
-    PRIMARY_GLOW = "#00D4FF"
-    SECONDARY = "#7C3AED"      # Purple — gradient
-    SECONDARY_DARK = "#5B21B6"
-    ACCENT_GRADIENT_START = "#00D4FF"
-    ACCENT_GRADIENT_END = "#7C3AED"
-    
-    # Holat ranglar
-    SUCCESS = "#10B981"
-    WARNING = "#F59E0B"
-    DANGER = "#EF4444"
-    INFO = "#3B82F6"
-    
-    # Matn ranglar
-    TEXT_PRIMARY = "#F9FAFB"
-    TEXT_SECONDARY = "#9CA3AF"
-    TEXT_MUTED = "#6B7280"
-    TEXT_ACCENT = "#00D4FF"
-    
-    # Chegara / ajratgich
-    BORDER = "#1E293B"
-    BORDER_HOVER = "#334155"
-    BORDER_ACCENT = "#00D4FF"
-    
-    # Sidebar
-    SIDEBAR_BG = "#080C16"
-    SIDEBAR_ACTIVE = "#0A1628"
-    SIDEBAR_HOVER = "#0E1A2E"
-    SIDEBAR_INDICATOR = "#00D4FF"
-    
-    # Status bar
-    STATUSBAR_BG = "#060A14"
+
+    _DARK = {
+        "BG_DARKEST": "#060A14",
+        "BG_DARK": "#0A0E1A",
+        "BG_SURFACE": "#0E1625",
+        "BG_CARD": "#151F30",
+        "BG_PANEL": "#182436",
+        "BG_HOVER": "#22314A",
+        "BG_INPUT": "#0C1524",
+        "BG_SOFT": "#101A2B",
+        "BG_ACCENT": "#07172B",
+        "PRIMARY": "#00D4FF",
+        "PRIMARY_DARK": "#0099CC",
+        "PRIMARY_GLOW": "#00D4FF",
+        "PRIMARY_SOFT": "#0A3042",
+        "SECONDARY": "#7C3AED",
+        "SECONDARY_DARK": "#5B21B6",
+        "SECONDARY_SOFT": "#251447",
+        "ACCENT_GRADIENT_START": "#00D4FF",
+        "ACCENT_GRADIENT_END": "#7C3AED",
+        "SUCCESS": "#10B981",
+        "SUCCESS_SOFT": "#0C2D25",
+        "WARNING": "#F59E0B",
+        "WARNING_SOFT": "#33240B",
+        "DANGER": "#EF4444",
+        "DANGER_SOFT": "#371617",
+        "INFO": "#3B82F6",
+        "INFO_SOFT": "#102846",
+        "TEXT_PRIMARY": "#F9FAFB",
+        "TEXT_SECONDARY": "#9CA3AF",
+        "TEXT_MUTED": "#6B7280",
+        "TEXT_ACCENT": "#00D4FF",
+        "BORDER": "#1E293B",
+        "BORDER_HOVER": "#334155",
+        "BORDER_ACCENT": "#00D4FF",
+        "SIDEBAR_BG": "#080C16",
+        "SIDEBAR_ACTIVE": "#0A1628",
+        "SIDEBAR_HOVER": "#0E1A2E",
+        "SIDEBAR_INDICATOR": "#00D4FF",
+        "STATUSBAR_BG": "#060A14",
+    }
+
+    _LIGHT = {
+        "BG_DARKEST": "#F4F7FB",
+        "BG_DARK": "#EEF3F8",
+        "BG_SURFACE": "#FFFFFF",
+        "BG_CARD": "#FFFFFF",
+        "BG_PANEL": "#E5EEF8",
+        "BG_HOVER": "#D9E5F3",
+        "BG_INPUT": "#F7FAFD",
+        "BG_SOFT": "#EAF1F8",
+        "BG_ACCENT": "#E1F2FF",
+        "PRIMARY": "#0284C7",
+        "PRIMARY_DARK": "#0369A1",
+        "PRIMARY_GLOW": "#38BDF8",
+        "PRIMARY_SOFT": "#D7EDF9",
+        "SECONDARY": "#7C3AED",
+        "SECONDARY_DARK": "#6D28D9",
+        "SECONDARY_SOFT": "#EEE7FF",
+        "ACCENT_GRADIENT_START": "#38BDF8",
+        "ACCENT_GRADIENT_END": "#8B5CF6",
+        "SUCCESS": "#059669",
+        "SUCCESS_SOFT": "#D8F5EA",
+        "WARNING": "#D97706",
+        "WARNING_SOFT": "#FFF1D6",
+        "DANGER": "#DC2626",
+        "DANGER_SOFT": "#FBE4E4",
+        "INFO": "#2563EB",
+        "INFO_SOFT": "#DFEAFE",
+        "TEXT_PRIMARY": "#0F172A",
+        "TEXT_SECONDARY": "#475569",
+        "TEXT_MUTED": "#64748B",
+        "TEXT_ACCENT": "#0284C7",
+        "BORDER": "#D6DFEA",
+        "BORDER_HOVER": "#BAC8D8",
+        "BORDER_ACCENT": "#0284C7",
+        "SIDEBAR_BG": "#E7EEF7",
+        "SIDEBAR_ACTIVE": "#D7E4F4",
+        "SIDEBAR_HOVER": "#DCE8F5",
+        "SIDEBAR_INDICATOR": "#0284C7",
+        "STATUSBAR_BG": "#E7EEF7",
+    }
+
+    CURRENT_THEME = "dark"
+
+    BG_DARKEST = _DARK["BG_DARKEST"]
+    BG_DARK = _DARK["BG_DARK"]
+    BG_SURFACE = _DARK["BG_SURFACE"]
+    BG_CARD = _DARK["BG_CARD"]
+    BG_PANEL = _DARK["BG_PANEL"]
+    BG_HOVER = _DARK["BG_HOVER"]
+    BG_INPUT = _DARK["BG_INPUT"]
+    BG_SOFT = _DARK["BG_SOFT"]
+    BG_ACCENT = _DARK["BG_ACCENT"]
+    PRIMARY = _DARK["PRIMARY"]
+    PRIMARY_DARK = _DARK["PRIMARY_DARK"]
+    PRIMARY_GLOW = _DARK["PRIMARY_GLOW"]
+    PRIMARY_SOFT = _DARK["PRIMARY_SOFT"]
+    SECONDARY = _DARK["SECONDARY"]
+    SECONDARY_DARK = _DARK["SECONDARY_DARK"]
+    SECONDARY_SOFT = _DARK["SECONDARY_SOFT"]
+    ACCENT_GRADIENT_START = _DARK["ACCENT_GRADIENT_START"]
+    ACCENT_GRADIENT_END = _DARK["ACCENT_GRADIENT_END"]
+    SUCCESS = _DARK["SUCCESS"]
+    SUCCESS_SOFT = _DARK["SUCCESS_SOFT"]
+    WARNING = _DARK["WARNING"]
+    WARNING_SOFT = _DARK["WARNING_SOFT"]
+    DANGER = _DARK["DANGER"]
+    DANGER_SOFT = _DARK["DANGER_SOFT"]
+    INFO = _DARK["INFO"]
+    INFO_SOFT = _DARK["INFO_SOFT"]
+    TEXT_PRIMARY = _DARK["TEXT_PRIMARY"]
+    TEXT_SECONDARY = _DARK["TEXT_SECONDARY"]
+    TEXT_MUTED = _DARK["TEXT_MUTED"]
+    TEXT_ACCENT = _DARK["TEXT_ACCENT"]
+    BORDER = _DARK["BORDER"]
+    BORDER_HOVER = _DARK["BORDER_HOVER"]
+    BORDER_ACCENT = _DARK["BORDER_ACCENT"]
+    SIDEBAR_BG = _DARK["SIDEBAR_BG"]
+    SIDEBAR_ACTIVE = _DARK["SIDEBAR_ACTIVE"]
+    SIDEBAR_HOVER = _DARK["SIDEBAR_HOVER"]
+    SIDEBAR_INDICATOR = _DARK["SIDEBAR_INDICATOR"]
+    STATUSBAR_BG = _DARK["STATUSBAR_BG"]
+
+    @classmethod
+    def apply_theme(cls, theme="dark"):
+        requested = (theme or "dark").lower()
+        if requested == "system":
+            actual = ctk.get_appearance_mode().lower()
+            palette = cls._LIGHT if actual == "light" else cls._DARK
+        else:
+            palette = cls._LIGHT if requested == "light" else cls._DARK
+
+        for key, value in palette.items():
+            setattr(cls, key, value)
+
+        cls.CURRENT_THEME = requested
 
 
 class Fonts:
     """Shrift sozlamalari"""
+
     FAMILY = "Segoe UI"
     FAMILY_MONO = "Cascadia Code"
-    
-    # O'lchamlar
-    HEADING_1 = (FAMILY, 22, "bold")
-    HEADING_2 = (FAMILY, 18, "bold")
-    HEADING_3 = (FAMILY, 15, "bold")
-    BODY = (FAMILY, 13)
-    BODY_BOLD = (FAMILY, 13, "bold")
-    SMALL = (FAMILY, 11)
-    SMALL_BOLD = (FAMILY, 11, "bold")
-    TINY = (FAMILY, 10)
-    MONO = (FAMILY_MONO, 12)
-    
-    # Nav
-    NAV_ICON = (FAMILY, 18)
-    NAV_LABEL = (FAMILY, 11)
-    STATUS = (FAMILY, 10)
+
+    _BASE = {
+        "HEADING_1": (FAMILY, 22, "bold"),
+        "HEADING_2": (FAMILY, 18, "bold"),
+        "HEADING_3": (FAMILY, 15, "bold"),
+        "BODY": (FAMILY, 13),
+        "BODY_BOLD": (FAMILY, 13, "bold"),
+        "SMALL": (FAMILY, 11),
+        "SMALL_BOLD": (FAMILY, 11, "bold"),
+        "TINY": (FAMILY, 10),
+        "MONO": (FAMILY_MONO, 12),
+        "NAV_ICON": (FAMILY, 18),
+        "NAV_LABEL": (FAMILY, 11),
+        "STATUS": (FAMILY, 10),
+    }
+
+    _COMPACT = {
+        "HEADING_1": (FAMILY, 19, "bold"),
+        "HEADING_2": (FAMILY, 16, "bold"),
+        "HEADING_3": (FAMILY, 14, "bold"),
+        "BODY": (FAMILY, 12),
+        "BODY_BOLD": (FAMILY, 12, "bold"),
+        "SMALL": (FAMILY, 10),
+        "SMALL_BOLD": (FAMILY, 10, "bold"),
+        "TINY": (FAMILY, 9),
+        "MONO": (FAMILY_MONO, 11),
+        "NAV_ICON": (FAMILY, 16),
+        "NAV_LABEL": (FAMILY, 10),
+        "STATUS": (FAMILY, 9),
+    }
+
+    HEADING_1 = _BASE["HEADING_1"]
+    HEADING_2 = _BASE["HEADING_2"]
+    HEADING_3 = _BASE["HEADING_3"]
+    BODY = _BASE["BODY"]
+    BODY_BOLD = _BASE["BODY_BOLD"]
+    SMALL = _BASE["SMALL"]
+    SMALL_BOLD = _BASE["SMALL_BOLD"]
+    TINY = _BASE["TINY"]
+    MONO = _BASE["MONO"]
+    NAV_ICON = _BASE["NAV_ICON"]
+    NAV_LABEL = _BASE["NAV_LABEL"]
+    STATUS = _BASE["STATUS"]
+
+    @classmethod
+    def apply_density(cls, compact=False):
+        selected = cls._COMPACT if compact else cls._BASE
+        for key, value in selected.items():
+            setattr(cls, key, value)
 
 
 class Sizing:
     """O'lcham konstantalari"""
-    # Sidebar
-    SIDEBAR_WIDTH_COLLAPSED = 64
-    SIDEBAR_WIDTH_EXPANDED = 200
-    
-    # Status bar
-    STATUSBAR_HEIGHT = 32
-    
-    # Kartalar
-    CARD_RADIUS = 12
-    CARD_PADDING = 16
-    
-    # Tugmalar
-    BUTTON_HEIGHT = 36
-    BUTTON_RADIUS = 8
-    BUTTON_PADDING_X = 16
-    
-    # Inputlar
-    INPUT_HEIGHT = 40
-    INPUT_RADIUS = 8
-    
-    # Boshqa
-    ICON_SIZE = 20
-    AVATAR_SIZE = 36
-    
+
+    _BASE = {
+        "SIDEBAR_WIDTH_COLLAPSED": 64,
+        "SIDEBAR_WIDTH_EXPANDED": 200,
+        "STATUSBAR_HEIGHT": 32,
+        "CARD_RADIUS": 14,
+        "CARD_PADDING": 16,
+        "BUTTON_HEIGHT": 38,
+        "BUTTON_RADIUS": 10,
+        "BUTTON_PADDING_X": 16,
+        "INPUT_HEIGHT": 42,
+        "INPUT_RADIUS": 10,
+        "ICON_SIZE": 20,
+        "AVATAR_SIZE": 36,
+        "PAGE_PADDING": 20,
+    }
+
+    _COMPACT = {
+        "SIDEBAR_WIDTH_COLLAPSED": 60,
+        "SIDEBAR_WIDTH_EXPANDED": 86,
+        "STATUSBAR_HEIGHT": 28,
+        "CARD_RADIUS": 12,
+        "CARD_PADDING": 12,
+        "BUTTON_HEIGHT": 34,
+        "BUTTON_RADIUS": 9,
+        "BUTTON_PADDING_X": 12,
+        "INPUT_HEIGHT": 38,
+        "INPUT_RADIUS": 9,
+        "ICON_SIZE": 18,
+        "AVATAR_SIZE": 32,
+        "PAGE_PADDING": 14,
+    }
+
+    SIDEBAR_WIDTH_COLLAPSED = _BASE["SIDEBAR_WIDTH_COLLAPSED"]
+    SIDEBAR_WIDTH_EXPANDED = _BASE["SIDEBAR_WIDTH_EXPANDED"]
+    STATUSBAR_HEIGHT = _BASE["STATUSBAR_HEIGHT"]
+    CARD_RADIUS = _BASE["CARD_RADIUS"]
+    CARD_PADDING = _BASE["CARD_PADDING"]
+    BUTTON_HEIGHT = _BASE["BUTTON_HEIGHT"]
+    BUTTON_RADIUS = _BASE["BUTTON_RADIUS"]
+    BUTTON_PADDING_X = _BASE["BUTTON_PADDING_X"]
+    INPUT_HEIGHT = _BASE["INPUT_HEIGHT"]
+    INPUT_RADIUS = _BASE["INPUT_RADIUS"]
+    ICON_SIZE = _BASE["ICON_SIZE"]
+    AVATAR_SIZE = _BASE["AVATAR_SIZE"]
+    PAGE_PADDING = _BASE["PAGE_PADDING"]
+
+    @classmethod
+    def apply_density(cls, compact=False):
+        selected = cls._COMPACT if compact else cls._BASE
+        for key, value in selected.items():
+            setattr(cls, key, value)
+
 
 class Icons:
     """Unicode ikonkalar (Emoji based — kengaytirish mumkin)"""
+
     # Navigatsiya
     DASHBOARD = "🏠"
     VOICE = "🎤"
@@ -108,12 +269,12 @@ class Icons:
     SCHEDULER = "⏰"
     PLUGINS = "🔌"
     SETTINGS = "⚙️"
-    
+
     # Holatlar
     ONLINE = "🟢"
     OFFLINE = "🔴"
     BUSY = "🟡"
-    
+
     # Harakatlar
     PLAY = "▶"
     PAUSE = "⏸"
@@ -127,7 +288,7 @@ class Icons:
     EDIT = "✏️"
     COPY = "📋"
     CLOSE = "✕"
-    
+
     # Tool kategoriyalar
     INTERNET = "🌐"
     CALCULATOR = "🔢"
@@ -141,3 +302,8 @@ class Icons:
     TRANSLATE = "🌍"
     SCREEN = "👁️"
     REMINDER = "📌"
+
+
+Colors.apply_theme("dark")
+Fonts.apply_density(False)
+Sizing.apply_density(False)

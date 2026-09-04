@@ -13,7 +13,7 @@ from threading import RLock
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Loyiha ildizi
 
 # ========================================================
 # 1. LEVENSHTEIN DISTANCE — Noto'g'ri so'zlarni tuzatish
@@ -391,7 +391,7 @@ class BuyruqBashorat:
         # {oldingi_buyruq: {keyingi_buyruq: soni}}
         self._transitions = defaultdict(lambda: defaultdict(int))
         self._jami_soni = defaultdict(int)
-        self._fayl = os.path.join(BASE_DIR, "markov_data.json")
+        self._fayl = os.path.join(BASE_DIR, "data", "markov_data.json")
         self._yuklandi = False
         self._yukla()
     

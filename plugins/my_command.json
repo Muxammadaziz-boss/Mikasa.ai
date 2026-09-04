@@ -1,0 +1,13 @@
+{
+    "name": "run_my_script",
+    "description": "Men yozgan maxsus scriptni ishga tushirish",
+    "category": "system",
+    "type": "command",
+    "command": "python C:/scripts/myscript.py {arg1}",
+    "parameters": {
+        "arg1": {
+            "type": "string",
+            "description": "Argument"
+        }
+    }
+}
