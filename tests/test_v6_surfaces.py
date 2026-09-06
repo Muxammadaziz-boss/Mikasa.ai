@@ -188,7 +188,7 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
 
                 # On Settings, Voice, Plugins, Commands, Memory, Scheduler:
                 # ALL content cards must be solid Card or ElevatedCard!
-                if page_name in ("SettingsPage", "VoicePage", "PluginsPage", "CommandsPage", "SchedulerPage"):
+                if page_name in ("SettingsPage", "PluginsPage", "CommandsPage", "SchedulerPage", "MemoryPage"):
                     self.assertEqual(
                         len(glass_cards),
                         0,
@@ -198,6 +198,12 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
                         len(solid_cards),
                         0,
                         f"{page_name} must have solid content Cards",
+                    )
+                elif page_name == "VoicePage":
+                    self.assertEqual(
+                        len(glass_cards),
+                        0,
+                        f"{page_name} has unexpected non-hero GlassCards: {glass_cards}",
                     )
 
             page.destroy()

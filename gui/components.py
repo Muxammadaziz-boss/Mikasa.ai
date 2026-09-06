@@ -726,20 +726,20 @@ class AppleSiriOrb(ctk.CTkFrame):
         st = self._state
 
         if st == "listening":
-            breath = math.sin(t * 0.18) * 8
-            img = draw_glow_blob(img, cx, cy, 96 + breath, (10, 132, 255), 180)
-            bx1 = cx + math.sin(t * 0.22) * 16
-            by1 = cy + math.cos(t * 0.22) * 12
-            img = draw_glow_blob(img, bx1, by1, 82, (0, 245, 255), 190)
-            bx2 = cx - math.sin(t * 0.19) * 14
-            by2 = cy - math.cos(t * 0.19) * 16
-            img = draw_glow_blob(img, bx2, by2, 76, (255, 45, 120), 170)
-            bx3 = cx + math.cos(t * 0.26) * 12
-            by3 = cy - math.sin(t * 0.26) * 10
-            img = draw_glow_blob(img, bx3, by3, 70, (175, 82, 222), 160)
-            img = draw_glow_blob(img, cx, cy, 44, (200, 245, 255), 230)
-            img = draw_glow_blob(img, cx, cy, 24, (255, 255, 255), 255)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            breath = math.sin(t * 0.16) * 6
+            img = draw_glow_blob(img, cx, cy, 94 + breath, (10, 132, 255), 170)
+            bx1 = cx + math.sin(t * 0.2) * 14
+            by1 = cy + math.cos(t * 0.2) * 10
+            img = draw_glow_blob(img, bx1, by1, 80, (56, 189, 248), 160)
+            bx2 = cx - math.sin(t * 0.17) * 12
+            by2 = cy - math.cos(t * 0.17) * 14
+            img = draw_glow_blob(img, bx2, by2, 74, (94, 92, 230), 160)
+            bx3 = cx + math.cos(t * 0.22) * 10
+            by3 = cy - math.sin(t * 0.22) * 8
+            img = draw_glow_blob(img, bx3, by3, 68, (124, 58, 237), 150)
+            img = draw_glow_blob(img, cx, cy, 42, (186, 230, 253), 210)
+            img = draw_glow_blob(img, cx, cy, 22, (255, 255, 255), 240)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
             draw = ImageDraw.Draw(img)
             bar_count = 7
@@ -748,59 +748,59 @@ class AppleSiriOrb(ctk.CTkFrame):
             total_w = bar_count * bar_w + (bar_count - 1) * bar_gap
             sx = cx - total_w // 2
             for i in range(bar_count):
-                phase = i * 0.8 + t * 0.4
-                h = int(10 + abs(math.sin(phase)) * 22 + abs(math.cos(phase * 0.7)) * 12)
+                phase = i * 0.8 + t * 0.35
+                h = int(10 + abs(math.sin(phase)) * 20 + abs(math.cos(phase * 0.7)) * 10)
                 x = sx + i * (bar_w + bar_gap)
-                draw.rounded_rectangle([x, cy - h // 2, x + bar_w, cy + h // 2], radius=2, fill=(255, 255, 255, 240))
+                draw.rounded_rectangle([x, cy - h // 2, x + bar_w, cy + h // 2], radius=2, fill=(255, 255, 255, 230))
 
         elif st == "thinking":
-            breath = math.sin(t * 0.14) * 6
-            img = draw_glow_blob(img, cx, cy, 90 + breath, (94, 92, 230), 180)
-            bx1 = cx + math.sin(t * 0.2) * 14
-            by1 = cy + math.cos(t * 0.2) * 14
-            img = draw_glow_blob(img, bx1, by1, 75, (175, 82, 222), 190)
-            bx2 = cx - math.sin(t * 0.2) * 12
-            by2 = cy - math.cos(t * 0.2) * 12
-            img = draw_glow_blob(img, bx2, by2, 68, (10, 132, 255), 170)
-            img = draw_glow_blob(img, cx, cy, 38, (230, 215, 255), 230)
-            img = draw_glow_blob(img, cx, cy, 20, (255, 255, 255), 255)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            breath = math.sin(t * 0.12) * 5
+            img = draw_glow_blob(img, cx, cy, 88 + breath, (94, 92, 230), 170)
+            bx1 = cx + math.sin(t * 0.18) * 12
+            by1 = cy + math.cos(t * 0.18) * 12
+            img = draw_glow_blob(img, bx1, by1, 72, (124, 58, 237), 170)
+            bx2 = cx - math.sin(t * 0.18) * 10
+            by2 = cy - math.cos(t * 0.18) * 10
+            img = draw_glow_blob(img, bx2, by2, 66, (10, 132, 255), 160)
+            img = draw_glow_blob(img, cx, cy, 36, (224, 231, 255), 210)
+            img = draw_glow_blob(img, cx, cy, 18, (255, 255, 255), 240)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
         elif st == "speaking":
-            breath = math.sin(t * 0.2) * 7
-            img = draw_glow_blob(img, cx, cy, 95 + breath, (80, 20, 160), 180)
-            bx1 = cx + math.sin(t * 0.24) * 14
-            by1 = cy + math.cos(t * 0.24) * 10
-            img = draw_glow_blob(img, bx1, by1, 80, (220, 40, 180), 190)
-            bx2 = cx - math.sin(t * 0.2) * 12
-            by2 = cy - math.cos(t * 0.2) * 12
-            img = draw_glow_blob(img, bx2, by2, 72, (160, 60, 240), 170)
-            img = draw_glow_blob(img, cx, cy, 42, (240, 210, 255), 230)
-            img = draw_glow_blob(img, cx, cy, 22, (255, 255, 255), 255)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            breath = math.sin(t * 0.18) * 6
+            img = draw_glow_blob(img, cx, cy, 92 + breath, (124, 58, 237), 170)
+            bx1 = cx + math.sin(t * 0.22) * 12
+            by1 = cy + math.cos(t * 0.22) * 10
+            img = draw_glow_blob(img, bx1, by1, 76, (10, 132, 255), 170)
+            bx2 = cx - math.sin(t * 0.18) * 10
+            by2 = cy - math.cos(t * 0.18) * 10
+            img = draw_glow_blob(img, bx2, by2, 70, (94, 92, 230), 160)
+            img = draw_glow_blob(img, cx, cy, 38, (216, 180, 254), 210)
+            img = draw_glow_blob(img, cx, cy, 20, (255, 255, 255), 240)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
         elif st == "error":
-            breath = math.sin(t * 0.25) * 5
-            img = draw_glow_blob(img, cx, cy, 88 + breath, (255, 69, 58), 180)
-            img = draw_glow_blob(img, cx, cy, 64, (255, 159, 10), 190)
-            img = draw_glow_blob(img, cx, cy, 32, (255, 220, 220), 230)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            breath = math.sin(t * 0.2) * 4
+            img = draw_glow_blob(img, cx, cy, 84 + breath, (220, 38, 38), 170)
+            img = draw_glow_blob(img, cx, cy, 60, (234, 88, 12), 170)
+            img = draw_glow_blob(img, cx, cy, 30, (254, 202, 202), 210)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
         elif st == "offline":
-            img = draw_glow_blob(img, cx, cy, 60, (50, 50, 70), 120)
-            img = draw_glow_blob(img, cx, cy, 28, (80, 80, 105), 160)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            img = draw_glow_blob(img, cx, cy, 55, (51, 65, 85), 110)
+            img = draw_glow_blob(img, cx, cy, 26, (71, 85, 105), 140)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
         else:
-            breath = math.sin(t * 0.1) * 6
-            img = draw_glow_blob(img, cx, cy, 92 + breath, (10, 132, 255), 180)
-            bx1 = cx + math.sin(t * 0.12) * 8
-            by1 = cy + math.cos(t * 0.12) * 6
-            img = draw_glow_blob(img, bx1, by1, 76 + breath * 0.8, (0, 210, 255), 190)
-            img = draw_glow_blob(img, cx, cy, 60 + breath * 0.5, (30, 100, 240), 200)
-            img = draw_glow_blob(img, cx, cy, 38, (180, 240, 255), 230)
-            img = draw_glow_blob(img, cx, cy, 20, (255, 255, 255), 255)
-            img = img.filter(ImageFilter.GaussianBlur(radius=4))
+            breath = math.sin(t * 0.08) * 5
+            img = draw_glow_blob(img, cx, cy, 90 + breath, (10, 132, 255), 160)
+            bx1 = cx + math.sin(t * 0.1) * 8
+            by1 = cy + math.cos(t * 0.1) * 6
+            img = draw_glow_blob(img, bx1, by1, 74 + breath * 0.6, (94, 92, 230), 160)
+            img = draw_glow_blob(img, cx, cy, 56 + breath * 0.4, (56, 189, 248), 180)
+            img = draw_glow_blob(img, cx, cy, 34, (224, 242, 254), 210)
+            img = draw_glow_blob(img, cx, cy, 18, (255, 255, 255), 240)
+            img = img.filter(ImageFilter.GaussianBlur(radius=3.5))
 
         try:
             self._photo = ImageTk.PhotoImage(img, master=self.canvas)
@@ -866,17 +866,23 @@ class MessageBubble(ctk.CTkFrame):
         is_user = role == "user"
 
         if is_user:
-            bg_color = Colors.PRIMARY
+            bg_color = kwargs.pop("fg_color", Colors.PRIMARY)
             border_width = 0
             border_color = Colors.PRIMARY
             text_color = "#FFFFFF"
-            time_color = "#CBE4FF"
+            time_color = "#A0C4FF"
+            radius = 16
+            inner_padx = 14
+            inner_pady = 8
         else:
-            bg_color = Colors.BG_CARD
+            bg_color = kwargs.pop("fg_color", Colors.BG_CARD)
             border_width = 1
             border_color = Colors.BORDER
             text_color = Colors.TEXT_PRIMARY
             time_color = Colors.TEXT_MUTED
+            radius = 16
+            inner_padx = 14
+            inner_pady = 8
 
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = "transparent"
@@ -884,14 +890,14 @@ class MessageBubble(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=bg_color,
-            corner_radius=Sizing.CARD,
+            corner_radius=radius,
             border_width=border_width,
             border_color=border_color,
             **kwargs,
         )
 
         container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=14, pady=10)
+        container.pack(fill="both", expand=True, padx=inner_padx, pady=inner_pady)
 
         # Assistant header with title, copy, and timestamp
         if not is_user:
@@ -900,7 +906,7 @@ class MessageBubble(ctk.CTkFrame):
 
             sparkle_img = get_vector_icon("sparkles", size=13, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="sparkles")
             if sparkle_img:
-                ctk.CTkLabel(meta_row, image=sparkle_img, text="").pack(side="left", padx=(0, 5))
+                ctk.CTkLabel(meta_row, image=sparkle_img, text="").pack(side="left", padx=(0, 6))
 
             ctk.CTkLabel(
                 meta_row,
@@ -948,7 +954,7 @@ class MessageBubble(ctk.CTkFrame):
             text=text,
             font=Fonts.BODY,
             text_color=text_color,
-            wraplength=520,
+            wraplength=680 if not is_user else 520,
             justify="left",
             anchor="w",
         )
@@ -980,15 +986,14 @@ class TypingBubble(ctk.CTkFrame):
 
         super().__init__(
             master,
-            fg_color=Colors.BG_CARD,
-            corner_radius=Sizing.CARD,
-            border_width=1,
-            border_color=Colors.BORDER,
+            fg_color="transparent",
+            corner_radius=0,
+            border_width=0,
             **kwargs,
         )
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(padx=14, pady=10)
+        inner.pack(padx=4, pady=4)
 
         sparkle_img = get_vector_icon("sparkles", size=13, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="sparkles")
         if sparkle_img:
@@ -1762,7 +1767,7 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
-            placeholder_text="Buyruq yoki sahifani qidiring...",
+            placeholder_text="Mikasa'dan so'rang...",
             font=Fonts.BODY,
             fg_color="transparent",
             border_width=0,
@@ -1772,6 +1777,8 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
         self.search_entry.pack(side="left", fill="x", expand=True, padx=6)
         self.search_entry.bind("<KeyRelease>", self._on_search)
         self.search_entry.bind("<Return>", self._on_select)
+        self.search_entry.bind("<Down>", self._on_arrow_down)
+        self.search_entry.bind("<Up>", self._on_arrow_up)
         self.search_entry.focus_set()
 
         # Natijalar ro'yxati
@@ -1789,9 +1796,14 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
             ("settings", "Sozlamalar", "Tizim va AI parametrlarini sozlash", "settings"),
         ]
 
-        self._render_results(self._commands)
+        self._current_filtered = list(self._commands)
+        self._selected_index = 0
+        self._buttons = []
+        self._render_results(self._current_filtered)
 
     def _render_results(self, items):
+        self._current_filtered = items
+        self._buttons.clear()
         for w in self.results_scroll.winfo_children():
             w.destroy()
 
@@ -1804,15 +1816,20 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
             ).pack(pady=20)
             return
 
-        for page_id, title, desc, icon_name in items:
+        self._selected_index = max(0, min(self._selected_index, len(items) - 1))
+
+        for idx, (page_id, title, desc, icon_name) in enumerate(items):
+            is_selected = (idx == self._selected_index)
             item_btn = ctk.CTkButton(
                 self.results_scroll,
                 text=f"  {title} — {desc}",
                 image=get_vector_icon(icon_name, size=16, color=Colors.PRIMARY),
                 compound="left",
                 font=Fonts.SMALL,
-                fg_color=Colors.BG_CARD,
+                fg_color=Colors.BG_HOVER if is_selected else Colors.BG_CARD,
                 hover_color=Colors.BG_HOVER,
+                border_width=1 if is_selected else 0,
+                border_color=Colors.PRIMARY if is_selected else Colors.BORDER,
                 text_color=Colors.TEXT_PRIMARY,
                 anchor="w",
                 height=38,
@@ -1820,10 +1837,41 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
                 command=lambda pid=page_id: self._execute_item(pid),
             )
             item_btn.pack(fill="x", pady=2)
+            self._buttons.append(item_btn)
+
+    def _highlight_selected(self):
+        for idx, btn in enumerate(self._buttons):
+            if idx == self._selected_index:
+                btn.configure(
+                    fg_color=Colors.BG_HOVER,
+                    border_width=1,
+                    border_color=Colors.PRIMARY,
+                )
+            else:
+                btn.configure(
+                    fg_color=Colors.BG_CARD,
+                    border_width=0,
+                    border_color=Colors.BORDER,
+                )
+
+    def _on_arrow_down(self, event=None):
+        if self._current_filtered:
+            self._selected_index = (self._selected_index + 1) % len(self._current_filtered)
+            self._highlight_selected()
+        return "break"
+
+    def _on_arrow_up(self, event=None):
+        if self._current_filtered:
+            self._selected_index = (self._selected_index - 1) % len(self._current_filtered)
+            self._highlight_selected()
+        return "break"
 
     def _on_search(self, event=None):
+        if event and event.keysym in ("Up", "Down", "Return", "Escape"):
+            return
         q = self.search_entry.get().strip().lower()
         if not q:
+            self._selected_index = 0
             self._render_results(self._commands)
             return
 
@@ -1831,16 +1879,12 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
             c for c in self._commands
             if q in c[1].lower() or q in c[2].lower() or q in c[0].lower()
         ]
+        self._selected_index = 0
         self._render_results(filtered)
 
     def _on_select(self, event=None):
-        q = self.search_entry.get().strip().lower()
-        filtered = [
-            c for c in self._commands
-            if q in c[1].lower() or q in c[2].lower() or q in c[0].lower()
-        ]
-        if filtered:
-            self._execute_item(filtered[0][0])
+        if self._current_filtered and 0 <= self._selected_index < len(self._current_filtered):
+            self._execute_item(self._current_filtered[self._selected_index][0])
 
     def _execute_item(self, page_id):
         self.destroy()

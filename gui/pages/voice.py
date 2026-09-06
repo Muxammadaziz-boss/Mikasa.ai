@@ -36,13 +36,21 @@ class VoicePage(ctk.CTkFrame):
     def _build_orb_section(self, parent):
         """Markaziy AI Orb — sahifaning dominant vizual elementi"""
         orb_container = ctk.CTkFrame(parent, fg_color="transparent")
-        orb_container.pack(pady=(40, 0))
-        
+        orb_container.pack(pady=(32, 0))
+
+        # "Mikasa" sarlavhasi
+        ctk.CTkLabel(
+            orb_container,
+            text="Mikasa",
+            font=(Fonts.FAMILY, 15, "bold"),
+            text_color=Colors.TEXT_MUTED,
+        ).pack(pady=(0, 16))
+
         # Katta orb (280px)
         self.apple_orb = AppleSiriOrb(orb_container, size=280)
         self.apple_orb.pack()
         self.orb_container = self.apple_orb
-        
+
         # "Qanday yordam beray?" — asosiy matn
         self.orb_text = ctk.CTkLabel(
             orb_container,
@@ -50,22 +58,22 @@ class VoicePage(ctk.CTkFrame):
             font=Fonts.HEADING_1,
             text_color=Colors.TEXT_PRIMARY,
         )
-        self.orb_text.pack(pady=(20, 0))
-        
-        # Holat indikatori: ● Online · Kutmoqda
+        self.orb_text.pack(pady=(18, 0))
+
+        # Holat indikatori: ● Online
         status_row = ctk.CTkFrame(orb_container, fg_color="transparent")
-        status_row.pack(pady=(8, 0))
-        
+        status_row.pack(pady=(6, 0))
+
         self.voice_dot = ctk.CTkLabel(
             status_row,
             text="",
-            image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle"),
+            image=get_vector_icon("circle", size=7, color=Colors.SUCCESS, fallback="circle"),
         )
         self.voice_dot.pack(side="left", padx=(0, 6))
-        
+
         self.voice_status = ctk.CTkLabel(
             status_row,
-            text="Online \u00b7 Kutmoqda",
+            text="Online",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         )
@@ -74,12 +82,11 @@ class VoicePage(ctk.CTkFrame):
     def _build_controls(self, parent):
         """Mikrofon tugmasi va ixcham boshqaruv tugmalari"""
         controls_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        controls_frame.pack(pady=(28, 0))
-        
-        # Katta mikrofon pill tugmasi
+        controls_frame.pack(pady=(24, 0))
+
         self._mic_icon_idle = get_vector_icon("mic", size=22, color=Colors.TEXT_PRIMARY, fallback="mic")
         self._mic_icon_active = get_vector_icon("stop", size=22, color="#FFFFFF", fallback="circle")
-        
+
         self.mic_btn = ctk.CTkButton(
             controls_frame,
             text="  Tinglashni boshlash",
@@ -90,59 +97,55 @@ class VoicePage(ctk.CTkFrame):
             hover_color=Colors.GLASS_HERO_HOVER,
             border_width=2,
             border_color=Colors.GLASS_HERO_BORDER,
-            text_color=Colors.TEXT_PRIMARY,
-            corner_radius=Sizing.PILL,
+            corner_radius=28,
             height=56,
-            width=300,
+            width=290,
             command=self._toggle_listening,
         )
         self.mic_btn.pack()
-        
+
         # Ikkilamchi tugmalar qatori
         secondary_row = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        secondary_row.pack(pady=(14, 0))
-        
-        # Use existing GlassButton from components 
+        secondary_row.pack(pady=(12, 0))
+
         GlassButton(
             secondary_row,
             text="Tozalash",
             icon="trash",
             font=Fonts.SMALL,
             height=32,
-            width=110,
+            width=100,
             corner_radius=Sizing.RADIUS_BUTTON,
             command=self._clear_transcript,
         ).pack(side="left", padx=4)
-        
+
         GlassButton(
             secondary_row,
             text="Chat",
-            icon="chat",  
+            icon="chat",
             font=Fonts.SMALL,
             height=32,
-            width=110,
+            width=100,
             corner_radius=Sizing.RADIUS_BUTTON,
             command=lambda: self.app.navigate_to("chat") if self.app else None,
         ).pack(side="left", padx=4)
 
     def _build_transcript_section(self, parent):
-        """Transkripsiya maydoni — solid Card (80/20 design system)"""
-        transcript_card = Card(parent, title="Transkripsiya")
-        transcript_card.pack(fill="x", pady=(24, 0), padx=20)
+        """Conversational transcript stream — no dashboard card container"""
+        self.transcript_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        self.transcript_frame.pack(fill="x", pady=(20, 0), padx=16)
 
+        self.transcript_list = ctk.CTkFrame(self.transcript_frame, fg_color="transparent")
+        self.transcript_list.pack(fill="x")
+
+        # Compatibility hidden textbox for legacy callers/tests
         self.transcript_text = ctk.CTkTextbox(
-            transcript_card.content,
-            font=Fonts.BODY,
-            fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_SECONDARY,
-            corner_radius=Sizing.SMALL,
-            border_width=1,
-            border_color=Colors.BORDER_SUBTLE,
-            height=120,
-            wrap="word",
-            state="disabled",
+            self.transcript_frame,
+            height=0,
+            fg_color="transparent",
+            text_color=Colors.TEXT_MUTED,
+            border_width=0,
         )
-        self.transcript_text.pack(fill="x")
 
     def _build_activity_section(self, parent):
         """Agent jarayoni ko'rsatish joyi"""
@@ -199,11 +202,14 @@ class VoicePage(ctk.CTkFrame):
 
     # ========== FUNKSIYALAR ==========
 
-    def _toggle_listening(self):
-        """Tinglashni boshlash/to'xtatish"""
-        self._is_listening = not self._is_listening
+    def set_voice_state(self, state: str):
+        """Ovoz holatini o'rnatish: 'idle', 'listening', 'thinking', 'speaking', 'error', 'offline'"""
+        st = state.lower()
+        if hasattr(self, "apple_orb"):
+            self.apple_orb.set_state(st)
 
-        if self._is_listening:
+        if st == "listening":
+            self._is_listening = True
             self.mic_btn.configure(
                 text="  To'xtatish",
                 image=self._mic_icon_active,
@@ -211,22 +217,39 @@ class VoicePage(ctk.CTkFrame):
                 hover_color="#DC2626",
                 border_color="#FF6961",
             )
-            if hasattr(self, "apple_orb"):
-                self.apple_orb.set_state("listening")
-            self.orb_text.configure(text="Tinglayapman...", text_color=Colors.PRIMARY)
-            if hasattr(self, "voice_dot"):
-                self.voice_dot.configure(
-                    image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle")
-                )
-            self.voice_status.configure(
-                text="Tinglayapman", text_color=Colors.SUCCESS
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.PRIMARY, fallback="circle")
             )
-            if self.app:
-                self.app.set_status("listening", "Tinglayapman...")
-                # Backend orqali tinglashni boshlash
-                if hasattr(self.app, "bridge"):
-                    self.app.bridge.start_listening()
-        else:
+            self.voice_status.configure(text="Tinglayapman...", text_color=Colors.PRIMARY)
+            self.orb_text.configure(text="Tinglayapman...", text_color=Colors.PRIMARY)
+        elif st == "thinking":
+            self.mic_btn.configure(
+                text="  Fikrlamoqda...",
+                image=get_vector_icon("sparkles", size=20, color="#FFFFFF", fallback="sparkles"),
+                fg_color=Colors.SECONDARY_DARK,
+                hover_color=Colors.SECONDARY,
+                border_color=Colors.SECONDARY,
+            )
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.SECONDARY, fallback="circle")
+            )
+            self.voice_status.configure(text="Fikrlamoqda...", text_color=Colors.SECONDARY)
+            self.orb_text.configure(text="Fikrlamoqda...", text_color=Colors.TEXT_PRIMARY)
+        elif st == "speaking":
+            self.mic_btn.configure(
+                text="  Javob bermoqda...",
+                image=self._mic_icon_active,
+                fg_color=Colors.PRIMARY_DARK,
+                hover_color=Colors.PRIMARY,
+                border_color=Colors.PRIMARY_GLOW,
+            )
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.SUCCESS, fallback="circle")
+            )
+            self.voice_status.configure(text="Gapirmoqda...", text_color=Colors.SUCCESS)
+            self.orb_text.configure(text="Javob bermoqda...", text_color=Colors.TEXT_PRIMARY)
+        elif st == "error":
+            self._is_listening = False
             self.mic_btn.configure(
                 text="  Tinglashni boshlash",
                 image=self._mic_icon_idle,
@@ -234,36 +257,114 @@ class VoicePage(ctk.CTkFrame):
                 hover_color=Colors.GLASS_HERO_HOVER,
                 border_color=Colors.GLASS_HERO_BORDER,
             )
-            if hasattr(self, "apple_orb"):
-                self.apple_orb.set_state("idle")
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.DANGER, fallback="circle")
+            )
+            self.voice_status.configure(text="Xatolik", text_color=Colors.DANGER)
+            self.orb_text.configure(text="Xatolik yuz berdi", text_color=Colors.DANGER)
+        elif st == "offline":
+            self._is_listening = False
+            self.mic_btn.configure(
+                text="  Oflayn",
+                image=get_vector_icon("mute", size=20, color=Colors.TEXT_MUTED, fallback="mic"),
+                fg_color=Colors.BG_CARD,
+                hover_color=Colors.BG_HOVER,
+                border_color=Colors.BORDER,
+            )
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.TEXT_MUTED, fallback="circle")
+            )
+            self.voice_status.configure(text="Oflayn", text_color=Colors.TEXT_MUTED)
+            self.orb_text.configure(text="Mikasa oflayn", text_color=Colors.TEXT_MUTED)
+        else:  # idle
+            self._is_listening = False
+            self.mic_btn.configure(
+                text="  Tinglashni boshlash",
+                image=self._mic_icon_idle,
+                fg_color=Colors.GLASS_HERO_BG,
+                hover_color=Colors.GLASS_HERO_HOVER,
+                border_color=Colors.GLASS_HERO_BORDER,
+            )
+            self.voice_dot.configure(
+                image=get_vector_icon("circle", size=7, color=Colors.SUCCESS, fallback="circle")
+            )
+            self.voice_status.configure(text="Online", text_color=Colors.TEXT_MUTED)
             self.orb_text.configure(text="Qanday yordam beray?", text_color=Colors.TEXT_PRIMARY)
-            if hasattr(self, "voice_dot"):
-                self.voice_dot.configure(
-                    image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle")
-                )
-            self.voice_status.configure(text="Online \u00b7 Kutmoqda", text_color=Colors.TEXT_MUTED)
+
+    def _toggle_listening(self):
+        """Tinglashni boshlash/to'xtatish"""
+        if not self._is_listening:
+            self.set_voice_state("listening")
+            if self.app:
+                self.app.set_status("listening", "Tinglayapman...")
+                if hasattr(self.app, "bridge"):
+                    self.app.bridge.start_listening()
+        else:
+            self.set_voice_state("idle")
             if self.app:
                 self.app.set_status("online", "Tayyor")
-                # Backend orqali tinglashni to'xtatish
                 if hasattr(self.app, "bridge"):
                     self.app.bridge.stop_listening()
 
     def _clear_transcript(self):
         """Transkripsiyani tozalash"""
-        self.transcript_text.configure(state="normal")
-        self.transcript_text.delete("1.0", "end")
-        self.transcript_text.configure(state="disabled")
+        try:
+            self.transcript_text.configure(state="normal")
+            self.transcript_text.delete("1.0", "end")
+            self.transcript_text.configure(state="disabled")
+        except Exception:
+            pass
         self._transcript_history.clear()
+        if hasattr(self, "transcript_list") and self.transcript_list:
+            for child in self.transcript_list.winfo_children():
+                child.destroy()
+
+    def _render_transcript_item(self, text, role):
+        if not hasattr(self, "transcript_list") or not self.transcript_list:
+            return
+        is_user = role == "user"
+        row = ctk.CTkFrame(self.transcript_list, fg_color="transparent")
+        row.pack(fill="x", pady=(4, 6))
+
+        sender = "Siz" if is_user else "Mikasa"
+        sender_color = Colors.TEXT_MUTED if is_user else Colors.PRIMARY
+
+        header = ctk.CTkFrame(row, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 2))
+
+        ctk.CTkLabel(
+            header,
+            text=sender,
+            font=Fonts.TINY,
+            text_color=sender_color,
+            anchor="w",
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            row,
+            text=f'"{text}"' if is_user else text,
+            font=Fonts.BODY if not is_user else Fonts.BODY_BOLD,
+            text_color=Colors.TEXT_PRIMARY if not is_user else Colors.TEXT_SECONDARY,
+            wraplength=540,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x")
 
     def add_transcript(self, text, role="user", track_state=True):
         """Transkripsiyaga matn qo'shish"""
         if track_state:
             self._transcript_history.append({"text": text, "role": role})
-        self.transcript_text.configure(state="normal")
-        prefix = "Siz: " if role == "user" else "Mikasa: "
-        self.transcript_text.insert("end", f"{prefix}{text}\n")
-        self.transcript_text.see("end")
-        self.transcript_text.configure(state="disabled")
+
+        try:
+            self.transcript_text.configure(state="normal")
+            prefix = "Siz: " if role == "user" else "Mikasa: "
+            self.transcript_text.insert("end", f"{prefix}{text}\n")
+            self.transcript_text.see("end")
+            self.transcript_text.configure(state="disabled")
+        except Exception:
+            pass
+
+        self._render_transcript_item(text, role)
 
     def on_show(self):
         """Sahifa ko'rsatilganda"""
@@ -272,39 +373,9 @@ class VoicePage(ctk.CTkFrame):
             and hasattr(self.app, "bridge")
             and self.app.bridge.is_listening
         ):
-            self._is_listening = True
-            self.mic_btn.configure(
-                text="  To'xtatish",
-                image=self._mic_icon_active,
-                fg_color=Colors.DANGER,
-                hover_color="#DC2626",
-            )
-            if hasattr(self, "voice_dot"):
-                self.voice_dot.configure(
-                    image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle")
-                )
-            self.voice_status.configure(
-                text="Tinglayapman", text_color=Colors.SUCCESS
-            )
-            self.orb_text.configure(
-                text="Tinglayapman...", text_color=Colors.PRIMARY
-            )
+            self.set_voice_state("listening")
         else:
-            self._is_listening = False
-            self.mic_btn.configure(
-                text="  Tinglashni boshlash",
-                image=self._mic_icon_idle,
-                fg_color=Colors.GLASS_HERO_BG,
-                hover_color=Colors.GLASS_HERO_HOVER,
-            )
-            if hasattr(self, "voice_dot"):
-                self.voice_dot.configure(
-                    image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle")
-                )
-            self.voice_status.configure(
-                text="Online \u00b7 Kutmoqda", text_color=Colors.TEXT_MUTED
-            )
-            self.orb_text.configure(text="Qanday yordam beray?", text_color=Colors.TEXT_PRIMARY)
+            self.set_voice_state("idle")
 
         # Orb animatsiyasini qayta faollashtirish
         if hasattr(self, "apple_orb"):
@@ -326,7 +397,6 @@ class VoicePage(ctk.CTkFrame):
         self._transcript_history = []
 
         transcript = state.get("transcript", [])
-
         for item in transcript:
             self.add_transcript(
                 item.get("text", ""), item.get("role", "user"), track_state=True

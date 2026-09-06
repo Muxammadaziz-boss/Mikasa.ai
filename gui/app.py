@@ -339,7 +339,7 @@ class MikasaApp(ctk.CTk):
 
         self.page_label = ctk.CTkLabel(
             self.titlebar,
-            text="Dashboard",
+            text="Ovozli muloqot",
             font=Fonts.STATUS,
             text_color=Colors.TEXT_SECONDARY,
         )

@@ -70,14 +70,13 @@ class ChatPage(ctk.CTkFrame):
     def _build_chat_area(self, parent):
         self.chat_scroll = ctk.CTkScrollableFrame(
             parent,
-            fg_color=Colors.BG_SURFACE,
-            corner_radius=12,
-            border_width=1,
-            border_color=Colors.BORDER,
+            fg_color="transparent",
+            corner_radius=0,
+            border_width=0,
             scrollbar_button_color=Colors.BG_CARD,
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
-        self.chat_scroll.pack(fill="both", expand=True, pady=(0, 8))
+        self.chat_scroll.pack(fill="both", expand=True, pady=(0, 6))
 
         self._add_welcome_message()
 
@@ -422,7 +421,7 @@ class ChatPage(ctk.CTkFrame):
         is_user = role == "user"
 
         msg_row = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
-        msg_row.pack(fill="x", padx=8, pady=4)
+        msg_row.pack(fill="x", padx=12, pady=3)
 
         bubble_frame = MessageBubble(
             msg_row,
@@ -432,9 +431,9 @@ class ChatPage(ctk.CTkFrame):
         )
 
         if is_user:
-            bubble_frame.pack(side="right", padx=(80, 4))
+            bubble_frame.pack(side="right", padx=(80, 8))
         else:
-            bubble_frame.pack(side="left", padx=(4, 80))
+            bubble_frame.pack(side="left", padx=(8, 60))
 
         self.after(50, self._scroll_to_bottom)
 
