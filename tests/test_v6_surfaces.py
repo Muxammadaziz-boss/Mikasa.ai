@@ -10,6 +10,7 @@ from gui.components import (
     Card,
     ElevatedCard,
     GlassCard,
+    HeroCard,
     PageHero,
     OverlayCard,
     ToastNotification,
@@ -117,11 +118,12 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
                     self.assertTrue(tok["border_color"])
 
     def test_surface_component_instantiations(self):
-        """Card, ElevatedCard, GlassCard, PageHero, OverlayCard instantiate with correct tiers"""
+        """Card, ElevatedCard, GlassCard, HeroCard, PageHero, OverlayCard instantiate with correct tiers"""
         base_surface = Surface(self.container, tier=Surfaces.BASE)
         card = Card(self.container, title="Solid Card")
         elevated = ElevatedCard(self.container, title="Elevated Panel")
         glass = GlassCard(self.container, title="Glass Panel")
+        hero_card = HeroCard(self.container, title="Hero Accent Panel")
         hero = PageHero(self.container, title="Hero Header", icon="sparkles")
         overlay = OverlayCard(self.container, title="Modal Dialog")
 
@@ -129,6 +131,7 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
         self.assertEqual(card._surface_tier, Surfaces.CARD)
         self.assertEqual(elevated._surface_tier, Surfaces.ELEVATED)
         self.assertEqual(glass._surface_tier, Surfaces.GLASS)
+        self.assertEqual(hero_card._surface_tier, Surfaces.HERO)
         self.assertEqual(hero._surface_tier, Surfaces.HERO)
         self.assertEqual(overlay._surface_tier, Surfaces.OVERLAY)
 
@@ -137,9 +140,11 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
         self.assertEqual(elevated.cget("fg_color"), Colors.BG_PANEL)
         self.assertEqual(glass.cget("fg_color"), Colors.GLASS_BG)
         self.assertEqual(glass.cget("border_color"), Colors.GLASS_BORDER)
+        self.assertEqual(hero_card.cget("fg_color"), Colors.GLASS_HERO_BG)
+        self.assertEqual(hero_card.cget("border_color"), Colors.GLASS_HERO_BORDER)
         self.assertEqual(overlay.cget("fg_color"), Colors.OVERLAY_BG)
 
-        for w in (base_surface, card, elevated, glass, hero, overlay):
+        for w in (base_surface, card, elevated, glass, hero_card, hero, overlay):
             w.destroy()
 
     def test_toast_notification_uses_overlay_surface(self):

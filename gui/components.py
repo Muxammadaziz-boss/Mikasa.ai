@@ -166,6 +166,29 @@ class GlassCard(Card):
         self._surface_tier = Surfaces.GLASS
 
 
+class HeroCard(Card):
+    """
+    Mikasa AI Hero Accent Surface Card.
+    
+    Prominent accent banner va yuqori darajadagi e'tibor panellari uchun sirt.
+    Accent border (Colors.GLASS_HERO_BORDER / Colors.BORDER_HERO) bilan ajratiladi.
+    """
+
+    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
+        kwargs.setdefault("fg_color", Colors.GLASS_HERO_BG)
+        kwargs.setdefault("border_color", Colors.GLASS_HERO_BORDER)
+        kwargs.setdefault("border_width", 1)
+        super().__init__(
+            master,
+            title=title,
+            subtitle=subtitle,
+            padding=padding,
+            accent_color=accent_color,
+            **kwargs,
+        )
+        self._surface_tier = Surfaces.HERO
+
+
 class OverlayCard(Card):
     """
     Mikasa AI Overlay Surface Card.
