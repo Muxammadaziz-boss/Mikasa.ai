@@ -103,7 +103,10 @@ class TestV6WindowChrome(unittest.TestCase):
         # Drag start chaqiruvi
         app._start_window_drag(MockEvent())
 
-        # 5. Toza yopish
+        # 5. Zero-pixel unwanted top frame va wndproc hook tekshiruvi
+        self.assertTrue(getattr(app, "_wndproc_installed", False))
+
+        # 6. Toza yopish
         app._on_closing()
 
 

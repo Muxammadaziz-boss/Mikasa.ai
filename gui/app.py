@@ -97,59 +97,157 @@ class MikasaApp(ctk.CTk):
 
     def _setup_custom_window_chrome(self):
         """
-        Standart Windows sarlavha panelini (WS_CAPTION) olib tashlash.
-        WS_THICKFRAME saqlanib qoladi (chekka va burchaklardan o'lcham o'zgartirish),
-        WS_MINIMIZEBOX, WS_MAXIMIZEBOX, WS_SYSMENU orqali vazifalar paneli va Alt+Tab ishlaydi.
+        Standart Windows sarlavha panelini (WS_CAPTION) va no-client oq/kulrang hoshiyasini
+        butunlay olib tashlash (Zero-pixel unwanted top frame).
+
+        Root cause tahlili:
+        WS_THICKFRAME bo'lgan oynada DefWindowProc standart holatda 7-8px non-client frame
+        ajratadi va DWM bu sohani oq/kulrang chiziq qilib chizadi.
+        WM_NCCALCSIZE xabarini ushlab 0 qaytarish orqali client area to'liq oynani (y=0 dan boshlab)
+        qamrab oladi va oq chiziq butunlay yo'qoladi.
+        WM_NCHITTEST orqali esa oynaning 4 ta chekkasi va burchaklaridan native resizing ta'minlanadi.
         """
-        if os.name == "nt":
-            try:
-                import ctypes
-                from ctypes import c_int, byref, Structure
+        if os.name != "nt":
+            return
 
-                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-                if not hwnd:
-                    hwnd = self.winfo_id()
+        try:
+            import ctypes
+            from ctypes import wintypes, c_int, c_void_p, WINFUNCTYPE, Structure, byref
 
-                GWL_STYLE = -16
-                WS_CAPTION = 0x00C00000
-                WS_THICKFRAME = 0x00040000
-                WS_MINIMIZEBOX = 0x00020000
-                WS_MAXIMIZEBOX = 0x00010000
-                WS_SYSMENU = 0x00080000
+            user32 = ctypes.windll.user32
+            user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, c_int]
+            user32.GetWindowLongPtrW.restype = c_void_p
+            user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, c_int, c_void_p]
+            user32.SetWindowLongPtrW.restype = c_void_p
+            user32.CallWindowProcW.argtypes = [c_void_p, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.CallWindowProcW.restype = c_void_p
 
-                SWP_FRAMECHANGED = 0x0020
-                SWP_NOMOVE = 0x0002
-                SWP_NOSIZE = 0x0001
-                SWP_NOZORDER = 0x0004
+            hwnd = user32.GetParent(self.winfo_id())
+            if not hwnd:
+                hwnd = self.winfo_id()
+            self._parent_hwnd = hwnd
 
-                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
-                new_style = (style & ~WS_CAPTION) | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU
-                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
-                ctypes.windll.user32.SetWindowPos(
-                    hwnd, 0, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
-                )
+            GWL_STYLE = -16
+            GWLP_WNDPROC = -4
+            WS_CAPTION = 0x00C00000
+            WS_THICKFRAME = 0x00040000
+            WS_MINIMIZEBOX = 0x00020000
+            WS_MAXIMIZEBOX = 0x00010000
+            WS_SYSMENU = 0x00080000
 
-                # DWM Immersive Dark Mode
-                DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-                dark_val = c_int(1)
-                ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                    hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(dark_val), 4
-                )
+            SWP_FRAMECHANGED = 0x0020
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_NOZORDER = 0x0004
 
-                # DWM Extend Frame into client area
-                class MARGINS(Structure):
-                    _fields_ = [
-                        ("cxLeftWidth", c_int),
-                        ("cxRightWidth", c_int),
-                        ("cyTopHeight", c_int),
-                        ("cyBottomHeight", c_int),
-                    ]
+            WM_NCCALCSIZE = 0x0083
+            WM_NCHITTEST = 0x0084
 
-                margins = MARGINS(0, 0, 0, 0)
-                ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, byref(margins))
-            except Exception as e:
-                logger.debug(f"Custom window chrome initialization warning: {e}")
+            class MONITORINFO(Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD),
+                ]
+
+            class NCCALCSIZE_PARAMS(Structure):
+                _fields_ = [("rgrc", wintypes.RECT * 3), ("lppos", c_void_p)]
+
+            # 1. Windows frame style ni to'g'irlash
+            style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+            new_style = (style & ~WS_CAPTION) | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU
+            user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
+            user32.SetWindowPos(
+                hwnd, 0, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+            )
+
+            # 2. DWM Dark Mode va ranglar
+            dark_val = c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, byref(dark_val), 4)
+
+            # DWMWA_BORDER_COLOR (34) va DWMWA_CAPTION_COLOR (35) ni Colors.BG_DARKEST ga moslash
+            # #08080C -> BGR 0x000C0808
+            border_color = c_int(0x000C0808)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 34, byref(border_color), 4)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(border_color), 4)
+
+            # DWMWA_WINDOW_CORNER_PREFERENCE (33): 2 = ROUND (Windows 11 silliq burchaklar)
+            corner_pref = c_int(2)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 33, byref(corner_pref), 4)
+
+            # 3. WndProc hook (WM_NCCALCSIZE va WM_NCHITTEST)
+            if not getattr(self, "_wndproc_installed", False):
+                old_wndproc = user32.GetWindowLongPtrW(hwnd, GWLP_WNDPROC)
+                self._old_wndproc = old_wndproc
+
+                WNDPROC_T = WINFUNCTYPE(c_void_p, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+
+                def custom_wndproc(h, msg, wp, lp):
+                    if msg == WM_NCCALCSIZE and wp:
+                        if user32.IsZoomed(h):
+                            hmon = user32.MonitorFromWindow(h, 2)
+                            mi = MONITORINFO()
+                            mi.cbSize = ctypes.sizeof(MONITORINFO)
+                            if user32.GetMonitorInfoW(hmon, byref(mi)):
+                                params = ctypes.cast(lp, ctypes.POINTER(NCCALCSIZE_PARAMS)).contents
+                                params.rgrc[0].left = mi.rcWork.left
+                                params.rgrc[0].top = mi.rcWork.top
+                                params.rgrc[0].right = mi.rcWork.right
+                                params.rgrc[0].bottom = mi.rcWork.bottom
+                            return 0
+                        return 0
+                    elif msg == WM_NCHITTEST:
+                        if not user32.IsZoomed(h):
+                            x = lp & 0xFFFF
+                            if x > 0x7FFF:
+                                x -= 0x10000
+                            y = (lp >> 16) & 0xFFFF
+                            if y > 0x7FFF:
+                                y -= 0x10000
+                            rect = wintypes.RECT()
+                            user32.GetWindowRect(h, byref(rect))
+                            border = 6
+
+                            # O'ng tomondagi boshqaruv tugmalari sohasi (Minimize, Maximize, Close)
+                            if y <= rect.top + 36 and x >= rect.right - 140:
+                                return 1  # HTCLIENT
+
+                            top = y < rect.top + border
+                            bottom = y >= rect.bottom - border
+                            left = x < rect.left + border
+                            right = x >= rect.right - border
+
+                            if top and left:
+                                return 13  # HTTOPLEFT
+                            if top and right:
+                                return 14  # HTTOPRIGHT
+                            if bottom and left:
+                                return 16  # HTBOTTOMLEFT
+                            if bottom and right:
+                                return 17  # HTBOTTOMRIGHT
+                            if top:
+                                return 12  # HTTOP
+                            if bottom:
+                                return 15  # HTBOTTOM
+                            if left:
+                                return 10  # HTLEFT
+                            if right:
+                                return 11  # HTRIGHT
+
+                    return user32.CallWindowProcW(self._old_wndproc, h, msg, wp, lp)
+
+                self._wndproc_ref = WNDPROC_T(custom_wndproc)
+                user32.SetWindowLongPtrW(hwnd, GWLP_WNDPROC, ctypes.cast(self._wndproc_ref, c_void_p))
+                self._wndproc_installed = True
+
+            user32.SetWindowPos(
+                hwnd, 0, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+            )
+        except Exception as e:
+            logger.debug(f"Custom window chrome initialization warning: {e}")
 
     def _start_window_drag(self, event):
         """Oynani surishni boshlash (Pure Tkinter main-thread xavfsiz mexanizm)"""
@@ -1037,6 +1135,17 @@ class MikasaApp(ctk.CTk):
                         os.remove(f)
                     except Exception:
                         pass
+
+            # 6. Windows wndproc tiklash
+            if getattr(self, "_old_wndproc", None) and getattr(self, "_parent_hwnd", None):
+                try:
+                    import ctypes
+                    GWLP_WNDPROC = -4
+                    ctypes.windll.user32.SetWindowLongPtrW(self._parent_hwnd, GWLP_WNDPROC, self._old_wndproc)
+                except Exception:
+                    pass
+                self._old_wndproc = None
+                self._wndproc_ref = None
 
         except Exception as e:
             import logging
