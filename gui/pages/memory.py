@@ -4,7 +4,7 @@
 import json
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from gui.theme import Colors, Fonts
+from gui.theme import Colors, Fonts, Sizing
 from gui.components import (
     Card,
     ElevatedCard,
@@ -78,7 +78,7 @@ class MemoryPage(ctk.CTkFrame):
             segmented_button_unselected_color=Colors.BG_INPUT,
             segmented_button_unselected_hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
-            corner_radius=14,
+            corner_radius=Sizing.CARD,
             border_width=1,
             border_color=Colors.BORDER,
         )
@@ -398,7 +398,7 @@ class MemoryPage(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 self._knowledge_scroll,
                 fg_color=Colors.BG_INPUT,
-                corner_radius=12,
+                corner_radius=Sizing.RADIUS_BUTTON,
                 border_width=1,
                 border_color=Colors.BORDER,
             )
@@ -515,7 +515,7 @@ class MemoryPage(ctk.CTkFrame):
             voice_label = voice or "ovoz yo'q"
             lang_label = lang or "til yo'q"
             self.profile_status.configure(
-                text=f"Profil tayyor: {name} • {voice_label} • {lang_label}"
+                text=f"Profil tayyor: {name} | {voice_label} | {lang_label}"
             )
             if len(self._stat_widgets) > 3:
                 self._stat_widgets[3].set_value("Tayyor")

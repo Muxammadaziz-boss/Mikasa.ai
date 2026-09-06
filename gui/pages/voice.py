@@ -120,7 +120,7 @@ class VoicePage(ctk.CTkFrame):
             font=Fonts.BODY,
             fg_color=Colors.BG_INPUT,
             text_color=Colors.TEXT_PRIMARY,
-            corner_radius=10,
+            corner_radius=Sizing.RADIUS_INPUT,
             border_width=1,
             border_color=Colors.BORDER,
             height=100,
@@ -148,10 +148,9 @@ class VoicePage(ctk.CTkFrame):
             border_width=2,
             border_color=Colors.GLASS_HERO_BORDER,
             text_color=Colors.TEXT_PRIMARY,
-            corner_radius=28,
+            corner_radius=Sizing.PILL,
             height=56,
             width=280,
-            bg_color=Colors.BG_DARK,
             command=self._toggle_listening,
         )
         self.mic_btn.pack()
@@ -167,7 +166,7 @@ class VoicePage(ctk.CTkFrame):
             font=Fonts.SMALL,
             height=32,
             width=190,
-            corner_radius=16,
+            corner_radius=Sizing.RADIUS_BUTTON,
             command=self._clear_transcript,
         ).pack(side="left", padx=4)
 

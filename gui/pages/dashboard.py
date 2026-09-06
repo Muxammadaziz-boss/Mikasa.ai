@@ -87,10 +87,9 @@ class DashboardPage(ctk.CTkFrame):
         emblem_frame = ctk.CTkFrame(
             top_row,
             fg_color=Colors.PRIMARY_SOFT,
-            corner_radius=24,
+            corner_radius=Sizing.PILL,
             width=48,
             height=48,
-            bg_color=Colors.BG_CARD,
         )
         emblem_frame.pack(side="left")
         emblem_frame.pack_propagate(False)

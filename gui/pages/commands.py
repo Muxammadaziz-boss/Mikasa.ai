@@ -2,7 +2,7 @@
 # Command Center sahifasi — tool'lar va buyruqlarni boshqarish
 
 import customtkinter as ctk
-from gui.theme import Colors, Fonts
+from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
 from gui.components import Card, EmptyState, GlassButton, GlassCard, InfoChip, PageHero, SearchBar
 
@@ -203,7 +203,7 @@ class CommandsPage(ctk.CTkFrame):
         card = ctk.CTkFrame(
             self.grid_frame,
             fg_color=Colors.BG_CARD,
-            corner_radius=14,
+            corner_radius=Sizing.CARD,
             border_width=1,
             border_color=Colors.BORDER,
             cursor="hand2",
@@ -218,7 +218,7 @@ class CommandsPage(ctk.CTkFrame):
         icon_box = ctk.CTkFrame(
             top,
             fg_color=Colors.BG_SOFT,
-            corner_radius=10,
+            corner_radius=Sizing.SMALL,
             width=40,
             height=40,
         )
@@ -275,7 +275,7 @@ class CommandsPage(ctk.CTkFrame):
             font=Fonts.SMALL,
             height=28,
             width=90,
-            corner_radius=14,
+            corner_radius=Sizing.PILL,
             command=lambda t=tool["name"]: self._on_tool_click(t),
         ).pack(side="right")
 

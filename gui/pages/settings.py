@@ -155,10 +155,10 @@ class SettingsPage(ctk.CTkFrame):
         card.pack(fill="x", pady=(0, 12))
 
         self._inputs["ai.gemini_api_key"] = self._add_field(
-            card.content, "Gemini API key", show="●"
+            card.content, "Gemini API key", show="*"
         )
         self._inputs["ai.openrouter_api_key"] = self._add_field(
-            card.content, "OpenRouter key", show="●"
+            card.content, "OpenRouter key", show="*"
         )
         self._inputs["ai.model"] = self._add_dropdown(
             card.content, "AI model", ["gemini", "openrouter"], "gemini"

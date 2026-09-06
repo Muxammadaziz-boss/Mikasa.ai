@@ -5,7 +5,7 @@ import json
 import os
 import customtkinter as ctk
 from tkinter import messagebox
-from gui.theme import Colors, Fonts
+from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
 from gui.components import Card, EmptyState, GlassCard, InfoChip, PageHero, SecondaryButton
 
@@ -54,7 +54,7 @@ class PluginsPage(ctk.CTkFrame):
             self.hero.actions,
             text="Papkani ochish",
             icon="folder",
-            corner_radius=999,
+            corner_radius=Sizing.PILL,
             command=self._open_plugins_folder,
         ).pack(anchor="e")
 
@@ -94,7 +94,7 @@ class PluginsPage(ctk.CTkFrame):
         info_card.pack(fill="x", pady=(0, 12))
 
         path_row = ctk.CTkFrame(
-            info_card.content, fg_color=Colors.BG_INPUT, corner_radius=12
+            info_card.content, fg_color=Colors.BG_INPUT, corner_radius=Sizing.RADIUS_BUTTON
         )
         path_row.pack(fill="x", pady=(0, 12))
 
@@ -183,7 +183,7 @@ class PluginsPage(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 self.installed_list,
                 fg_color=Colors.GLASS_BG,
-                corner_radius=12,
+                corner_radius=Sizing.RADIUS_BUTTON,
                 border_width=1,
                 border_color=Colors.GLASS_BORDER if enabled else Colors.BORDER,
             )
@@ -229,7 +229,7 @@ class PluginsPage(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 info,
-                text=f"{ptype} • {file_name}",
+                text=f"{ptype} | {file_name}",
                 font=Fonts.TINY,
                 text_color=Colors.TEXT_MUTED,
                 anchor="w",
@@ -277,7 +277,7 @@ class PluginsPage(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 templates_card.content,
                 fg_color=Colors.BG_INPUT,
-                corner_radius=12,
+                corner_radius=Sizing.RADIUS_BUTTON,
                 border_width=1,
                 border_color=Colors.BORDER,
             )
@@ -310,13 +310,14 @@ class PluginsPage(ctk.CTkFrame):
                 font=Fonts.SMALL,
                 text_color=Colors.TEXT_MUTED,
                 anchor="w",
+                justify="left",
             ).pack(fill="x", pady=(4, 0))
 
             SecondaryButton(
                 inner,
                 text="Yaratish",
                 icon="sparkles",
-                corner_radius=999,
+                corner_radius=Sizing.PILL,
                 command=cmd,
             ).pack(side="right")
 

@@ -507,7 +507,7 @@ class Button(ctk.CTkButton):
                 "hover_color": Colors.GLASS_BG_HOVER,
                 "border_color": Colors.GLASS_BORDER,
                 "border_width": 1,
-                "text_color": "#FFFFFF",
+                "text_color": Colors.GLASS_TEXT,
                 "border_hover_color": Colors.GLASS_BORDER_HOVER,
             }
         return {
@@ -602,7 +602,8 @@ class IconButton(GlassButton):
     """Icon-only button"""
 
     def __init__(self, master, icon="", size=36, **kwargs):
-        super().__init__(master, text="", icon=icon, width=size, height=size, corner_radius=12, **kwargs)
+        kwargs.setdefault("corner_radius", Sizing.RADIUS_BUTTON)
+        super().__init__(master, text="", icon=icon, width=size, height=size, **kwargs)
 
 
 class CircleIconButton(GlassButton):
@@ -646,8 +647,14 @@ class AppleSiriOrb(ctk.CTkFrame):
     """
 
     def __init__(self, master, size=210, **kwargs):
+        # Resolve canvas background
+        canvas_bg = kwargs.get("bg_color", None)
+        if not canvas_bg or canvas_bg == "transparent":
+            cand = getattr(master, "_fg_color", None) or getattr(master, "fg_color", None)
+            canvas_bg = cand if (cand and cand != "transparent") else Colors.BG_DARK
+
         if "bg_color" not in kwargs:
-            kwargs["bg_color"] = Colors.BG_DARK
+            kwargs["bg_color"] = canvas_bg
 
         super().__init__(
             master,
@@ -669,7 +676,7 @@ class AppleSiriOrb(ctk.CTkFrame):
             self,
             width=size,
             height=size,
-            bg=Colors.BG_DARK,
+            bg=canvas_bg,
             highlightthickness=0,
             bd=0,
         )
@@ -818,6 +825,17 @@ class AppleSiriOrb(ctk.CTkFrame):
                 pass
             self._anim_job = None
 
+    def update_theme(self):
+        """Mavzu o'zgarganda orb fonini yangilash"""
+        curr_bg = getattr(self.master, "_fg_color", None) or getattr(self.master, "fg_color", None) or Colors.BG_DARK
+        if curr_bg == "transparent":
+            curr_bg = Colors.BG_DARK
+        try:
+            self.canvas.configure(bg=curr_bg)
+            self._draw_orb()
+        except Exception:
+            pass
+
     def destroy(self):
         self.stop()
         super().destroy()
@@ -850,12 +868,12 @@ class MessageBubble(ctk.CTkFrame):
             time_color = Colors.TEXT_MUTED
 
         if "bg_color" not in kwargs:
-            kwargs["bg_color"] = Colors.BG_SURFACE
+            kwargs["bg_color"] = "transparent"
 
         super().__init__(
             master,
             fg_color=bg_color,
-            corner_radius=16,
+            corner_radius=Sizing.CARD,
             border_width=border_width,
             border_color=border_color,
             **kwargs,
@@ -942,7 +960,7 @@ class TypingBubble(ctk.CTkFrame):
 
     def __init__(self, master, prefix="Mikasa o'ylamoqda", **kwargs):
         if "bg_color" not in kwargs:
-            kwargs["bg_color"] = Colors.BG_SURFACE
+            kwargs["bg_color"] = "transparent"
 
         prefix_text = kwargs.pop("prefix", prefix)
         if prefix_text.startswith("✦ "):
@@ -952,7 +970,7 @@ class TypingBubble(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=Colors.BG_CARD,
-            corner_radius=16,
+            corner_radius=Sizing.CARD,
             border_width=1,
             border_color=Colors.BORDER,
             **kwargs,
@@ -975,8 +993,8 @@ class TypingBubble(ctk.CTkFrame):
 
         self.dots_label = ctk.CTkLabel(
             inner,
-            text="● ○ ○",
-            font=(Fonts.FAMILY, 10),
+            text=".  ",
+            font=Fonts.BODY_BOLD,
             text_color=Colors.PRIMARY,
         )
         self.dots_label.pack(side="left")
@@ -989,7 +1007,7 @@ class TypingBubble(ctk.CTkFrame):
     def _animate(self):
         if not self._is_running:
             return
-        patterns = ["● ○ ○", "○ ● ○", "○ ○ ●"]
+        patterns = [".  ", ".. ", "..."]
         self._phase = (self._phase + 1) % len(patterns)
         try:
             if self.winfo_exists():
@@ -1029,7 +1047,7 @@ class AgentStepIndicator(ctk.CTkFrame):
         self._steps = []
 
     def add_step(self, step_type: str, title: str, description: str = ""):
-        step_row = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=10, border_width=1, border_color=Colors.BORDER)
+        step_row = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Sizing.SMALL, border_width=1, border_color=Colors.BORDER)
         step_row.pack(fill="x", pady=3)
 
         inner = ctk.CTkFrame(step_row, fg_color="transparent")
@@ -1044,7 +1062,7 @@ class AgentStepIndicator(ctk.CTkFrame):
         }
         bg, tc, icon_name = badge_colors.get(step_type, (Colors.BG_INPUT, Colors.TEXT_MUTED, "circle"))
 
-        icon_frame = ctk.CTkFrame(inner, fg_color=bg, corner_radius=10, width=20, height=20)
+        icon_frame = ctk.CTkFrame(inner, fg_color=bg, corner_radius=Sizing.SMALL, width=20, height=20)
         icon_frame.pack(side="left")
         icon_frame.pack_propagate(False)
         v_img = get_vector_icon(icon_name, size=11, color_dark=tc, color_light=tc, fallback="circle")
@@ -1093,9 +1111,9 @@ class NavItem(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=10 if active else 0,
+            corner_radius=Sizing.SMALL if active else 0,
             border_width=1 if active else 0,
-            border_color="#33334A" if active else Colors.SIDEBAR_BG,
+            border_color=Colors.BORDER_HOVER if active else Colors.SIDEBAR_BG,
             height=44,
             cursor="hand2",
             **kwargs,
@@ -1150,7 +1168,7 @@ class NavItem(ctk.CTkFrame):
 
     def _on_enter(self, event=None):
         if not self._active:
-            self.configure(fg_color=Colors.SIDEBAR_HOVER, corner_radius=10, border_width=1, border_color="#262638")
+            self.configure(fg_color=Colors.SIDEBAR_HOVER, corner_radius=Sizing.SMALL, border_width=1, border_color=Colors.BORDER_HOVER)
             self.text_label.configure(text_color=Colors.TEXT_PRIMARY)
 
     def _on_leave(self, event=None):
@@ -1162,9 +1180,9 @@ class NavItem(ctk.CTkFrame):
         self._active = active
         self.configure(
             fg_color=Colors.SIDEBAR_ACTIVE if active else "transparent",
-            corner_radius=10 if active else 0,
+            corner_radius=Sizing.SMALL if active else 0,
             border_width=1 if active else 0,
-            border_color="#33334A" if active else Colors.SIDEBAR_BG,
+            border_color=Colors.BORDER_HOVER if active else Colors.SIDEBAR_BG,
         )
         self.indicator.configure(fg_color=Colors.SIDEBAR_INDICATOR if active else "transparent")
         self.text_label.configure(text_color=Colors.TEXT_PRIMARY if active else Colors.TEXT_SECONDARY)
@@ -1460,7 +1478,7 @@ class ToastNotification(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=Colors.OVERLAY_BG,
-            corner_radius=12,
+            corner_radius=Sizing.RADIUS_BUTTON,
             border_width=1,
             border_color=accent,
             **kwargs,

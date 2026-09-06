@@ -4,7 +4,7 @@
 import datetime
 import customtkinter as ctk
 from tkinter import messagebox
-from gui.theme import Colors, Fonts
+from gui.theme import Colors, Fonts, Sizing
 from gui.components import Card, ElevatedCard, EmptyState, GlassButton, GlassCard, GlowButton, InfoChip, PageHero
 
 
@@ -268,7 +268,7 @@ class SchedulerPage(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 self.tasks_scroll,
                 fg_color=Colors.BG_INPUT,
-                corner_radius=12,
+                corner_radius=Sizing.RADIUS_BUTTON,
                 border_width=1,
                 border_color=Colors.BORDER,
             )
@@ -325,7 +325,7 @@ class SchedulerPage(ctk.CTkFrame):
                 border_color=Colors.BORDER,
                 border_hover_color=Colors.DANGER,
                 text_color=Colors.DANGER,
-                corner_radius=15,
+                corner_radius=Sizing.PILL,
                 height=30,
                 width=110,
                 command=lambda tid=task["id"]: self._remove_task(tid),
@@ -360,7 +360,7 @@ class SchedulerPage(ctk.CTkFrame):
 
         recurring_count = sum(1 for task in self._tasks if task.get("recurring"))
         self.timeline_summary.configure(
-            text=f"{len(self._tasks)} ta task • {recurring_count} ta takroriy"
+            text=f"{len(self._tasks)} ta task | {recurring_count} ta takroriy"
         )
 
         for task in self._tasks[:6]:

@@ -309,7 +309,6 @@ class MikasaApp(ctk.CTk):
                 corner_radius=Sizing.RADIUS_PILL,
                 border_width=1,
                 border_color=Colors.BORDER,
-                bg_color=Colors.BG_DARKEST,
             )
             self.version_badge.pack(side="left", padx=(0, 10))
             self.version_label = ctk.CTkLabel(

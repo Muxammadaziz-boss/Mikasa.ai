@@ -174,10 +174,9 @@ class ChatPage(ctk.CTkFrame):
             chip = ctk.CTkFrame(
                 info_row,
                 fg_color=Colors.GLASS_BG,
-                corner_radius=999,
+                corner_radius=Sizing.PILL,
                 border_width=1,
                 border_color=Colors.GLASS_BORDER,
-                bg_color=Colors.BG_CARD,
             )
             chip.pack(side="left", padx=4)
             chip_img = get_vector_icon(icon_name, size=12, color=Colors.TEXT_SECONDARY, fallback="circle")
@@ -214,7 +213,7 @@ class ChatPage(ctk.CTkFrame):
                 text=suggestion,
                 icon=icon_name,
                 font=Fonts.SMALL,
-                corner_radius=999,
+                corner_radius=Sizing.PILL,
                 height=34,
                 command=lambda s=suggestion: self._send_suggestion(s),
             )
@@ -230,7 +229,7 @@ class ChatPage(ctk.CTkFrame):
         self.attachment_bar = ctk.CTkFrame(
             parent,
             fg_color=Colors.BG_CARD,
-            corner_radius=12,
+            corner_radius=Sizing.RADIUS_BUTTON,
             border_width=1,
             border_color=Colors.BORDER,
             height=34,
@@ -465,7 +464,7 @@ class ChatPage(ctk.CTkFrame):
         """Biriktirilgan fayl nishonini ko'rsatish"""
         filename = os.path.basename(file_path)
         ext = os.path.splitext(filename)[1].lower()
-        icon = "🖼️" if ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp") else "📄"
+        icon_name = "image" if ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp") else "file"
 
         try:
             size_bytes = os.path.getsize(file_path)
@@ -478,8 +477,12 @@ class ChatPage(ctk.CTkFrame):
         except Exception:
             size_str = ""
 
-        disp_text = f"{icon} {filename}" + (f" ({size_str})" if size_str else "")
-        self.attachment_label.configure(text=disp_text)
+        disp_text = f"  {filename}" + (f" ({size_str})" if size_str else "")
+        v_img = get_vector_icon(icon_name, size=14, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="file")
+        if v_img:
+            self.attachment_label.configure(image=v_img, compound="left", text=disp_text)
+        else:
+            self.attachment_label.configure(image=None, text=disp_text)
         self.attachment_bar.pack(fill="x", pady=(0, 4), before=self.input_frame)
 
     def _remove_attached_file(self):
@@ -487,6 +490,8 @@ class ChatPage(ctk.CTkFrame):
         self._attached_file = None
         if hasattr(self, "attachment_bar") and self.attachment_bar.winfo_ismapped():
             self.attachment_bar.pack_forget()
+        if hasattr(self, "attachment_label"):
+            self.attachment_label.configure(image=None, text="")
         self.attach_btn.configure(
             fg_color=Colors.GLASS_BG,
             hover_color=Colors.GLASS_BG_HOVER,
