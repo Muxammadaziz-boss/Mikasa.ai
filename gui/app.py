@@ -16,7 +16,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import NavItem, StatusBadge
+from gui.components import NavItem, StatusBadge, LoadingSkeleton
 from gui.backend import BackendBridge
 
 # Versiyani bitta joydan olish
@@ -34,6 +34,12 @@ class MikasaApp(ctk.CTk):
 
         self._current_page = None
         self._pages = {}
+        self._nav_state = "IDLE"
+        self._lazy_nav_job = None
+        self._clock_job = None
+        self._stats_job = None
+        self._page_loading_skeleton = None
+        self._pending_page_states = {}
         self._compact_mode = False
         self._ui_theme = "dark"
         self._color_theme = "blue"
@@ -53,6 +59,10 @@ class MikasaApp(ctk.CTk):
         self.title(f"MIKASA AI v{VERSION}")
         self.configure(fg_color=Colors.BG_DARK)
         self._apply_window_mode()
+
+        # Global hotkeys: Ctrl+K orqali qidiruv
+        self.bind("<Control-k>", lambda e: self._on_global_search())
+        self.bind("<Control-K>", lambda e: self._on_global_search())
 
         # UI qurish
         self._build_shell()
@@ -160,10 +170,12 @@ class MikasaApp(ctk.CTk):
         self._build_statusbar()
         self._build_layout()
         self._build_sidebar()
-        self._init_pages()
+        if page_states:
+            self._pending_page_states = dict(page_states)
+        self._init_pages(initial_page=page_id)
         if page_states:
             self._restore_page_states(page_states)
-        self.navigate_to(page_id)
+        self.navigate_to(page_id, sync=True)
         self._restore_runtime_state()
 
     def _rebuild_shell(self):
@@ -171,6 +183,20 @@ class MikasaApp(ctk.CTk):
         page_states = self._capture_page_states()
         self._current_page = None
         self._is_rebuilding_shell = True
+
+        if self._lazy_nav_job:
+            try:
+                self.after_cancel(self._lazy_nav_job)
+            except Exception:
+                pass
+            self._lazy_nav_job = None
+
+        if self._page_loading_skeleton:
+            try:
+                self._page_loading_skeleton.destroy()
+            except Exception:
+                pass
+            self._page_loading_skeleton = None
 
         # O'chiriladigan widgetlarga focus tushib qolmasligi uchun
         self.focused_widget_before_widthdraw = None
@@ -528,74 +554,185 @@ class MikasaApp(ctk.CTk):
         )
         self.tts_label.pack(side="right", padx=16)
 
-    # ========== SAHIFALAR ==========
+    # ========== SAHIFALAR & LAZY NAVIGATSIYA ==========
 
-    def _init_pages(self):
-        """Barcha sahifalarni yaratish"""
-        from gui.pages.dashboard import DashboardPage
-        from gui.pages.voice import VoicePage
-        from gui.pages.chat import ChatPage
-        from gui.pages.commands import CommandsPage
-        from gui.pages.memory import MemoryPage
-        from gui.pages.scheduler import SchedulerPage
-        from gui.pages.plugins import PluginsPage
-        from gui.pages.settings import SettingsPage
-
-        page_classes = {
-            "dashboard": DashboardPage,
-            "voice": VoicePage,
-            "chat": ChatPage,
-            "commands": CommandsPage,
-            "memory": MemoryPage,
-            "scheduler": SchedulerPage,
-            "plugins": PluginsPage,
-            "settings": SettingsPage,
+    def _get_page_class(self, page_id):
+        page_registry = {
+            "dashboard": ("gui.pages.dashboard", "DashboardPage"),
+            "voice": ("gui.pages.voice", "VoicePage"),
+            "chat": ("gui.pages.chat", "ChatPage"),
+            "commands": ("gui.pages.commands", "CommandsPage"),
+            "memory": ("gui.pages.memory", "MemoryPage"),
+            "scheduler": ("gui.pages.scheduler", "SchedulerPage"),
+            "plugins": ("gui.pages.plugins", "PluginsPage"),
+            "settings": ("gui.pages.settings", "SettingsPage"),
         }
+        return page_registry.get(page_id)
 
-        for page_id, page_class in page_classes.items():
+    def _init_pages(self, initial_page="dashboard"):
+        """Dastlabki sahifani yuklash (Lazy loading — qolgan sahifalar talab bo'lganda yaratiladi)"""
+        self._get_or_create_page(initial_page)
+
+    def _get_or_create_page(self, page_id):
+        """Sahifani keshdan olish yoki birinchi marta yaratish (Lazy loading)"""
+        if page_id in self._pages:
+            return self._pages[page_id]
+
+        entry = self._get_page_class(page_id)
+        if not entry:
+            logger.warning(f"Noma'lum sahifa identifikatori: {page_id}")
+            return None
+
+        module_name, class_name = entry
+        try:
+            import importlib
+            module = importlib.import_module(module_name)
+            page_class = getattr(module, class_name)
             page = page_class(self.content_frame, app=self)
             self._pages[page_id] = page
 
-    def navigate_to(self, page_id):
-        """Sahifaga o'tish"""
-        if page_id == self._current_page:
+            # Agar saqlangan holat bo'lsa tiklash
+            if page_id in self._pending_page_states:
+                state = self._pending_page_states.pop(page_id)
+                if hasattr(page, "import_ui_state"):
+                    try:
+                        page.import_ui_state(state)
+                    except Exception as err:
+                        logger.error(f"UI holatini tiklashda xatolik ({page_id}): {err}")
+
+            return page
+        except Exception as e:
+            logger.error(f"Sahifani yaratishda xatolik ({page_id}): {e}", exc_info=True)
+            return None
+
+    def _on_global_search(self):
+        """Ctrl + K orqali global qidiruv (Buyruqlar sahifasiga o'tib qidiruv inputiga fokus beradi)"""
+        self.navigate_to("commands")
+        def _focus():
+            page = self._pages.get("commands")
+            if page and hasattr(page, "focus_search"):
+                page.focus_search()
+        self.after(50, _focus)
+
+    def navigate_to(self, page_id, sync=False):
+        """
+        Sahifaga o'tish (State Machine + Lazy Load + Zero-Freeze)
+        IDLE -> LOADING -> READY / ERROR
+        """
+        if page_id == self._current_page and self._nav_state == "READY":
             return
 
-        # Avvalgi sahifani yashirish
-        if self._current_page and self._current_page in self._pages:
-            self._pages[self._current_page].pack_forget()
-
-        # Yangi sahifani ko'rsatish
-        if page_id in self._pages:
-            self._pages[page_id].pack(fill="both", expand=True)
-
-            # on_show callback — sahifa ko'rsatilganda
-            if hasattr(self._pages[page_id], "on_show"):
-                self._pages[page_id].on_show()
-
-        # Nav aktivligini yangilash
+        # 1. Tezkor vizual aks-sado (<10ms): sidebar nav va titlebar
         for nav_id, nav_item in self._nav_items.items():
             nav_item.set_active(nav_id == page_id)
 
-        self._current_page = page_id
         self.page_label.configure(text=self._page_title(page_id))
         self.user_label.configure(text=f"User: {self._get_user_name()}")
+
+        # 2. Bekor qilinmagan oldingi lazy nav jobini to'xtatish
+        if self._lazy_nav_job:
+            try:
+                self.after_cancel(self._lazy_nav_job)
+            except Exception:
+                pass
+            self._lazy_nav_job = None
+
+        # 3. Oldingi sahifani yashirish
+        if self._current_page and self._current_page in self._pages:
+            try:
+                self._pages[self._current_page].pack_forget()
+            except Exception:
+                pass
+
+        # 4. Keshda mavjud bo'lsa — darhol ko'rsatish
+        if page_id in self._pages:
+            if self._page_loading_skeleton:
+                self._page_loading_skeleton.pack_forget()
+
+            page = self._pages[page_id]
+            page.pack(fill="both", expand=True)
+
+            if hasattr(page, "on_show"):
+                try:
+                    page.on_show()
+                except Exception as e:
+                    logger.error(f"on_show da xatolik ({page_id}): {e}")
+
+            self._current_page = page_id
+            self._nav_state = "READY"
+            return
+
+        # 5. Keshda yo'q bo'lsa — Loading Skeleton ko'rsatish
+        self._nav_state = "LOADING"
+        if not self._page_loading_skeleton:
+            self._page_loading_skeleton = LoadingSkeleton(
+                self.content_frame,
+                title=f"{self._page_title(page_id)} yuklanmoqda...",
+                rows=4,
+            )
+        else:
+            self._page_loading_skeleton.set_title(f"{self._page_title(page_id)} yuklanmoqda...")
+
+        self._page_loading_skeleton.pack(fill="both", expand=True)
+
+        if sync:
+            self._finish_lazy_navigation(page_id)
+        else:
+            # UI chizib olishi uchun 16ms kechiktirish
+            self._lazy_nav_job = self.after(16, lambda pid=page_id: self._finish_lazy_navigation(pid))
+
+    def _finish_lazy_navigation(self, page_id):
+        """Lazy yuklashni yakunlash va sahifani chiqarish"""
+        self._lazy_nav_job = None
+        try:
+            page = self._get_or_create_page(page_id)
+
+            if self._page_loading_skeleton:
+                self._page_loading_skeleton.pack_forget()
+
+            if page:
+                page.pack(fill="both", expand=True)
+                if hasattr(page, "on_show"):
+                    try:
+                        page.on_show()
+                    except Exception as e:
+                        logger.error(f"on_show da xatolik ({page_id}): {e}")
+
+                self._current_page = page_id
+                self._nav_state = "READY"
+            else:
+                self._nav_state = "ERROR"
+        except Exception as e:
+            self._nav_state = "ERROR"
+            if self._page_loading_skeleton:
+                self._page_loading_skeleton.pack_forget()
+            logger.error(f"Lazy navigatsiyada xatolik ({page_id}): {e}", exc_info=True)
 
     # ========== YANGILANISHLAR ==========
 
     def _update_clock(self):
         """Soatni har soniyada yangilash"""
-        now = datetime.datetime.now()
-        self.clock_label.configure(text=now.strftime("%H:%M:%S"))
-        self.after(1000, self._update_clock)
+        try:
+            if not self.winfo_exists():
+                return
+            now = datetime.datetime.now()
+            if hasattr(self, "clock_label") and self.clock_label.winfo_exists():
+                self.clock_label.configure(text=now.strftime("%H:%M:%S"))
+        except Exception:
+            pass
+        self._clock_job = self.after(1000, self._update_clock)
 
     def _update_system_stats(self):
         """Tizim ma'lumotlarini har 3 soniyada yangilash"""
         try:
+            if not self.winfo_exists():
+                return
             cpu = psutil.cpu_percent(interval=0)
             ram = psutil.virtual_memory().percent
-            self.cpu_label.configure(text=f"CPU: {cpu:.0f}%")
-            self.ram_label.configure(text=f"RAM: {ram:.0f}%")
+            if hasattr(self, "cpu_label") and self.cpu_label.winfo_exists():
+                self.cpu_label.configure(text=f"CPU: {cpu:.0f}%")
+            if hasattr(self, "ram_label") and self.ram_label.winfo_exists():
+                self.ram_label.configure(text=f"RAM: {ram:.0f}%")
 
             # Rang o'zgartirish
             cpu_color = (
@@ -608,14 +745,16 @@ class MikasaApp(ctk.CTk):
                 if ram < 70
                 else (Colors.WARNING if ram < 90 else Colors.DANGER)
             )
-            self.cpu_label.configure(text_color=cpu_color)
-            self.ram_label.configure(text_color=ram_color)
-            if self.api_label is not None:
+            if hasattr(self, "cpu_label") and self.cpu_label.winfo_exists():
+                self.cpu_label.configure(text_color=cpu_color)
+            if hasattr(self, "ram_label") and self.ram_label.winfo_exists():
+                self.ram_label.configure(text_color=ram_color)
+            if self.api_label is not None and self.api_label.winfo_exists():
                 self.api_label.configure(text_color=Colors.TEXT_MUTED)
         except Exception:
             pass
 
-        self.after(3000, self._update_system_stats)
+        self._stats_job = self.after(3000, self._update_system_stats)
 
     def set_status(self, status, text=None):
         """Global holatni o'zgartirish"""
@@ -653,6 +792,15 @@ class MikasaApp(ctk.CTk):
     def _on_closing(self):
         """Dasturni yopish — resurslarni tozalash"""
         try:
+            for timer_attr in ["_lazy_nav_job", "_clock_job", "_stats_job"]:
+                job = getattr(self, timer_attr, None)
+                if job:
+                    try:
+                        self.after_cancel(job)
+                    except Exception:
+                        pass
+                    setattr(self, timer_attr, None)
+
             self._remember_window_geometry()
             try:
                 from config import set_config

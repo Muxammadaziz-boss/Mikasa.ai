@@ -616,3 +616,6 @@ def get_vector_icon(
         **kwargs,
     )
 
+
+IconEngine = VectorIconEngine
+

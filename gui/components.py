@@ -1348,10 +1348,87 @@ class EmptyState(ctk.CTkFrame):
             Button(self, text=action_label, variant="secondary", height=34, command=action_cmd).pack(pady=(0, 10))
 
 
-class SearchBar(ctk.CTkFrame):
-    """Qidiruv maydoni"""
+class LoadingSkeleton(ctk.CTkFrame):
+    """
+    Mikasa AI Ultra-Lightweight Loading Skeleton.
+    Shows calm placeholder cards/bars while heavy content loads lazily.
+    Zero fake-blur, zero CPU lag, safe timer cancellation.
+    """
 
-    def __init__(self, master, placeholder="Qidirish...", **kwargs):
+    def __init__(self, master, rows=4, title="Yuklanmoqda...", **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+
+        self._is_active = True
+        self._pulse_job = None
+
+        # Header skeleton
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(20, 16))
+
+        sparkle_img = get_vector_icon("sparkles", size=18, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
+        if sparkle_img:
+            self._icon_lbl = ctk.CTkLabel(header, image=sparkle_img, text="")
+            self._icon_lbl.pack(side="left", padx=(0, 10))
+
+        self.title_label = ctk.CTkLabel(
+            header,
+            text=title,
+            font=Fonts.HEADING_3,
+            text_color=Colors.TEXT_MUTED,
+            anchor="w",
+        )
+        self.title_label.pack(side="left")
+
+        # Skeleton cards container
+        self.cards_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.cards_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        self._cards = []
+        for i in range(rows):
+            card = ctk.CTkFrame(
+                self.cards_frame,
+                fg_color=Colors.BG_CARD,
+                corner_radius=Sizing.CARD,
+                border_width=1,
+                border_color=Colors.BORDER_SUBTLE,
+                height=84,
+            )
+            card.pack(fill="x", pady=5)
+            card.pack_propagate(False)
+
+            inner = ctk.CTkFrame(card, fg_color="transparent")
+            inner.pack(fill="both", expand=True, padx=16, pady=12)
+
+            top_bar = ctk.CTkFrame(inner, fg_color=Colors.BG_INPUT, corner_radius=4, height=14, width=160 + (i * 40) % 120)
+            top_bar.pack(anchor="w", pady=(0, 8))
+            top_bar.pack_propagate(False)
+
+            sub_bar = ctk.CTkFrame(inner, fg_color=Colors.BG_INPUT, corner_radius=4, height=10, width=280)
+            sub_bar.pack(anchor="w")
+            sub_bar.pack_propagate(False)
+
+            self._cards.append((card, top_bar, sub_bar))
+
+    def set_title(self, title: str):
+        """Update skeleton header title"""
+        if hasattr(self, "title_label") and self.title_label.winfo_exists():
+            self.title_label.configure(text=title)
+
+    def destroy(self):
+        self._is_active = False
+        if self._pulse_job:
+            try:
+                self.after_cancel(self._pulse_job)
+            except Exception:
+                pass
+            self._pulse_job = None
+        super().destroy()
+
+
+class SearchBar(ctk.CTkFrame):
+    """Qidiruv maydoni — Debounced va hotkey badge bilan"""
+
+    def __init__(self, master, placeholder="Qidirish...", shortcut="Ctrl + K", **kwargs):
         super().__init__(
             master,
             fg_color=Colors.BG_INPUT,
@@ -1375,7 +1452,25 @@ class SearchBar(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
             placeholder_text_color=Colors.TEXT_MUTED,
         )
-        self.entry.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        self.entry.pack(side="left", fill="both", expand=True, padx=(0, 8))
+
+        if shortcut:
+            self.shortcut_badge = ctk.CTkFrame(
+                self,
+                fg_color=Colors.BG_PANEL,
+                corner_radius=Sizing.SMALL,
+                border_width=1,
+                border_color=Colors.BORDER,
+            )
+            self.shortcut_badge.pack(side="right", padx=(0, 8), pady=6)
+            ctk.CTkLabel(
+                self.shortcut_badge,
+                text=shortcut,
+                font=Fonts.TINY,
+                text_color=Colors.TEXT_MUTED,
+            ).pack(padx=6, pady=2)
+        else:
+            self.shortcut_badge = None
 
     def clear(self):
         """Qidiruv maydonini tozalash"""
