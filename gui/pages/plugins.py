@@ -6,7 +6,8 @@ import os
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts
-from gui.components import EmptyState, GlassCard, InfoChip, PageHero, SecondaryButton
+from gui.icons import get_vector_icon
+from gui.components import Card, EmptyState, GlassCard, InfoChip, PageHero, SecondaryButton
 
 
 class PluginsPage(ctk.CTkFrame):
@@ -26,13 +27,13 @@ class PluginsPage(ctk.CTkFrame):
             self,
             title="Plugin markazi",
             subtitle="JSON va Python plugin'larni ko'ring, yoqing va yangi template yarating.",
-            icon="🔌",
+            icon="plugins",
             accent_color=Colors.INFO,
             chips=[
-                ("JSON + Python", "🧩", Colors.GLASS_BG, Colors.TEXT_SECONDARY),
+                ("JSON + Python", "plugins", Colors.GLASS_BG, Colors.TEXT_SECONDARY),
                 (
                     "Qayta ishga tushganda faollashadi",
-                    "♻️",
+                    "refresh",
                     Colors.GLASS_BG,
                     Colors.TEXT_SECONDARY,
                 ),
@@ -43,7 +44,7 @@ class PluginsPage(ctk.CTkFrame):
         self.plugin_count_chip = InfoChip(
             self.hero.actions,
             text="0 ta plugin",
-            icon="📦",
+            icon="plugins",
             fg_color=Colors.INFO_SOFT,
             text_color=Colors.INFO,
         )
@@ -52,10 +53,11 @@ class PluginsPage(ctk.CTkFrame):
         SecondaryButton(
             self.hero.actions,
             text="Papkani ochish",
-            icon="📁",
+            icon="folder",
             corner_radius=999,
             command=self._open_plugins_folder,
         ).pack(anchor="e")
+
 
         self.scroll = ctk.CTkScrollableFrame(
             self,
@@ -67,7 +69,7 @@ class PluginsPage(ctk.CTkFrame):
 
         self._build_plugin_info()
 
-        self.installed_card = GlassCard(
+        self.installed_card = Card(
             self.scroll,
             title="O'rnatilgan pluginlar",
             subtitle="Faol va nofaol pluginlar statusi shu yerda ko'rinadi.",
@@ -83,7 +85,7 @@ class PluginsPage(ctk.CTkFrame):
         self._build_templates()
 
     def _build_plugin_info(self):
-        info_card = GlassCard(
+        info_card = Card(
             self.scroll,
             title="Plugin tizimi",
             subtitle="Plugin'lar `plugins/` papkasida saqlanadi va dastur ishga tushganda yuklanadi.",
@@ -96,14 +98,18 @@ class PluginsPage(ctk.CTkFrame):
         )
         path_row.pack(fill="x", pady=(0, 12))
 
+        p_icon = get_vector_icon("folder", size=14, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED, fallback="folder")
+        if p_icon:
+            ctk.CTkLabel(path_row, image=p_icon, text="").pack(side="left", padx=(12, 6))
+
         ctk.CTkLabel(
             path_row,
-            text=f"📁 {self.plugins_dir}",
+            text=str(self.plugins_dir),
             font=Fonts.SMALL,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
             justify="left",
-        ).pack(fill="x", padx=12, pady=10)
+        ).pack(side="left", fill="x", expand=True, pady=10)
 
         chip_row = ctk.CTkFrame(info_card.content, fg_color="transparent")
         chip_row.pack(fill="x")
@@ -111,21 +117,21 @@ class PluginsPage(ctk.CTkFrame):
         InfoChip(
             chip_row,
             text="JSON plugin",
-            icon="📄",
+            icon="folder",
             fg_color=Colors.GLASS_BG,
             text_color=Colors.INFO,
         ).pack(side="left", padx=(0, 8))
         InfoChip(
             chip_row,
             text="Python plugin",
-            icon="🐍",
+            icon="commands",
             fg_color=Colors.GLASS_BG,
             text_color=Colors.SUCCESS,
         ).pack(side="left", padx=(0, 8))
         InfoChip(
             chip_row,
             text="Explorer orqali boshqarish",
-            icon="🗂️",
+            icon="folder",
             fg_color=Colors.GLASS_BG,
             text_color=Colors.TEXT_SECONDARY,
         ).pack(side="left")
@@ -164,11 +170,12 @@ class PluginsPage(ctk.CTkFrame):
         if not plugins:
             EmptyState(
                 self.installed_list,
-                icon="🧩",
+                icon="plugins",
                 title="Plugin topilmadi",
                 description="Template yaratib boshlang yoki plugin fayllarni plugins papkasiga joylang.",
             ).pack(fill="x", pady=20)
             return
+
 
         for name, file_name, ptype, enabled, desc in sorted(
             plugins, key=lambda item: item[0]
@@ -191,9 +198,13 @@ class PluginsPage(ctk.CTkFrame):
             head = ctk.CTkFrame(info, fg_color="transparent")
             head.pack(fill="x")
 
+            p_img = get_vector_icon("plugins", size=14, color_dark=Colors.PRIMARY if enabled else Colors.TEXT_MUTED, color_light=Colors.PRIMARY if enabled else Colors.TEXT_MUTED, fallback="plugins")
+            if p_img:
+                ctk.CTkLabel(head, image=p_img, text="").pack(side="left", padx=(0, 6))
+
             ctk.CTkLabel(
                 head,
-                text=f"🔌 {name}",
+                text=str(name),
                 font=Fonts.BODY_BOLD,
                 text_color=Colors.TEXT_PRIMARY if enabled else Colors.TEXT_MUTED,
                 anchor="w",
@@ -237,7 +248,7 @@ class PluginsPage(ctk.CTkFrame):
             switch.pack(side="right", padx=(10, 0))
 
     def _build_templates(self):
-        templates_card = GlassCard(
+        templates_card = Card(
             self.scroll,
             title="Plugin template'lari",
             subtitle="Bir klik bilan boshlang'ich plugin fayllarini yaratib oling.",
@@ -247,14 +258,14 @@ class PluginsPage(ctk.CTkFrame):
 
         templates = [
             (
-                "🌐",
+                "search",
                 "Web opener",
                 "Har qanday saytni voice command bilan ochish",
                 self._create_web_template,
                 Colors.INFO,
             ),
             (
-                "🖥️",
+                "commands",
                 "System command",
                 "Windows CLI yoki script buyruqlarini chaqirish",
                 self._create_cmd_template,
@@ -262,7 +273,7 @@ class PluginsPage(ctk.CTkFrame):
             ),
         ]
 
-        for icon, name, desc, cmd, color in templates:
+        for icon_key, name, desc, cmd, color in templates:
             row = ctk.CTkFrame(
                 templates_card.content,
                 fg_color=Colors.BG_INPUT,
@@ -278,13 +289,20 @@ class PluginsPage(ctk.CTkFrame):
             left = ctk.CTkFrame(inner, fg_color="transparent")
             left.pack(side="left", fill="x", expand=True)
 
+            t_box = ctk.CTkFrame(left, fg_color="transparent")
+            t_box.pack(fill="x")
+
+            t_img = get_vector_icon(icon_key, size=14, color_dark=color, color_light=color, fallback="sparkles")
+            if t_img:
+                ctk.CTkLabel(t_box, image=t_img, text="").pack(side="left", padx=(0, 6))
+
             ctk.CTkLabel(
-                left,
-                text=f"{icon} {name}",
+                t_box,
+                text=str(name),
                 font=Fonts.BODY_BOLD,
                 text_color=Colors.TEXT_PRIMARY,
                 anchor="w",
-            ).pack(fill="x")
+            ).pack(side="left")
 
             ctk.CTkLabel(
                 left,
@@ -297,10 +315,11 @@ class PluginsPage(ctk.CTkFrame):
             SecondaryButton(
                 inner,
                 text="Yaratish",
-                icon="✨",
+                icon="sparkles",
                 corner_radius=999,
                 command=cmd,
             ).pack(side="right")
+
 
     def _open_plugins_folder(self):
         if not os.path.exists(self.plugins_dir):

@@ -6,7 +6,7 @@ import shutil
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts
-from gui.components import GlassCard, GlowButton, InfoChip, PageHero, SecondaryButton
+from gui.components import Card, GlassCard, GlowButton, InfoChip, PageHero, SecondaryButton
 
 
 def _safe_remove(path):
@@ -40,11 +40,11 @@ class SettingsPage(ctk.CTkFrame):
             self,
             title="Sozlamalar markazi",
             subtitle="Mikasa interfeysi, AI ulanishlari va ovoz parametrlarini bir joydan boshqaring.",
-            icon="⚙️",
+            icon="settings",
             accent_color=Colors.PRIMARY,
             chips=[
-                ("Real-time saqlash", "💾", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Voice bilan sinxron", "🎤", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Real-time saqlash", "check", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Voice bilan sinxron", "mic", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
             ],
         )
         self.hero.pack(fill="x", padx=20, pady=(16, 12))
@@ -52,7 +52,7 @@ class SettingsPage(ctk.CTkFrame):
         self.save_state_chip = InfoChip(
             self.hero.actions,
             text="O'zgarishlar saqlanmagan",
-            icon="📝",
+            icon="info",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
@@ -61,12 +61,12 @@ class SettingsPage(ctk.CTkFrame):
         self.save_btn = GlowButton(
             self.hero.actions,
             text="Saqlash",
-            icon="💾",
+            icon="check",
             command=self._save_settings,
         )
         self.save_btn.pack(anchor="e")
 
-        self.summary_card = GlassCard(
+        self.summary_card = Card(
             self,
             title="Joriy ko'rinish",
             subtitle="Asosiy sozlamalarning tezkor xulosasi.",
@@ -82,7 +82,7 @@ class SettingsPage(ctk.CTkFrame):
         self.summary_voice = InfoChip(
             self.summary_row,
             text="TTS: -",
-            icon="🔊",
+            icon="mic",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
@@ -91,7 +91,7 @@ class SettingsPage(ctk.CTkFrame):
         self.summary_ai = InfoChip(
             self.summary_row,
             text="AI: -",
-            icon="🤖",
+            icon="sparkles",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
@@ -100,11 +100,12 @@ class SettingsPage(ctk.CTkFrame):
         self.summary_ui = InfoChip(
             self.summary_row,
             text="UI: -",
-            icon="🎨",
+            icon="settings",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
         self.summary_ui.pack(side="left")
+
 
         self.scroll = ctk.CTkScrollableFrame(
             self,
@@ -120,7 +121,7 @@ class SettingsPage(ctk.CTkFrame):
         self._build_data_section()
 
     def _build_voice_section(self):
-        card = GlassCard(
+        card = Card(
             self.scroll,
             title="Ovoz",
             subtitle="TTS engine, model va sample rate sozlamalari.",
@@ -145,7 +146,7 @@ class SettingsPage(ctk.CTkFrame):
         )
 
     def _build_ai_section(self):
-        card = GlassCard(
+        card = Card(
             self.scroll,
             title="AI",
             subtitle="Model va API kalitlari shu yerda saqlanadi.",
@@ -167,7 +168,7 @@ class SettingsPage(ctk.CTkFrame):
         )
 
     def _build_gui_section(self):
-        card = GlassCard(
+        card = Card(
             self.scroll,
             title="Interfeys",
             subtitle="Tashqi ko'rinish va animatsiya parametrlari.",
@@ -189,7 +190,7 @@ class SettingsPage(ctk.CTkFrame):
         )
 
     def _build_data_section(self):
-        card = GlassCard(
+        card = Card(
             self.scroll,
             title="Ma'lumotlar va servis",
             subtitle="Lokal kesh, loglar va eksport amallari.",
@@ -201,15 +202,16 @@ class SettingsPage(ctk.CTkFrame):
         actions.pack(fill="x")
 
         btn_data = [
-            ("Keshni tozalash", "🗑️", self._clear_cache),
-            ("Loglarni tozalash", "📋", self._clear_logs),
-            ("Ma'lumot eksport", "📤", self._export_data),
+            ("Keshni tozalash", "trash", self._clear_cache),
+            ("Loglarni tozalash", "folder", self._clear_logs),
+            ("Ma'lumot eksport", "send", self._export_data),
         ]
 
         for i, (text, icon, command) in enumerate(btn_data):
             button = SecondaryButton(actions, text=text, icon=icon, command=command)
             button.grid(row=0, column=i, padx=4, pady=4, sticky="ew")
             actions.columnconfigure(i, weight=1)
+
 
     def _add_field(self, parent, label, default="", show=None):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -473,7 +475,7 @@ class SettingsPage(ctk.CTkFrame):
             messagebox.showerror("Saqlashda xatolik", str(exc))
 
     def _show_saved_feedback(self):
-        self.save_btn.configure(text="✅  Saqlandi", fg_color=Colors.SUCCESS)
+        self.save_btn.configure(text="Saqlandi", icon="check", fg_color=Colors.SUCCESS)
         self.save_state_chip.set_text("Saqlandi")
         self.after(
             1800,
@@ -484,10 +486,11 @@ class SettingsPage(ctk.CTkFrame):
         try:
             if self.winfo_exists() and self.save_btn.winfo_exists():
                 self.save_btn.configure(
-                    text="💾  Saqlash", fg_color=Colors.PRIMARY_DARK
+                    text="Saqlash", icon="check", fg_color=Colors.PRIMARY_DARK
                 )
         except Exception:
             pass
+
 
     def _get_config_value(self, getter, key):
         value = getter(key)

@@ -6,6 +6,8 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from gui.theme import Colors, Fonts
 from gui.components import (
+    Card,
+    ElevatedCard,
     EmptyState,
     GlassCard,
     GlowButton,
@@ -32,11 +34,11 @@ class MemoryPage(ctk.CTkFrame):
             self,
             title="Xotira markazi",
             subtitle="Profil, bilimlar bazasi va suhbat tarixini bir joydan boshqaring.",
-            icon="🧠",
+            icon="memory",
             accent_color=Colors.SECONDARY,
             chips=[
-                ("Uzoq muddatli xotira", "📚", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Suhbat bilan sinxron", "🔄", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Uzoq muddatli xotira", "folder", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Suhbat bilan sinxron", "refresh", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
             ],
         )
         self.hero.pack(fill="x", padx=20, pady=(16, 12))
@@ -44,7 +46,7 @@ class MemoryPage(ctk.CTkFrame):
         SecondaryButton(
             self.hero.actions,
             text="Eksport",
-            icon="📤",
+            icon="folder",
             command=self._export_data,
         ).pack(anchor="e")
 
@@ -53,10 +55,10 @@ class MemoryPage(ctk.CTkFrame):
 
         self._stat_widgets = []
         stats_data = [
-            ("0", "Kontekst", "💭", Colors.PRIMARY),
-            ("0", "Suhbatlar", "💬", Colors.SECONDARY),
-            ("0", "Bilimlar", "📚", Colors.SUCCESS),
-            ("Noaniq", "Profil", "👤", Colors.INFO),
+            ("0", "Kontekst", "chat", Colors.PRIMARY),
+            ("0", "Suhbatlar", "chat", Colors.SECONDARY),
+            ("0", "Bilimlar", "memory", Colors.SUCCESS),
+            ("Noaniq", "Profil", "settings", Colors.INFO),
         ]
 
         for i, (val, label, icon, color) in enumerate(stats_data):
@@ -82,9 +84,10 @@ class MemoryPage(ctk.CTkFrame):
         )
         self.tabs.pack(fill="both", expand=True, padx=20, pady=(0, 16))
 
-        tab1 = self.tabs.add("👤 Profil")
-        tab2 = self.tabs.add("📚 Bilimlar")
-        tab3 = self.tabs.add("💬 Suhbat tarixi")
+        tab1 = self.tabs.add("Profil")
+        tab2 = self.tabs.add("Bilimlar")
+        tab3 = self.tabs.add("Suhbat tarixi")
+
 
         self._build_profile_tab(tab1)
         self._build_knowledge_tab(tab2)
@@ -94,7 +97,7 @@ class MemoryPage(ctk.CTkFrame):
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
 
-        summary = GlassCard(
+        summary = ElevatedCard(
             scroll,
             title="Profil holati",
             subtitle="Mikasa sizni to'g'ri taniy olishi uchun asosiy ma'lumotlarni saqlang.",
@@ -111,7 +114,7 @@ class MemoryPage(ctk.CTkFrame):
         )
         self.profile_status.pack(fill="x")
 
-        form_card = GlassCard(
+        form_card = Card(
             scroll,
             title="Asosiy maydonlar",
             subtitle="Bu qiymatlar ovozli dialog, chat va agent xotirasida ishlatiladi.",
@@ -132,7 +135,7 @@ class MemoryPage(ctk.CTkFrame):
         self.profile_save_btn = GlowButton(
             form_card.content,
             text="Saqlash",
-            icon="💾",
+            icon="check",
             command=self._save_profile,
         )
         self.profile_save_btn.pack(anchor="e", pady=(10, 0))
@@ -149,7 +152,7 @@ class MemoryPage(ctk.CTkFrame):
             "<KeyRelease>", lambda e: self._refresh_knowledge()
         )
 
-        add_card = GlassCard(
+        add_card = Card(
             parent,
             title="Yangi bilim qo'shish",
             subtitle="Kalit va qiymat kiriting. Bu ma'lumot keyingi suhbatlarda ishlatiladi.",
@@ -186,10 +189,11 @@ class MemoryPage(ctk.CTkFrame):
         self.new_value.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         GlowButton(
-            add_row, text="Qo'shish", icon="➕", command=self._add_knowledge
+            add_row, text="Qo'shish", icon="plus", command=self._add_knowledge
         ).pack(side="right")
 
-        list_card = GlassCard(
+
+        list_card = Card(
             parent,
             title="Bilimlar ro'yxati",
             subtitle="Saqlangan bilimlar va ularning foydalanish statistikasi.",
@@ -203,7 +207,7 @@ class MemoryPage(ctk.CTkFrame):
         self._knowledge_scroll.pack(fill="both", expand=True)
 
     def _build_history_tab(self, parent):
-        intro = GlassCard(
+        intro = ElevatedCard(
             parent,
             title="Suhbat oqimi",
             subtitle="Oxirgi dialoglar shu yerda saqlanadi. Har bir yozuv context tiklash uchun ishlatiladi.",
@@ -295,12 +299,12 @@ class MemoryPage(ctk.CTkFrame):
                 pass
 
             self.profile_save_btn.configure(
-                text="✅  Saqlandi", fg_color=Colors.SUCCESS
+                text="Saqlandi", icon="check", fg_color=Colors.SUCCESS
             )
             self.after(
                 1800,
                 lambda: self.profile_save_btn.configure(
-                    text="💾  Saqlash", fg_color=Colors.PRIMARY_DARK
+                    text="Saqlash", icon="check", fg_color=Colors.PRIMARY_DARK
                 ),
             )
             if self.app and hasattr(self.app, "user_label"):
@@ -378,7 +382,7 @@ class MemoryPage(ctk.CTkFrame):
         if not rows:
             EmptyState(
                 self._knowledge_scroll,
-                icon="📚",
+                icon="memory",
                 title="Bilim topilmadi",
                 description="Yangi bilim qo'shing yoki qidiruv matnini o'zgartiring.",
             ).pack(fill="x", pady=20)
@@ -406,9 +410,13 @@ class MemoryPage(ctk.CTkFrame):
             head = ctk.CTkFrame(inner, fg_color="transparent")
             head.pack(fill="x")
 
+            key_icon = get_vector_icon("settings", size=13, color_dark=Colors.SUCCESS, color_light=Colors.SUCCESS, fallback="info")
+            if key_icon:
+                ctk.CTkLabel(head, image=key_icon, text="").pack(side="left", padx=(0, 6))
+
             ctk.CTkLabel(
                 head,
-                text=f"🔑 {key}",
+                text=str(key),
                 font=Fonts.SMALL_BOLD,
                 text_color=Colors.SUCCESS,
                 anchor="w",
@@ -454,7 +462,7 @@ class MemoryPage(ctk.CTkFrame):
         if not conversations:
             EmptyState(
                 self._history_scroll,
-                icon="💬",
+                icon="chat",
                 title="Tarix bo'sh",
                 description="Mikasa bilan suhbat boshlang. Yangi dialoglar shu yerda paydo bo'ladi.",
             ).pack(fill="x", pady=24)
@@ -465,12 +473,12 @@ class MemoryPage(ctk.CTkFrame):
             ai_text = conv.get("agent", conv.get("assistant", conv.get("output", "")))
             timestamp = conv.get("time", conv.get("timestamp", ""))
 
-            row = GlassCard(self._history_scroll, accent_color=Colors.SECONDARY)
+            row = ElevatedCard(self._history_scroll, accent_color=Colors.SECONDARY)
             row.pack(fill="x", pady=6)
 
             ctk.CTkLabel(
                 row.content,
-                text=f"👤 {user_text[:180]}",
+                text=f"Siz: {user_text[:180]}",
                 font=Fonts.SMALL_BOLD,
                 text_color=Colors.TEXT_PRIMARY,
                 anchor="w",
@@ -480,7 +488,7 @@ class MemoryPage(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 row.content,
-                text=f"🤖 {ai_text[:260]}",
+                text=f"Mikasa: {ai_text[:260]}",
                 font=Fonts.SMALL,
                 text_color=Colors.TEXT_SECONDARY,
                 anchor="w",
@@ -491,11 +499,12 @@ class MemoryPage(ctk.CTkFrame):
             if timestamp:
                 ctk.CTkLabel(
                     row.content,
-                    text=f"🕐 {str(timestamp)[:19]}",
+                    text=f"{str(timestamp)[:19]}",
                     font=Fonts.TINY,
                     text_color=Colors.TEXT_MUTED,
                     anchor="e",
                 ).pack(fill="x")
+
 
     def _update_profile_status(self):
         name = self._profile_entries["user.name"].get().strip()

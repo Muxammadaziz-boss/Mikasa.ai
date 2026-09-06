@@ -3,7 +3,31 @@
 
 import customtkinter as ctk
 from gui.theme import Colors, Fonts
-from gui.components import EmptyState, GlassButton, GlassCard, InfoChip, PageHero, SearchBar
+from gui.icons import get_vector_icon
+from gui.components import Card, EmptyState, GlassButton, GlassCard, InfoChip, PageHero, SearchBar
+
+
+CAT_COLORS = {
+    "internet": Colors.INFO,
+    "utility": Colors.SUCCESS,
+    "system": Colors.DANGER,
+    "media": Colors.SECONDARY,
+    "info": Colors.WARNING,
+    "productivity": Colors.PRIMARY,
+    "memory": Colors.SECONDARY,
+    "interaction": Colors.INFO,
+}
+
+CAT_ICONS = {
+    "internet": "search",
+    "utility": "settings",
+    "system": "commands",
+    "media": "play",
+    "info": "info",
+    "productivity": "scheduler",
+    "memory": "memory",
+    "interaction": "chat",
+}
 
 
 class CommandsPage(ctk.CTkFrame):
@@ -20,13 +44,13 @@ class CommandsPage(ctk.CTkFrame):
             self,
             title="Tool katalogi",
             subtitle="Mikasa ichidagi barcha agent tool'larni qidiring, ko'ring va bir klik bilan chatga yuboring.",
-            icon="⚡",
+            icon="commands",
             accent_color=Colors.WARNING,
             chips=[
-                ("Chat bilan ulanadi", "💬", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Chat bilan ulanadi", "chat", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
                 (
                     "Kategoriya bo'yicha qidiruv",
-                    "🔎",
+                    "search",
                     Colors.BG_PANEL,
                     Colors.TEXT_SECONDARY,
                 ),
@@ -37,11 +61,12 @@ class CommandsPage(ctk.CTkFrame):
         self.tool_count_chip = InfoChip(
             self.hero.actions,
             text="0 ta tool",
-            icon="🧰",
+            icon="commands",
             fg_color=Colors.WARNING_SOFT,
             text_color=Colors.WARNING,
         )
         self.tool_count_chip.pack(anchor="e")
+
 
         self.search = SearchBar(
             self, placeholder="Tool, kategoriya yoki tavsif qidiring..."
@@ -49,7 +74,7 @@ class CommandsPage(ctk.CTkFrame):
         self.search.pack(fill="x", padx=20, pady=(0, 12))
         self.search.entry.bind("<KeyRelease>", self._on_search)
 
-        self.summary_card = GlassCard(
+        self.summary_card = Card(
             self,
             title="Kategoriya ko'rinishi",
             subtitle="Qaysi yo'nalishdagi tool'lar ko'proq ekanini shu yerdan ko'rasiz.",
@@ -101,27 +126,6 @@ class CommandsPage(ctk.CTkFrame):
 
             registry = get_registry()
             if hasattr(registry, "_tools"):
-                cat_colors = {
-                    "internet": Colors.INFO,
-                    "utility": Colors.SUCCESS,
-                    "system": Colors.DANGER,
-                    "media": Colors.SECONDARY,
-                    "info": Colors.WARNING,
-                    "productivity": Colors.PRIMARY,
-                    "memory": Colors.SECONDARY,
-                    "interaction": Colors.INFO,
-                }
-                cat_icons = {
-                    "internet": "🌐",
-                    "utility": "🔧",
-                    "system": "💻",
-                    "media": "🎵",
-                    "info": "🌤️",
-                    "productivity": "📌",
-                    "memory": "📚",
-                    "interaction": "💬",
-                }
-
                 for name, tool in registry._tools.items():
                     category = getattr(tool, "category", "utility")
                     description = (
@@ -132,8 +136,8 @@ class CommandsPage(ctk.CTkFrame):
                             "name": name,
                             "description": description[:120],
                             "category": category,
-                            "icon": cat_icons.get(category, "⚡"),
-                            "color": cat_colors.get(category, Colors.TEXT_MUTED),
+                            "icon": CAT_ICONS.get(category, "commands"),
+                            "color": CAT_COLORS.get(category, Colors.TEXT_MUTED),
                         }
                     )
         except Exception:
@@ -147,7 +151,7 @@ class CommandsPage(ctk.CTkFrame):
         if not tools:
             EmptyState(
                 self.summary_row,
-                icon="🧩",
+                icon="commands",
                 title="Kategoriya yo'q",
                 description="Tool yuklangach shu yerda kategoriyalar ko'rinadi.",
             ).pack(fill="x", pady=10)
@@ -162,7 +166,7 @@ class CommandsPage(ctk.CTkFrame):
             InfoChip(
                 self.summary_row,
                 text=f"{category.title()}: {count}",
-                icon="🏷️",
+                icon=CAT_ICONS.get(category, "commands"),
                 fg_color=Colors.BG_PANEL,
                 text_color=Colors.TEXT_SECONDARY,
             ).pack(side="left", padx=(0, 8), pady=(0, 4))
@@ -179,11 +183,12 @@ class CommandsPage(ctk.CTkFrame):
         if not tools:
             EmptyState(
                 self.grid_frame,
-                icon="🔎",
+                icon="search",
                 title="Mos tool topilmadi",
                 description="Qidiruvni qisqartirib ko'ring yoki boshqa kategoriya nomini yozing.",
             ).pack(fill="x", pady=20)
             return
+
 
         columns = 3
         for i in range(columns):
@@ -220,12 +225,9 @@ class CommandsPage(ctk.CTkFrame):
         icon_box.pack(side="left")
         icon_box.pack_propagate(False)
 
-        ctk.CTkLabel(
-            icon_box,
-            text=tool["icon"],
-            font=(Fonts.FAMILY, 20),
-            text_color=tool["color"],
-        ).pack(expand=True)
+        v_img = get_vector_icon(tool["icon"], size=20, color_dark=tool["color"], color_light=tool["color"], fallback="commands")
+        if v_img:
+            ctk.CTkLabel(icon_box, image=v_img, text="").pack(expand=True)
 
         name_wrap = ctk.CTkFrame(top, fg_color="transparent")
         name_wrap.pack(side="left", fill="x", expand=True, padx=(10, 0))
@@ -241,6 +243,7 @@ class CommandsPage(ctk.CTkFrame):
         InfoChip(
             name_wrap,
             text=tool["category"],
+            icon=tool["icon"],
             fg_color=Colors.BG_PANEL,
             text_color=tool["color"],
         ).pack(anchor="w", pady=(6, 0))
@@ -268,7 +271,7 @@ class CommandsPage(ctk.CTkFrame):
         GlassButton(
             footer,
             text="Foydalanish",
-            icon="→",
+            icon="send",
             font=Fonts.SMALL,
             height=28,
             width=90,

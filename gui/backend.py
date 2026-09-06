@@ -7,6 +7,9 @@ import logging
 import datetime
 import re
 import queue
+import customtkinter as ctk
+from gui.theme import Colors, Fonts
+from gui.icons import get_vector_icon
 from gui.components import show_toast
 
 logger = logging.getLogger(__name__)
@@ -453,13 +456,20 @@ class BackendBridge:
                 inner.pack(side="left", fill="x", expand=True, padx=(6, 12), pady=5)
 
                 # Activity type ga mos rangdagi ikonka
-                ctk.CTkLabel(
-                    inner,
-                    text="●",
-                    font=(Fonts.FAMILY, 9),
-                    text_color=act_color,
-                    width=14,
-                ).pack(side="left", padx=(0, 6))
+                act_icon_img = get_vector_icon("circle", size=8, color=act_color, fallback="circle")
+                if act_icon_img:
+                    ctk.CTkLabel(
+                        inner,
+                        text="",
+                        image=act_icon_img,
+                        width=14,
+                    ).pack(side="left", padx=(0, 6))
+                else:
+                    ctk.CTkLabel(
+                        inner,
+                        text="",
+                        width=14,
+                    ).pack(side="left", padx=(0, 6))
 
                 ctk.CTkLabel(
                     inner,

@@ -5,7 +5,7 @@
 import customtkinter as ctk
 import datetime
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import GlassButton, GlassCard, GlowButton, StatWidget, StatusBadge
+from gui.components import Card, GlassButton, GlassCard, GlowButton, StatWidget, StatusBadge
 from gui.icons import get_vector_icon
 
 
@@ -111,13 +111,15 @@ class DashboardPage(ctk.CTkFrame):
         status_row.pack(fill="x")
 
         # Yashil nuqta
-        ctk.CTkLabel(
-            status_row,
-            text="●",
-            font=(Fonts.FAMILY, 10),
-            text_color=Colors.SUCCESS,
-            width=14,
-        ).pack(side="left")
+        dot_icon = get_vector_icon("circle", size=8, color_dark=Colors.SUCCESS, color_light=Colors.SUCCESS, fallback="circle")
+        if dot_icon:
+            ctk.CTkLabel(
+                status_row,
+                image=dot_icon,
+                text="",
+                width=14,
+            ).pack(side="left")
+
 
         self.orb_status = ctk.CTkLabel(
             status_row,
@@ -291,7 +293,7 @@ class DashboardPage(ctk.CTkFrame):
 
     def _build_activity(self):
         """Oxirgi faoliyat ro'yxati — Apple uslubidagi toza timeline"""
-        activity_card = GlassCard(self.scroll, title="Oxirgi faoliyat")
+        activity_card = Card(self.scroll, title="Oxirgi faoliyat")
         activity_card.pack(fill="x", pady=(0, 20))
 
         self._activity_list = ctk.CTkFrame(
@@ -303,10 +305,10 @@ class DashboardPage(ctk.CTkFrame):
 
         row = ctk.CTkFrame(
             self._activity_list,
-            fg_color=Colors.GLASS_BG,
+            fg_color=Colors.BG_PANEL,
             corner_radius=Sizing.RADIUS_CARD_SM,
             border_width=1,
-            border_color=Colors.GLASS_BORDER,
+            border_color=Colors.BORDER_ELEVATED,
         )
         row.pack(fill="x", pady=3)
 

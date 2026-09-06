@@ -5,7 +5,7 @@ import datetime
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts
-from gui.components import EmptyState, GlassButton, GlassCard, GlowButton, InfoChip, PageHero
+from gui.components import Card, ElevatedCard, EmptyState, GlassButton, GlassCard, GlowButton, InfoChip, PageHero
 
 
 class SchedulerPage(ctk.CTkFrame):
@@ -23,11 +23,11 @@ class SchedulerPage(ctk.CTkFrame):
             self,
             title="Planner va eslatmalar",
             subtitle="Vaqtli vazifa, buyruq yoki takroriy reminder qo'shing. Mikasa kerakli vaqtda ishga tushiradi.",
-            icon="⏰",
+            icon="scheduler",
             accent_color=Colors.WARNING,
             chips=[
-                ("Reminder", "📌", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Takroriy task", "🔁", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Reminder", "commands", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
+                ("Takroriy task", "refresh", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
             ],
         )
         self.hero.pack(fill="x", padx=20, pady=(16, 12))
@@ -35,7 +35,7 @@ class SchedulerPage(ctk.CTkFrame):
         self.task_count_chip = InfoChip(
             self.hero.actions,
             text="0 ta aktiv vazifa",
-            icon="📋",
+            icon="scheduler",
             fg_color=Colors.WARNING_SOFT,
             text_color=Colors.WARNING,
         )
@@ -44,11 +44,12 @@ class SchedulerPage(ctk.CTkFrame):
         self.next_task_chip = InfoChip(
             self.hero.actions,
             text="Keyingi task yo'q",
-            icon="🕐",
+            icon="info",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
         self.next_task_chip.pack(anchor="e")
+
 
         content = ctk.CTkFrame(self, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=20, pady=(0, 16))
@@ -67,7 +68,7 @@ class SchedulerPage(ctk.CTkFrame):
         self._build_timeline(right)
 
     def _build_add_form(self, parent):
-        form_card = GlassCard(
+        form_card = Card(
             parent,
             title="Yangi vazifa",
             subtitle="Daqiqalarda vaqt kiriting. Takroriy rejim uchun interval ham shu qiymatdan olinadi.",
@@ -131,7 +132,7 @@ class SchedulerPage(ctk.CTkFrame):
 
         self.task_type = ctk.CTkSegmentedButton(
             form_card.content,
-            values=["📌 Eslatma", "⚡ Buyruq", "🔁 Takroriy"],
+            values=["Eslatma", "Buyruq", "Takroriy"],
             font=Fonts.SMALL,
             fg_color=Colors.BG_INPUT,
             selected_color=Colors.PRIMARY_DARK,
@@ -140,18 +141,19 @@ class SchedulerPage(ctk.CTkFrame):
             unselected_hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
         )
-        self.task_type.set("📌 Eslatma")
+        self.task_type.set("Eslatma")
         self.task_type.pack(fill="x", pady=(0, 12))
 
         GlowButton(
             form_card.content,
             text="Jadvalga qo'shish",
-            icon="➕",
+            icon="plus",
             command=self._add_task,
         ).pack(anchor="e")
 
+
     def _build_task_list(self, parent):
-        list_card = GlassCard(
+        list_card = Card(
             parent,
             title="Aktiv vazifalar",
             subtitle="Yaqinlashayotgan task'lar shu yerda ko'rinadi. Istalgan vaqtda bekor qilish mumkin.",
@@ -165,7 +167,7 @@ class SchedulerPage(ctk.CTkFrame):
         self.tasks_scroll.pack(fill="both", expand=True)
 
     def _build_timeline(self, parent):
-        timeline_card = GlassCard(
+        timeline_card = ElevatedCard(
             parent,
             title="Bugungi timeline",
             subtitle="Jonli vaqt va eng yaqin task holati.",
@@ -253,7 +255,7 @@ class SchedulerPage(ctk.CTkFrame):
         if not self._tasks:
             EmptyState(
                 self.tasks_scroll,
-                icon="📭",
+                icon="scheduler",
                 title="Task yo'q",
                 description="Yuqoridagi formadan yangi vazifa qo'shing. Mikasa uni kerakli vaqtda eslatadi.",
             ).pack(fill="x", pady=24)
@@ -316,7 +318,7 @@ class SchedulerPage(ctk.CTkFrame):
             GlassButton(
                 footer,
                 text="Bekor qilish",
-                icon="🗑️",
+                icon="trash",
                 font=Fonts.SMALL,
                 fg_color=Colors.GLASS_BG,
                 hover_color=Colors.DANGER_SOFT,
@@ -350,7 +352,7 @@ class SchedulerPage(ctk.CTkFrame):
             self.timeline_summary.configure(text="Bugun uchun reja yo'q")
             EmptyState(
                 self.timeline_list,
-                icon="🗓️",
+                icon="scheduler",
                 title="Timeline bo'sh",
                 description="Yangi task qo'shilgach shu yerda vaqt bo'yicha ko'rinadi.",
             ).pack(fill="x", pady=16)
@@ -382,12 +384,13 @@ class SchedulerPage(ctk.CTkFrame):
                 font=Fonts.SMALL,
                 text_color=Colors.TEXT_PRIMARY,
                 anchor="w",
+                wraplength=200,
             ).pack(side="left", fill="x", expand=True)
 
     def _task_badge(self, task):
         if task.get("recurring"):
-            return "🔁 Takroriy"
-        return "📌 Eslatma" if task.get("type") == "reminder" else "⚡ Buyruq"
+            return "Takroriy"
+        return "Eslatma" if task.get("type") == "reminder" else "Buyruq"
 
     def _task_color(self, task):
         if task.get("recurring"):

@@ -11,14 +11,14 @@ class Colors:
 
     _DARK = {
         # Sirtlar ierarxiyasi (80% Minimal Solid Surfaces)
-        "BG_DARKEST": "#08080C",
-        "BG_DARK": "#0D0D14",
-        "BG_SURFACE": "#12121A",
-        "BG_CARD": "#161622",
-        "BG_PANEL": "#1C1C2A",
-        "BG_HOVER": "#242436",
-        "BG_ACTIVE": "#2A2A40",
-        "BG_INPUT": "#14141E",
+        "BG_DARKEST": "#08080C",       # Base canvas / statusbar
+        "BG_DARK": "#0D0D14",          # Page backgrounds, scroll areas
+        "BG_SURFACE": "#12121A",       # Inner content surface
+        "BG_CARD": "#161622",          # Solid 80% Card default
+        "BG_PANEL": "#1C1C2A",         # Elevated card, dropdown, tool items
+        "BG_HOVER": "#242436",         # Hover state
+        "BG_ACTIVE": "#2E2E44",        # Active state / pressed
+        "BG_INPUT": "#13131D",         # Textbox, input fields
         "BG_SOFT": "#1A1A26",
         "BG_ACCENT": "#0F1E33",
         # Asosiy aksentlar
@@ -47,8 +47,12 @@ class Colors:
         "TEXT_SECONDARY": "#C5C9D6",
         "TEXT_MUTED": "#868B9D",
         "TEXT_ACCENT": "#0A84FF",
-        # Hoshiyalar
-        "BORDER": "#232334",
+        # Hoshiyalar (Border discipline)
+        "BORDER_SUBTLE": "#1A1A28",    # Primary surface subtle 1px border
+        "BORDER": "#232334",           # Standard card border
+        "BORDER_ELEVATED": "#2C2C3E",  # Elevated surface border
+        "BORDER_GLASS": "#383850",     # Glass-like surface border
+        "BORDER_HERO": "#409CFF",      # Hero accent border
         "BORDER_HOVER": "#3C3C54",
         "BORDER_ACCENT": "#0A84FF",
         # Sidebar va status
@@ -57,28 +61,31 @@ class Colors:
         "SIDEBAR_HOVER": "#14141E",
         "SIDEBAR_INDICATOR": "#0A84FF",
         "STATUSBAR_BG": "#08080C",
-        # 20% Glassmorphism / Accent tokens (Floating, Hero, Modals)
+        # 20% Glassmorphism / Accent tokens (Glass-like opaque surface: Hero, Floating, Modals)
         "GLASS_BG": "#1E1E2E",
         "GLASS_BG_HOVER": "#2A2A3E",
-        "GLASS_BORDER": "#383850",
+        "GLASS_BORDER": "#383850",     # Slightly stronger glass highlight border
         "GLASS_BORDER_HOVER": "#525274",
         "GLASS_TEXT": "#FFFFFF",
         "GLASS_HERO_BG": "#0A84FF",
         "GLASS_HERO_HOVER": "#0071E3",
         "GLASS_HERO_BORDER": "#409CFF",
+        # Overlay / Modal tokens
+        "OVERLAY_BG": "#161622",
+        "OVERLAY_BACKDROP": "#050508",
     }
 
     _LIGHT = {
         # Sirtlar ierarxiyasi (Light theme)
-        "BG_DARKEST": "#F1F5F9",
-        "BG_DARK": "#F8FAFC",
-        "BG_SURFACE": "#FFFFFF",
-        "BG_CARD": "#FFFFFF",
-        "BG_PANEL": "#E2E8F0",
-        "BG_HOVER": "#EDF2F7",
-        "BG_ACTIVE": "#E2E8F0",
-        "BG_INPUT": "#F1F5F9",
-        "BG_SOFT": "#F8FAFC",
+        "BG_DARKEST": "#F1F5F9",       # Base canvas (Slate 100)
+        "BG_DARK": "#F8FAFC",          # Page background (Slate 50)
+        "BG_SURFACE": "#FFFFFF",       # Content surface (Pure white)
+        "BG_CARD": "#FFFFFF",          # 80% Solid Card (Pure white)
+        "BG_PANEL": "#F1F5F9",         # Elevated panel (Slate 100)
+        "BG_HOVER": "#E2E8F0",         # Hover state (Slate 200)
+        "BG_ACTIVE": "#CBD5E1",        # Active state (Slate 300 - clearly visible!)
+        "BG_INPUT": "#F8FAFC",         # Textbox, input fields (Slate 50)
+        "BG_SOFT": "#F1F5F9",
         "BG_ACCENT": "#E0F2FE",
         # Asosiy aksentlar
         "PRIMARY": "#0284C7",
@@ -102,13 +109,17 @@ class Colors:
         "INFO": "#2563EB",
         "INFO_SOFT": "#DBEAFE",
         # Matn ranglari (High contrast)
-        "TEXT_PRIMARY": "#0F172A",
-        "TEXT_SECONDARY": "#475569",
-        "TEXT_MUTED": "#64748B",
+        "TEXT_PRIMARY": "#0F172A",     # Slate 900
+        "TEXT_SECONDARY": "#334155",   # Slate 700
+        "TEXT_MUTED": "#64748B",       # Slate 500
         "TEXT_ACCENT": "#0284C7",
-        # Hoshiyalar
-        "BORDER": "#CBD5E1",
-        "BORDER_HOVER": "#94A3B8",
+        # Hoshiyalar (Border discipline - softer, non-aggressive in light mode)
+        "BORDER_SUBTLE": "#EEF2F6",    # Subtle border for primary cards
+        "BORDER": "#E2E8F0",           # Standard border (Slate 200)
+        "BORDER_ELEVATED": "#CBD5E1",  # Elevated border (Slate 300)
+        "BORDER_GLASS": "#CBD8E7",     # Glass-like surface border
+        "BORDER_HERO": "#38BDF8",      # Hero accent border
+        "BORDER_HOVER": "#94A3B8",     # Border hover (Slate 400)
         "BORDER_ACCENT": "#0284C7",
         # Sidebar va status
         "SIDEBAR_BG": "#F1F5F9",
@@ -116,15 +127,18 @@ class Colors:
         "SIDEBAR_HOVER": "#E8EFF7",
         "SIDEBAR_INDICATOR": "#0284C7",
         "STATUSBAR_BG": "#F1F5F9",
-        # Glassmorphism tokens
-        "GLASS_BG": "#E8EFF7",
-        "GLASS_BG_HOVER": "#DCE7F3",
-        "GLASS_BORDER": "#CBD8E7",
+        # 20% Glassmorphism / Accent tokens (Glass-like opaque surface - crisp ice-tinted white, NOT dingy grey!)
+        "GLASS_BG": "#F0F6FD",         # Crisp cool ice-tint
+        "GLASS_BG_HOVER": "#E2EDF9",
+        "GLASS_BORDER": "#CBD8E7",     # Clean, cool-tinted border
         "GLASS_BORDER_HOVER": "#A6BCD4",
         "GLASS_TEXT": "#0F172A",
         "GLASS_HERO_BG": "#0284C7",
         "GLASS_HERO_HOVER": "#0369A1",
         "GLASS_HERO_BORDER": "#38BDF8",
+        # Overlay / Modal tokens
+        "OVERLAY_BG": "#FFFFFF",
+        "OVERLAY_BACKDROP": "#0F172A",
     }
 
     CURRENT_THEME = "dark"
@@ -163,7 +177,11 @@ class Colors:
     TEXT_SECONDARY = _DARK["TEXT_SECONDARY"]
     TEXT_MUTED = _DARK["TEXT_MUTED"]
     TEXT_ACCENT = _DARK["TEXT_ACCENT"]
+    BORDER_SUBTLE = _DARK["BORDER_SUBTLE"]
     BORDER = _DARK["BORDER"]
+    BORDER_ELEVATED = _DARK["BORDER_ELEVATED"]
+    BORDER_GLASS = _DARK["BORDER_GLASS"]
+    BORDER_HERO = _DARK["BORDER_HERO"]
     BORDER_HOVER = _DARK["BORDER_HOVER"]
     BORDER_ACCENT = _DARK["BORDER_ACCENT"]
     SIDEBAR_BG = _DARK["SIDEBAR_BG"]
@@ -179,6 +197,8 @@ class Colors:
     GLASS_HERO_BG = _DARK["GLASS_HERO_BG"]
     GLASS_HERO_HOVER = _DARK["GLASS_HERO_HOVER"]
     GLASS_HERO_BORDER = _DARK["GLASS_HERO_BORDER"]
+    OVERLAY_BG = _DARK["OVERLAY_BG"]
+    OVERLAY_BACKDROP = _DARK["OVERLAY_BACKDROP"]
 
     @classmethod
     def apply_theme(cls, theme="dark"):
@@ -193,6 +213,47 @@ class Colors:
             setattr(cls, key, value)
 
         cls.CURRENT_THEME = requested
+
+
+class Surfaces:
+    """
+    Mikasa AI 7-Tier Semantic Surface Architecture
+    
+    1. BASE: Window root canvas, deepest background container (BG_DARKEST)
+    2. SURFACE: Page canvas, scroll frame background (BG_DARK / BG_SURFACE)
+    3. CARD: 80% Solid container for general UI, forms, tables, lists (BG_CARD)
+    4. ELEVATED: Elevated panels, grouped tool cards, sidebars, dropdowns (BG_PANEL)
+    5. GLASS: 20% Glass-like opaque tinted surface for floating panels, heroes, pinned status (GLASS_BG)
+    6. HERO: Prominent accent banner with highlight borders (GLASS_HERO_BG / BG_ACCENT)
+    7. OVERLAY: Modals, dialogs, popovers, and toast notifications (OVERLAY_BG)
+    """
+    BASE = "base"
+    SURFACE = "surface"
+    CARD = "card"
+    ELEVATED = "elevated"
+    GLASS = "glass"
+    HERO = "hero"
+    OVERLAY = "overlay"
+
+    @classmethod
+    def get_tokens(cls, tier: str) -> dict:
+        """Returns standard {fg_color, border_color, border_width} for a given surface tier"""
+        t = tier.lower()
+        if t == cls.BASE:
+            return {"fg_color": Colors.BG_DARKEST, "border_color": Colors.BORDER_SUBTLE, "border_width": 0}
+        elif t == cls.SURFACE:
+            return {"fg_color": Colors.BG_DARK, "border_color": Colors.BORDER_SUBTLE, "border_width": 0}
+        elif t == cls.CARD:
+            return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1}
+        elif t == cls.ELEVATED:
+            return {"fg_color": Colors.BG_PANEL, "border_color": Colors.BORDER_ELEVATED, "border_width": 1}
+        elif t == cls.GLASS:
+            return {"fg_color": Colors.GLASS_BG, "border_color": Colors.GLASS_BORDER, "border_width": 1}
+        elif t == cls.HERO:
+            return {"fg_color": Colors.GLASS_HERO_BG, "border_color": Colors.GLASS_HERO_BORDER, "border_width": 1}
+        elif t == cls.OVERLAY:
+            return {"fg_color": Colors.OVERLAY_BG, "border_color": Colors.BORDER_ELEVATED, "border_width": 1}
+        return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1}
 
 
 class Fonts:
@@ -351,9 +412,9 @@ class Icons:
     SETTINGS = "settings"
 
     # Holatlar
-    ONLINE = "●"
-    OFFLINE = "●"
-    BUSY = "●"
+    ONLINE = "circle"
+    OFFLINE = "circle"
+    BUSY = "circle"
 
     # Harakatlar
     PLAY = "play"

@@ -105,42 +105,42 @@ class TestV6ChatUI(unittest.TestCase):
         page = ChatPage(self.root)
 
         # 1. Chapdagi skripka tugmasi mavjudligi va aniq ko'rinishi (transparent emas)
-        self.assertEqual(page.attach_btn.cget("text"), "📎")
+        self.assertEqual(page.attach_btn._icon_name, "attach")
         self.assertNotEqual(page.attach_btn.cget("fg_color"), "transparent")
         self.assertEqual(page.attach_btn.cget("border_width"), 1)
 
-        # 2. Boshlang'ich holat: matn yo'q -> mikrofon icon (🎙️) va aniq ko'rinishi
-        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        # 2. Boshlang'ich holat: matn yo'q -> mikrofon icon (mic) va aniq ko'rinishi
+        self.assertEqual(page.action_btn._icon_name, "mic")
         self.assertEqual(page._action_mode, "mic")
         self.assertNotEqual(page.action_btn.cget("fg_color"), "transparent")
         self.assertEqual(page.action_btn.cget("border_width"), 1)
         self.assertEqual(page.action_btn.cget("text_color"), Colors.PRIMARY)
 
-        # 3. Matn yozilganda -> avtomatik yuborish (➤) tugmasiga aylanadi
+        # 3. Matn yozilganda -> avtomatik yuborish (send) tugmasiga aylanadi
         page._input_var.set("Salom Mikasa")
-        self.assertEqual(page.action_btn.cget("text"), "➤")
+        self.assertEqual(page.action_btn._icon_name, "send")
         self.assertEqual(page._action_mode, "send")
         self.assertEqual(page.action_btn.cget("fg_color"), Colors.GLASS_HERO_BG)
         self.assertEqual(page.action_btn.cget("border_width"), 1)
         self.assertEqual(page.action_btn.cget("border_color"), Colors.GLASS_HERO_BORDER)
 
-        # 4. Matn o'chirilganda -> avtomatik mikrofon (🎙️) ga qaytadi
+        # 4. Matn o'chirilganda -> avtomatik mikrofon (mic) ga qaytadi
         page._input_var.set("")
-        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        self.assertEqual(page.action_btn._icon_name, "mic")
         self.assertEqual(page._action_mode, "mic")
         self.assertEqual(page.action_btn.cget("border_width"), 1)
 
-        # 5. Fayl biriktirilganda -> tugma ➤ ga aylanadi va attach_btn active bo'ladi
+        # 5. Fayl biriktirilganda -> tugma send ga aylanadi va attach_btn active bo'ladi
         page._attached_file = "test_document.pdf"
         page.attach_btn.configure(fg_color=Colors.PRIMARY)
         page._update_action_button()
-        self.assertEqual(page.action_btn.cget("text"), "➤")
+        self.assertEqual(page.action_btn._icon_name, "send")
         self.assertEqual(page._action_mode, "send")
         self.assertEqual(page.attach_btn.cget("fg_color"), Colors.PRIMARY)
 
-        # 6. Fayl olib tashlanganda -> tugma yana 🎙️ ga qaytadi
+        # 6. Fayl olib tashlanganda -> tugma yana mic ga qaytadi
         page._remove_attached_file()
-        self.assertEqual(page.action_btn.cget("text"), "🎙️")
+        self.assertEqual(page.action_btn._icon_name, "mic")
         self.assertEqual(page._action_mode, "mic")
         self.assertNotEqual(page.attach_btn.cget("fg_color"), Colors.PRIMARY)
 
@@ -152,7 +152,8 @@ class TestV6ChatUI(unittest.TestCase):
         self.assertEqual(btn.cget("fg_color"), Colors.GLASS_BG)
         self.assertEqual(btn.cget("border_width"), 1)
         self.assertEqual(btn.cget("border_color"), Colors.GLASS_BORDER)
-        self.assertEqual(btn.cget("text"), "⚡  Test")
+        self.assertEqual(btn.cget("text"), "Test")
+        self.assertEqual(btn._icon_name, "commands")
 
         # Centering tekshiruvi: _text_label CTkCanvas burchaklarini to'sib qo'ymasligi va markazda turishi kerak
         if hasattr(btn, "_text_label") and btn._text_label is not None:
@@ -175,11 +176,11 @@ class TestV6ChatUI(unittest.TestCase):
         self.assertEqual(cbtn.cget("corner_radius"), 19)
         self.assertEqual(cbtn.cget("width"), 38)
         self.assertEqual(cbtn.cget("height"), 38)
-        self.assertEqual(cbtn.cget("text"), "📎")
+        self.assertEqual(cbtn._icon_name, "attach")
 
         # Configure orqali icon o'zgarishi
         cbtn.configure(icon="🎙️")
-        self.assertEqual(cbtn.cget("text"), "🎙️")
+        self.assertEqual(cbtn._icon_name, "mic")
         cbtn.destroy()
 
     def test_glow_and_secondary_button_glass_inheritance(self):

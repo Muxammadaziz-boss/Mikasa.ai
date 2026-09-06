@@ -6,18 +6,34 @@
 import math
 import tkinter as tk
 import customtkinter as ctk
-from gui.theme import Colors, Fonts, Sizing
+from gui.theme import Colors, Fonts, Sizing, Surfaces
 from gui.icons import VectorIconEngine, get_vector_icon
 
 
 # ==========================================
-# 1. CARD ARCHITECTURE (80% Solid / 20% Glass)
+# 1. SEMANTIC SURFACE HIERARCHY (80% Solid / 20% Glass)
 # ==========================================
 
-class Card(ctk.CTkFrame):
+class Surface(ctk.CTkFrame):
+    """
+    Mikasa AI Semantic Surface Base.
+    Barcha darajadagi konteyner va sirtlar uchun poydevor klass.
+    """
+    def __init__(self, master, tier=Surfaces.CARD, **kwargs):
+        tokens = Surfaces.get_tokens(tier)
+        kwargs.setdefault("fg_color", tokens["fg_color"])
+        kwargs.setdefault("border_color", tokens["border_color"])
+        kwargs.setdefault("border_width", tokens["border_width"])
+        super().__init__(master, **kwargs)
+        self._surface_tier = tier
+
+
+class Card(Surface):
     """
     Mikasa AI 80% Solid Surface Card.
-    Toza, shovqinsiz va yuqori kontrastli minimal karta konteyneri.
+    
+    Standard container for general UI: forms, lists, tables, data rows, and settings.
+    Solid, distraction-free container with subtle hairline border (Colors.BORDER).
     """
 
     def __init__(
@@ -36,14 +52,12 @@ class Card(ctk.CTkFrame):
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = Colors.BG_DARK
 
-        super().__init__(
-            master,
-            fg_color=kwargs.pop("fg_color", Colors.BG_CARD),
-            corner_radius=kwargs.pop("corner_radius", Sizing.CARD_RADIUS),
-            border_width=kwargs.pop("border_width", 1),
-            border_color=kwargs.pop("border_color", Colors.BORDER),
-            **kwargs,
-        )
+        kwargs.setdefault("corner_radius", Sizing.CARD_RADIUS)
+        kwargs.setdefault("border_width", 1)
+        kwargs.setdefault("border_color", Colors.BORDER)
+        kwargs.setdefault("fg_color", Colors.BG_CARD)
+
+        super().__init__(master, tier=Surfaces.CARD, **kwargs)
 
         self._padding = padding
         self._accent_color = accent_color
@@ -56,13 +70,9 @@ class Card(ctk.CTkFrame):
             title_row.pack(fill="x")
 
             if title:
-                ctk.CTkLabel(
-                    title_row,
-                    text="●",
-                    font=(Fonts.FAMILY, 8),
-                    text_color=accent_color,
-                    width=12,
-                ).pack(side="left")
+                dot_img = get_vector_icon("circle", size=7, color_dark=accent_color, color_light=accent_color, fallback="circle")
+                if dot_img:
+                    ctk.CTkLabel(title_row, image=dot_img, text="", width=12).pack(side="left")
 
                 self.title_label = ctk.CTkLabel(
                     title_row,
@@ -91,7 +101,7 @@ class Card(ctk.CTkFrame):
             # Hairline 1px divider
             ctk.CTkFrame(
                 self,
-                fg_color=Colors.BORDER,
+                fg_color=Colors.BORDER_SUBTLE,
                 height=1,
             ).pack(fill="x", padx=padding, pady=(4, padding))
 
@@ -99,15 +109,52 @@ class Card(ctk.CTkFrame):
         self.content.pack(fill="both", expand=True, padx=padding, pady=(0, padding))
 
 
+class ElevatedCard(Card):
+    """
+    Mikasa AI Solid Elevated Surface Card.
+    
+    Qatlamli, balandroq sirtlar uchun: yon panellar, asbob kartalari,
+    dropdown ro'yxatlar va ikkinchi darajali guruhlar.
+    """
+
+    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
+        kwargs.setdefault("fg_color", Colors.BG_PANEL)
+        kwargs.setdefault("border_color", Colors.BORDER_ELEVATED)
+        kwargs.setdefault("border_width", 1)
+        super().__init__(
+            master,
+            title=title,
+            subtitle=subtitle,
+            padding=padding,
+            accent_color=accent_color,
+            **kwargs,
+        )
+        self._surface_tier = Surfaces.ELEVATED
+
+
 class GlassCard(Card):
     """
-    Mikasa AI 20% Glass Surface Card.
-    Faqat suzuvchi panellar, hero elementlar va muhim holat kartalari uchun.
+    Mikasa AI 20% Glass-like Opaque Surface Card.
+    
+    NOTE ON ARCHITECTURE & RENDERING:
+    CustomTkinter desktop widgets do not support real-time dynamic GPU backdrop blur
+    or native window-level alpha compositing without crippling per-frame overhead.
+    This component provides a "Glass-like opaque surface" — an engineered opaque tinted
+    surface (Colors.GLASS_BG) framed by a crisp highlight border (Colors.GLASS_BORDER).
+    It delivers the sleek visual tier of Apple/Linear glassmorphic design with ZERO fake-blur lag.
+    
+    STRICT 80/20 USAGE RULE:
+    Reserved strictly for:
+      - Hero banners and prominent headers
+      - Floating control / status panels
+      - Modals and prominent accent cards
+    Do NOT use for ordinary buttons, lists, tables, or settings rows.
     """
 
     def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
         kwargs.setdefault("fg_color", Colors.GLASS_BG)
         kwargs.setdefault("border_color", Colors.GLASS_BORDER)
+        kwargs.setdefault("border_width", 1)
         super().__init__(
             master,
             title=title,
@@ -116,14 +163,20 @@ class GlassCard(Card):
             accent_color=accent_color,
             **kwargs,
         )
+        self._surface_tier = Surfaces.GLASS
 
 
-class ElevatedCard(Card):
-    """Qatlamli yoki hover bo'ladigan sirtlar uchun karta"""
+class OverlayCard(Card):
+    """
+    Mikasa AI Overlay Surface Card.
+    
+    Modal dialoglar, qalqib chiquvchi oynalar va toast bildirishnomalar uchun sirt.
+    """
 
     def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
-        kwargs.setdefault("fg_color", Colors.BG_PANEL)
-        kwargs.setdefault("border_color", Colors.BORDER)
+        kwargs.setdefault("fg_color", Colors.OVERLAY_BG)
+        kwargs.setdefault("border_color", Colors.BORDER_ELEVATED)
+        kwargs.setdefault("border_width", 1)
         super().__init__(
             master,
             title=title,
@@ -132,6 +185,7 @@ class ElevatedCard(Card):
             accent_color=accent_color,
             **kwargs,
         )
+        self._surface_tier = Surfaces.OVERLAY
 
 
 class PageHero(GlassCard):
@@ -142,11 +196,14 @@ class PageHero(GlassCard):
         master,
         title="",
         subtitle="",
-        icon="✦",
+        icon="sparkles",
         accent_color=None,
         chips=None,
         **kwargs,
     ):
+        accent = accent_color or Colors.PRIMARY
+        kwargs.setdefault("border_color", Colors.GLASS_HERO_BORDER if accent == Colors.PRIMARY else accent)
+        kwargs.setdefault("border_width", 1)
         super().__init__(
             master,
             title="",
@@ -155,8 +212,7 @@ class PageHero(GlassCard):
             padding=Sizing.SPACING_16,
             **kwargs,
         )
-
-        accent = accent_color or Colors.PRIMARY
+        self._surface_tier = Surfaces.HERO
 
         header_row = ctk.CTkFrame(self.content, fg_color="transparent")
         header_row.pack(fill="x")
@@ -174,17 +230,10 @@ class PageHero(GlassCard):
         icon_frame.pack(side="left")
         icon_frame.pack_propagate(False)
 
-        # Check for vector icon or symbol
-        v_img = get_vector_icon(icon, size=20, color_dark=accent, color_light=accent)
-        if v_img:
-            ctk.CTkLabel(icon_frame, image=v_img, text="").pack(expand=True)
-        else:
-            ctk.CTkLabel(
-                icon_frame,
-                text=icon,
-                font=(Fonts.FAMILY, 16),
-                text_color=accent,
-            ).pack(expand=True)
+        # Pure vector icon rendering with automatic fallback
+        v_img = get_vector_icon(icon, size=20, color_dark=accent, color_light=accent, fallback="sparkles")
+        self.icon_label = ctk.CTkLabel(icon_frame, image=v_img, text="")
+        self.icon_label.pack(expand=True)
 
         text_block = ctk.CTkFrame(header_row, fg_color="transparent")
         text_block.pack(side="left", padx=12, fill="x", expand=True)
@@ -220,7 +269,8 @@ class PageHero(GlassCard):
             for text, chip_icon, fg, tc in chips:
                 self.add_chip(chip_row, text, chip_icon, fg, tc)
 
-    def add_chip(self, parent, text, icon="•", fg=None, text_color=None):
+    def add_chip(self, parent, text, icon="circle", fg=None, text_color=None):
+        tc = text_color or Colors.TEXT_SECONDARY
         chip = ctk.CTkFrame(
             parent,
             fg_color=fg or Colors.BG_CARD,
@@ -234,13 +284,19 @@ class PageHero(GlassCard):
         inner = ctk.CTkFrame(chip, fg_color="transparent")
         inner.pack(padx=10, pady=3)
 
+        if icon:
+            v_img = get_vector_icon(icon, size=12, color_dark=tc, color_light=tc, fallback="circle")
+            if v_img:
+                ctk.CTkLabel(inner, image=v_img, text="").pack(side="left", padx=(0, 5))
+
         ctk.CTkLabel(
             inner,
-            text=f"{icon}  {text}",
+            text=text,
             font=Fonts.TINY,
-            text_color=text_color or Colors.TEXT_SECONDARY,
-        ).pack()
+            text_color=tc,
+        ).pack(side="left")
         return chip
+
 
 
 # ==========================================
@@ -297,11 +353,11 @@ class Button(ctk.CTkButton):
                     size=icon_size,
                     color_dark=text_color if text_color != "transparent" else "#FFFFFF",
                     color_light=text_color if text_color != "transparent" else "#0F172A",
+                    fallback="sparkles",
                 )
                 if v_img:
                     image = v_img
-                else:
-                    final_text = f"{icon}  {text}" if text else icon
+
 
         btn_kwargs = {}
         if width is not None:
@@ -325,6 +381,10 @@ class Button(ctk.CTkButton):
             **kwargs,
         )
 
+        from gui.icons import VectorIconEngine
+        self._raw_icon = icon if isinstance(icon, str) else ""
+        self._icon_name = VectorIconEngine.resolve_icon_name(icon, fallback="sparkles") if isinstance(icon, str) else ""
+        self._icon_size = icon_size
         self._variant = variant
         self._tooltip_text = tooltip
 
@@ -392,14 +452,17 @@ class Button(ctk.CTkButton):
             self._hover_border = kwargs.pop("border_hover_color")
         if "icon" in kwargs:
             icon = kwargs.pop("icon")
-            v_img = get_vector_icon(icon, size=16, color_dark="#FFFFFF", color_light="#0F172A") if isinstance(icon, str) else None
+            from gui.icons import VectorIconEngine
+            self._raw_icon = icon if isinstance(icon, str) else ""
+            self._icon_name = VectorIconEngine.resolve_icon_name(icon, fallback="sparkles") if isinstance(icon, str) else ""
+            v_img = (
+                get_vector_icon(icon, size=getattr(self, "_icon_size", 16), color_dark="#FFFFFF", color_light="#0F172A", fallback="sparkles")
+                if isinstance(icon, str)
+                else None
+            )
             if v_img:
                 kwargs["image"] = v_img
-            else:
-                if "text" in kwargs:
-                    kwargs["text"] = f"{icon}  {kwargs['text']}" if kwargs["text"] else icon
-                else:
-                    kwargs["text"] = icon
+
         if "variant" in kwargs:
             kwargs.pop("variant")
         super().configure(require_redraw=require_redraw, **kwargs)
@@ -469,7 +532,7 @@ class IconButton(GlassButton):
 
 class CircleIconButton(GlassButton):
     """
-    Doiraviy ikonka tugmasi (📎, 🎙️, ➤, ✕).
+    Doiraviy ikonka tugmasi.
     CustomTkinter scaled_minsize ustunlarini 0 ga tushirib,
     1:1 aniq doira geometriyasini kafolatlaydi.
     """
@@ -658,10 +721,6 @@ class AppleSiriOrb(ctk.CTkFrame):
         except Exception:
             return
 
-        if st in ("idle", "offline"):
-            self.canvas.create_text(cx, cy, text="✦", font=("Segoe UI", 16, "bold"), fill="#0A2540")
-        elif st == "speaking":
-            self.canvas.create_text(cx, cy, text="✦", font=("Segoe UI", 16, "bold"), fill="#2E0854")
 
     def _animate(self):
         if not self._is_active:
@@ -735,9 +794,13 @@ class MessageBubble(ctk.CTkFrame):
             meta_row = ctk.CTkFrame(container, fg_color="transparent")
             meta_row.pack(fill="x", pady=(0, 4))
 
+            sparkle_img = get_vector_icon("sparkles", size=13, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="sparkles")
+            if sparkle_img:
+                ctk.CTkLabel(meta_row, image=sparkle_img, text="").pack(side="left", padx=(0, 5))
+
             ctk.CTkLabel(
                 meta_row,
-                text="✦ Mikasa",
+                text="Mikasa",
                 font=Fonts.SMALL_BOLD,
                 text_color=Colors.PRIMARY,
                 anchor="w",
@@ -753,10 +816,10 @@ class MessageBubble(ctk.CTkFrame):
                 ).pack(side="right", padx=(6, 0))
 
             # Copy button
-            c_img = get_vector_icon("copy", size=13, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED)
+            c_img = get_vector_icon("copy", size=13, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED, fallback="copy")
             copy_btn = ctk.CTkButton(
                 meta_row,
-                text="" if c_img else "❐",
+                text="",
                 image=c_img,
                 width=18,
                 height=18,
@@ -802,11 +865,13 @@ class MessageBubble(ctk.CTkFrame):
 class TypingBubble(ctk.CTkFrame):
     """Animatsiyali 3-nuqta yozish indikatori"""
 
-    def __init__(self, master, prefix="✦ Mikasa o'ylamoqda", **kwargs):
+    def __init__(self, master, prefix="Mikasa o'ylamoqda", **kwargs):
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = Colors.BG_SURFACE
 
         prefix_text = kwargs.pop("prefix", prefix)
+        if prefix_text.startswith("✦ "):
+            prefix_text = prefix_text[2:]
         self._prefix = prefix_text
 
         super().__init__(
@@ -820,6 +885,10 @@ class TypingBubble(ctk.CTkFrame):
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.pack(padx=14, pady=10)
+
+        sparkle_img = get_vector_icon("sparkles", size=13, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="sparkles")
+        if sparkle_img:
+            ctk.CTkLabel(inner, image=sparkle_img, text="").pack(side="left", padx=(0, 6))
 
         self.text_label = ctk.CTkLabel(
             inner,
@@ -855,6 +924,8 @@ class TypingBubble(ctk.CTkFrame):
             pass
 
     def set_prefix(self, prefix: str):
+        if prefix.startswith("✦ "):
+            prefix = prefix[2:]
         self._prefix = prefix
         self.text_label.configure(text=prefix)
 
@@ -875,7 +946,7 @@ class TypingBubble(ctk.CTkFrame):
 class AgentStepIndicator(ctk.CTkFrame):
     """
     ReAct Agent qadamlari vizualizatori.
-    ✓ Bajarildi (muted) | ◌ Faol (electric blue/violet) | ○ Kutilmoqda | ✕ Xato
+    check Bajarildi | sparkles O'ylash | commands Asbob | close Xato | circle Kutilmoqda
     """
 
     def __init__(self, master, **kwargs):
@@ -890,18 +961,21 @@ class AgentStepIndicator(ctk.CTkFrame):
         inner.pack(fill="x", padx=10, pady=6)
 
         badge_colors = {
-            "completed": (Colors.SUCCESS_SOFT, Colors.SUCCESS, "✓"),
-            "thought": (Colors.PRIMARY_SOFT, Colors.PRIMARY, "✦"),
-            "tool": (Colors.INFO_SOFT, Colors.INFO, "⚡"),
-            "error": (Colors.DANGER_SOFT, Colors.DANGER, "✕"),
-            "pending": (Colors.BG_INPUT, Colors.TEXT_MUTED, "○"),
+            "completed": (Colors.SUCCESS_SOFT, Colors.SUCCESS, "check"),
+            "thought": (Colors.PRIMARY_SOFT, Colors.PRIMARY, "sparkles"),
+            "tool": (Colors.INFO_SOFT, Colors.INFO, "commands"),
+            "error": (Colors.DANGER_SOFT, Colors.DANGER, "close"),
+            "pending": (Colors.BG_INPUT, Colors.TEXT_MUTED, "circle"),
         }
-        bg, tc, sym = badge_colors.get(step_type, (Colors.BG_INPUT, Colors.TEXT_MUTED, "•"))
+        bg, tc, icon_name = badge_colors.get(step_type, (Colors.BG_INPUT, Colors.TEXT_MUTED, "circle"))
 
         icon_frame = ctk.CTkFrame(inner, fg_color=bg, corner_radius=10, width=20, height=20)
         icon_frame.pack(side="left")
         icon_frame.pack_propagate(False)
-        ctk.CTkLabel(icon_frame, text=sym, font=(Fonts.FAMILY, 10, "bold"), text_color=tc).pack(expand=True)
+        v_img = get_vector_icon(icon_name, size=11, color_dark=tc, color_light=tc, fallback="circle")
+        if v_img:
+            ctk.CTkLabel(icon_frame, image=v_img, text="").pack(expand=True)
+
 
         text_block = ctk.CTkFrame(inner, fg_color="transparent")
         text_block.pack(side="left", padx=8, fill="x", expand=True)
@@ -991,11 +1065,9 @@ class NavItem(ctk.CTkFrame):
     def _update_icon(self):
         c_dark = Colors.PRIMARY if self._active else Colors.TEXT_SECONDARY
         c_light = Colors.PRIMARY if self._active else Colors.TEXT_SECONDARY
-        v_img = get_vector_icon(self._icon_name, size=18, color_dark=c_dark, color_light=c_light)
-        if v_img:
-            self.icon_label.configure(image=v_img, text="")
-        else:
-            self.icon_label.configure(image=None, text=self._icon_name, text_color=c_dark, font=Fonts.NAV_ICON)
+        v_img = get_vector_icon(self._icon_name, size=18, color_dark=c_dark, color_light=c_light, fallback="circle")
+        self.icon_label.configure(image=v_img, text="")
+
 
     def _on_click(self, event=None):
         if self._command:
@@ -1055,11 +1127,11 @@ class StatusBadge(ctk.CTkFrame):
         )
 
         color = self._status_color(status)
+        v_dot = get_vector_icon("circle", size=8, color_dark=color, color_light=color, fallback="circle")
         self.dot = ctk.CTkLabel(
             self,
-            text="●",
-            font=(Fonts.FAMILY, 10),
-            text_color=color,
+            image=v_dot,
+            text="",
             width=14,
         )
         self.dot.pack(side="left", padx=(10, 4), pady=4)
@@ -1077,8 +1149,10 @@ class StatusBadge(ctk.CTkFrame):
     def set_status(self, status, text=None):
         self._status = status
         color = self._status_color(status)
-        self.dot.configure(text_color=color)
+        v_dot = get_vector_icon("circle", size=8, color_dark=color, color_light=color, fallback="circle")
+        self.dot.configure(image=v_dot)
         self.label.configure(text=text or status.capitalize())
+
 
     def _status_color(self, status):
         return {
@@ -1108,11 +1182,15 @@ class InfoChip(ctk.CTkFrame):
         inner.pack(padx=10, pady=4)
 
         if icon:
-            v_img = get_vector_icon(icon, size=13, color_dark=text_color or Colors.TEXT_SECONDARY, color_light=text_color or Colors.TEXT_SECONDARY)
+            v_img = get_vector_icon(
+                icon,
+                size=13,
+                color_dark=text_color or Colors.TEXT_SECONDARY,
+                color_light=text_color or Colors.TEXT_SECONDARY,
+                fallback="info",
+            )
             if v_img:
                 ctk.CTkLabel(inner, image=v_img, text="").pack(side="left", padx=(0, 4))
-            else:
-                ctk.CTkLabel(inner, text=icon, font=(Fonts.FAMILY, 11), text_color=text_color or Colors.TEXT_SECONDARY).pack(side="left", padx=(0, 4))
 
         self.label = ctk.CTkLabel(
             inner,
@@ -1157,11 +1235,10 @@ class EmptyState(ctk.CTkFrame):
         icon_frame.pack(pady=(16, 8))
         icon_frame.pack_propagate(False)
 
-        v_img = get_vector_icon(icon, size=24, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
+        v_img = get_vector_icon(icon, size=24, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY, fallback="sparkles")
         if v_img:
             ctk.CTkLabel(icon_frame, image=v_img, text="").pack(expand=True)
-        else:
-            ctk.CTkLabel(icon_frame, text=icon, font=(Fonts.FAMILY, 20), text_color=Colors.PRIMARY).pack(expand=True)
+
 
         ctk.CTkLabel(self, text=title, font=Fonts.BODY_BOLD, text_color=Colors.TEXT_PRIMARY).pack(pady=(4, 0))
 
@@ -1193,11 +1270,8 @@ class SearchBar(ctk.CTkFrame):
         )
         self.pack_propagate(False)
 
-        s_img = get_vector_icon("search", size=16, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED)
-        if s_img:
-            ctk.CTkLabel(self, image=s_img, text="").pack(side="left", padx=(12, 6))
-        else:
-            ctk.CTkLabel(self, text="⌕", font=(Fonts.FAMILY, 14), text_color=Colors.TEXT_MUTED).pack(side="left", padx=(12, 6))
+        s_img = get_vector_icon("search", size=16, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED, fallback="search")
+        ctk.CTkLabel(self, image=s_img, text="").pack(side="left", padx=(12, 6))
 
         self.entry = ctk.CTkEntry(
             self,
@@ -1210,6 +1284,14 @@ class SearchBar(ctk.CTkFrame):
         )
         self.entry.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
+    def clear(self):
+        """Qidiruv maydonini tozalash"""
+        self.entry.delete(0, "end")
+
+    def get(self):
+        """Kiritilgan matnni olish"""
+        return self.entry.get()
+
 
 class StatWidget(Card):
     """Statistika vidjeti"""
@@ -1221,11 +1303,11 @@ class StatWidget(Card):
         top = ctk.CTkFrame(self.content, fg_color="transparent")
         top.pack(fill="x")
 
-        v_img = get_vector_icon(icon, size=18, color_dark=color, color_light=color)
-        if v_img:
-            ctk.CTkLabel(top, image=v_img, text="").pack(side="left")
-        elif icon:
-            ctk.CTkLabel(top, text=icon, font=(Fonts.FAMILY, 16), text_color=color).pack(side="left")
+        if icon:
+            v_img = get_vector_icon(icon, size=18, color_dark=color, color_light=color, fallback="info")
+            if v_img:
+                ctk.CTkLabel(top, image=v_img, text="").pack(side="left")
+
 
         ctk.CTkLabel(top, text=label, font=Fonts.SMALL, text_color=Colors.TEXT_MUTED).pack(side="left", padx=(6, 0))
 
@@ -1302,7 +1384,7 @@ class ToastNotification(ctk.CTkFrame):
 
         super().__init__(
             master,
-            fg_color=Colors.BG_CARD,
+            fg_color=Colors.OVERLAY_BG,
             corner_radius=12,
             border_width=1,
             border_color=accent,
@@ -1315,18 +1397,22 @@ class ToastNotification(ctk.CTkFrame):
         header = ctk.CTkFrame(inner, fg_color="transparent")
         header.pack(fill="x", pady=(0, 4))
 
-        v_img = get_vector_icon(toast_type if toast_type in ("info", "warning", "check", "close") else "sparkles", size=14, color_dark=accent, color_light=accent)
+        v_img = get_vector_icon(
+            toast_type if toast_type in ("info", "warning", "check", "close") else "sparkles",
+            size=14,
+            color_dark=accent,
+            color_light=accent,
+            fallback="sparkles",
+        )
         if v_img:
             ctk.CTkLabel(header, image=v_img, text="").pack(side="left")
-        else:
-            ctk.CTkLabel(header, text="✦", font=(Fonts.FAMILY, 12), text_color=accent).pack(side="left")
 
         ctk.CTkLabel(header, text=title, font=Fonts.BODY_BOLD, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=6)
 
-        c_img = get_vector_icon("close", size=12, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED)
+        c_img = get_vector_icon("close", size=12, color_dark=Colors.TEXT_MUTED, color_light=Colors.TEXT_MUTED, fallback="close")
         ctk.CTkButton(
             header,
-            text="" if c_img else "✕",
+            text="",
             image=c_img,
             width=18,
             height=18,
@@ -1334,6 +1420,7 @@ class ToastNotification(ctk.CTkFrame):
             hover_color=Colors.BG_HOVER,
             command=self.dismiss,
         ).pack(side="right")
+
 
         ctk.CTkLabel(
             inner,

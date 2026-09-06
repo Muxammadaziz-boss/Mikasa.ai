@@ -101,8 +101,8 @@ class TestV6AllPagesGlassButtons(unittest.TestCase):
             return btns
 
         btns = find_buttons(page)
-        self.assertGreaterEqual(len(btns), 1)
-        self.assertEqual(btns[0].cget("text"), "→  Foydalanish")
+        self.assertEqual(btns[0].cget("text"), "Foydalanish")
+        self.assertEqual(btns[0]._icon_name, "send")
 
         page.pack_forget()
         page.destroy()
@@ -133,10 +133,10 @@ class TestV6AllPagesGlassButtons(unittest.TestCase):
             return btns
 
         btns = find_buttons(page)
-        self.assertGreaterEqual(len(btns), 1)
         cancel_btns = [b for b in btns if "Bekor qilish" in b.cget("text")]
         self.assertGreaterEqual(len(cancel_btns), 1)
-        self.assertEqual(cancel_btns[0].cget("text"), "🗑️  Bekor qilish")
+        self.assertEqual(cancel_btns[0].cget("text"), "Bekor qilish")
+        self.assertEqual(cancel_btns[0]._icon_name, "trash")
 
         page.pack_forget()
         page.destroy()
