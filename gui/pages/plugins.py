@@ -7,7 +7,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
-from gui.components import Card, EmptyState, GlassCard, InfoChip, PageHero, SecondaryButton
+from gui.components import Card, EmptyState, GlassCard, InfoChip, SecondaryButton
 
 
 class PluginsPage(ctk.CTkFrame):
@@ -23,40 +23,41 @@ class PluginsPage(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        self.hero = PageHero(
-            self,
-            title="Plugin markazi",
-            subtitle="JSON va Python plugin'larni ko'ring, yoqing va yangi template yarating.",
-            icon="plugins",
-            accent_color=Colors.INFO,
-            chips=[
-                ("JSON + Python", "plugins", Colors.GLASS_BG, Colors.TEXT_SECONDARY),
-                (
-                    "Qayta ishga tushganda faollashadi",
-                    "refresh",
-                    Colors.GLASS_BG,
-                    Colors.TEXT_SECONDARY,
-                ),
-            ],
-        )
-        self.hero.pack(fill="x", padx=20, pady=(16, 12))
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
+
+        from gui.icons import get_vector_icon
+        icon = get_vector_icon("plugins", size=20, color=Colors.INFO)
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            header,
+            text="Plaginlar",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
+
+        actions = ctk.CTkFrame(header, fg_color="transparent")
+        actions.pack(side="right")
 
         self.plugin_count_chip = InfoChip(
-            self.hero.actions,
+            actions,
             text="0 ta plugin",
             icon="plugins",
             fg_color=Colors.INFO_SOFT,
             text_color=Colors.INFO,
         )
-        self.plugin_count_chip.pack(anchor="e", pady=(0, 6))
+        self.plugin_count_chip.pack(side="left", padx=(0, 8))
 
         SecondaryButton(
-            self.hero.actions,
+            actions,
             text="Papkani ochish",
             icon="folder",
             corner_radius=Sizing.PILL,
             command=self._open_plugins_folder,
-        ).pack(anchor="e")
+        ).pack(side="left")
 
 
         self.scroll = ctk.CTkScrollableFrame(

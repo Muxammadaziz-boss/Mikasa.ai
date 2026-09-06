@@ -7,7 +7,7 @@ import time
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
-from gui.components import Card, EmptyState, GlassButton, InfoChip, PageHero, SearchBar, Button
+from gui.components import Card, EmptyState, GlassButton, InfoChip, SearchBar, Button
 
 
 CAT_COLORS = {
@@ -88,28 +88,25 @@ class CommandsPage(ctk.CTkFrame):
         return self._search_timer
 
     def _build_ui(self):
-        # 1. Sahifa bosh sarlavhasi (PageHero)
-        self.hero = PageHero(
-            self,
-            title="Tool katalogi",
-            subtitle="29 ta tool • 8 ta kategoriya | Kerakli tool'ni qidiring yoki kategoriyalarga ko'ra ko'ring.",
-            icon="commands",
-            accent_color=Colors.WARNING,
-            chips=[
-                ("Chat bilan ulanadi", "chat", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Kategoriya filtri", "search", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-            ],
-        )
-        self.hero.pack(fill="x", padx=20, pady=(16, 12))
+        # Replace PageHero(...) with a simple header frame
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
 
-        self.tool_count_chip = InfoChip(
-            self.hero.actions,
-            text="0 ta tool",
-            icon="commands",
-            fg_color=Colors.WARNING_SOFT,
-            text_color=Colors.WARNING,
-        )
-        self.tool_count_chip.pack(anchor="e")
+        from gui.icons import get_vector_icon
+        icon = get_vector_icon("commands", size=20, color=Colors.PRIMARY)
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            header,
+            text="Buyruqlar",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
+
+        self.tool_count_chip = InfoChip(header, text="0 ta tool", icon="commands")
+        self.tool_count_chip.pack(side="left", padx=12)
 
         # 2. Qidiruv paneli — Ctrl + K nishoni bilan
         self.search = SearchBar(

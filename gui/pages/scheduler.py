@@ -5,7 +5,7 @@ import datetime
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts, Sizing
-from gui.components import Card, ElevatedCard, EmptyState, GlassButton, GlassCard, GlowButton, InfoChip, PageHero
+from gui.components import Card, ElevatedCard, EmptyState, GlassButton, GlassCard, GlowButton, InfoChip
 
 
 class SchedulerPage(ctk.CTkFrame):
@@ -19,36 +19,42 @@ class SchedulerPage(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        self.hero = PageHero(
-            self,
-            title="Planner va eslatmalar",
-            subtitle="Vaqtli vazifa, buyruq yoki takroriy reminder qo'shing. Mikasa kerakli vaqtda ishga tushiradi.",
-            icon="scheduler",
-            accent_color=Colors.WARNING,
-            chips=[
-                ("Reminder", "commands", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Takroriy task", "refresh", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-            ],
-        )
-        self.hero.pack(fill="x", padx=20, pady=(16, 12))
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
+
+        from gui.icons import get_vector_icon
+        icon = get_vector_icon("scheduler", size=20, color=Colors.WARNING)
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            header,
+            text="Rejalashtiruvchi",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
+
+        actions = ctk.CTkFrame(header, fg_color="transparent")
+        actions.pack(side="right")
 
         self.task_count_chip = InfoChip(
-            self.hero.actions,
+            actions,
             text="0 ta aktiv vazifa",
             icon="scheduler",
             fg_color=Colors.WARNING_SOFT,
             text_color=Colors.WARNING,
         )
-        self.task_count_chip.pack(anchor="e", pady=(0, 6))
+        self.task_count_chip.pack(side="left", padx=(0, 8))
 
         self.next_task_chip = InfoChip(
-            self.hero.actions,
+            actions,
             text="Keyingi task yo'q",
             icon="info",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
-        self.next_task_chip.pack(anchor="e")
+        self.next_task_chip.pack(side="left")
 
 
         content = ctk.CTkFrame(self, fg_color="transparent")

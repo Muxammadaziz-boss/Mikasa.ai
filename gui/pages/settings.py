@@ -6,7 +6,7 @@ import shutil
 import customtkinter as ctk
 from tkinter import messagebox
 from gui.theme import Colors, Fonts
-from gui.components import Card, GlassCard, GlowButton, InfoChip, PageHero, SecondaryButton
+from gui.components import Card, GlassCard, GlowButton, InfoChip, SecondaryButton
 
 
 def _safe_remove(path):
@@ -36,35 +36,41 @@ class SettingsPage(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        self.hero = PageHero(
-            self,
-            title="Sozlamalar markazi",
-            subtitle="Mikasa interfeysi, AI ulanishlari va ovoz parametrlarini bir joydan boshqaring.",
-            icon="settings",
-            accent_color=Colors.PRIMARY,
-            chips=[
-                ("Real-time saqlash", "check", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Voice bilan sinxron", "mic", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-            ],
-        )
-        self.hero.pack(fill="x", padx=20, pady=(16, 12))
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
+
+        from gui.icons import get_vector_icon
+        icon = get_vector_icon("settings", size=20, color=Colors.PRIMARY)
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            header,
+            text="Sozlamalar",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
+
+        actions = ctk.CTkFrame(header, fg_color="transparent")
+        actions.pack(side="right")
 
         self.save_state_chip = InfoChip(
-            self.hero.actions,
+            actions,
             text="O'zgarishlar saqlanmagan",
             icon="info",
             fg_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
         )
-        self.save_state_chip.pack(anchor="e", pady=(0, 6))
+        self.save_state_chip.pack(side="left", padx=(0, 8))
 
         self.save_btn = GlowButton(
-            self.hero.actions,
+            actions,
             text="Saqlash",
             icon="check",
             command=self._save_settings,
         )
-        self.save_btn.pack(anchor="e")
+        self.save_btn.pack(side="left")
 
         self.summary_card = Card(
             self,
@@ -119,6 +125,7 @@ class SettingsPage(ctk.CTkFrame):
         self._build_ai_section()
         self._build_gui_section()
         self._build_data_section()
+        self._build_diagnostics_section()
 
     def _build_voice_section(self):
         card = Card(
@@ -211,6 +218,27 @@ class SettingsPage(ctk.CTkFrame):
             button = SecondaryButton(actions, text=text, icon=icon, command=command)
             button.grid(row=0, column=i, padx=4, pady=4, sticky="ew")
             actions.columnconfigure(i, weight=1)
+
+    def _build_diagnostics_section(self):
+        card = Card(
+            self.scroll,
+            title="Diagnostika",
+            subtitle="Tizim holati va resurslar sarfi.",
+            accent_color=Colors.DANGER,
+        )
+        card.pack(fill="x", pady=(0, 12))
+
+        row = ctk.CTkFrame(card.content, fg_color="transparent")
+        row.pack(fill="x")
+
+        self.cpu_ram_label = ctk.CTkLabel(row, text="CPU: --% | RAM: --MB", font=Fonts.BODY, text_color=Colors.TEXT_SECONDARY)
+        self.cpu_ram_label.pack(side="left", padx=4)
+
+        self.tts_status_label = ctk.CTkLabel(row, text="TTS: Kutish", font=Fonts.BODY, text_color=Colors.TEXT_SECONDARY)
+        self.tts_status_label.pack(side="left", padx=12)
+
+        self.api_status_label = ctk.CTkLabel(row, text="API: Offline", font=Fonts.BODY, text_color=Colors.TEXT_SECONDARY)
+        self.api_status_label.pack(side="left", padx=4)
 
 
     def _add_field(self, parent, label, default="", show=None):

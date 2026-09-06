@@ -9,136 +9,79 @@ from gui.components import AppleSiriOrb, Card, GlassButton, GlassCard, GlowButto
 
 
 class VoicePage(ctk.CTkFrame):
-    """Ovozli buyruq va dialog sahifasi"""
+    """Ovozli buyruq va dialog sahifasi - Voice First Premium UI"""
 
     def __init__(self, master, app=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.app = app
         self._is_listening = False
         self._transcript_history = []
-        self._recent_commands_data = []
         self._build_ui()
 
     def _build_ui(self):
-        # Markaziy layout
-        self.center_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.center_frame.pack(fill="both", expand=True, padx=20, pady=16)
+        # Asosiy scroll konteyner
+        self.main_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.main_scroll.pack(fill="both", expand=True)
+        
+        # Markazlashtirish uchun ichki konteyner (max 600px kenglik)
+        self.center = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
+        self.center.pack(expand=True, fill="y", padx=40)
+        
+        # Build sections
+        self._build_orb_section(self.center)
+        self._build_controls(self.center)
+        self._build_transcript_section(self.center)
+        self._build_activity_section(self.center)
 
-        # ===== SARLAVHA =====
-        header = ctk.CTkFrame(self.center_frame, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
-
-        title_frame = ctk.CTkFrame(header, fg_color="transparent")
-        title_frame.pack(side="left")
-
-        mic_icon_img = get_vector_icon("mic", size=22, color=Colors.PRIMARY, fallback="mic")
-        if mic_icon_img:
-            ctk.CTkLabel(title_frame, text="", image=mic_icon_img).pack(side="left", padx=(0, 8))
-
-        ctk.CTkLabel(
-            title_frame,
-            text="Ovozli Dialog",
-            font=Fonts.HEADING_2,
+    def _build_orb_section(self, parent):
+        """Markaziy AI Orb — sahifaning dominant vizual elementi"""
+        orb_container = ctk.CTkFrame(parent, fg_color="transparent")
+        orb_container.pack(pady=(40, 0))
+        
+        # Katta orb (280px)
+        self.apple_orb = AppleSiriOrb(orb_container, size=280)
+        self.apple_orb.pack()
+        self.orb_container = self.apple_orb
+        
+        # "Qanday yordam beray?" — asosiy matn
+        self.orb_text = ctk.CTkLabel(
+            orb_container,
+            text="Qanday yordam beray?",
+            font=Fonts.HEADING_1,
             text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(side="left")
-
-        status_frame = ctk.CTkFrame(header, fg_color="transparent")
-        status_frame.pack(side="right")
-
+        )
+        self.orb_text.pack(pady=(20, 0))
+        
+        # Holat indikatori: ● Online · Kutmoqda
+        status_row = ctk.CTkFrame(orb_container, fg_color="transparent")
+        status_row.pack(pady=(8, 0))
+        
         self.voice_dot = ctk.CTkLabel(
-            status_frame,
+            status_row,
             text="",
-            image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle"),
+            image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle"),
         )
         self.voice_dot.pack(side="left", padx=(0, 6))
-
+        
         self.voice_status = ctk.CTkLabel(
-            status_frame,
-            text="Kutmoqda",
-            font=Fonts.SMALL_BOLD,
+            status_row,
+            text="Online \u00b7 Kutmoqda",
+            font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         )
         self.voice_status.pack(side="left")
 
-        # ===== ASOSIY KONTENT — 2 COLUMN =====
-        content = ctk.CTkFrame(self.center_frame, fg_color="transparent")
-        content.pack(fill="both", expand=True)
-        content.columnconfigure(0, weight=3)
-        content.columnconfigure(1, weight=1)
-        content.rowconfigure(0, weight=1)
-
-        # --- CHAP: ORB VA TRANSKRIPSIYA ---
-        left = ctk.CTkFrame(content, fg_color="transparent")
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-
-        self._build_orb(left)
-        self._build_transcript(left)
-        self._build_mic_button(left)
-
-        # --- O'NG: SOZLAMALAR VA TARIX ---
-        right = ctk.CTkFrame(content, fg_color="transparent")
-        right.grid(row=0, column=1, sticky="nsew")
-
-        self._build_voice_settings(right)
-        self._build_recent_commands(right)
-
-    def _build_orb(self, parent):
-        """Markaziy AI Orb — Apple Siri / Apple Intelligence glowing aura"""
-        orb_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        orb_frame.pack(pady=(16, 8))
-
-        # Dynamic Apple Siri Orb
-        self.apple_orb = AppleSiriOrb(orb_frame, size=220)
-        self.apple_orb.pack()
-        self.orb_container = self.apple_orb  # Backwards compatibility alias
-
-        # Status matni
-        self.orb_text = ctk.CTkLabel(
-            orb_frame,
-            text="Mikasa AI Tayyor",
-            font=Fonts.HEADING_2,
-            text_color=Colors.TEXT_PRIMARY,
-        )
-        self.orb_text.pack(pady=(10, 0))
-
-        self.orb_hint = ctk.CTkLabel(
-            orb_frame,
-            text="Ovozli buyruq berish uchun pastdagi tugmani bosing",
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
-        )
-        self.orb_hint.pack(pady=(4, 0))
-
-    def _build_transcript(self, parent):
-        """Real-time transkripsiya maydoni"""
-        transcript_card = Card(parent, title="Transkripsiya")
-        transcript_card.pack(fill="x", padx=20, pady=10)
-
-        self.transcript_text = ctk.CTkTextbox(
-            transcript_card.content,
-            font=Fonts.BODY,
-            fg_color=Colors.BG_INPUT,
-            text_color=Colors.TEXT_PRIMARY,
-            corner_radius=Sizing.RADIUS_INPUT,
-            border_width=1,
-            border_color=Colors.BORDER,
-            height=100,
-            wrap="word",
-            state="disabled",
-        )
-        self.transcript_text.pack(fill="x")
-
-    def _build_mic_button(self, parent):
-        """Mikrofon tugmasi va boshqaruv paneli"""
-        mic_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        mic_frame.pack(pady=(12, 16))
-
-        self._mic_icon_idle = get_vector_icon("mic", size=20, color=Colors.TEXT_PRIMARY, fallback="mic")
-        self._mic_icon_active = get_vector_icon("stop", size=20, color="#FFFFFF", fallback="circle")
-
+    def _build_controls(self, parent):
+        """Mikrofon tugmasi va ixcham boshqaruv tugmalari"""
+        controls_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        controls_frame.pack(pady=(28, 0))
+        
+        # Katta mikrofon pill tugmasi
+        self._mic_icon_idle = get_vector_icon("mic", size=22, color=Colors.TEXT_PRIMARY, fallback="mic")
+        self._mic_icon_active = get_vector_icon("stop", size=22, color="#FFFFFF", fallback="circle")
+        
         self.mic_btn = ctk.CTkButton(
-            mic_frame,
+            controls_frame,
             text="  Tinglashni boshlash",
             image=self._mic_icon_idle,
             compound="left",
@@ -150,127 +93,109 @@ class VoicePage(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
             corner_radius=Sizing.PILL,
             height=56,
-            width=280,
+            width=300,
             command=self._toggle_listening,
         )
         self.mic_btn.pack()
-
-        # Qo'shimcha tozalash tugmasi
-        btn_row = ctk.CTkFrame(mic_frame, fg_color="transparent")
-        btn_row.pack(pady=(10, 0))
-
+        
+        # Ikkilamchi tugmalar qatori
+        secondary_row = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        secondary_row.pack(pady=(14, 0))
+        
+        # Use existing GlassButton from components 
         GlassButton(
-            btn_row,
-            text="Transkripsiyani tozalash",
+            secondary_row,
+            text="Tozalash",
             icon="trash",
             font=Fonts.SMALL,
             height=32,
-            width=190,
+            width=110,
             corner_radius=Sizing.RADIUS_BUTTON,
             command=self._clear_transcript,
         ).pack(side="left", padx=4)
+        
+        GlassButton(
+            secondary_row,
+            text="Chat",
+            icon="chat",  
+            font=Fonts.SMALL,
+            height=32,
+            width=110,
+            corner_radius=Sizing.RADIUS_BUTTON,
+            command=lambda: self.app.navigate_to("chat") if self.app else None,
+        ).pack(side="left", padx=4)
+
+    def _build_transcript_section(self, parent):
+        """Transkripsiya maydoni — solid Card (80/20 design system)"""
+        transcript_card = Card(parent, title="Transkripsiya")
+        transcript_card.pack(fill="x", pady=(24, 0), padx=20)
+
+        self.transcript_text = ctk.CTkTextbox(
+            transcript_card.content,
+            font=Fonts.BODY,
+            fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_SECONDARY,
+            corner_radius=Sizing.SMALL,
+            border_width=1,
+            border_color=Colors.BORDER_SUBTLE,
+            height=120,
+            wrap="word",
+            state="disabled",
+        )
+        self.transcript_text.pack(fill="x")
+
+    def _build_activity_section(self, parent):
+        """Agent jarayoni ko'rsatish joyi"""
+        self.activity_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        self.activity_frame.pack(fill="x", pady=(16, 30), padx=20)
+        
+        self.activity_label = ctk.CTkLabel(
+            self.activity_frame,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            anchor="w",
+        )
+        # Initially hidden - will be shown when agent is active
+        
+    def show_activity(self, text):
+        """Agent activity ko'rsatish"""
+        self.activity_label.configure(text=text)
+        self.activity_label.pack(fill="x")
+        
+    def hide_activity(self):
+        """Agent activity yashirish"""
+        self.activity_label.pack_forget()
+
+    # ========== STUBS FOR REMOVED FEATURES ==========
+    
+    def add_recent_command(self, text, result="", time_str=None, track_state=True):
+        """Stub — Endi bu funksiya shu sahifada emas"""
+        pass
 
     def _build_voice_settings(self, parent):
-        """Ovoz sozlamalari paneli"""
-        settings_card = Card(parent, title="Ovoz sozlamalari")
-        settings_card.pack(fill="x", pady=(0, 10))
-
-        # Ovoz turi
-        ctk.CTkLabel(
-            settings_card.content,
-            text="Ovoz turi",
-            font=Fonts.SMALL_BOLD,
-            text_color=Colors.TEXT_SECONDARY,
-            anchor="w",
-        ).pack(fill="x", pady=(0, 4))
-
-        self.voice_type = ctk.CTkSegmentedButton(
-            settings_card.content,
-            values=["Erkak", "Ayol"],
-            font=Fonts.SMALL,
-            fg_color=Colors.BG_INPUT,
-            selected_color=Colors.PRIMARY_DARK,
-            selected_hover_color=Colors.PRIMARY,
-            unselected_color=Colors.BG_INPUT,
-            unselected_hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            command=self._on_voice_type_change,
-        )
-        self.voice_type.set("Erkak")
-        self.voice_type.pack(fill="x", pady=(0, 12))
-
-        # Ovoz tezligi
-        ctk.CTkLabel(
-            settings_card.content,
-            text="Tezlik",
-            font=Fonts.SMALL_BOLD,
-            text_color=Colors.TEXT_SECONDARY,
-            anchor="w",
-        ).pack(fill="x", pady=(0, 4))
-
-        self.speed_slider = ctk.CTkSlider(
-            settings_card.content,
-            from_=0.5,
-            to=2.0,
-            number_of_steps=15,
-            progress_color=Colors.PRIMARY,
-            button_color=Colors.PRIMARY,
-            button_hover_color=Colors.PRIMARY_DARK,
-            fg_color=Colors.BG_INPUT,
-            command=self._on_speed_change,
-        )
-        self.speed_slider.set(1.0)
-        self.speed_slider.pack(fill="x", pady=(0, 12))
-
-        # TTS Engine
-        ctk.CTkLabel(
-            settings_card.content,
-            text="TTS Engine",
-            font=Fonts.SMALL_BOLD,
-            text_color=Colors.TEXT_SECONDARY,
-            anchor="w",
-        ).pack(fill="x", pady=(0, 4))
-
-        self.tts_engine_var = ctk.CTkSegmentedButton(
-            settings_card.content,
-            values=["Silero", "Edge TTS"],
-            font=Fonts.SMALL,
-            fg_color=Colors.BG_INPUT,
-            selected_color=Colors.PRIMARY_DARK,
-            selected_hover_color=Colors.PRIMARY,
-            unselected_color=Colors.BG_INPUT,
-            unselected_hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            command=self._on_tts_engine_change,
-        )
-        self.tts_engine_var.set("Silero")
-        self.tts_engine_var.pack(fill="x")
+        """Stub — Voice sozlamalari Settings sahifasiga ko'chirildi"""
+        pass
 
     def _build_recent_commands(self, parent):
-        """Oxirgi buyruqlar"""
-        recent_card = Card(parent, title="Oxirgi buyruqlar")
-        recent_card.pack(fill="both", expand=True, pady=(10, 0))
+        """Stub — Oxirgi buyruqlar olib tashlandi"""
+        pass
 
-        # Bo'sh holat
-        self.recent_list = ctk.CTkFrame(recent_card.content, fg_color="transparent")
-        self.recent_list.pack(fill="both", expand=True)
+    def _on_voice_type_change(self, value):
+        """Stub"""
+        pass
 
-        self.recent_count = ctk.CTkLabel(
-            recent_card.content,
-            text="0 buyruq",
-            font=Fonts.TINY,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        )
-        self.recent_count.pack(fill="x", pady=(0, 4))
+    def _on_speed_change(self, value):
+        """Stub"""
+        pass
 
-        ctk.CTkLabel(
-            self.recent_list,
-            text="Hali buyruq berilmagan.\nMasalan: 'Bugun havo qanday?', 'Musiqa qo\\'y', 'Dollar kursi'",
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
-            justify="center",
-        ).pack(pady=24)
+    def _on_tts_engine_change(self, value):
+        """Stub"""
+        pass
+
+    def _recent_command_count(self):
+        """Stub"""
+        return 0
 
     # ========== FUNKSIYALAR ==========
 
@@ -296,7 +221,6 @@ class VoicePage(ctk.CTkFrame):
             self.voice_status.configure(
                 text="Tinglayapman", text_color=Colors.SUCCESS
             )
-            self.orb_hint.configure(text="Mikrofondan tinglayapman...")
             if self.app:
                 self.app.set_status("listening", "Tinglayapman...")
                 # Backend orqali tinglashni boshlash
@@ -312,13 +236,12 @@ class VoicePage(ctk.CTkFrame):
             )
             if hasattr(self, "apple_orb"):
                 self.apple_orb.set_state("idle")
-            self.orb_text.configure(text="Mikasa AI Tayyor", text_color=Colors.TEXT_PRIMARY)
+            self.orb_text.configure(text="Qanday yordam beray?", text_color=Colors.TEXT_PRIMARY)
             if hasattr(self, "voice_dot"):
                 self.voice_dot.configure(
                     image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle")
                 )
-            self.voice_status.configure(text="Kutmoqda", text_color=Colors.TEXT_MUTED)
-            self.orb_hint.configure(text="Ovozli buyruq berish uchun pastdagi tugmani bosing")
+            self.voice_status.configure(text="Online \u00b7 Kutmoqda", text_color=Colors.TEXT_MUTED)
             if self.app:
                 self.app.set_status("online", "Tayyor")
                 # Backend orqali tinglashni to'xtatish
@@ -342,144 +265,46 @@ class VoicePage(ctk.CTkFrame):
         self.transcript_text.see("end")
         self.transcript_text.configure(state="disabled")
 
-    def add_recent_command(self, text, result="", time_str=None, track_state=True):
-        """Oxirgi buyruqlar ro'yxatiga qo'shish"""
-        time_str = time_str or datetime.datetime.now().strftime("%H:%M")
-
-        if track_state:
-            self._recent_commands_data.append(
-                {"text": text, "result": result, "time": time_str}
-            )
-            self._recent_commands_data = self._recent_commands_data[-10:]
-
-        # Birinchi element placeholder bo'lsa, o'chirib tashlash
-        children = self.recent_list.winfo_children()
-        if len(children) == 1 and isinstance(children[0], ctk.CTkLabel):
-            children[0].destroy()
-            children = []
-
-        # Maksimal 10 ta saqlash
-        if len(children) >= 10:
-            children[0].destroy()
-
-        row = ctk.CTkFrame(self.recent_list, fg_color="transparent")
-        row.pack(fill="x", pady=2)
-
-        dot_img = get_vector_icon("circle", size=6, color=Colors.PRIMARY, fallback="circle")
-        if dot_img:
-            ctk.CTkLabel(row, text="", image=dot_img).pack(side="left", padx=(0, 6))
-
-        ctk.CTkLabel(
-            row,
-            text=text,
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(side="left", fill="x", expand=True)
-
-        ctk.CTkLabel(
-            row, text=time_str, font=Fonts.TINY, text_color=Colors.TEXT_MUTED
-        ).pack(side="right")
-
-        self.recent_count.configure(text=f"{self._recent_command_count()} buyruq")
-
-    def _on_voice_type_change(self, value):
-        """Ovoz turi o'zgarganda — config ga saqlash va backend ga xabar"""
-        try:
-            from config import set_config
-
-            ovoz = "erkak" if value == "Erkak" else "ayol"
-            set_config("user.voice_type", ovoz)
-            # main.py global_state ni ham yangilash
-            try:
-                import main
-
-                main.global_state.ovoz_turi_global = ovoz
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    def _on_speed_change(self, value):
-        """Ovoz tezligi o'zgarganda — config ga saqlash"""
-        try:
-            from config import set_config
-
-            set_config("audio.tts_speed", round(value, 1))
-        except Exception:
-            pass
-
-    def _on_tts_engine_change(self, value):
-        """TTS Engine o'zgarganda — config ga saqlash"""
-        try:
-            from config import set_config
-
-            engine = "silero" if value == "Silero" else "edge_tts"
-            set_config("audio.tts_engine", engine)
-        except Exception:
-            pass
-
     def on_show(self):
-        """Sahifa ko'rsatilganda — config dan joriy qiymatlarni yuklash"""
-        try:
-            from config import get_config
-
-            # Ovoz turi
-            ovoz = get_config("user.voice_type", "erkak")
-            self.voice_type.set("Ayol" if ovoz == "ayol" else "Erkak")
-            # Tezlik
-            speed = get_config("audio.tts_speed", 1.0)
-            self.speed_slider.set(float(str(speed)))
-            # TTS Engine
-            engine = get_config("audio.tts_engine", "silero")
-            self.tts_engine_var.set("Edge TTS" if engine == "edge_tts" else "Silero")
-
-            if (
-                self.app
-                and hasattr(self.app, "bridge")
-                and self.app.bridge.is_listening
-            ):
-                self._is_listening = True
-                self.mic_btn.configure(
-                    text="  To'xtatish",
-                    image=self._mic_icon_active,
-                    fg_color=Colors.DANGER,
-                    hover_color="#DC2626",
+        """Sahifa ko'rsatilganda"""
+        if (
+            self.app
+            and hasattr(self.app, "bridge")
+            and self.app.bridge.is_listening
+        ):
+            self._is_listening = True
+            self.mic_btn.configure(
+                text="  To'xtatish",
+                image=self._mic_icon_active,
+                fg_color=Colors.DANGER,
+                hover_color="#DC2626",
+            )
+            if hasattr(self, "voice_dot"):
+                self.voice_dot.configure(
+                    image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle")
                 )
-                if hasattr(self, "voice_dot"):
-                    self.voice_dot.configure(
-                        image=get_vector_icon("circle", size=8, color=Colors.SUCCESS, fallback="circle")
-                    )
-                self.voice_status.configure(
-                    text="Tinglayapman", text_color=Colors.SUCCESS
+            self.voice_status.configure(
+                text="Tinglayapman", text_color=Colors.SUCCESS
+            )
+            self.orb_text.configure(
+                text="Tinglayapman...", text_color=Colors.PRIMARY
+            )
+        else:
+            self._is_listening = False
+            self.mic_btn.configure(
+                text="  Tinglashni boshlash",
+                image=self._mic_icon_idle,
+                fg_color=Colors.GLASS_HERO_BG,
+                hover_color=Colors.GLASS_HERO_HOVER,
+            )
+            if hasattr(self, "voice_dot"):
+                self.voice_dot.configure(
+                    image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle")
                 )
-                self.orb_text.configure(
-                    text="Tinglayapman...", text_color=Colors.PRIMARY
-                )
-                self.orb_hint.configure(text="Mikrofondan tinglayapman...")
-            else:
-                self._is_listening = False
-                self.mic_btn.configure(
-                    text="  Tinglashni boshlash",
-                    image=self._mic_icon_idle,
-                    fg_color=Colors.PRIMARY_DARK,
-                    hover_color=Colors.PRIMARY,
-                )
-                if hasattr(self, "voice_dot"):
-                    self.voice_dot.configure(
-                        image=get_vector_icon("circle", size=8, color=Colors.TEXT_MUTED, fallback="circle")
-                    )
-                self.voice_status.configure(
-                    text="Kutmoqda", text_color=Colors.TEXT_MUTED
-                )
-                self.orb_text.configure(text="Tayyor", text_color=Colors.TEXT_SECONDARY)
-                self.orb_hint.configure(
-                    text="Ovozli buyruq berish uchun tugmani bosing"
-                )
-
-            self.recent_count.configure(text=f"{self._recent_command_count()} buyruq")
-        except Exception:
-            pass
+            self.voice_status.configure(
+                text="Online \u00b7 Kutmoqda", text_color=Colors.TEXT_MUTED
+            )
+            self.orb_text.configure(text="Qanday yordam beray?", text_color=Colors.TEXT_PRIMARY)
 
         # Orb animatsiyasini qayta faollashtirish
         if hasattr(self, "apple_orb"):
@@ -490,50 +315,19 @@ class VoicePage(ctk.CTkFrame):
         if hasattr(self, "apple_orb"):
             self.apple_orb.stop()
 
-    def _recent_command_count(self):
-        return sum(
-            1
-            for child in self.recent_list.winfo_children()
-            if isinstance(child, ctk.CTkFrame)
-        )
-
     def export_ui_state(self):
         return {
             "transcript": list(self._transcript_history),
-            "recent_commands": list(self._recent_commands_data),
         }
 
     def import_ui_state(self, state):
         state = state or {}
         self._clear_transcript()
-        for child in self.recent_list.winfo_children():
-            child.destroy()
-
-        self._recent_commands_data = []
         self._transcript_history = []
 
         transcript = state.get("transcript", [])
-        recent_commands = state.get("recent_commands", [])
 
         for item in transcript:
             self.add_transcript(
                 item.get("text", ""), item.get("role", "user"), track_state=True
             )
-
-        for item in recent_commands:
-            self.add_recent_command(
-                item.get("text", ""),
-                item.get("result", ""),
-                time_str=item.get("time", ""),
-                track_state=True,
-            )
-
-        if not recent_commands:
-            ctk.CTkLabel(
-                self.recent_list,
-                text="Hali buyruq berilmagan",
-                font=Fonts.SMALL,
-                text_color=Colors.TEXT_MUTED,
-            ).pack(pady=20)
-
-        self.recent_count.configure(text=f"{self._recent_command_count()} buyruq")

@@ -38,19 +38,19 @@ class TestV6AppLazyLoading(unittest.TestCase):
         IconEngine.clear_cache()
 
     def test_lazy_initialization_on_startup(self):
-        """Verify that app startup only initializes dashboard and does NOT instantiate all 8 pages"""
+        """Verify that app startup only initializes voice and does NOT instantiate all 8 pages"""
         self.app = MikasaApp(connect_backend=False)
         self.app.withdraw()
 
-        # On startup, only dashboard should be instantiated
-        self.assertIn("dashboard", self.app._pages)
-        self.assertEqual(len(self.app._pages), 1, "Only initial page (dashboard) should be loaded at startup")
+        # On startup, only initial page (voice) should be instantiated
+        self.assertIn("voice", self.app._pages)
+        self.assertEqual(len(self.app._pages), 1, "Only initial page (voice) should be loaded at startup")
 
         # Other pages must NOT exist in _pages yet
-        for page_id in ["voice", "chat", "commands", "memory", "scheduler", "plugins", "settings"]:
+        for page_id in ["dashboard", "chat", "commands", "memory", "scheduler", "plugins", "settings"]:
             self.assertNotIn(page_id, self.app._pages, f"{page_id} should NOT be initialized at startup")
 
-        self.assertEqual(self.app._current_page, "dashboard")
+        self.assertEqual(self.app._current_page, "voice")
         self.assertEqual(self.app._nav_state, "READY")
 
     def test_lazy_navigation_and_page_caching(self):
@@ -69,9 +69,9 @@ class TestV6AppLazyLoading(unittest.TestCase):
         cmd_page_ref = self.app._pages["commands"]
         self.assertIsInstance(cmd_page_ref, CommandsPage)
 
-        # 2. Navigation back to 'dashboard'
-        self.app.navigate_to("dashboard", sync=True)
-        self.assertEqual(self.app._current_page, "dashboard")
+        # 2. Navigation back to 'voice'
+        self.app.navigate_to("voice", sync=True)
+        self.assertEqual(self.app._current_page, "voice")
         self.assertEqual(len(self.app._pages), 2)
 
         # 3. Navigation again to 'commands' — must reuse cached instance!
@@ -108,13 +108,13 @@ class TestV6AppLazyLoading(unittest.TestCase):
         cmd_gen = self.app._nav_generation
         self.assertGreater(cmd_gen, initial_gen)
 
-        # Now simulate a stale lazy navigation callback for "voice" with old generation
+        # Now simulate a stale lazy navigation callback for "chat" with old generation
         stale_gen = initial_gen
-        self.app._finish_lazy_navigation("voice", generation=stale_gen)
+        self.app._finish_lazy_navigation("chat", generation=stale_gen)
 
-        # Current page must still be commands, voice must NOT be activated!
+        # Current page must still be commands, chat must NOT be activated!
         self.assertEqual(self.app._current_page, "commands")
-        self.assertNotIn("voice", self.app._pages)
+        self.assertNotIn("chat", self.app._pages)
 
 
 class TestV6CommandsPerformance(unittest.TestCase):

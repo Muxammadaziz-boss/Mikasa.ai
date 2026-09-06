@@ -11,7 +11,6 @@ from gui.components import (
     EmptyState,
     GlassCard,
     GlowButton,
-    PageHero,
     SearchBar,
     SecondaryButton,
     StatWidget,
@@ -30,25 +29,28 @@ class MemoryPage(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        self.hero = PageHero(
-            self,
-            title="Xotira markazi",
-            subtitle="Profil, bilimlar bazasi va suhbat tarixini bir joydan boshqaring.",
-            icon="memory",
-            accent_color=Colors.SECONDARY,
-            chips=[
-                ("Uzoq muddatli xotira", "folder", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-                ("Suhbat bilan sinxron", "refresh", Colors.BG_PANEL, Colors.TEXT_SECONDARY),
-            ],
-        )
-        self.hero.pack(fill="x", padx=20, pady=(16, 12))
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
+
+        from gui.icons import get_vector_icon
+        icon = get_vector_icon("memory", size=20, color=Colors.SECONDARY)
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            header,
+            text="Xotira",
+            font=Fonts.HEADING_2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
 
         SecondaryButton(
-            self.hero.actions,
+            header,
             text="Eksport",
             icon="folder",
             command=self._export_data,
-        ).pack(anchor="e")
+        ).pack(side="right")
 
         stats_frame = ctk.CTkFrame(self, fg_color="transparent")
         stats_frame.pack(fill="x", padx=20, pady=(0, 12))

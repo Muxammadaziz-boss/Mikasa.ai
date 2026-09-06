@@ -353,6 +353,47 @@ class VectorIconEngine:
         """Circle Outline: Hollow circle for idle/pending status"""
         c.circle(12.0, 12.0, radius=8.0, outline=color)
 
+    @staticmethod
+    def _draw_mute(c: IconCanvas, color: str):
+        """Mikrofon o'chirilgan — diagonal chiziq bilan"""
+        c.rect(9.5, 4.0, 14.5, 13.0, radius=2.5, outline=color)
+        c.arc(7.0, 8.0, 17.0, 17.0, start=0, end=180, color=color)
+        c.line((12.0, 17.0), (12.0, 19.5), color=color)
+        c.line((9.0, 19.5), (15.0, 19.5), color=color)
+        c.line((5.0, 19.0), (19.0, 5.0), color=color)
+
+    @staticmethod
+    def _draw_arrow_back(c: IconCanvas, color: str):
+        """Chapga strelka"""
+        c.polyline([(14.0, 5.0), (7.0, 12.0), (14.0, 19.0)], color=color)
+
+    @staticmethod
+    def _draw_arrow_forward(c: IconCanvas, color: str):
+        """O'ngga strelka"""
+        c.polyline([(10.0, 5.0), (17.0, 12.0), (10.0, 19.0)], color=color)
+
+    @staticmethod
+    def _draw_notification(c: IconCanvas, color: str):
+        """Qo'ng'iroq (bildirishnoma)"""
+        c.arc(6.0, 3.0, 18.0, 16.0, start=180, end=360, color=color)
+        c.line((6.0, 9.5), (6.0, 17.0), color=color)
+        c.line((18.0, 9.5), (18.0, 17.0), color=color)
+        c.line((4.5, 17.0), (19.5, 17.0), color=color)
+        c.circle(12.0, 20.0, radius=1.5, fill=color)
+
+    @staticmethod
+    def _draw_switch_mode(c: IconCanvas, color: str):
+        """Almashtirish (↔)"""
+        c.polyline([(4.0, 9.0), (8.0, 5.0), (8.0, 13.0)], color=color)
+        c.line((8.0, 9.0), (20.0, 9.0), color=color)
+        c.polyline([(20.0, 15.0), (16.0, 19.0), (16.0, 11.0)], color=color)
+        c.line((4.0, 15.0), (16.0, 15.0), color=color)
+
+    @staticmethod
+    def _draw_chevron_down(c: IconCanvas, color: str):
+        """Pastga chevron"""
+        c.polyline([(7.0, 9.0), (12.0, 15.0), (17.0, 9.0)], color=color)
+
     REGISTRY: Tuple[str, ...] = (
         "dashboard",
         "chat",
@@ -380,6 +421,12 @@ class VectorIconEngine:
         "info",
         "circle",
         "circle_outline",
+        "mute",
+        "arrow_back",
+        "arrow_forward",
+        "notification",
+        "switch_mode",
+        "chevron_down",
     )
 
     SEMANTIC_ALIASES: Dict[str, str] = {
@@ -387,7 +434,7 @@ class VectorIconEngine:
         "home": "dashboard",
         "voice": "mic",
         "microphone": "mic",
-        "mic_off": "mic",
+        "mic_off": "mute",
         "vision": "eye",
         "view": "eye",
         "delete": "trash",
@@ -414,6 +461,14 @@ class VectorIconEngine:
         "status": "circle",
         "x": "close",
         "cancel": "close",
+        "back": "arrow_back",
+        "forward": "arrow_forward",
+        "bell": "notification",
+        "alert": "notification",
+        "swap": "switch_mode",
+        "toggle": "switch_mode",
+        "dropdown": "chevron_down",
+        "expand": "chevron_down",
 
         # Unicode Symbols & Decorative Glyphs
         "✦": "sparkles",

@@ -462,6 +462,11 @@ class Button(ctk.CTkButton):
         self._icon_size = icon_size
         self._variant = variant
         self._tooltip_text = tooltip
+        if tooltip:
+            try:
+                self.after(50, lambda: Tooltip(self, tooltip))
+            except Exception:
+                pass
 
     @staticmethod
     def _resolve_variant_colors(variant: str) -> dict:
@@ -1650,3 +1655,194 @@ def show_toast(root_widget, message: str, title: str = "Mikasa AI", duration: in
         root_widget.after(0, lambda: ToastNotification(root_widget, message, title=title, duration=duration, toast_type=toast_type))
     except Exception:
         pass
+
+
+class Tooltip:
+    """
+    Silliq va engil Tooltip (hover matni).
+    Widget ustiga sichqoncha kelganda 400ms dan so'ng paydo bo'ladi.
+    """
+
+    def __init__(self, widget, text: str):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self._after_id = None
+
+        self.widget.bind("<Enter>", self._schedule_show)
+        self.widget.bind("<Leave>", self._hide)
+        self.widget.bind("<ButtonPress>", self._hide)
+
+    def _schedule_show(self, event=None):
+        self._cancel()
+        self._after_id = self.widget.after(400, self._show)
+
+    def _cancel(self):
+        if self._after_id:
+            try:
+                self.widget.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
+
+    def _show(self):
+        if self.tip_window or not self.text:
+            return
+        try:
+            x = self.widget.winfo_rootx() + (self.widget.winfo_width() // 2)
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+
+            import tkinter as tk
+            self.tip_window = tw = tk.Toplevel(self.widget)
+            tw.wm_overrideredirect(True)
+            tw.wm_geometry(f"+{x}+{y}")
+            tw.attributes("-topmost", True)
+
+            label = tk.Label(
+                tw,
+                text=self.text,
+                justify="left",
+                background=Colors.BG_PANEL,
+                foreground=Colors.TEXT_PRIMARY,
+                relief="solid",
+                borderwidth=1,
+                font=(Fonts.FAMILY, 9),
+                padx=8,
+                pady=4,
+            )
+            label.pack()
+        except Exception:
+            pass
+
+    def _hide(self, event=None):
+        self._cancel()
+        if self.tip_window:
+            try:
+                self.tip_window.destroy()
+            except Exception:
+                pass
+            self.tip_window = None
+
+
+def attach_tooltip(widget, text: str):
+    """Har qanday widgetga tooltip ulash yordamchisi"""
+    return Tooltip(widget, text)
+
+
+class CommandPaletteOverlay(ctk.CTkToplevel):
+    """
+    Apple Spotlight / Raycast uslubidagi Command Palette (Ctrl + K).
+    Tezkor qidiruv, sahifalarga o'tish va amallarni bajarish modal oynasi.
+    """
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.app = app
+        self.title("Mikasa Command Palette")
+        self.geometry("560x360")
+        self.resizable(False, False)
+        self.configure(fg_color=Colors.BG_DARKEST)
+        self.attributes("-topmost", True)
+
+        # Markazlashtirish
+        app.update_idletasks()
+        ax = app.winfo_x() + (app.winfo_width() - 560) // 2
+        ay = app.winfo_y() + (app.winfo_height() - 360) // 3
+        self.geometry(f"560x360+{max(ax, 50)}+{max(ay, 50)}")
+
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        # Qidiruv qatori
+        search_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE, corner_radius=Sizing.CARD, border_width=1, border_color=Colors.BORDER)
+        search_frame.pack(fill="x", padx=16, pady=(16, 10))
+
+        s_icon = get_vector_icon("search", size=16, color=Colors.TEXT_MUTED)
+        if s_icon:
+            ctk.CTkLabel(search_frame, image=s_icon, text="").pack(side="left", padx=(12, 6))
+
+        self.search_entry = ctk.CTkEntry(
+            search_frame,
+            placeholder_text="Buyruq yoki sahifani qidiring...",
+            font=Fonts.BODY,
+            fg_color="transparent",
+            border_width=0,
+            text_color=Colors.TEXT_PRIMARY,
+            height=40,
+        )
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=6)
+        self.search_entry.bind("<KeyRelease>", self._on_search)
+        self.search_entry.bind("<Return>", self._on_select)
+        self.search_entry.focus_set()
+
+        # Natijalar ro'yxati
+        self.results_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.results_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+
+        # Standart amallar ro'yxati
+        self._commands = [
+            ("voice", "Ovozli muloqot", "Mikasa bilan ovozli dialog ochish", "mic"),
+            ("chat", "AI Suhbat", "Matnli xabar yozish va maslahat olish", "chat"),
+            ("commands", "Buyruqlar & Asboblar", "Barcha 29 ta tool va funksiyalar katalogi", "commands"),
+            ("memory", "Xotira markazi", "Profil faktlari va muloqotlar tarixi", "memory"),
+            ("scheduler", "Rejalashtiruvchi", "Eslatmalar va vazifalar taqvimi", "scheduler"),
+            ("plugins", "Plaginlar", "Qo'shimcha modullarni ko'rish", "plugins"),
+            ("settings", "Sozlamalar", "Tizim va AI parametrlarini sozlash", "settings"),
+        ]
+
+        self._render_results(self._commands)
+
+    def _render_results(self, items):
+        for w in self.results_scroll.winfo_children():
+            w.destroy()
+
+        if not items:
+            ctk.CTkLabel(
+                self.results_scroll,
+                text="Mos buyruq topilmadi",
+                font=Fonts.SMALL,
+                text_color=Colors.TEXT_MUTED,
+            ).pack(pady=20)
+            return
+
+        for page_id, title, desc, icon_name in items:
+            item_btn = ctk.CTkButton(
+                self.results_scroll,
+                text=f"  {title} — {desc}",
+                image=get_vector_icon(icon_name, size=16, color=Colors.PRIMARY),
+                compound="left",
+                font=Fonts.SMALL,
+                fg_color=Colors.BG_CARD,
+                hover_color=Colors.BG_HOVER,
+                text_color=Colors.TEXT_PRIMARY,
+                anchor="w",
+                height=38,
+                corner_radius=Sizing.SMALL,
+                command=lambda pid=page_id: self._execute_item(pid),
+            )
+            item_btn.pack(fill="x", pady=2)
+
+    def _on_search(self, event=None):
+        q = self.search_entry.get().strip().lower()
+        if not q:
+            self._render_results(self._commands)
+            return
+
+        filtered = [
+            c for c in self._commands
+            if q in c[1].lower() or q in c[2].lower() or q in c[0].lower()
+        ]
+        self._render_results(filtered)
+
+    def _on_select(self, event=None):
+        q = self.search_entry.get().strip().lower()
+        filtered = [
+            c for c in self._commands
+            if q in c[1].lower() or q in c[2].lower() or q in c[0].lower()
+        ]
+        if filtered:
+            self._execute_item(filtered[0][0])
+
+    def _execute_item(self, page_id):
+        self.destroy()
+        if hasattr(self.app, "navigate_to"):
+            self.app.navigate_to(page_id)

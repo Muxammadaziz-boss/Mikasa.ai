@@ -69,8 +69,8 @@ class MikasaApp(ctk.CTk):
         self._build_shell()
 
         # Soat va tizim ma'lumotlarini yangilash
-        self._update_clock()
-        self._update_system_stats()
+        # self._update_clock()
+        # self._update_system_stats()
 
         # Backend ni ishga tushirish
         if connect_backend:
@@ -166,7 +166,7 @@ class MikasaApp(ctk.CTk):
             self.geometry(target_size)
             self.minsize(1000, 600)
 
-    def _build_shell(self, page_id="dashboard", page_states=None):
+    def _build_shell(self, page_id="voice", page_states=None):
         self._build_titlebar()
         self._build_statusbar()
         self._build_layout()
@@ -180,7 +180,7 @@ class MikasaApp(ctk.CTk):
         self._restore_runtime_state()
 
     def _rebuild_shell(self):
-        current_page = self._current_page or "dashboard"
+        current_page = self._current_page or "voice"
         page_states = self._capture_page_states()
         self._current_page = None
         self._is_rebuilding_shell = True
@@ -290,7 +290,7 @@ class MikasaApp(ctk.CTk):
             pass
 
     def _sync_tts_label(self):
-        if not hasattr(self, "tts_label"):
+        if not getattr(self, "tts_label", None):
             return
         try:
             from config import get_config
@@ -307,7 +307,7 @@ class MikasaApp(ctk.CTk):
         self.titlebar = ctk.CTkFrame(
             self,
             fg_color=Colors.BG_DARKEST,
-            height=40 if self._compact_mode else 44,
+            height=36,
             corner_radius=0,
         )
         self.titlebar.pack(fill="x", side="top")
@@ -328,24 +328,6 @@ class MikasaApp(ctk.CTk):
         )
         self.logo_label.pack(side="left", padx=(14, 6))
 
-        # Versiya pill badge
-        if not self._compact_mode:
-            self.version_badge = ctk.CTkFrame(
-                self.titlebar,
-                fg_color=Colors.BG_CARD,
-                corner_radius=Sizing.RADIUS_PILL,
-                border_width=1,
-                border_color=Colors.BORDER,
-            )
-            self.version_badge.pack(side="left", padx=(0, 10))
-            self.version_label = ctk.CTkLabel(
-                self.version_badge,
-                text=f"v{VERSION}",
-                font=Fonts.TINY,
-                text_color=Colors.TEXT_MUTED,
-            )
-            self.version_label.pack(padx=8, pady=2)
-
         # Status badge
         self.status_badge = StatusBadge(
             self.titlebar,
@@ -363,23 +345,16 @@ class MikasaApp(ctk.CTk):
         )
         self.page_label.pack(side="left", padx=8 if self._compact_mode else 10)
 
-        self.user_label = ctk.CTkLabel(
+        # Ctrl+K qidiruv indikatori
+        self.search_hint = ctk.CTkLabel(
             self.titlebar,
-            text=f"{self._get_user_name()}",
-            font=Fonts.STATUS,
+            text="⌘K",
+            font=Fonts.TINY,
             text_color=Colors.TEXT_MUTED,
+            cursor="hand2",
         )
-        if not self._compact_mode:
-            self.user_label.pack(side="left", padx=8)
-
-        # O'ng tomon — soat
-        self.clock_label = ctk.CTkLabel(
-            self.titlebar,
-            text="--:--",
-            font=(Fonts.FAMILY, 12),
-            text_color=Colors.TEXT_MUTED,
-        )
-        self.clock_label.pack(side="right", padx=16)
+        self.search_hint.pack(side="right", padx=16)
+        self.search_hint.bind("<Button-1>", lambda e: self._on_global_search())
 
         # 1px hairline border below titlebar
         self.titlebar_divider = ctk.CTkFrame(
@@ -429,22 +404,16 @@ class MikasaApp(ctk.CTk):
         # Nav elementlar bo'limlari
         nav_sections = [
             (
-                "ASOSIY",
+                "MIKASA",
                 [
-                    ("dashboard", Icons.DASHBOARD, "Dashboard"),
-                    ("chat", Icons.CHAT, "AI Suhbat"),
                     ("voice", Icons.VOICE, "Ovozli muloqot"),
-                ],
-            ),
-            (
-                "INTELLIGENCE",
-                [
+                    ("chat", Icons.CHAT, "AI Suhbat"),
                     ("commands", Icons.COMMANDS, "Buyruqlar"),
                     ("memory", Icons.MEMORY, "Xotira"),
                 ],
             ),
             (
-                "TIZIM",
+                "AGENT",
                 [
                     ("scheduler", Icons.SCHEDULER, "Rejalashtiruvchi"),
                     ("plugins", Icons.PLUGINS, "Plaginlar"),
@@ -490,8 +459,11 @@ class MikasaApp(ctk.CTk):
         self._nav_items["settings"] = settings_item
 
     def _build_statusbar(self):
-        """Pastki status bar — Apple hairline border + muted stats"""
-        # 1px hairline border above statusbar
+        """Persistent AI Control Bar — AI holati va tezkor boshqaruv"""
+        from gui.icons import get_vector_icon
+        from gui.components import GlassButton
+        
+        # 1px hairline border above
         self.statusbar_divider = ctk.CTkFrame(
             self,
             fg_color=Colors.BORDER,
@@ -499,61 +471,113 @@ class MikasaApp(ctk.CTk):
             corner_radius=0,
         )
         self.statusbar_divider.pack(fill="x", side="bottom")
-
+        
+        # Control bar
         self.statusbar = ctk.CTkFrame(
             self,
-            fg_color=Colors.STATUSBAR_BG,
-            height=Sizing.STATUSBAR_HEIGHT,
+            fg_color=Colors.BG_DARKEST,
+            height=34,
             corner_radius=0,
         )
         self.statusbar.pack(fill="x", side="bottom")
         self.statusbar.pack_propagate(False)
-
-        # CPU
-        self.cpu_label = ctk.CTkLabel(
-            self.statusbar,
-            text="CPU: --%",
-            font=Fonts.STATUS,
+        
+        # Left: AI status indicator
+        status_left = ctk.CTkFrame(self.statusbar, fg_color="transparent")
+        status_left.pack(side="left", padx=14)
+        
+        self._ai_dot = ctk.CTkLabel(
+            status_left,
+            text="",
+            image=get_vector_icon("circle", size=7, color=Colors.SUCCESS),
+        )
+        self._ai_dot.pack(side="left", padx=(0, 6))
+        
+        self._ai_status_label = ctk.CTkLabel(
+            status_left,
+            text="Mikasa kutmoqda",
+            font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         )
-        self.cpu_label.pack(side="left", padx=16)
-
-        if not self._compact_mode:
-            ctk.CTkLabel(
-                self.statusbar, text="│", font=Fonts.STATUS, text_color=Colors.BORDER
-            ).pack(side="left")
-
-        self.ram_label = ctk.CTkLabel(
+        self._ai_status_label.pack(side="left")
+        
+        # Right: Voice <-> Chat switch button
+        self._mode_switch_btn = ctk.CTkButton(
             self.statusbar,
-            text="RAM: --%",
-            font=Fonts.STATUS,
+            text="Chat",
+            image=get_vector_icon("chat", size=14, color=Colors.TEXT_MUTED),
+            compound="left",
+            font=Fonts.TINY,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_MUTED,
+            height=26,
+            width=80,
+            corner_radius=Sizing.SMALL,
+            command=self._toggle_voice_chat,
         )
-        self.ram_label.pack(side="left", padx=12 if self._compact_mode else 16)
+        self._mode_switch_btn.pack(side="right", padx=10)
+        
+        # Center-right: Mic toggle button  
+        self._bar_mic_btn = ctk.CTkButton(
+            self.statusbar,
+            text="",
+            image=get_vector_icon("mic", size=16, color=Colors.TEXT_MUTED),
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            width=30,
+            height=26,
+            corner_radius=Sizing.SMALL,
+            command=self._bar_toggle_mic,
+        )
+        self._bar_mic_btn.pack(side="right", padx=4)
+        
+        # Backward compatibility stubs
+        self.cpu_label = None
+        self.ram_label = None
+        self.api_label = None
+        self.tts_label = None
 
-        if not self._compact_mode:
-            ctk.CTkLabel(
-                self.statusbar, text="│", font=Fonts.STATUS, text_color=Colors.BORDER
-            ).pack(side="left")
-
-            self.api_label = ctk.CTkLabel(
-                self.statusbar,
-                text=f"API: {self._status_state['text']}",
-                font=Fonts.STATUS,
-                text_color=Colors.TEXT_MUTED,
-            )
-            self.api_label.pack(side="left", padx=16)
+    def _toggle_voice_chat(self):
+        """Voice va Chat orasida tezkor almashtirish"""
+        if self._current_page == "voice":
+            self.navigate_to("chat")
         else:
-            self.api_label = None
+            self.navigate_to("voice")
 
-        # O'ng tomon — TTS engine
-        self.tts_label = ctk.CTkLabel(
-            self.statusbar,
-            text="TTS: Silero",
-            font=Fonts.STATUS,
-            text_color=Colors.TEXT_MUTED,
-        )
-        self.tts_label.pack(side="right", padx=16)
+    def _bar_toggle_mic(self):
+        """Control bar mikrofon toggle — Voice sahifasiga o'tib tinglashni boshlash/to'xtatish"""
+        if self._current_page != "voice":
+            self.navigate_to("voice")
+        voice_page = self._pages.get("voice")
+        if voice_page and hasattr(voice_page, "_toggle_listening"):
+            self.after(100, voice_page._toggle_listening)
+
+    def update_ai_control_bar(self, status_text=None, is_listening=False):
+        """AI Control Bar holatini yangilash"""
+        from gui.icons import get_vector_icon
+        if not hasattr(self, '_ai_status_label'):
+            return
+        try:
+            if status_text and self._ai_status_label.winfo_exists():
+                self._ai_status_label.configure(text=status_text)
+            
+            if is_listening:
+                self._ai_dot.configure(
+                    image=get_vector_icon("circle", size=7, color=Colors.PRIMARY)
+                )
+                self._bar_mic_btn.configure(
+                    image=get_vector_icon("mic", size=16, color=Colors.PRIMARY)
+                )
+            else:
+                self._ai_dot.configure(
+                    image=get_vector_icon("circle", size=7, color=Colors.SUCCESS)
+                )
+                self._bar_mic_btn.configure(
+                    image=get_vector_icon("mic", size=16, color=Colors.TEXT_MUTED)
+                )
+        except Exception:
+            pass
 
     # ========== SAHIFALAR & LAZY NAVIGATSIYA ==========
 
@@ -570,7 +594,7 @@ class MikasaApp(ctk.CTk):
         }
         return page_registry.get(page_id)
 
-    def _init_pages(self, initial_page="dashboard"):
+    def _init_pages(self, initial_page="voice"):
         """Dastlabki sahifani yuklash (Lazy loading — qolgan sahifalar talab bo'lganda yaratiladi)"""
         self._get_or_create_page(initial_page)
 
@@ -607,13 +631,21 @@ class MikasaApp(ctk.CTk):
             return None
 
     def _on_global_search(self):
-        """Ctrl + K orqali global qidiruv (Buyruqlar sahifasiga o'tib qidiruv inputiga fokus beradi)"""
-        self.navigate_to("commands")
-        def _focus():
-            page = self._pages.get("commands")
-            if page and hasattr(page, "focus_search"):
-                page.focus_search()
-        self.after(50, _focus)
+        """Ctrl + K orqali Command Palette (Spotlight) ochish"""
+        try:
+            from gui.components import CommandPaletteOverlay
+            if hasattr(self, "_palette") and self._palette and self._palette.winfo_exists():
+                self._palette.lift()
+                self._palette.focus_set()
+                return
+            self._palette = CommandPaletteOverlay(self)
+        except Exception:
+            self.navigate_to("commands")
+            def _focus():
+                page = self._pages.get("commands")
+                if page and hasattr(page, "focus_search"):
+                    page.focus_search()
+            self.after(50, _focus)
 
     def navigate_to(self, page_id, sync=False):
         """
@@ -640,7 +672,6 @@ class MikasaApp(ctk.CTk):
             nav_item.set_active(nav_id == page_id)
 
         self.page_label.configure(text=self._page_title(page_id))
-        self.user_label.configure(text=f"User: {self._get_user_name()}")
 
         # 3. Bekor qilinmagan oldingi lazy nav jobini to'xtatish
         if self._lazy_nav_job:
@@ -673,6 +704,24 @@ class MikasaApp(ctk.CTk):
 
             self._current_page = page_id
             self._nav_state = "READY"
+            
+            # Update AI Control Bar mode button
+            if hasattr(self, '_mode_switch_btn'):
+                try:
+                    from gui.icons import get_vector_icon
+                    if page_id == "voice":
+                        self._mode_switch_btn.configure(
+                            text="Chat",
+                            image=get_vector_icon("chat", size=14, color=Colors.TEXT_MUTED),
+                        )
+                    elif page_id == "chat":
+                        self._mode_switch_btn.configure(
+                            text="Voice", 
+                            image=get_vector_icon("mic", size=14, color=Colors.TEXT_MUTED),
+                        )
+                except Exception:
+                    pass
+                    
             return
 
         # 6. Keshda yo'q bo'lsa — Loading Skeleton ko'rsatish
@@ -724,6 +773,23 @@ class MikasaApp(ctk.CTk):
 
                 self._current_page = page_id
                 self._nav_state = "READY"
+                
+                # Update AI Control Bar mode button
+                if hasattr(self, '_mode_switch_btn'):
+                    try:
+                        from gui.icons import get_vector_icon
+                        if page_id == "voice":
+                            self._mode_switch_btn.configure(
+                                text="Chat",
+                                image=get_vector_icon("chat", size=14, color=Colors.TEXT_MUTED),
+                            )
+                        elif page_id == "chat":
+                            self._mode_switch_btn.configure(
+                                text="Voice", 
+                                image=get_vector_icon("mic", size=14, color=Colors.TEXT_MUTED),
+                            )
+                    except Exception:
+                        pass
             else:
                 self._nav_state = "ERROR"
         except Exception as e:
@@ -735,60 +801,22 @@ class MikasaApp(ctk.CTk):
     # ========== YANGILANISHLAR ==========
 
     def _update_clock(self):
-        """Soatni har soniyada yangilash"""
-        try:
-            if not self.winfo_exists():
-                return
-            now = datetime.datetime.now()
-            if hasattr(self, "clock_label") and self.clock_label.winfo_exists():
-                self.clock_label.configure(text=now.strftime("%H:%M:%S"))
-        except Exception:
-            pass
-        self._clock_job = self.after(1000, self._update_clock)
+        """Soat endi yo'q"""
+        pass
 
     def _update_system_stats(self):
-        """Tizim ma'lumotlarini har 3 soniyada yangilash"""
-        try:
-            if not self.winfo_exists():
-                return
-            cpu = psutil.cpu_percent(interval=0)
-            ram = psutil.virtual_memory().percent
-            if hasattr(self, "cpu_label") and self.cpu_label.winfo_exists():
-                self.cpu_label.configure(text=f"CPU: {cpu:.0f}%")
-            if hasattr(self, "ram_label") and self.ram_label.winfo_exists():
-                self.ram_label.configure(text=f"RAM: {ram:.0f}%")
-
-            # Rang o'zgartirish
-            cpu_color = (
-                Colors.SUCCESS
-                if cpu < 60
-                else (Colors.WARNING if cpu < 85 else Colors.DANGER)
-            )
-            ram_color = (
-                Colors.SUCCESS
-                if ram < 70
-                else (Colors.WARNING if ram < 90 else Colors.DANGER)
-            )
-            if hasattr(self, "cpu_label") and self.cpu_label.winfo_exists():
-                self.cpu_label.configure(text_color=cpu_color)
-            if hasattr(self, "ram_label") and self.ram_label.winfo_exists():
-                self.ram_label.configure(text_color=ram_color)
-            if self.api_label is not None and self.api_label.winfo_exists():
-                self.api_label.configure(text_color=Colors.TEXT_MUTED)
-        except Exception:
-            pass
-
-        self._stats_job = self.after(3000, self._update_system_stats)
+        """Tizim ma'lumotlari endi yo'q"""
+        pass
 
     def set_status(self, status, text=None):
         """Global holatni o'zgartirish"""
         self._status_state = {"status": status, "text": text or status.capitalize()}
         if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
             self.status_badge.set_status(status, text)
+        # Update AI Control Bar
         display_text = self._status_state["text"]
-        api_label = getattr(self, "api_label", None)
-        if api_label is not None and api_label.winfo_exists():
-            api_label.configure(text=f"API: {display_text}")
+        is_listening = status == "listening"
+        self.update_ai_control_bar(f"Mikasa: {display_text}", is_listening)
 
     def _get_user_name(self):
         try:
@@ -800,7 +828,6 @@ class MikasaApp(ctk.CTk):
 
     def _page_title(self, page_id):
         titles = {
-            "dashboard": "Dashboard",
             "voice": "Ovozli dialog",
             "chat": "AI suhbat",
             "commands": "Buyruqlar",
@@ -816,7 +843,7 @@ class MikasaApp(ctk.CTk):
     def _on_closing(self):
         """Dasturni yopish — resurslarni tozalash"""
         try:
-            for timer_attr in ["_lazy_nav_job", "_clock_job", "_stats_job"]:
+            for timer_attr in ["_lazy_nav_job", "_stats_job"]:
                 job = getattr(self, timer_attr, None)
                 if job:
                     try:
