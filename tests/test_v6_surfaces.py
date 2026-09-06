@@ -202,6 +202,105 @@ class TestSurfaceHierarchyAndTokens(unittest.TestCase):
 
             page.destroy()
 
+    def test_explicit_surface_api(self):
+        """Card(..., surface=...) allows explicit surface selection without subclassing"""
+        c_elevated = Card(self.container, title="Explicit Elevated", surface="elevated")
+        c_glass = Card(self.container, title="Explicit Glass", surface="glass")
+        c_hero = Card(self.container, title="Explicit Hero", surface="hero")
+
+        self.assertEqual(c_elevated._surface_tier, Surfaces.ELEVATED)
+        self.assertEqual(c_elevated.cget("fg_color"), Colors.BG_PANEL)
+
+        self.assertEqual(c_glass._surface_tier, Surfaces.GLASS)
+        self.assertEqual(c_glass.cget("fg_color"), Colors.GLASS_BG)
+
+        self.assertEqual(c_hero._surface_tier, Surfaces.HERO)
+        self.assertEqual(c_hero.cget("fg_color"), Colors.GLASS_HERO_BG)
+
+        for w in (c_elevated, c_glass, c_hero):
+            w.destroy()
+
+    def test_fg_color_precedence_and_overrides(self):
+        """Explicit fg_color, border_color, border_width, corner_radius take strict precedence"""
+        custom = Card(
+            self.container,
+            title="Custom Override",
+            fg_color="#123456",
+            border_color="#654321",
+            border_width=3,
+            corner_radius=8,
+        )
+        self.assertEqual(custom.cget("fg_color"), "#123456")
+        self.assertEqual(custom.cget("border_color"), "#654321")
+        self.assertEqual(custom.cget("border_width"), 3)
+        self.assertEqual(custom.cget("corner_radius"), 8)
+        self.assertTrue(custom._user_fg_override)
+        self.assertTrue(custom._user_border_override)
+        custom.destroy()
+
+    def test_nested_cards_combinations(self):
+        """
+        Verify nested card hierarchies:
+        1. Card -> Card
+        2. Card -> GlassCard
+        3. GlassCard -> Card
+        4. ElevatedCard -> Card
+        Child card corner bg_color must resolve cleanly to parent foreground.
+        """
+        # 1. Card -> Card
+        p1 = Card(self.container, title="Parent Solid")
+        c1 = Card(p1.content, title="Child Solid")
+        self.root.update()
+        self.assertEqual(c1._bg_color, p1.cget("fg_color"))
+
+        # 2. Card -> GlassCard
+        p2 = Card(self.container, title="Parent Solid")
+        c2 = GlassCard(p2.content, title="Child Glass")
+        self.root.update()
+        self.assertEqual(c2._bg_color, p2.cget("fg_color"))
+
+        # 3. GlassCard -> Card
+        p3 = GlassCard(self.container, title="Parent Glass")
+        c3 = Card(p3.content, title="Child Solid")
+        self.root.update()
+        self.assertEqual(c3._bg_color, p3.cget("fg_color"))
+
+        # 4. ElevatedCard -> Card
+        p4 = ElevatedCard(self.container, title="Parent Elevated")
+        c4 = Card(p4.content, title="Child Solid")
+        self.root.update()
+        self.assertEqual(c4._bg_color, p4.cget("fg_color"))
+
+        for w in (p1, p2, p3, p4):
+            w.destroy()
+
+    def test_theme_switching_lifecycle(self):
+        """Card.update_theme() refreshes colors on Dark -> Light -> Dark transitions without losing overrides"""
+        Colors.apply_theme("dark")
+        card = Card(self.container, title="Switching Card")
+        override_card = Card(self.container, title="Overridden Card", fg_color="#AABBCC")
+
+        self.assertEqual(card.cget("fg_color"), Colors._DARK["BG_CARD"])
+        self.assertEqual(override_card.cget("fg_color"), "#AABBCC")
+
+        # Switch to Light
+        Colors.apply_theme("light")
+        card.update_theme()
+        override_card.update_theme()
+        self.assertEqual(card.cget("fg_color"), Colors._LIGHT["BG_CARD"])
+        # Override must be preserved!
+        self.assertEqual(override_card.cget("fg_color"), "#AABBCC")
+
+        # Switch back to Dark
+        Colors.apply_theme("dark")
+        card.update_theme()
+        override_card.update_theme()
+        self.assertEqual(card.cget("fg_color"), Colors._DARK["BG_CARD"])
+        self.assertEqual(override_card.cget("fg_color"), "#AABBCC")
+
+        card.destroy()
+        override_card.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()

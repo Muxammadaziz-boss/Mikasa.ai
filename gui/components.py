@@ -16,16 +16,80 @@ from gui.icons import VectorIconEngine, get_vector_icon
 
 class Surface(ctk.CTkFrame):
     """
-    Mikasa AI Semantic Surface Base.
+    Mikasa AI Semantic Surface Base Frame.
+    
     Barcha darajadagi konteyner va sirtlar uchun poydevor klass.
+    Avtomatik ravishda Surfaces tokenlaridan rang, hoshiya va radiuslarni oladi.
     """
-    def __init__(self, master, tier=Surfaces.CARD, **kwargs):
-        tokens = Surfaces.get_tokens(tier)
-        kwargs.setdefault("fg_color", tokens["fg_color"])
-        kwargs.setdefault("border_color", tokens["border_color"])
-        kwargs.setdefault("border_width", tokens["border_width"])
-        super().__init__(master, **kwargs)
-        self._surface_tier = tier
+    DEFAULT_SURFACE = Surfaces.CARD
+
+    def __init__(
+        self,
+        master,
+        surface: str = None,
+        fg_color=None,
+        bg_color=None,
+        border_color=None,
+        border_width=None,
+        corner_radius=None,
+        tier=None,
+        **kwargs,
+    ):
+        # Sirt darajasini aniqlash (Backward-compatible: 'surface' yoki 'tier')
+        effective_surface = (surface or tier or self.DEFAULT_SURFACE or Surfaces.CARD).lower()
+        self._surface_tier = effective_surface
+        tokens = Surfaces.get_tokens(effective_surface)
+
+        # Precedence 1: fg_color (explicit arg > kwargs.pop > semantic token default)
+        if fg_color is None:
+            fg_color = kwargs.pop("fg_color", None)
+        self._user_fg_override = fg_color is not None
+        resolved_fg = fg_color if self._user_fg_override else tokens.get("fg_color", Colors.BG_CARD)
+
+        # Precedence 2: border_color
+        if border_color is None:
+            border_color = kwargs.pop("border_color", None)
+        self._user_border_override = border_color is not None
+        resolved_border_color = border_color if self._user_border_override else tokens.get("border_color", Colors.BORDER)
+
+        # Precedence 3: border_width
+        if border_width is None:
+            border_width = kwargs.pop("border_width", None)
+        self._user_border_width_override = border_width is not None
+        resolved_border_width = border_width if self._user_border_width_override else tokens.get("border_width", 1)
+
+        # Precedence 4: corner_radius
+        if corner_radius is None:
+            corner_radius = kwargs.pop("corner_radius", None)
+        self._user_radius_override = corner_radius is not None
+        resolved_radius = corner_radius if self._user_radius_override else tokens.get("corner_radius", Sizing.CARD)
+
+        # Precedence 5: bg_color
+        # Muhim: agar bg_color berilmagan bo'lsa, "transparent" beriladi.
+        # CustomTkinter avtomatik ravishda master ning fg_color ini aniqlaydi va burchaklar
+        # o'sha rangda tekis chiziladi (dark halo yoki mismatch bo'lmaydi).
+        if bg_color is None:
+            bg_color = kwargs.pop("bg_color", None)
+        self._user_bg_override = bg_color is not None
+        resolved_bg = bg_color if self._user_bg_override else "transparent"
+
+        super().__init__(
+            master=master,
+            fg_color=resolved_fg,
+            bg_color=resolved_bg,
+            border_color=resolved_border_color,
+            border_width=resolved_border_width,
+            corner_radius=resolved_radius,
+            **kwargs,
+        )
+
+    def update_theme(self):
+        """Mavzu o'zgarganda sirt ranglarini qayta qo'llash"""
+        tokens = Surfaces.get_tokens(self._surface_tier)
+        if not self._user_fg_override:
+            self.configure(fg_color=tokens.get("fg_color", Colors.BG_CARD))
+        if not self._user_border_override:
+            self.configure(border_color=tokens.get("border_color", Colors.BORDER))
 
 
 class Card(Surface):
@@ -35,6 +99,7 @@ class Card(Surface):
     Standard container for general UI: forms, lists, tables, data rows, and settings.
     Solid, distraction-free container with subtle hairline border (Colors.BORDER).
     """
+    DEFAULT_SURFACE = Surfaces.CARD
 
     def __init__(
         self,
@@ -44,23 +109,35 @@ class Card(Surface):
         padding=None,
         accent_color=None,
         action_widget=None,
+        surface=None,
+        fg_color=None,
+        bg_color=None,
+        border_color=None,
+        border_width=None,
+        corner_radius=None,
+        tier=None,
         **kwargs,
     ):
         padding = Sizing.CARD_PADDING if padding is None else padding
         accent_color = accent_color or Colors.PRIMARY
+        effective_surface = surface or tier or self.DEFAULT_SURFACE
 
-        if "bg_color" not in kwargs:
-            kwargs["bg_color"] = Colors.BG_DARK
-
-        kwargs.setdefault("corner_radius", Sizing.CARD_RADIUS)
-        kwargs.setdefault("border_width", 1)
-        kwargs.setdefault("border_color", Colors.BORDER)
-        kwargs.setdefault("fg_color", Colors.BG_CARD)
-
-        super().__init__(master, tier=Surfaces.CARD, **kwargs)
+        super().__init__(
+            master=master,
+            surface=effective_surface,
+            fg_color=fg_color,
+            bg_color=bg_color,
+            border_color=border_color,
+            border_width=border_width,
+            corner_radius=corner_radius,
+            **kwargs,
+        )
 
         self._padding = padding
         self._accent_color = accent_color
+        self.title_label = None
+        self.subtitle_label = None
+        self.header_divider = None
 
         if title or subtitle:
             self.header = ctk.CTkFrame(self, fg_color="transparent")
@@ -98,15 +175,25 @@ class Card(Surface):
                 )
                 self.subtitle_label.pack(fill="x", pady=(2, 0))
 
-            # Hairline 1px divider
-            ctk.CTkFrame(
+            # Hairline 1px divider (subtle, non-intrusive)
+            self.header_divider = ctk.CTkFrame(
                 self,
                 fg_color=Colors.BORDER_SUBTLE,
                 height=1,
-            ).pack(fill="x", padx=padding, pady=(4, padding))
+            )
+            self.header_divider.pack(fill="x", padx=padding, pady=(4, padding))
 
         self.content = ctk.CTkFrame(self, fg_color="transparent")
         self.content.pack(fill="both", expand=True, padx=padding, pady=(0, padding))
+
+    def update_theme(self):
+        super().update_theme()
+        if self.header_divider:
+            self.header_divider.configure(fg_color=Colors.BORDER_SUBTLE)
+        if self.title_label:
+            self.title_label.configure(text_color=Colors.TEXT_PRIMARY)
+        if self.subtitle_label:
+            self.subtitle_label.configure(text_color=Colors.TEXT_MUTED)
 
 
 class ElevatedCard(Card):
@@ -116,20 +203,7 @@ class ElevatedCard(Card):
     Qatlamli, balandroq sirtlar uchun: yon panellar, asbob kartalari,
     dropdown ro'yxatlar va ikkinchi darajali guruhlar.
     """
-
-    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
-        kwargs.setdefault("fg_color", Colors.BG_PANEL)
-        kwargs.setdefault("border_color", Colors.BORDER_ELEVATED)
-        kwargs.setdefault("border_width", 1)
-        super().__init__(
-            master,
-            title=title,
-            subtitle=subtitle,
-            padding=padding,
-            accent_color=accent_color,
-            **kwargs,
-        )
-        self._surface_tier = Surfaces.ELEVATED
+    DEFAULT_SURFACE = Surfaces.ELEVATED
 
 
 class GlassCard(Card):
@@ -150,20 +224,7 @@ class GlassCard(Card):
       - Modals and prominent accent cards
     Do NOT use for ordinary buttons, lists, tables, or settings rows.
     """
-
-    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
-        kwargs.setdefault("fg_color", Colors.GLASS_BG)
-        kwargs.setdefault("border_color", Colors.GLASS_BORDER)
-        kwargs.setdefault("border_width", 1)
-        super().__init__(
-            master,
-            title=title,
-            subtitle=subtitle,
-            padding=padding,
-            accent_color=accent_color,
-            **kwargs,
-        )
-        self._surface_tier = Surfaces.GLASS
+    DEFAULT_SURFACE = Surfaces.GLASS
 
 
 class HeroCard(Card):
@@ -173,20 +234,7 @@ class HeroCard(Card):
     Prominent accent banner va yuqori darajadagi e'tibor panellari uchun sirt.
     Accent border (Colors.GLASS_HERO_BORDER / Colors.BORDER_HERO) bilan ajratiladi.
     """
-
-    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
-        kwargs.setdefault("fg_color", Colors.GLASS_HERO_BG)
-        kwargs.setdefault("border_color", Colors.GLASS_HERO_BORDER)
-        kwargs.setdefault("border_width", 1)
-        super().__init__(
-            master,
-            title=title,
-            subtitle=subtitle,
-            padding=padding,
-            accent_color=accent_color,
-            **kwargs,
-        )
-        self._surface_tier = Surfaces.HERO
+    DEFAULT_SURFACE = Surfaces.HERO
 
 
 class OverlayCard(Card):
@@ -195,24 +243,12 @@ class OverlayCard(Card):
     
     Modal dialoglar, qalqib chiquvchi oynalar va toast bildirishnomalar uchun sirt.
     """
-
-    def __init__(self, master, title="", subtitle="", padding=None, accent_color=None, **kwargs):
-        kwargs.setdefault("fg_color", Colors.OVERLAY_BG)
-        kwargs.setdefault("border_color", Colors.BORDER_ELEVATED)
-        kwargs.setdefault("border_width", 1)
-        super().__init__(
-            master,
-            title=title,
-            subtitle=subtitle,
-            padding=padding,
-            accent_color=accent_color,
-            **kwargs,
-        )
-        self._surface_tier = Surfaces.OVERLAY
+    DEFAULT_SURFACE = Surfaces.OVERLAY
 
 
-class PageHero(GlassCard):
+class PageHero(HeroCard):
     """Sahifa bosh sarlavhasi — zamonaviy minimal banner"""
+    DEFAULT_SURFACE = Surfaces.HERO
 
     def __init__(
         self,
@@ -222,17 +258,26 @@ class PageHero(GlassCard):
         icon="sparkles",
         accent_color=None,
         chips=None,
+        surface=None,
         **kwargs,
     ):
         accent = accent_color or Colors.PRIMARY
-        kwargs.setdefault("border_color", Colors.GLASS_HERO_BORDER if accent == Colors.PRIMARY else accent)
+        tier = surface or self.DEFAULT_SURFACE
+        
+        # Border discipline: accent highlight border
+        default_border = Colors.GLASS_HERO_BORDER if accent == Colors.PRIMARY else accent
+        kwargs.setdefault("border_color", default_border)
         kwargs.setdefault("border_width", 1)
+        kwargs.setdefault("corner_radius", Sizing.LARGE)
+        kwargs.setdefault("fg_color", Colors.GLASS_BG)
+
         super().__init__(
-            master,
+            master=master,
             title="",
             subtitle="",
             accent_color=accent_color,
             padding=Sizing.SPACING_16,
+            surface=tier,
             **kwargs,
         )
         self._surface_tier = Surfaces.HERO
@@ -240,22 +285,21 @@ class PageHero(GlassCard):
         header_row = ctk.CTkFrame(self.content, fg_color="transparent")
         header_row.pack(fill="x")
 
-        icon_frame = ctk.CTkFrame(
+        self.icon_frame = ctk.CTkFrame(
             header_row,
             fg_color=Colors.BG_CARD,
             border_width=1,
             border_color=Colors.BORDER,
-            corner_radius=12,
+            corner_radius=Sizing.RADIUS_BUTTON,
             width=42,
             height=42,
-            bg_color=Colors.GLASS_BG,
         )
-        icon_frame.pack(side="left")
-        icon_frame.pack_propagate(False)
+        self.icon_frame.pack(side="left")
+        self.icon_frame.pack_propagate(False)
 
         # Pure vector icon rendering with automatic fallback
         v_img = get_vector_icon(icon, size=20, color_dark=accent, color_light=accent, fallback="sparkles")
-        self.icon_label = ctk.CTkLabel(icon_frame, image=v_img, text="")
+        self.icon_label = ctk.CTkLabel(self.icon_frame, image=v_img, text="")
         self.icon_label.pack(expand=True)
 
         text_block = ctk.CTkFrame(header_row, fg_color="transparent")
@@ -297,10 +341,9 @@ class PageHero(GlassCard):
         chip = ctk.CTkFrame(
             parent,
             fg_color=fg or Colors.BG_CARD,
-            corner_radius=Sizing.RADIUS_PILL,
+            corner_radius=Sizing.PILL,
             border_width=1,
             border_color=Colors.BORDER,
-            bg_color=Colors.GLASS_BG,
         )
         chip.pack(side="left", padx=(0, 8))
 
@@ -319,6 +362,15 @@ class PageHero(GlassCard):
             text_color=tc,
         ).pack(side="left")
         return chip
+
+    def update_theme(self):
+        super().update_theme()
+        if hasattr(self, "icon_frame") and self.icon_frame:
+            self.icon_frame.configure(fg_color=Colors.BG_CARD, border_color=Colors.BORDER)
+        if hasattr(self, "title_label") and self.title_label:
+            self.title_label.configure(text_color=Colors.TEXT_PRIMARY)
+        if hasattr(self, "subtitle_label") and self.subtitle_label:
+            self.subtitle_label.configure(text_color=Colors.TEXT_MUTED)
 
 
 
@@ -1251,7 +1303,7 @@ class EmptyState(ctk.CTkFrame):
             bg_color=effective_bg,
             border_width=1,
             border_color=Colors.BORDER,
-            corner_radius=28,
+            corner_radius=Sizing.PILL,
             width=56,
             height=56,
         )

@@ -237,23 +237,23 @@ class Surfaces:
 
     @classmethod
     def get_tokens(cls, tier: str) -> dict:
-        """Returns standard {fg_color, border_color, border_width} for a given surface tier"""
-        t = tier.lower()
+        """Returns standard {fg_color, border_color, border_width, corner_radius} for a given surface tier"""
+        t = (tier or cls.CARD).lower()
         if t == cls.BASE:
-            return {"fg_color": Colors.BG_DARKEST, "border_color": Colors.BORDER_SUBTLE, "border_width": 0}
+            return {"fg_color": Colors.BG_DARKEST, "border_color": Colors.BORDER_SUBTLE, "border_width": 0, "corner_radius": 0}
         elif t == cls.SURFACE:
-            return {"fg_color": Colors.BG_DARK, "border_color": Colors.BORDER_SUBTLE, "border_width": 0}
+            return {"fg_color": Colors.BG_DARK, "border_color": Colors.BORDER_SUBTLE, "border_width": 0, "corner_radius": 0}
         elif t == cls.CARD:
-            return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1}
+            return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1, "corner_radius": Sizing.CARD}
         elif t == cls.ELEVATED:
-            return {"fg_color": Colors.BG_PANEL, "border_color": Colors.BORDER_ELEVATED, "border_width": 1}
+            return {"fg_color": Colors.BG_PANEL, "border_color": Colors.BORDER_ELEVATED, "border_width": 1, "corner_radius": Sizing.CARD}
         elif t == cls.GLASS:
-            return {"fg_color": Colors.GLASS_BG, "border_color": Colors.GLASS_BORDER, "border_width": 1}
+            return {"fg_color": Colors.GLASS_BG, "border_color": Colors.GLASS_BORDER, "border_width": 1, "corner_radius": Sizing.CARD}
         elif t == cls.HERO:
-            return {"fg_color": Colors.GLASS_HERO_BG, "border_color": Colors.GLASS_HERO_BORDER, "border_width": 1}
+            return {"fg_color": Colors.GLASS_HERO_BG, "border_color": Colors.GLASS_HERO_BORDER, "border_width": 1, "corner_radius": Sizing.LARGE}
         elif t == cls.OVERLAY:
-            return {"fg_color": Colors.OVERLAY_BG, "border_color": Colors.BORDER_ELEVATED, "border_width": 1}
-        return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1}
+            return {"fg_color": Colors.OVERLAY_BG, "border_color": Colors.BORDER_ELEVATED, "border_width": 1, "corner_radius": Sizing.CARD}
+        return {"fg_color": Colors.BG_CARD, "border_color": Colors.BORDER, "border_width": 1, "corner_radius": Sizing.CARD}
 
 
 class Fonts:
@@ -332,14 +332,20 @@ class Sizing:
     SPACING_40 = 40
     SPACING_48 = 48
 
+    # Semantik radiuslar (Semantic Radii Hierarchy)
+    SMALL = 10
+    CARD = 16
+    LARGE = 20
+    PILL = 999
+
     # Radius ierarxiyasi
-    RADIUS_PILL = 999
-    RADIUS_HERO = 20
-    RADIUS_CARD = 16
-    RADIUS_CARD_SM = 10
+    RADIUS_PILL = PILL
+    RADIUS_HERO = LARGE
+    RADIUS_CARD = CARD
+    RADIUS_CARD_SM = SMALL
     RADIUS_INPUT = 14
     RADIUS_BUTTON = 12
-    RADIUS_SMALL = 10
+    RADIUS_SMALL = SMALL
     RADIUS_ICON = 12
 
     _BASE = {
@@ -380,6 +386,10 @@ class Sizing:
     SIDEBAR_WIDTH_EXPANDED = _BASE["SIDEBAR_WIDTH_EXPANDED"]
     STATUSBAR_HEIGHT = _BASE["STATUSBAR_HEIGHT"]
     CARD_RADIUS = _BASE["CARD_RADIUS"]
+    CARD = CARD_RADIUS
+    SMALL = RADIUS_SMALL
+    LARGE = RADIUS_HERO
+    PILL = RADIUS_PILL
     CARD_PADDING = _BASE["CARD_PADDING"]
     BUTTON_HEIGHT = _BASE["BUTTON_HEIGHT"]
     BUTTON_HEIGHT_COMPACT = _BASE["BUTTON_HEIGHT_COMPACT"]
@@ -396,6 +406,7 @@ class Sizing:
         selected = cls._COMPACT if compact else cls._BASE
         for key, value in selected.items():
             setattr(cls, key, value)
+        cls.CARD = cls.CARD_RADIUS
 
 
 class Icons:
