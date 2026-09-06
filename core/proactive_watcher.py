@@ -6,6 +6,7 @@ import os
 import time
 import logging
 import threading
+import queue
 from typing import Optional, Callable, Dict, List
 from datetime import datetime, timedelta
 
@@ -15,13 +16,15 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class ProactiveWatcher:
-    """Proaktiv kuzatuvchi — foydalanuvchiga o'zi yordam taklif qiladi"""
+    """Proaktiv kuzatuvchi — foydalanuvchiga o'zi yordam taklif qiladi (Thread-safe)"""
 
     def __init__(self, check_interval: int = 180, min_silent_time: int = 300):
         self.check_interval = check_interval
         self.min_silent_time = min_silent_time
         self._thread: Optional[threading.Thread] = None
         self._running = False
+        self._stop_event = threading.Event()
+        self._suggestion_queue: queue.Queue = queue.Queue()
         self._callbacks: List[Callable] = []
         self._last_activity = time.time()
         self._last_suggestion = time.time()
@@ -36,25 +39,35 @@ class ProactiveWatcher:
             logger.warning("Watcher allaqachon ishlamoqda")
             return
 
+        self._stop_event.clear()
         self._running = True
+        self._enabled = True
         self._thread = threading.Thread(
             target=self._watch_loop, daemon=True, name="ProactiveWatcher"
         )
         self._thread.start()
-        self._enabled = True
         logger.info(f"ProactiveWatcher started (interval: {self.check_interval}s)")
 
     def stop(self):
-        """Kuzatuvchini to'xtatish"""
+        """Kuzatuvchini tezkor va xavfsiz to'xtatish"""
         self._running = False
         self._enabled = False
-        if self._thread:
-            self._thread.join(timeout=2)
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        self._thread = None
         logger.info("ProactiveWatcher stopped")
 
     def on_suggestion(self, callback: Callable[[str], None]):
         """Taklif kelganda callback"""
         self._callbacks.append(callback)
+
+    def get_suggestion(self, timeout: Optional[float] = None) -> Optional[str]:
+        """Thread-safe navbatdan taklifni olish"""
+        try:
+            return self._suggestion_queue.get(timeout=timeout)
+        except (queue.Empty, Exception):
+            return None
 
     def record_activity(self):
         """Foydalanuvchi faolligini qayd etish"""
@@ -62,12 +75,14 @@ class ProactiveWatcher:
             self._last_activity = time.time()
 
     def _watch_loop(self):
-        """Asosiy kuzatuv loop"""
+        """Asosiy kuzatuv loop (stop_event bilan boshqariladi)"""
         import psutil
 
-        while self._running:
+        while self._running and not self._stop_event.is_set():
             try:
-                time.sleep(self.check_interval)
+                # Bloklovchi time.sleep o'rniga tezkor to'xtash imkonini beruvchi wait
+                if self._stop_event.wait(timeout=self.check_interval):
+                    break
 
                 if not self._enabled:
                     continue
@@ -84,7 +99,11 @@ class ProactiveWatcher:
                 if suggestions and (
                     current_time - self._last_suggestion > self._suggestion_cooldown
                 ):
-                    for callback in self._callbacks:
+                    # Thread-safe queue ga yozish
+                    self._suggestion_queue.put(suggestions)
+
+                    # Ro'yxatdan o'tgan callbacklarni chaqirish
+                    for callback in list(self._callbacks):
                         try:
                             callback(suggestions)
                         except Exception as e:

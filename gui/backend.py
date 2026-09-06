@@ -55,18 +55,25 @@ class BackendBridge:
 
         # Activity feed
         self._activities = []
+        self._shutting_down = False
+        self._ui_job = None
 
         try:
-            self.app.after(40, self._process_ui_queue)
+            self._ui_job = self.app.after(40, self._process_ui_queue)
         except Exception:
             pass
 
     def _queue_ui(self, callback):
         """Background thread lardan UI ishlarini main thread ga uzatish."""
+        if getattr(self, "_shutting_down", False):
+            return
         self._ui_queue.put(callback)
 
     def _process_ui_queue(self):
         """Main thread da kutayotgan UI callbacklarni bajarish."""
+        if getattr(self, "_shutting_down", False):
+            return
+
         try:
             while True:
                 callback = self._ui_queue.get_nowait()
@@ -78,8 +85,8 @@ class BackendBridge:
             pass
 
         try:
-            if self.app.winfo_exists():
-                self.app.after(40, self._process_ui_queue)
+            if not getattr(self, "_shutting_down", False) and self.app.winfo_exists():
+                self._ui_job = self.app.after(40, self._process_ui_queue)
         except Exception:
             pass
 
@@ -252,6 +259,33 @@ class BackendBridge:
     @property
     def is_listening(self):
         return self._listening
+
+    def stop(self):
+        """Backend bridge ni xavfsiz to'xtatish va tozalash"""
+        self._shutting_down = True
+        self.stop_listening()
+
+        # UI timer jobini bekor qilish
+        if hasattr(self, "_ui_job") and self._ui_job:
+            try:
+                self.app.after_cancel(self._ui_job)
+            except Exception:
+                pass
+            self._ui_job = None
+
+        # Proactive Watcherni to'xtatish
+        if hasattr(self, "_proactive_watcher") and self._proactive_watcher:
+            try:
+                self._proactive_watcher.stop()
+            except Exception:
+                pass
+
+        # UI navbatidagi qoldiq callbacklarni xavfsiz tozalash
+        try:
+            while not self._ui_queue.empty():
+                self._ui_queue.get_nowait()
+        except Exception:
+            pass
 
     # ========== BACKEND → GUI ==========
 

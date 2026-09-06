@@ -152,32 +152,34 @@ class MikasaApp(ctk.CTk):
                 logger.debug(f"Custom window chrome initialization warning: {e}")
 
     def _start_window_drag(self, event):
-        """Oynani surishni boshlash (Windows native Aero Snap yoki koordinata harakati)"""
-        if os.name == "nt":
-            try:
-                import ctypes
-                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-                if not hwnd:
-                    hwnd = self.winfo_id()
-                ctypes.windll.user32.ReleaseCapture()
-                ctypes.windll.user32.SendMessageW(hwnd, 0x00A1, 2, 0)
-                # Windows drag tugagach maximized holatini tekshirib sinxronlash
-                is_max = self.state() == "zoomed"
-                if hasattr(self, "window_controls") and self.window_controls:
-                    self.window_controls.sync_maximized_state(is_max)
-                return
-            except Exception:
-                pass
+        """Oynani surishni boshlash (Pure Tkinter main-thread xavfsiz mexanizm)"""
+        if self.state() == "zoomed":
+            max_w = self.winfo_width()
+            click_ratio = max(0.0, min(1.0, event.x / max_w)) if max_w > 0 else 0.5
+            self._toggle_maximize()
+            self.update_idletasks()
+            new_w = self.winfo_width()
+            self._drag_start_x = int(new_w * click_ratio)
+            self._drag_start_y = event.y
+            new_x = event.x_root - self._drag_start_x
+            new_y = event.y_root - self._drag_start_y
+            self.geometry(f"+{new_x}+{max(0, new_y)}")
+            return
 
         self._drag_start_x = event.x_root - self.winfo_x()
         self._drag_start_y = event.y_root - self.winfo_y()
 
     def _on_window_drag(self, event):
-        """Cross-platform surish fallback"""
-        if hasattr(self, "_drag_start_x") and self._drag_start_x is not None:
+        """Oynani koordinatalar bo'yicha surish (GIL yoki modal loop xatolarisiz)"""
+        if getattr(self, "_drag_start_x", None) is not None and getattr(self, "_drag_start_y", None) is not None:
             new_x = event.x_root - self._drag_start_x
             new_y = event.y_root - self._drag_start_y
-            self.geometry(f"+{new_x}+{new_y}")
+            self.geometry(f"+{new_x}+{max(0, new_y)}")
+
+    def _end_window_drag(self, event=None):
+        """Oynani surish yakunlanganda koordinata holatini tozalash"""
+        self._drag_start_x = None
+        self._drag_start_y = None
 
     def _toggle_maximize(self):
         """Oynani kattalashtirish yoki avvalgi o'lchamga qaytarish (Maximize ↔ Restore)"""
@@ -479,6 +481,7 @@ class MikasaApp(ctk.CTk):
         for widget in (self.titlebar, self.logo_label, self.page_label):
             widget.bind("<ButtonPress-1>", self._start_window_drag)
             widget.bind("<B1-Motion>", self._on_window_drag)
+            widget.bind("<ButtonRelease-1>", self._end_window_drag)
             widget.bind("<Double-Button-1>", lambda e: self._toggle_maximize())
 
         # 7. 1px hairline border below titlebar
@@ -986,24 +989,34 @@ class MikasaApp(ctk.CTk):
             except Exception:
                 pass
 
-            # 1. Tinglashni to'xtatish
-            self.bridge.stop_listening()
-
-            # 2. AgentMemory saqlash
-            if self.bridge._agent_memory:
-                self.bridge._agent_memory.save_all()
-
-            # 3. Scheduler to'xtatish
-            if self.bridge._agent_scheduler:
-                self.bridge._agent_scheduler.stop()
-
-            # 4. Proactive Watcher to'xtatish
+            # 1. Proactive Watcher to'xtatish (fon oqimi xavfsiz to'xtashi uchun)
             try:
                 from core.proactive_watcher import stop_proactive_watcher
 
                 stop_proactive_watcher()
             except Exception:
                 pass
+
+            # 2. Backend bridge to'xtatish va tozalash
+            if hasattr(self, "bridge") and self.bridge:
+                try:
+                    self.bridge.stop()
+                except Exception:
+                    pass
+
+            # 3. AgentMemory saqlash
+            if hasattr(self, "bridge") and self.bridge and getattr(self.bridge, "_agent_memory", None):
+                try:
+                    self.bridge._agent_memory.save_all()
+                except Exception:
+                    pass
+
+            # 4. Scheduler to'xtatish
+            if hasattr(self, "bridge") and self.bridge and getattr(self.bridge, "_agent_scheduler", None):
+                try:
+                    self.bridge._agent_scheduler.stop()
+                except Exception:
+                    pass
 
             # 5. pygame tozalash
             try:
