@@ -1,7 +1,9 @@
 # ========== commands.py ==========
 # Command Center sahifasi — tool'lar va buyruqlarni boshqarish
-# Yuqori unumdorlik: Debounced qidiruv, in-memory kesh, chunked batch render
+# Yuqori unumdorlik: Normalized Search Index, Card Cache & Result Diffing,
+# Virtualized Windowing (100–1000 tools), Time-Budgeted Rendering
 
+import time
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
@@ -39,23 +41,35 @@ class CommandsPage(ctk.CTkFrame):
     """Buyruqlar va tool'lar markazi — yuqori unumdorlikdagi katalog"""
 
     BATCH_SIZE = 8
+    WINDOW_SIZE = 24
+    MAX_BATCH_TIME_MS = 12.0
 
     def __init__(self, master, app=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.app = app
-        self._all_tools = []
-        self._active_category = "all"
-        self._sort_mode = "name"
-        self._view_mode = "grid"  # "grid" yoki "list"
+        self._all_tools: list[dict] = []
+        self._tools_dataset_version: int = 1
+        self._active_category: str = "all"
+        self._sort_mode: str = "name"
+        self._view_mode: str = "grid"  # "grid" yoki "list"
 
         self._search_timer = None
         self._batch_job = None
-        self._search_cache = {}
-        self._category_chips = {}
-        self._tools_loaded = False
+        self._search_cache: dict = {}
+        self._category_chips: dict[str, ctk.CTkButton] = {}
+        self._tools_loaded: bool = False
+
+        # Card Widget Cache & Result Diffing
+        self._tool_cards: dict[str, ctk.CTkFrame] = {}
+        self._rendered_tool_names: list[str] = []
+        self._current_filtered_tools: list[dict] = []
+        self._active_window_limit: int = self.WINDOW_SIZE
+
+        self._empty_state_widget = None
+        self._load_more_frame = None
 
         self._build_ui()
-        self.on_show()
+        self._init_data()
 
     @property
     def search_entry(self):
@@ -196,12 +210,33 @@ class CommandsPage(ctk.CTkFrame):
         self.grid_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         self.grid_frame.pack(fill="both", expand=True)
 
+        # 6. Bo'sh holat placeholder (EmptyState)
+        self._empty_state_widget = EmptyState(
+            self.grid_frame,
+            icon="search",
+            title="Mos tool topilmadi",
+            description="Qidiruvni qisqartirib ko'ring yoki boshqa kategoriya filtrini tanlang.",
+        )
+
+        # 7. "Ko'proq yuklash" paneli (Katta ro'yxatlar uchun)
+        self._load_more_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        self._load_more_btn = GlassButton(
+            self._load_more_frame,
+            text="Yana ko'proq yuklash",
+            icon="refresh",
+            font=Fonts.SMALL_BOLD,
+            height=34,
+            corner_radius=Sizing.PILL,
+            command=self._load_more_items,
+        )
+        self._load_more_btn.pack(pady=12)
+
     # ========================================================
-    # DATA & CATEGORY PIPELINE
+    # DATA & NORMALIZED SEARCH INDEX
     # ========================================================
 
     def _get_tools(self):
-        """ToolRegistry dan tool ro'yxatini tezkor xotiradan olish"""
+        """ToolRegistry dan tool ro'yxatini tezkor olish"""
         tools = []
         try:
             from core.agent_tools import get_registry
@@ -225,6 +260,42 @@ class CommandsPage(ctk.CTkFrame):
         except Exception:
             pass
         return tools
+
+    def _init_data(self):
+        """Dastlabki ma'lumotlarni xotiraga yuklash va indekslash"""
+        if not self._tools_loaded:
+            self._load_and_index_tools()
+            self._tools_loaded = True
+            count = len(self._all_tools)
+            self.tool_count_chip.set_text(f"{count} ta tool")
+            self._build_category_filters()
+            self._execute_search(immediate=True)
+
+    def _load_and_index_tools(self, tools=None):
+        """Normalized qidiruv indeksini bir marta yaratish (Har bir harfda qayta hisoblamaslik uchun)"""
+        raw_tools = tools if tools is not None else self._get_tools()
+        self._all_tools = []
+        for t in raw_tools:
+            item = dict(t)
+            # Normalized search text (kichik harflar bilan birlashgan qidiruv maydoni)
+            item["_search_text"] = f"{item['name'].lower()} {item['category'].lower()} {item['description'].lower()}"
+            self._all_tools.append(item)
+
+        self._tools_dataset_version += 1
+        self._search_cache.clear()
+        self._prune_card_cache()
+
+    def _prune_card_cache(self):
+        """Olib tashlangan yoki eskirgan kartalarni xotiradan xavfsiz tozalash"""
+        valid_names = {t["name"] for t in self._all_tools}
+        for name in list(self._tool_cards.keys()):
+            if name not in valid_names:
+                card = self._tool_cards.pop(name, None)
+                if card:
+                    try:
+                        card.destroy()
+                    except Exception:
+                        pass
 
     def _build_category_filters(self):
         """Kategoriya chiplarini (Barchasi, System, Utility, ...) qurish"""
@@ -287,10 +358,11 @@ class CommandsPage(ctk.CTkFrame):
                 font=Fonts.SMALL_BOLD if is_active else Fonts.SMALL,
             )
 
+        self._active_window_limit = self.WINDOW_SIZE
         self._execute_search(immediate=True)
 
     # ========================================================
-    # DEBOUNCED SEARCH & IN-MEMORY FILTERING
+    # DEBOUNCED SEARCH & DATA PIPELINE
     # ========================================================
 
     def _on_search_keyrelease(self, event=None):
@@ -309,51 +381,55 @@ class CommandsPage(ctk.CTkFrame):
 
         query = self.search.entry.get().strip()
         if not query:
-            # So'z bo'shatilganda kutmasdan zudlik bilan tiklash
+            # So'z tozalanganda zudlik bilan tiklash
+            self._active_window_limit = self.WINDOW_SIZE
             self._execute_search(immediate=True)
         else:
-            # Yozish davomida 280ms debounce
+            # 280ms debounced search
             self._search_timer = self.after(280, lambda: self._execute_search(immediate=False))
 
     def _on_search(self, event=None):
         """Backward compatibility helper for tests and external callers"""
         self._execute_search(immediate=True)
 
+    def _filter_and_sort_tools(self, query: str, category: str, sort_mode: str) -> list[dict]:
+        """Sof ma'lumotlar bosqichi (UI ga daxlsiz, o'ta tezkor)"""
+        cache_key = (query, category, sort_mode, self._tools_dataset_version)
+        if cache_key in self._search_cache:
+            return self._search_cache[cache_key]
+
+        results = self._all_tools
+
+        # 1. Kategoriya filtri
+        if category != "all":
+            results = [t for t in results if t["category"] == category]
+
+        # 2. Normalized qidiruv
+        if query:
+            q = query.lower()
+            results = [t for t in results if q in t["_search_text"]]
+
+        # 3. Saralash
+        if sort_mode == "category":
+            results = sorted(results, key=lambda t: (t["category"], t["name"]))
+        else:
+            results = sorted(results, key=lambda t: t["name"])
+
+        # Keshga saqlash (maksimum 100 ta yozuv)
+        if len(self._search_cache) > 100:
+            self._search_cache.clear()
+        self._search_cache[cache_key] = results
+        return results
+
     def _execute_search(self, immediate=False):
         self._search_timer = None
-        query = self.search.entry.get().strip().lower()
-        cache_key = (query, self._active_category, self._sort_mode)
+        query = self.search.entry.get().strip().lower() if hasattr(self, "search") and self.search.entry else ""
 
-        if cache_key in self._search_cache:
-            filtered = self._search_cache[cache_key]
-        else:
-            filtered = self._all_tools
+        # Ma'lumotlarni filtrlash
+        filtered = self._filter_and_sort_tools(query, self._active_category, self._sort_mode)
+        self._current_filtered_tools = filtered
 
-            # 1. Kategoriya filtri
-            if self._active_category != "all":
-                filtered = [t for t in filtered if t["category"] == self._active_category]
-
-            # 2. Qidiruv so'zi filtri
-            if query:
-                filtered = [
-                    t for t in filtered
-                    if query in t["name"].lower()
-                    or query in t["description"].lower()
-                    or query in t["category"].lower()
-                ]
-
-            # 3. Saralash
-            if self._sort_mode == "category":
-                filtered = sorted(filtered, key=lambda t: (t["category"], t["name"]))
-            else:
-                filtered = sorted(filtered, key=lambda t: t["name"])
-
-            # Keshda saqlash (maksimum 50 ta yozuv)
-            if len(self._search_cache) > 50:
-                self._search_cache.clear()
-            self._search_cache[cache_key] = filtered
-
-        # Sarlavhani yangilash
+        # Sarlavha va natijalar metani yangilash
         if query:
             self.results_label.configure(text=f"Qidiruv: {query}")
         elif self._active_category != "all":
@@ -362,19 +438,29 @@ class CommandsPage(ctk.CTkFrame):
             self.results_label.configure(text="Barcha tool'lar")
 
         self.result_meta.configure(text=f"{len(filtered)} ta natija")
-        self._build_tools_grid(filtered)
+
+        # UI diffing va render
+        self._build_tools_grid(filtered, immediate=immediate)
 
     def _on_sort_change(self, choice):
         self._sort_mode = "category" if "Kategoriya" in choice else "name"
+        self._active_window_limit = self.WINDOW_SIZE
         self._execute_search(immediate=True)
 
     def _toggle_view_mode(self):
         self._view_mode = "list" if self._view_mode == "grid" else "grid"
         self.view_btn.configure(icon="chat" if self._view_mode == "list" else "dashboard")
+        # View mode o'zgarganda barcha kartalar yangi layoutga joylashtiriladi
+        self._rendered_tool_names.clear()
         self._execute_search(immediate=True)
 
+    def _load_more_items(self):
+        """Katta kataloglarda keyingi oynani yuklash"""
+        self._active_window_limit += self.WINDOW_SIZE
+        self._build_tools_grid(self._current_filtered_tools)
+
     # ========================================================
-    # CHUNKED / BATCHED PROGRESSIVE RENDERING
+    # CARD CACHE, RESULT DIFFING & TIME-BUDGET RENDERING
     # ========================================================
 
     def _cancel_batch_render(self):
@@ -385,62 +471,120 @@ class CommandsPage(ctk.CTkFrame):
                 pass
             self._batch_job = None
 
-    def _build_tools_grid(self, tools=None):
+    def _build_tools_grid(self, tools=None, immediate: bool = False):
+        """
+        Natijalarni diffing va Card Cache orqali ekranga chiqarish.
+        Mavjud kartalar destroy() qilinmaydi, to'g'ridan-to'g'ri qayta ishlatiladi!
+        """
         self._cancel_batch_render()
-
-        for widget in self.grid_frame.winfo_children():
-            widget.destroy()
 
         if tools is None:
             tools = self._all_tools
 
+        # 1. Bo'sh holat tekshiruvi
         if not tools:
-            EmptyState(
-                self.grid_frame,
-                icon="search",
-                title="Mos tool topilmadi",
-                description="Qidiruvni qisqartirib ko'ring yoki boshqa kategoriya filtrini tanlang.",
-            ).pack(fill="x", pady=20)
+            # Barcha ochiq kartalarni yashirish
+            for name in self._rendered_tool_names:
+                card = self._tool_cards.get(name)
+                if card and card.winfo_exists():
+                    card.grid_remove() if self._view_mode == "grid" else card.pack_forget()
+            self._rendered_tool_names.clear()
+
+            if self._load_more_frame and self._load_more_frame.winfo_exists():
+                self._load_more_frame.pack_forget()
+
+            if self._empty_state_widget and self._empty_state_widget.winfo_exists():
+                self._empty_state_widget.pack(fill="x", pady=20)
+            return
+        else:
+            if self._empty_state_widget and self._empty_state_widget.winfo_exists():
+                self._empty_state_widget.pack_forget()
+
+        # 2. Windowing / Virtualizatsiya (Ko'rinuvchi qism)
+        visible_tools = tools[:self._active_window_limit]
+        target_names = [t["name"] for t in visible_tools]
+
+        # 3. No-Op tekshiruvi: Agar ko'rinayotgan ro'yxat aynan bir xil bo'lsa — hech narsa o'zgarmaydi (0ms)
+        if target_names == self._rendered_tool_names:
+            self._update_load_more_visibility(len(tools), len(visible_tools))
             return
 
-        # Ustunlar soni
-        if self._view_mode == "list":
-            columns = 1
-        else:
-            columns = 3
-
+        # 4. Ustunlar konfiguratsiyasi
+        columns = 1 if self._view_mode == "list" else 3
         for i in range(columns):
             self.grid_frame.columnconfigure(i, weight=1)
 
-        # 1-qadam: Birinchi to'plamni (<8 ta) zudlik bilan chizish (<50ms)
-        self._render_batch_chunk(tools, 0, self.BATCH_SIZE, columns)
+        # 5. Diffing: Ko'rinishdan chiqqan kartalarni yashirish (grid_remove / pack_forget)
+        target_name_set = set(target_names)
+        for name in list(self._rendered_tool_names):
+            if name not in target_name_set:
+                card = self._tool_cards.get(name)
+                if card and card.winfo_exists():
+                    card.grid_remove() if self._view_mode == "grid" else card.pack_forget()
 
-    def _render_batch_chunk(self, tools, start_idx: int, batch_size: int, columns: int):
+        # 6. Partiyalab render qilish (Time-budgeted yoki immediate)
+        self._rendered_tool_names = list(target_names)
+        self._render_chunk_time_budget(visible_tools, 0, columns, len(tools), synchronous=immediate)
+
+    def _render_chunk_time_budget(self, tools: list[dict], start_idx: int, columns: int, total_tools_count: int, synchronous: bool = False):
+        """Vaqt byudjetiga ega (max 12ms) bosqichma-bosqich chizish"""
         if not self.winfo_exists():
             return
 
-        end_idx = min(start_idx + batch_size, len(tools))
-        chunk = tools[start_idx:end_idx]
+        t_start = time.perf_counter()
+        idx = start_idx
+        n = len(tools)
 
-        for i, tool in enumerate(chunk):
-            idx = start_idx + i
-            card = self._create_tool_card(tool)
+        while idx < n:
+            tool = tools[idx]
+            name = tool["name"]
+
+            # Kartani keshdan olish yoki bir marta yaratish
+            if name in self._tool_cards and self._tool_cards[name].winfo_exists():
+                card = self._tool_cards[name]
+            else:
+                card = self._create_tool_card(tool)
+                self._tool_cards[name] = card
+
+            # Geometriyaga joylashtirish
             if columns == 1:
                 card.pack(fill="x", padx=6, pady=4)
             else:
                 row, col = divmod(idx, columns)
                 card.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
 
-        # Agar qolgan elementlar bo'lsa, keyingi tick'da (16ms) davom ettirish
-        if end_idx < len(tools):
+            idx += 1
+
+            # Agar sinxron bo'lmasa, 12 ms dan oshib ketgan bo'lsa, qolganini keyingi freymga uzatish (Zero UI freeze)
+            if not synchronous and (time.perf_counter() - t_start) * 1000.0 >= self.MAX_BATCH_TIME_MS:
+                break
+
+        if idx < n:
             self._batch_job = self.after(
                 16,
-                lambda: self._render_batch_chunk(tools, end_idx, batch_size, columns),
+                lambda: self._render_chunk_time_budget(tools, idx, columns, total_tools_count, synchronous=synchronous),
             )
         else:
             self._batch_job = None
+            self._update_load_more_visibility(total_tools_count, len(tools))
 
-    def _create_tool_card(self, tool):
+    def _update_load_more_visibility(self, total_count: int, visible_count: int):
+        """Katta ro'yxatlarda 'Ko'proq ko'rsatish' tugmasi boshqaruvi"""
+        if not self._load_more_frame or not self._load_more_frame.winfo_exists():
+            return
+
+        if total_count > visible_count:
+            remaining = total_count - visible_count
+            self._load_more_btn.configure(text=f"Yana {remaining} ta tool'ni ko'rsatish...")
+            self._load_more_frame.pack(fill="x", pady=16)
+        else:
+            self._load_more_frame.pack_forget()
+
+    # ========================================================
+    # CARD COMPONENT (100% Retained Visuals & Styling)
+    # ========================================================
+
+    def _create_tool_card(self, tool: dict) -> ctk.CTkFrame:
         card = ctk.CTkFrame(
             self.grid_frame,
             fg_color=Colors.BG_CARD,
@@ -525,12 +669,14 @@ class CommandsPage(ctk.CTkFrame):
         )
         act_btn.pack(side="right")
 
-        # Hover & Click bog'lash (faqat asosiy elementlarga, rekursiyasiz)
+        # Hover & Click bog'lash (faqat asosiy qatlamlarga)
         def on_enter(event=None):
-            card.configure(border_color=tool["color"])
+            if card.winfo_exists():
+                card.configure(border_color=tool["color"])
 
         def on_leave(event=None):
-            card.configure(border_color=Colors.BORDER)
+            if card.winfo_exists():
+                card.configure(border_color=Colors.BORDER)
 
         def on_card_click(event=None):
             self._on_tool_click(tool["name"])
@@ -543,7 +689,7 @@ class CommandsPage(ctk.CTkFrame):
 
         return card
 
-    def _on_tool_click(self, tool_name):
+    def _on_tool_click(self, tool_name: str):
         if self.app:
             self.app.navigate_to("chat")
             chat_page = self.app._pages.get("chat")
@@ -556,31 +702,24 @@ class CommandsPage(ctk.CTkFrame):
                 elif hasattr(chat_page, "focus_primary_input"):
                     chat_page.focus_primary_input()
 
+    # ========================================================
+    # LIFECYCLE: ON_SHOW, ON_HIDE, DESTROY
+    # ========================================================
+
     def on_show(self):
-        """Sahifa ochilganda chaqiriladi — tezkor va ortiqcha re-render qilmaydi"""
+        """Navigatsiya orqali sahifa ochilganda chaqiriladi"""
         if not self._tools_loaded:
-            self._all_tools = self._get_tools()
-            self._tools_loaded = True
-            count = len(self._all_tools)
-            self.tool_count_chip.set_text(f"{count} ta tool")
-            self._build_category_filters()
-            self._execute_search(immediate=True)
+            self._init_data()
         else:
-            # Agar oldin yuklangan bo'lsa, zudlik bilan search inputga fokus berish
+            # Qidiruv inputiga fokus berish
             try:
-                self.search.entry.focus_set()
+                if hasattr(self, "search") and self.search.entry:
+                    self.search.entry.focus_set()
             except Exception:
                 pass
 
-    def focus_search(self):
-        """Ctrl + K orqali qidiruvga fokus berish"""
-        try:
-            self.search.entry.focus_set()
-            self.search.entry.select_range(0, "end")
-        except Exception:
-            pass
-
-    def destroy(self):
+    def on_hide(self):
+        """Sahifadan chiqilganda barcha kutilayotgan timer va batch joblarni to'xtatish"""
         self._cancel_batch_render()
         if self._search_timer:
             try:
@@ -588,4 +727,19 @@ class CommandsPage(ctk.CTkFrame):
             except Exception:
                 pass
             self._search_timer = None
+
+    def focus_search(self):
+        """Ctrl + K orqali qidiruvga fokus berish"""
+        try:
+            if hasattr(self, "search") and self.search.entry:
+                self.search.entry.focus_set()
+                self.search.entry.select_range(0, "end")
+        except Exception:
+            pass
+
+    def destroy(self):
+        self.on_hide()
+        self._tool_cards.clear()
+        self._rendered_tool_names.clear()
+        self._search_cache.clear()
         super().destroy()

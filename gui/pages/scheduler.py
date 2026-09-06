@@ -433,8 +433,10 @@ class SchedulerPage(ctk.CTkFrame):
         except Exception:
             pass
 
-        if self.winfo_exists():
-            self.after(1000, self._update_clock)
+        if self.winfo_exists() and self._timeline_running:
+            self._clock_job = self.after(1000, self._update_clock)
+        else:
+            self._clock_job = None
 
     def on_show(self):
         self._refresh_task_list()
@@ -442,6 +444,16 @@ class SchedulerPage(ctk.CTkFrame):
             self._timeline_running = True
             self._update_clock()
 
-    def destroy(self):
+    def on_hide(self):
+        """Sahifadan chiqilganda soat timerini to'xtatish"""
         self._timeline_running = False
+        if hasattr(self, "_clock_job") and self._clock_job:
+            try:
+                self.after_cancel(self._clock_job)
+            except Exception:
+                pass
+            self._clock_job = None
+
+    def destroy(self):
+        self.on_hide()
         super().destroy()

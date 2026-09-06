@@ -481,6 +481,15 @@ class VoicePage(ctk.CTkFrame):
         except Exception:
             pass
 
+        # Orb animatsiyasini qayta faollashtirish
+        if hasattr(self, "apple_orb"):
+            self.apple_orb.start()
+
+    def on_hide(self):
+        """Sahifadan chiqilganda orb animatsiyasini to'xtatish (CPU yukini 0% qilish)"""
+        if hasattr(self, "apple_orb"):
+            self.apple_orb.stop()
+
     def _recent_command_count(self):
         return sum(
             1

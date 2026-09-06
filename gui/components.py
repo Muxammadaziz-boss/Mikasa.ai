@@ -825,6 +825,12 @@ class AppleSiriOrb(ctk.CTkFrame):
                 pass
             self._anim_job = None
 
+    def start(self):
+        """Resume orb animation if stopped"""
+        if not self._is_active:
+            self._is_active = True
+            self._animate()
+
     def update_theme(self):
         """Mavzu o'zgarganda orb fonini yangilash"""
         curr_bg = getattr(self.master, "_fg_color", None) or getattr(self.master, "fg_color", None) or Colors.BG_DARK

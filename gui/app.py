@@ -35,6 +35,7 @@ class MikasaApp(ctk.CTk):
         self._current_page = None
         self._pages = {}
         self._nav_state = "IDLE"
+        self._nav_generation = 0
         self._lazy_nav_job = None
         self._clock_job = None
         self._stats_job = None
@@ -616,20 +617,32 @@ class MikasaApp(ctk.CTk):
 
     def navigate_to(self, page_id, sync=False):
         """
-        Sahifaga o'tish (State Machine + Lazy Load + Zero-Freeze)
+        Sahifaga o'tish (State Machine + Generation Token + Lazy Load + Zero-Freeze)
         IDLE -> LOADING -> READY / ERROR
         """
+        self._nav_generation += 1
+        req_generation = self._nav_generation
+
         if page_id == self._current_page and self._nav_state == "READY":
             return
 
-        # 1. Tezkor vizual aks-sado (<10ms): sidebar nav va titlebar
+        # 1. Oldingi sahifaning on_hide() lifecycle chaqiruvi
+        if self._current_page and self._current_page in self._pages:
+            old_page = self._pages[self._current_page]
+            if hasattr(old_page, "on_hide"):
+                try:
+                    old_page.on_hide()
+                except Exception as e:
+                    logger.error(f"on_hide da xatolik ({self._current_page}): {e}")
+
+        # 2. Tezkor vizual aks-sado (<10ms): sidebar nav va titlebar
         for nav_id, nav_item in self._nav_items.items():
             nav_item.set_active(nav_id == page_id)
 
         self.page_label.configure(text=self._page_title(page_id))
         self.user_label.configure(text=f"User: {self._get_user_name()}")
 
-        # 2. Bekor qilinmagan oldingi lazy nav jobini to'xtatish
+        # 3. Bekor qilinmagan oldingi lazy nav jobini to'xtatish
         if self._lazy_nav_job:
             try:
                 self.after_cancel(self._lazy_nav_job)
@@ -637,14 +650,14 @@ class MikasaApp(ctk.CTk):
                 pass
             self._lazy_nav_job = None
 
-        # 3. Oldingi sahifani yashirish
+        # 4. Oldingi sahifani yashirish
         if self._current_page and self._current_page in self._pages:
             try:
                 self._pages[self._current_page].pack_forget()
             except Exception:
                 pass
 
-        # 4. Keshda mavjud bo'lsa — darhol ko'rsatish
+        # 5. Keshda mavjud bo'lsa — darhol ko'rsatish
         if page_id in self._pages:
             if self._page_loading_skeleton:
                 self._page_loading_skeleton.pack_forget()
@@ -662,7 +675,7 @@ class MikasaApp(ctk.CTk):
             self._nav_state = "READY"
             return
 
-        # 5. Keshda yo'q bo'lsa — Loading Skeleton ko'rsatish
+        # 6. Keshda yo'q bo'lsa — Loading Skeleton ko'rsatish
         self._nav_state = "LOADING"
         if not self._page_loading_skeleton:
             self._page_loading_skeleton = LoadingSkeleton(
@@ -676,19 +689,30 @@ class MikasaApp(ctk.CTk):
         self._page_loading_skeleton.pack(fill="both", expand=True)
 
         if sync:
-            self._finish_lazy_navigation(page_id)
+            self._finish_lazy_navigation(page_id, req_generation)
         else:
             # UI chizib olishi uchun 16ms kechiktirish
-            self._lazy_nav_job = self.after(16, lambda pid=page_id: self._finish_lazy_navigation(pid))
+            self._lazy_nav_job = self.after(
+                16,
+                lambda pid=page_id, gen=req_generation: self._finish_lazy_navigation(pid, gen)
+            )
 
-    def _finish_lazy_navigation(self, page_id):
-        """Lazy yuklashni yakunlash va sahifani chiqarish"""
+    def _finish_lazy_navigation(self, page_id, generation=None):
+        """Lazy yuklashni yakunlash va sahifani chiqarish (Stale generation rejection)"""
         self._lazy_nav_job = None
+        # Agar navigatsiya avlodi mos kelmasa (stale async callback) — bekor qilish
+        if generation is not None and generation != self._nav_generation:
+            logger.debug(f"Stale navigation callback rejected: target={page_id}, gen={generation}, current={self._nav_generation}")
+            return
+
         try:
             page = self._get_or_create_page(page_id)
 
             if self._page_loading_skeleton:
                 self._page_loading_skeleton.pack_forget()
+
+            if generation is not None and generation != self._nav_generation:
+                return
 
             if page:
                 page.pack(fill="both", expand=True)
