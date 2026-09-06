@@ -1,5 +1,5 @@
 # ========== chat.py ==========
-# AI Chat sahifasi — Open conversation-first workspace
+# AI Chat sahifasi — Open conversation-first workspace with precision desktop geometry
 
 import os
 import datetime
@@ -203,7 +203,14 @@ class AgentActivityGroup(ctk.CTkFrame):
 
 
 class ChatPage(ctk.CTkFrame):
-    """AI bilan matnli suhbat sahifasi — Open conversation-first workspace"""
+    """
+    AI bilan matnli suhbat sahifasi.
+    Arxitektura:
+    - Butun ishchi sohani to'liq egallovchi Full-Width tashqi Viewport (chat_scroll)
+    - O'ng chekkada joylashgan haqiqiy skrollbar (bo'sh holatda avtomatik yashiriladi)
+    - O'rtada markazlashgan Inner Conversation Column (900–1000px desktopda)
+    - Xabarlar bilan bir xil gorizontal o'q va kenglikka ega Kompozitor
+    """
 
     def __init__(self, master, app=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -220,9 +227,9 @@ class ChatPage(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        # ===== HEADER (Minimal) =====
+        # ===== 1. HEADER (Minimal, Full-Width) =====
         header = ctk.CTkFrame(self, fg_color="transparent", height=42)
-        header.pack(fill="x", padx=24, pady=(12, 4))
+        header.pack(fill="x", side="top", padx=24, pady=(12, 4))
         header.pack_propagate(False)
 
         title_frame = ctk.CTkFrame(header, fg_color="transparent")
@@ -261,54 +268,158 @@ class ChatPage(ctk.CTkFrame):
         )
         self.clear_btn.pack(side="right")
 
-        # ===== OPEN WORKSPACE & CENTERED CONVERSATION COLUMN =====
-        self.workspace = ctk.CTkFrame(self, fg_color="transparent")
-        self.workspace.pack(fill="both", expand=True)
+        # ===== 2. COMPOSER WRAPPER (Pastda mahkamlangan) =====
+        # Xabarlar bilan bir xil gorizontal o'qda markazlashadi
+        self.composer_wrapper = ctk.CTkFrame(self, fg_color="transparent")
+        self.composer_wrapper.pack(fill="x", side="bottom", pady=(0, 12))
 
-        self.conversation_column = ctk.CTkFrame(self.workspace, fg_color="transparent")
-        self.conversation_column.pack(fill="both", expand=True, padx=24, pady=(0, 10))
+        self._build_input_bar(self.composer_wrapper)
 
-        self.workspace.bind("<Configure>", self._on_workspace_resize)
-
-        self._build_chat_area(self.conversation_column)
-        self._build_input_bar(self.conversation_column)
-
-    def _on_workspace_resize(self, event=None):
-        try:
-            if not self.workspace.winfo_exists():
-                return
-            w = self.workspace.winfo_width()
-            if w < 100:
-                return
-            target_max = 780
-            if w > target_max + 48:
-                pad_x = (w - target_max) // 2
-            else:
-                pad_x = 16
-            self.conversation_column.pack_configure(padx=pad_x)
-        except Exception:
-            pass
-
-    def _build_chat_area(self, parent):
+        # ===== 3. FULL-WIDTH CHAT VIEWPORT =====
+        # Tashqi viewport butun ishchi soha kengligini to'liq egallaydi
+        # Skrollbar to'g'ridan-to'g'ri uning o'ng chekkasida turadi
         self.chat_scroll = ctk.CTkScrollableFrame(
-            parent,
+            self,
             fg_color="transparent",
             corner_radius=0,
             border_width=0,
             scrollbar_button_color=Colors.BG_CARD,
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
-        self.chat_scroll.pack(fill="both", expand=True, pady=(0, 8))
+        self.chat_scroll.pack(fill="both", expand=True, side="top")
+
+        # Skrollbarni faqat kontent sig'may qolganda ko'rsatish
+        self._setup_auto_scrollbar()
+
+        # ===== 4. INNER CONVERSATION COLUMN =====
+        # chat_scroll ichida barcha xabarlarni tutib turuvchi markazlashgan ustun
+        self.conversation_column = ctk.CTkFrame(
+            self.chat_scroll, fg_color="transparent"
+        )
+        self.conversation_column.pack(fill="x")
 
         self._add_welcome_message()
 
+        # Oyna o'lchami o'zgarganda ustun va kompozitorni sinxron moslashtirish
+        self.bind("<Configure>", self._on_layout_resize)
+
+    def _setup_auto_scrollbar(self):
+        """
+        Bo'sh holatda yoki kontent butunlay ko'rinib turganda skrollbarni yashirish.
+        Faqat kontent viewport balandligidan oshib ketganda skrollbarni ko'rsatish.
+        """
+        orig_set = self.chat_scroll._scrollbar.set
+
+        def _auto_scrollbar_set(start, end):
+            try:
+                s = float(start)
+                e = float(end)
+                if not self._messages or (s <= 0.0 and e >= 1.0):
+                    if self.chat_scroll._scrollbar.grid_info():
+                        self.chat_scroll._scrollbar.grid_remove()
+                        self._update_layout_geometry()
+                else:
+                    if not self.chat_scroll._scrollbar.grid_info():
+                        self.chat_scroll._scrollbar.grid()
+                        self._update_layout_geometry()
+            except Exception:
+                pass
+            orig_set(start, end)
+
+        self.chat_scroll._parent_canvas.configure(yscrollcommand=_auto_scrollbar_set)
+        # Boshlang'ich holatda bo'sh bo'lgani uchun skrollbarni yashirish
+        if hasattr(self.chat_scroll, "_scrollbar"):
+            self.chat_scroll._scrollbar.grid_remove()
+
+    def _get_target_column_width(self, available_width):
+        """
+        Mavjud ishchi soha kengligiga qarab ideal o'qish kengligi:
+        1920x1080 (viewport ~1680px) -> ~960px
+        1440x900  (viewport ~1200px) -> ~900px
+        1280x800  (viewport ~1040px) -> ~820px
+        1024x700  (viewport ~780px)  -> ~720px (yoki xavfsiz marja bilan)
+        """
+        w = available_width
+        if w >= 1400:
+            return 960
+        elif w >= 1150:
+            return 900
+        elif w >= 900:
+            return 820
+        elif w >= 700:
+            return 720
+        else:
+            return max(320, w - 32)
+
+    def _on_layout_resize(self, event=None):
+        self._update_layout_geometry()
+
+    def _update_layout_geometry(self):
+        """
+        Ichki suhbat ustuni va pastki kompozitorni bir xil gorizontal o'q bo'yicha
+        to'liq markazlashtirib tekislash.
+        """
+        try:
+            if not self.winfo_exists():
+                return
+            w = self.winfo_width()
+            if w < 100:
+                return
+
+            col_w = self._get_target_column_width(w)
+
+            # Agar skrollbar ko'rinib turgan bo'lsa, uning kengligini hisobga olamiz
+            is_sb_visible = (
+                hasattr(self.chat_scroll, "_scrollbar")
+                and bool(self.chat_scroll._scrollbar.grid_info())
+            )
+            sb_w = (
+                getattr(self.chat_scroll._scrollbar, "_current_width", 16)
+                if is_sb_visible
+                else 0
+            )
+
+            pad_x = max(16, (w - col_w - sb_w) // 2)
+
+            if (
+                hasattr(self, "conversation_column")
+                and self.conversation_column.winfo_exists()
+            ):
+                self.conversation_column.pack_configure(padx=pad_x)
+
+            if (
+                hasattr(self, "composer_wrapper")
+                and self.composer_wrapper.winfo_exists()
+            ):
+                # Kompozitor va xabarlar o'qi bir xil bo'lishi uchun
+                self.composer_wrapper.pack_configure(
+                    padx=(pad_x, pad_x + sb_w)
+                )
+
+            # Welcome state vizual vertikal markazda turishi uchun
+            if (
+                hasattr(self, "_welcome_frame")
+                and self._welcome_frame
+                and self._welcome_frame.winfo_exists()
+            ):
+                viewport_h = self.chat_scroll.winfo_height()
+                if viewport_h > 150:
+                    top_pad = max(24, int((viewport_h - 220) * 0.38))
+                    self._welcome_frame.pack_configure(pady=(top_pad, 16))
+        except Exception:
+            pass
+
     def _add_welcome_message(self):
-        self._welcome_frame = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
-        self._welcome_frame.pack(fill="x", pady=(70, 20))
+        self._welcome_frame = ctk.CTkFrame(
+            self.conversation_column, fg_color="transparent"
+        )
+        self._welcome_frame.pack(fill="x", pady=(90, 20))
 
         ai_icon = get_vector_icon("sparkles", size=36, color=Colors.PRIMARY)
         if ai_icon:
-            ctk.CTkLabel(self._welcome_frame, text="", image=ai_icon).pack(pady=(4, 6))
+            ctk.CTkLabel(self._welcome_frame, text="", image=ai_icon).pack(
+                pady=(4, 6)
+            )
 
         ctk.CTkLabel(
             self._welcome_frame,
@@ -324,7 +435,9 @@ class ChatPage(ctk.CTkFrame):
             text_color=Colors.TEXT_MUTED,
         ).pack(pady=(0, 16))
 
-        suggestions_frame = ctk.CTkFrame(self._welcome_frame, fg_color="transparent")
+        suggestions_frame = ctk.CTkFrame(
+            self._welcome_frame, fg_color="transparent"
+        )
         suggestions_frame.pack(pady=(6, 0))
 
         suggestions = [
@@ -633,11 +746,20 @@ class ChatPage(ctk.CTkFrame):
                 pass
         self._active_activity_group = None
 
-        for widget in self.chat_scroll.winfo_children():
-            widget.destroy()
+        if hasattr(self, "conversation_column") and self.conversation_column.winfo_exists():
+            for widget in self.conversation_column.winfo_children():
+                widget.destroy()
+
         self._messages.clear()
         self._last_user_text = None
         self._add_welcome_message()
+        try:
+            self.chat_scroll._parent_canvas.yview_moveto(0.0)
+            if hasattr(self.chat_scroll, "_scrollbar"):
+                self.chat_scroll._scrollbar.grid_remove()
+        except Exception:
+            pass
+        self._update_layout_geometry()
 
     def show_typing(self, prefix="yozyapti"):
         if self._typing_bubble:
@@ -647,7 +769,9 @@ class ChatPage(ctk.CTkFrame):
 
         self._remove_welcome_message()
 
-        self._typing_row = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
+        self._typing_row = ctk.CTkFrame(
+            self.conversation_column, fg_color="transparent"
+        )
         self._typing_row.pack(fill="x", padx=4, pady=(4, 2))
 
         self._typing_bubble = TypingBubble(self._typing_row, prefix=prefix)
@@ -704,7 +828,9 @@ class ChatPage(ctk.CTkFrame):
             else:
                 pady = (2, 3)
 
-        msg_row = ctk.CTkFrame(self.chat_scroll, fg_color="transparent")
+        msg_row = ctk.CTkFrame(
+            self.conversation_column, fg_color="transparent"
+        )
         msg_row.pack(fill="x", padx=4, pady=pady)
 
         bubble_frame = MessageBubble(
@@ -715,14 +841,16 @@ class ChatPage(ctk.CTkFrame):
         )
 
         if is_user:
-            bubble_frame.pack(side="right", padx=(60, 4))
+            bubble_frame.pack(side="right", padx=(80, 4))
         else:
-            bubble_frame.pack(side="left", padx=(4, 40))
+            bubble_frame.pack(side="left", padx=(4, 60))
 
         self.after(50, lambda: self._scroll_to_bottom(force=is_user))
 
     def _scroll_to_bottom(self, force=False):
         try:
+            if not self._messages:
+                return
             canvas = self.chat_scroll._parent_canvas
             if not force:
                 yview = canvas.yview()
@@ -776,7 +904,7 @@ class ChatPage(ctk.CTkFrame):
                     else None
                 )
                 self._active_activity_group = AgentActivityGroup(
-                    self.chat_scroll, before_widget=before_w
+                    self.conversation_column, before_widget=before_w
                 )
 
             self._active_activity_group.add_action(tool_name, tool_detail)
@@ -809,13 +937,13 @@ class ChatPage(ctk.CTkFrame):
                     else None
                 )
                 self._active_activity_group = AgentActivityGroup(
-                    self.chat_scroll, before_widget=before_w
+                    self.conversation_column, before_widget=before_w
                 )
             self._active_activity_group.add_action("Xatolik", str(data))
             self.after(50, lambda: self._scroll_to_bottom(force=False))
 
     def on_show(self):
-        pass
+        self._update_layout_geometry()
 
     def focus_primary_input(self):
         try:
@@ -832,8 +960,9 @@ class ChatPage(ctk.CTkFrame):
 
     def import_ui_state(self, state):
         state = state or {}
-        for widget in self.chat_scroll.winfo_children():
-            widget.destroy()
+        if hasattr(self, "conversation_column") and self.conversation_column.winfo_exists():
+            for widget in self.conversation_column.winfo_children():
+                widget.destroy()
 
         self._messages = []
         replay_messages = state.get("messages", [])
@@ -849,8 +978,15 @@ class ChatPage(ctk.CTkFrame):
                 )
         else:
             self._add_welcome_message()
+            try:
+                self.chat_scroll._parent_canvas.yview_moveto(0.0)
+                if hasattr(self.chat_scroll, "_scrollbar"):
+                    self.chat_scroll._scrollbar.grid_remove()
+            except Exception:
+                pass
 
         self._last_user_text = state.get("last_user_text")
 
         self.input_entry.delete(0, "end")
         self.input_entry.insert(0, state.get("input_text", ""))
+        self._update_layout_geometry()

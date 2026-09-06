@@ -93,24 +93,46 @@ class TestV6ChatUXCriticalFix(unittest.TestCase):
     def test_centered_conversation_column_resize(self):
         page = ChatPage(self.root)
 
-        # Katta oyna (1920px kenglik) simulatsiyasi:
-        # workspace kengligi 1600px bo'lganda column max 780px ga markazlashishi kerak
-        class MockEvent:
-            pass
-
-        page.workspace.winfo_width = lambda: 1600
-        page._on_workspace_resize(MockEvent())
+        # 1600px kenglik: target column width 960px, padx = (1600 - 960) // 2 = 320px
+        page.winfo_width = lambda: 1600
+        page._update_layout_geometry()
 
         col_info = page.conversation_column.pack_info()
-        expected_padx = (1600 - 780) // 2
+        expected_padx = (1600 - 960) // 2
         self.assertEqual(int(col_info.get("padx", 0)), expected_padx)
 
-        # Kichik oyna (750px kenglik) simulatsiyasi:
-        page.workspace.winfo_width = lambda: 750
-        page._on_workspace_resize(MockEvent())
+        comp_info = page.composer_wrapper.pack_info()
+        self.assertEqual(int(comp_info.get("padx", 0)), expected_padx)
+
+        # 750px kenglik: target column width 720px, padx = max(16, (750 - 720) // 2) = 16
+        page.winfo_width = lambda: 750
+        page._update_layout_geometry()
 
         col_info_small = page.conversation_column.pack_info()
         self.assertEqual(int(col_info_small.get("padx", 0)), 16)
+
+        page.destroy()
+
+    def test_layout_geometry_and_full_width_viewport(self):
+        page = ChatPage(self.root)
+
+        # chat_scroll tashqi containeri (_parent_frame) to'liq enli va bo'sh joyni to'liq egallashi kerak
+        scroll_info = page.chat_scroll._parent_frame.pack_info()
+        self.assertEqual(scroll_info.get("fill"), "both")
+        self.assertEqual(scroll_info.get("expand"), "1" if isinstance(scroll_info.get("expand"), str) else 1)
+
+        # target ustun kengliklari tekshiruvi (viewport kengliklari bo'yicha):
+        # 1920x1080 oynada (viewport ~1680px) -> 960px
+        self.assertEqual(page._get_target_column_width(1680), 960)
+        # 1440x900 oynada (viewport ~1200px) -> 900px
+        self.assertEqual(page._get_target_column_width(1200), 900)
+        # 1280x800 oynada (viewport ~1040px) -> 820px
+        self.assertEqual(page._get_target_column_width(1040), 820)
+        # 1024x700 oynada (viewport ~780px) -> 720px
+        self.assertEqual(page._get_target_column_width(780), 720)
+
+        # Bo'sh holatda skrollbar yashirilgan bo'lishi kerak
+        self.assertFalse(bool(page.chat_scroll._scrollbar.grid_info()))
 
         page.destroy()
 

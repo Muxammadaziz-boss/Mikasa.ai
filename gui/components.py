@@ -949,12 +949,13 @@ class MessageBubble(ctk.CTkFrame):
                 anchor="e",
             ).pack(side="right")
 
+        wrap = kwargs.pop("wraplength", 720 if not is_user else 540)
         self.text_label = ctk.CTkLabel(
             container,
             text=text,
             font=Fonts.BODY,
             text_color=text_color,
-            wraplength=680 if not is_user else 520,
+            wraplength=wrap,
             justify="left",
             anchor="w",
         )
