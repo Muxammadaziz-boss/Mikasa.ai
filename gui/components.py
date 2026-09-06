@@ -1891,3 +1891,128 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
         self.destroy()
         if hasattr(self.app, "navigate_to"):
             self.app.navigate_to(page_id)
+
+
+class WindowControls(ctk.CTkFrame):
+    """
+    Mikasa AI Desktop Native Window Controls.
+    Yuqori o'ng burchakdagi ixcham desktop boshqaruv paneli:
+    Minimize (Kichraytirish), Maximize/Restore (Kattalashtirish/Tiklash), Close (Yopish).
+    """
+
+    def __init__(self, master, app=None, height=36, btn_width=44, **kwargs):
+        super().__init__(
+            master,
+            fg_color="transparent",
+            corner_radius=0,
+            height=height,
+            **kwargs,
+        )
+        self.app = app
+        self.btn_width = btn_width
+        self.btn_height = height
+        self._is_maximized = False
+
+        self._build_controls()
+
+    def _build_controls(self):
+        # 1. Minimize Button
+        min_icon = get_vector_icon("minimize", size=14, color=Colors.TEXT_MUTED)
+        self.min_btn = ctk.CTkButton(
+            self,
+            text="",
+            image=min_icon,
+            width=self.btn_width,
+            height=self.btn_height,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            command=self._on_minimize,
+        )
+        self.min_btn.pack(side="left", fill="y")
+        Tooltip(self.min_btn, "Kichraytirish")
+
+        # 2. Maximize / Restore Button
+        self._max_icon = get_vector_icon("maximize", size=13, color=Colors.TEXT_MUTED)
+        self._restore_icon = get_vector_icon("restore", size=13, color=Colors.TEXT_MUTED)
+
+        self.max_btn = ctk.CTkButton(
+            self,
+            text="",
+            image=self._max_icon,
+            width=self.btn_width,
+            height=self.btn_height,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            command=self._on_toggle_maximize,
+        )
+        self.max_btn.pack(side="left", fill="y")
+        self.max_tooltip = Tooltip(self.max_btn, "Kattalashtirish")
+
+        # 3. Close Button
+        self._close_icon_normal = get_vector_icon("close", size=13, color=Colors.TEXT_MUTED)
+        self._close_icon_hover = get_vector_icon("close", size=13, color="#FFFFFF")
+
+        self.close_btn = ctk.CTkButton(
+            self,
+            text="",
+            image=self._close_icon_normal,
+            width=self.btn_width,
+            height=self.btn_height,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color="#DC2626",
+            command=self._on_close,
+        )
+        self.close_btn.pack(side="left", fill="y")
+        Tooltip(self.close_btn, "Yopish")
+
+        # Close button hover icon switch (oq rangga o'tadi)
+        self.close_btn.bind(
+            "<Enter>",
+            lambda e: self.close_btn.configure(image=self._close_icon_hover),
+            add="+",
+        )
+        self.close_btn.bind(
+            "<Leave>",
+            lambda e: self.close_btn.configure(image=self._close_icon_normal),
+            add="+",
+        )
+
+    def _on_minimize(self):
+        if self.app:
+            try:
+                self.app.iconify()
+            except Exception:
+                try:
+                    self.app.state("iconic")
+                except Exception:
+                    pass
+
+    def _on_toggle_maximize(self):
+        if self.app and hasattr(self.app, "_toggle_maximize"):
+            self.app._toggle_maximize()
+        else:
+            self._is_maximized = not self._is_maximized
+            self.sync_maximized_state(self._is_maximized)
+
+    def _on_close(self):
+        if self.app:
+            if hasattr(self.app, "_on_closing"):
+                self.app._on_closing()
+            else:
+                self.app.destroy()
+
+    def sync_maximized_state(self, is_maximized: bool):
+        """Window maximized holatiga qarab icon va tooltipni yangilash"""
+        self._is_maximized = is_maximized
+        if is_maximized:
+            self.max_btn.configure(image=self._restore_icon)
+            if hasattr(self, "max_tooltip") and self.max_tooltip:
+                self.max_tooltip.text = "Tiklash"
+        else:
+            self.max_btn.configure(image=self._max_icon)
+            if hasattr(self, "max_tooltip") and self.max_tooltip:
+                self.max_tooltip.text = "Kattalashtirish"
+

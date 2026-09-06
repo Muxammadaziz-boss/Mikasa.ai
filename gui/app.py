@@ -57,7 +57,7 @@ class MikasaApp(ctk.CTk):
         self._apply_ui_preferences(initial=True)
 
         # Oyna sozlamalari
-        self.title(f"MIKASA AI v{VERSION}")
+        self.title("MIKASA AI")
         self.configure(fg_color=Colors.BG_DARK)
         self._apply_window_mode()
 
@@ -67,6 +67,10 @@ class MikasaApp(ctk.CTk):
 
         # UI qurish
         self._build_shell()
+
+        # Custom window chrome va configure listener
+        self._setup_custom_window_chrome()
+        self.bind("<Configure>", self._on_window_configure, add="+")
 
         # Soat va tizim ma'lumotlarini yangilash
         # self._update_clock()
@@ -89,6 +93,110 @@ class MikasaApp(ctk.CTk):
             pass
         finally:
             self.focused_widget_before_widthdraw = None
+            self._setup_custom_window_chrome()
+
+    def _setup_custom_window_chrome(self):
+        """
+        Standart Windows sarlavha panelini (WS_CAPTION) olib tashlash.
+        WS_THICKFRAME saqlanib qoladi (chekka va burchaklardan o'lcham o'zgartirish),
+        WS_MINIMIZEBOX, WS_MAXIMIZEBOX, WS_SYSMENU orqali vazifalar paneli va Alt+Tab ishlaydi.
+        """
+        if os.name == "nt":
+            try:
+                import ctypes
+                from ctypes import c_int, byref, Structure
+
+                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                if not hwnd:
+                    hwnd = self.winfo_id()
+
+                GWL_STYLE = -16
+                WS_CAPTION = 0x00C00000
+                WS_THICKFRAME = 0x00040000
+                WS_MINIMIZEBOX = 0x00020000
+                WS_MAXIMIZEBOX = 0x00010000
+                WS_SYSMENU = 0x00080000
+
+                SWP_FRAMECHANGED = 0x0020
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+
+                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
+                new_style = (style & ~WS_CAPTION) | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, new_style)
+                ctypes.windll.user32.SetWindowPos(
+                    hwnd, 0, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+                )
+
+                # DWM Immersive Dark Mode
+                DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+                dark_val = c_int(1)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(dark_val), 4
+                )
+
+                # DWM Extend Frame into client area
+                class MARGINS(Structure):
+                    _fields_ = [
+                        ("cxLeftWidth", c_int),
+                        ("cxRightWidth", c_int),
+                        ("cyTopHeight", c_int),
+                        ("cyBottomHeight", c_int),
+                    ]
+
+                margins = MARGINS(0, 0, 0, 0)
+                ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(hwnd, byref(margins))
+            except Exception as e:
+                logger.debug(f"Custom window chrome initialization warning: {e}")
+
+    def _start_window_drag(self, event):
+        """Oynani surishni boshlash (Windows native Aero Snap yoki koordinata harakati)"""
+        if os.name == "nt":
+            try:
+                import ctypes
+                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                if not hwnd:
+                    hwnd = self.winfo_id()
+                ctypes.windll.user32.ReleaseCapture()
+                ctypes.windll.user32.SendMessageW(hwnd, 0x00A1, 2, 0)
+                # Windows drag tugagach maximized holatini tekshirib sinxronlash
+                is_max = self.state() == "zoomed"
+                if hasattr(self, "window_controls") and self.window_controls:
+                    self.window_controls.sync_maximized_state(is_max)
+                return
+            except Exception:
+                pass
+
+        self._drag_start_x = event.x_root - self.winfo_x()
+        self._drag_start_y = event.y_root - self.winfo_y()
+
+    def _on_window_drag(self, event):
+        """Cross-platform surish fallback"""
+        if hasattr(self, "_drag_start_x") and self._drag_start_x is not None:
+            new_x = event.x_root - self._drag_start_x
+            new_y = event.y_root - self._drag_start_y
+            self.geometry(f"+{new_x}+{new_y}")
+
+    def _toggle_maximize(self):
+        """Oynani kattalashtirish yoki avvalgi o'lchamga qaytarish (Maximize ↔ Restore)"""
+        if self.state() == "zoomed":
+            self.state("normal")
+            if hasattr(self, "window_controls") and self.window_controls:
+                self.window_controls.sync_maximized_state(False)
+        else:
+            self.state("zoomed")
+            if hasattr(self, "window_controls") and self.window_controls:
+                self.window_controls.sync_maximized_state(True)
+
+    def _on_window_configure(self, event=None):
+        """Oyna o'lchami yoki holati o'zgarganda window_controls ni yangilash"""
+        if event and event.widget == self:
+            is_max = self.state() == "zoomed"
+            if hasattr(self, "window_controls") and self.window_controls:
+                if self.window_controls._is_maximized != is_max:
+                    self.window_controls.sync_maximized_state(is_max)
 
     def report_callback_exception(self, exc, val, tb):
         """Rebuild yoki sahifa almashtirish paytidagi o'chirilgan widgetlar focus TclError larini xavfsiz bartaraf etish"""
@@ -303,7 +411,9 @@ class MikasaApp(ctk.CTk):
         self.tts_label.configure(text=f"TTS: {label}")
 
     def _build_titlebar(self):
-        """Dastur sarlavha paneli — Apple Dark minimal"""
+        """Dastur sarlavha paneli — Custom Premium Window Chrome"""
+        from gui.components import WindowControls
+
         self.titlebar = ctk.CTkFrame(
             self,
             fg_color=Colors.BG_DARKEST,
@@ -313,7 +423,7 @@ class MikasaApp(ctk.CTk):
         self.titlebar.pack(fill="x", side="top")
         self.titlebar.pack_propagate(False)
 
-        # Logo va nom (vector sparkles bilan)
+        # 1. Chap tomon: Logo va nom (vector sparkles bilan)
         from gui.icons import get_vector_icon
         logo_icon = get_vector_icon("sparkles", size=15, color_dark=Colors.PRIMARY, color_light=Colors.PRIMARY)
 
@@ -328,7 +438,7 @@ class MikasaApp(ctk.CTk):
         )
         self.logo_label.pack(side="left", padx=(14, 6))
 
-        # Status badge
+        # 2. Status badge (subtle)
         self.status_badge = StatusBadge(
             self.titlebar,
             status=self._status_state["status"],
@@ -337,6 +447,7 @@ class MikasaApp(ctk.CTk):
         )
         self.status_badge.pack(side="left", padx=6)
 
+        # 3. Joriy sahifa/rejim sarlavhasi
         self.page_label = ctk.CTkLabel(
             self.titlebar,
             text="Ovozli muloqot",
@@ -345,7 +456,15 @@ class MikasaApp(ctk.CTk):
         )
         self.page_label.pack(side="left", padx=8 if self._compact_mode else 10)
 
-        # Ctrl+K qidiruv indikatori
+        # 4. O'ng tomon: Desktop Native Window Controls (Minimize, Maximize/Restore, Close)
+        self.window_controls = WindowControls(self.titlebar, app=self, height=36, btn_width=44)
+        self.window_controls.pack(side="right", fill="y")
+        try:
+            self.window_controls.sync_maximized_state(self.state() == "zoomed")
+        except Exception:
+            pass
+
+        # 5. Ctrl+K qidiruv indikatori (controls'dan chaproqda)
         self.search_hint = ctk.CTkLabel(
             self.titlebar,
             text="⌘K",
@@ -353,10 +472,16 @@ class MikasaApp(ctk.CTk):
             text_color=Colors.TEXT_MUTED,
             cursor="hand2",
         )
-        self.search_hint.pack(side="right", padx=16)
+        self.search_hint.pack(side="right", padx=(0, 16))
         self.search_hint.bind("<Button-1>", lambda e: self._on_global_search())
 
-        # 1px hairline border below titlebar
+        # 6. Sarlavhadan ushlab oynani surish (Dragging) va Double-Click Maximize
+        for widget in (self.titlebar, self.logo_label, self.page_label):
+            widget.bind("<ButtonPress-1>", self._start_window_drag)
+            widget.bind("<B1-Motion>", self._on_window_drag)
+            widget.bind("<Double-Button-1>", lambda e: self._toggle_maximize())
+
+        # 7. 1px hairline border below titlebar
         self.titlebar_divider = ctk.CTkFrame(
             self,
             fg_color=Colors.BORDER,

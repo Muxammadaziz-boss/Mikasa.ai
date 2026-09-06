@@ -261,6 +261,22 @@ class VectorIconEngine:
         c.line((14.0, 10.0), (14.0, 16.5), color=color)
 
     @staticmethod
+    def _draw_minimize(c: IconCanvas, color: str):
+        """Minimize: Single horizontal bar aligned to logical center"""
+        c.line((5.0, 12.0), (19.0, 12.0), color=color)
+
+    @staticmethod
+    def _draw_maximize(c: IconCanvas, color: str):
+        """Maximize: Clean square outline"""
+        c.rect(5.5, 5.5, 18.5, 18.5, radius=1.0, outline=color)
+
+    @staticmethod
+    def _draw_restore(c: IconCanvas, color: str):
+        """Restore: Two overlapping square outlines (desktop restore)"""
+        c.polyline([(8.5, 5.5), (18.5, 5.5), (18.5, 15.5)], color=color)
+        c.rect(5.5, 8.5, 15.5, 18.5, radius=1.0, outline=color)
+
+    @staticmethod
     def _draw_close(c: IconCanvas, color: str):
         """Close: Symmetrical 45° cross with optical centering"""
         c.line((5.5, 5.5), (18.5, 18.5), color=color)
@@ -408,6 +424,9 @@ class VectorIconEngine:
         "send",
         "trash",
         "close",
+        "minimize",
+        "maximize",
+        "restore",
         "check",
         "plus",
         "copy",
@@ -430,6 +449,18 @@ class VectorIconEngine:
     )
 
     SEMANTIC_ALIASES: Dict[str, str] = {
+        # Window control aliases
+        "win_minimize": "minimize",
+        "win_min": "minimize",
+        "win_maximize": "maximize",
+        "win_max": "maximize",
+        "win_restore": "restore",
+        "win_close": "close",
+        "window_close": "close",
+        "window_min": "minimize",
+        "window_max": "maximize",
+        "window_restore": "restore",
+
         # English aliases
         "home": "dashboard",
         "voice": "mic",
