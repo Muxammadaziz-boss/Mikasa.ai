@@ -612,17 +612,9 @@ class VectorIconEngine:
         curr_root_id = id(curr_root) if curr_root is not None else None
 
         if key in cls._CTK_CACHE:
-            ctk_img = cls._CTK_CACHE[key]
-            # If the Tk root context has changed (e.g. test teardown / root restart),
-            # invalidate stale PhotoImages to prevent _tkinter.TclError "pyimageX doesn't exist"
-            if getattr(ctk_img, "_tk_root_id", None) != curr_root_id:
-                try:
-                    ctk_img._scaled_light_photo_images.clear()
-                    ctk_img._scaled_dark_photo_images.clear()
-                    ctk_img._tk_root_id = curr_root_id
-                except Exception:
-                    pass
-            return ctk_img
+            cached_img = cls._CTK_CACHE[key]
+            if getattr(cached_img, "_tk_root_id", None) == curr_root_id:
+                return cached_img
 
         if key not in cls._PIL_CACHE:
             method_name = f"_draw_{resolved}"

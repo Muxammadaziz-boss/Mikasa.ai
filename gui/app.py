@@ -29,7 +29,7 @@ except ImportError:
 class MikasaApp(ctk.CTk):
     """Mikasa AI asosiy dastur oynasi"""
 
-    def __init__(self, connect_backend=False):
+    def __init__(self, connect_backend=False, show_splash=True):
         super().__init__()
 
         self._current_page = None
@@ -45,6 +45,8 @@ class MikasaApp(ctk.CTk):
         self._ui_theme = "dark"
         self._color_theme = "blue"
         self._connect_backend = connect_backend
+        self._show_splash = show_splash
+        self.splash = None
         self._is_rebuilding_shell = False
         self._status_state = {"status": "online", "text": "Tayyor"}
         self._window_sizes = {"standard": "1280x800", "compact": "960x700"}
@@ -65,16 +67,20 @@ class MikasaApp(ctk.CTk):
         self.bind("<Control-k>", lambda e: self._on_global_search())
         self.bind("<Control-K>", lambda e: self._on_global_search())
 
-        # UI qurish
+        # UI qurish (Asosiy shell)
         self._build_shell()
 
         # Custom window chrome va configure listener
         self._setup_custom_window_chrome()
         self.bind("<Configure>", self._on_window_configure, add="+")
 
-        # Soat va tizim ma'lumotlarini yangilash
-        # self._update_clock()
-        # self._update_system_stats()
+        # Splash Screen ni ishga tushirish (Mikasa 7.0 birinchi vizual kadri)
+        if show_splash:
+            from gui.splash import MikasaSplashScreen
+
+            self.splash = MikasaSplashScreen(self, on_retry=self._on_splash_retry)
+            self.splash.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
+            self.splash.lift()
 
         # Backend ni ishga tushirish
         if connect_backend:
@@ -82,6 +88,42 @@ class MikasaApp(ctk.CTk):
 
         # Yopish event
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    # ========== SPLASH SCREEN & STARTUP LIFECYCLE ==========
+
+    def on_init_progress(self, text: str, progress: float = None):
+        """Backend yuklanish jarayonida splash statusini yangilash (Thread-safe)"""
+        if hasattr(self, "splash") and self.splash and self.splash.winfo_exists():
+            self.splash.set_status(text, progress)
+
+    def on_backend_ready(self):
+        """Backend to'liq tayyor bo'lganda splash dan asosiy oynaga silliq o'tish"""
+        self._transition_from_splash()
+
+    def on_backend_error(self, error_msg: str):
+        """Backend da jiddiy xato yuz berganda splash xatolik holatini ko'rsatish"""
+        if hasattr(self, "splash") and self.splash and self.splash.winfo_exists():
+            self.splash.set_error(error_msg)
+
+    def _on_splash_retry(self):
+        """Foydalanuvchi Qayta urinish tugmasini bosganda"""
+        if self._connect_backend:
+            self.bridge.init_backend()
+        else:
+            self.after(250, self._transition_from_splash)
+
+    def _transition_from_splash(self):
+        """Splash ekrandan asosiy dastur interfeysiga silliq o'tish"""
+        if hasattr(self, "splash") and self.splash and self.splash.winfo_exists():
+            def _cleanup():
+                self.splash = None
+                try:
+                    self.update_idletasks()
+                except Exception:
+                    pass
+
+            self.splash.fade_out_and_destroy(on_complete=_cleanup)
+
 
     def _windows_set_titlebar_color(self, color_mode: str):
         """CustomTkinter _windows_set_titlebar_color xavfsiz versiyasi:

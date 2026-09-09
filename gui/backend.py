@@ -93,8 +93,15 @@ class BackendBridge:
     def init_backend(self):
         """Backend modullarini ishga tushirish (background thread da)"""
 
+        def _notify_progress(text, prog=None):
+            def _fn():
+                if hasattr(self.app, "on_init_progress"):
+                    self.app.on_init_progress(text, prog)
+            self._queue_ui(_fn)
+
         def _init():
             try:
+                _notify_progress("AI tizimi tekshirilmoqda...", 0.2)
                 import main as main_module
 
                 self._main_module = main_module
@@ -110,13 +117,13 @@ class BackendBridge:
                 except ImportError:
                     logger.warning("ai_engine topilmadi")
 
+                _notify_progress("Xotira va modullar yuklanmoqda...", 0.5)
                 # Agent Memory (singleton — duplikat yaratmaslik!)
                 try:
                     from core.agent_memory import get_memory
 
                     self._agent_memory = get_memory()
                 except ImportError:
-                    # get_memory yo'q bo'lsa, to'g'ridan yaratish
                     from core.agent_memory import AgentMemory
 
                     self._agent_memory = AgentMemory()
@@ -131,6 +138,7 @@ class BackendBridge:
                 except Exception as e:
                     logger.warning(f"Scheduler yuklanmadi: {e}")
 
+                _notify_progress("Proaktiv xizmatlar tayyorlanmoqda...", 0.8)
                 # Proactive Watcher — fon rejimida kuzatish
                 try:
                     from core.proactive_watcher import (
@@ -147,13 +155,28 @@ class BackendBridge:
                 self._ready = True
                 logger.info("Backend bridge tayyor")
 
+                _notify_progress("Tayyor!", 1.0)
+
                 # GUI ga xabar
                 self._queue_ui(lambda: self.app.set_status("online", "Tayyor"))
                 self._add_activity("🟢 Backend ishga tushdi", "success")
 
+                # Asosiy ilovaga o'tishni xabardor qilish
+                def _ready_cb():
+                    if hasattr(self.app, "on_backend_ready"):
+                        self.app.on_backend_ready()
+
+                self._queue_ui(_ready_cb)
+
             except Exception as e:
                 logger.error(f"Backend init xatolik: {e}")
                 self._queue_ui(lambda: self.app.set_status("offline", f"Xatolik: {e}"))
+
+                def _err_cb():
+                    if hasattr(self.app, "on_backend_error"):
+                        self.app.on_backend_error(str(e))
+
+                self._queue_ui(_err_cb)
 
         thread = threading.Thread(target=_init, daemon=True, name="BackendInit")
         thread.start()
