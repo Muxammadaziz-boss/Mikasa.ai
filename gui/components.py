@@ -1445,14 +1445,14 @@ class LoadingSkeleton(ctk.CTkFrame):
 class SearchBar(ctk.CTkFrame):
     """Qidiruv maydoni — Debounced va hotkey badge bilan"""
 
-    def __init__(self, master, placeholder="Qidirish...", shortcut="Ctrl + K", **kwargs):
+    def __init__(self, master, placeholder="Qidirish...", shortcut="Ctrl + K", height=40, **kwargs):
         super().__init__(
             master,
             fg_color=Colors.BG_INPUT,
             corner_radius=Sizing.RADIUS_INPUT,
             border_width=1,
             border_color=Colors.BORDER,
-            height=40,
+            height=height,
             **kwargs,
         )
         self.pack_propagate(False)

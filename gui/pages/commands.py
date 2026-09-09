@@ -1,13 +1,15 @@
 # ========== commands.py ==========
 # Command Center sahifasi — tool'lar va buyruqlarni boshqarish
+# Raycast-level discovery + Linear-level discipline + Yandex Music polish
 # Yuqori unumdorlik: Normalized Search Index, Card Cache & Result Diffing,
-# Virtualized Windowing (100–1000 tools), Time-Budgeted Rendering
+# Virtualized Windowing, Dynamic Responsive Grid, Keyboard Navigation
 
 import time
+import tkinter as tk
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
-from gui.components import Card, EmptyState, GlassButton, InfoChip, SearchBar, Button
+from gui.components import Card, EmptyState, GlassButton, InfoChip, SearchBar, Button, attach_tooltip
 
 
 CAT_COLORS = {
@@ -20,6 +22,7 @@ CAT_COLORS = {
     "memory": Colors.SECONDARY,
     "interaction": Colors.INFO,
     "coding": Colors.PRIMARY,
+    "knowledge": Colors.SECONDARY,
     "general": Colors.TEXT_MUTED,
 }
 
@@ -33,15 +36,16 @@ CAT_ICONS = {
     "memory": "memory",
     "interaction": "chat",
     "coding": "commands",
+    "knowledge": "memory",
     "general": "sparkles",
 }
 
 
 class CommandsPage(ctk.CTkFrame):
-    """Buyruqlar va tool'lar markazi — yuqori unumdorlikdagi katalog"""
+    """Buyruqlar va tool'lar markazi — tezkor capability browser"""
 
     BATCH_SIZE = 8
-    WINDOW_SIZE = 24
+    WINDOW_SIZE = 32
     MAX_BATCH_TIME_MS = 12.0
 
     def __init__(self, master, app=None, **kwargs):
@@ -52,6 +56,8 @@ class CommandsPage(ctk.CTkFrame):
         self._active_category: str = "all"
         self._sort_mode: str = "name"
         self._view_mode: str = "grid"  # "grid" yoki "list"
+        self._current_columns: int = 3
+        self._selected_index: int = -1
 
         self._search_timer = None
         self._batch_job = None
@@ -88,86 +94,35 @@ class CommandsPage(ctk.CTkFrame):
         return self._search_timer
 
     def _build_ui(self):
-        # Replace PageHero(...) with a simple header frame
+        # 1. Ixcham header (Title, Badge, Sort & View mode)
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=20, pady=(16, 8))
+        header.pack(fill="x", padx=24, pady=(16, 8))
 
-        from gui.icons import get_vector_icon
-        icon = get_vector_icon("commands", size=20, color=Colors.PRIMARY)
+        # Chap tomonda Ikonka + Sarlavha + Toollar soni badge
+        header_left = ctk.CTkFrame(header, fg_color="transparent")
+        header_left.pack(side="left", fill="y")
+
+        icon = get_vector_icon("commands", size=22, color=Colors.PRIMARY)
         if icon:
-            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 8))
+            ctk.CTkLabel(header_left, text="", image=icon).pack(side="left", padx=(0, 8))
 
         ctk.CTkLabel(
-            header,
+            header_left,
             text="Buyruqlar",
             font=Fonts.HEADING_2,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         ).pack(side="left")
 
-        self.tool_count_chip = InfoChip(header, text="0 ta tool", icon="commands")
+        self.tool_count_chip = InfoChip(header_left, text="0 ta tool", icon="commands")
         self.tool_count_chip.pack(side="left", padx=12)
 
-        # 2. Qidiruv paneli — Ctrl + K nishoni bilan
-        self.search = SearchBar(
-            self,
-            placeholder="Tool, buyruq yoki kategoriya qidiring...",
-            shortcut="Ctrl + K",
-        )
-        self.search.pack(fill="x", padx=20, pady=(0, 10))
-        self.search.entry.bind("<KeyRelease>", self._on_search_keyrelease)
-        self.search.entry.bind("<Return>", lambda e: self._execute_search(immediate=True))
-
-        # 3. Kategoriya filtri chiplari konteyneri
-        self.filter_scroll = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent",
-            height=44,
-            orientation="horizontal",
-            scrollbar_button_color=Colors.BG_CARD,
-            scrollbar_button_hover_color=Colors.BG_HOVER,
-        )
-        self.filter_scroll.pack(fill="x", padx=20, pady=(0, 10))
-
-        # 4. Natijalar paneli va boshqaruv qatori (Card)
-        self.controls_card = Card(
-            self,
-            surface="card",
-            padding=Sizing.SPACING_8,
-        )
-        self.controls_card.pack(fill="x", padx=20, pady=(0, 10))
-
-        ctrl_inner = ctk.CTkFrame(self.controls_card.content, fg_color="transparent")
-        ctrl_inner.pack(fill="x")
-
-        # Chap tomonda natijalar sarlavhasi
-        left_meta = ctk.CTkFrame(ctrl_inner, fg_color="transparent")
-        left_meta.pack(side="left", fill="x", expand=True)
-
-        self.results_label = ctk.CTkLabel(
-            left_meta,
-            text="Barcha tool'lar",
-            font=Fonts.HEADING_3,
-            text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        )
-        self.results_label.pack(side="left")
-
-        self.result_meta = ctk.CTkLabel(
-            left_meta,
-            text="",
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        )
-        self.result_meta.pack(side="left", padx=(10, 0))
-
-        # O'ng tomonda saralash va view mode
-        right_controls = ctk.CTkFrame(ctrl_inner, fg_color="transparent")
-        right_controls.pack(side="right")
+        # O'ng tomonda Saralash va Ko'rinish rejimi (Grid / List)
+        header_right = ctk.CTkFrame(header, fg_color="transparent")
+        header_right.pack(side="right")
 
         self.sort_menu = ctk.CTkOptionMenu(
-            right_controls,
+            header_right,
             values=["Nomi bo'yicha", "Kategoriya bo'yicha"],
             font=Fonts.SMALL,
             fg_color=Colors.BG_INPUT,
@@ -177,14 +132,15 @@ class CommandsPage(ctk.CTkFrame):
             dropdown_hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
             height=30,
-            width=130,
+            width=134,
+            corner_radius=Sizing.RADIUS_BUTTON,
             command=self._on_sort_change,
         )
         self.sort_menu.set("Nomi bo'yicha")
         self.sort_menu.pack(side="left", padx=(0, 8))
 
         self.view_btn = Button(
-            right_controls,
+            header_right,
             text="",
             icon="dashboard",
             variant="secondary",
@@ -195,7 +151,98 @@ class CommandsPage(ctk.CTkFrame):
         )
         self.view_btn.pack(side="left")
 
-        # 5. Asosiy natijalar ScrollableFrame
+        # 2. Raycast-style Qidiruv paneli (44px)
+        self.search = SearchBar(
+            self,
+            placeholder="Buyruq yoki amalni qidiring... (masalan: tizim, ob-havo, fayl)",
+            shortcut="Ctrl + K",
+            height=44,
+        )
+        self.search.pack(fill="x", padx=24, pady=(0, 8))
+        self.search.entry.bind("<KeyRelease>", self._on_search_keyrelease)
+        self.search.entry.bind("<Return>", self._on_search_return)
+        self.search.entry.bind("<Down>", self._on_search_down)
+        self.search.entry.bind("<Escape>", self._on_search_escape)
+
+        # Qidiruv maydoni interaktiv fokus effekti
+        def on_search_focus_in(event=None):
+            if hasattr(self.search, "configure"):
+                self.search.configure(border_color=Colors.PRIMARY, border_width=1.5)
+
+        def on_search_focus_out(event=None):
+            if hasattr(self.search, "configure"):
+                self.search.configure(border_color=Colors.BORDER, border_width=1)
+
+        self.search.entry.bind("<FocusIn>", on_search_focus_in)
+        self.search.entry.bind("<FocusOut>", on_search_focus_out)
+
+        # Qidiruvni tozalash tugmasi
+        self._search_clear_btn = ctk.CTkButton(
+            self.search,
+            text="✕",
+            font=Fonts.SMALL,
+            width=22,
+            height=22,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            text_color=Colors.TEXT_MUTED,
+            corner_radius=11,
+            command=self._clear_search,
+        )
+
+        # 3. Kategoriya filtri chiplari konteyneri
+        self.filter_scroll = ctk.CTkScrollableFrame(
+            self,
+            fg_color="transparent",
+            height=34,
+            orientation="horizontal",
+            scrollbar_button_color=Colors.BG_DARK,
+            scrollbar_button_hover_color=Colors.BG_DARK,
+        )
+        self.filter_scroll.pack(fill="x", padx=24, pady=(0, 6))
+
+        # 4. Ixcham Natijalar va boshqaruv kartasi (Solid Card - 80/20 surface hierarchy)
+        self.controls_card = Card(
+            self,
+            surface="card",
+            padding=Sizing.SPACING_8,
+        )
+        self.controls_card.pack(fill="x", padx=24, pady=(0, 8))
+
+        ctrl_inner = ctk.CTkFrame(self.controls_card.content, fg_color="transparent")
+        ctrl_inner.pack(fill="x")
+
+        self.results_label = ctk.CTkLabel(
+            ctrl_inner,
+            text="Barcha tool'lar",
+            font=Fonts.BODY_BOLD,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        )
+        self.results_label.pack(side="left")
+
+        self.result_meta = ctk.CTkLabel(
+            ctrl_inner,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            anchor="w",
+        )
+        self.result_meta.pack(side="left", padx=(8, 0))
+
+        # Klaviatura ko'rsatmalari (o'ng tomonda)
+        self.hints_lbl = ctk.CTkLabel(
+            ctrl_inner,
+            text="↑↓ Navigatsiya   ↵ Tanlash   Esc Tozalash",
+            font=Fonts.TINY,
+            text_color=Colors.TEXT_MUTED,
+            anchor="e",
+        )
+        self.hints_lbl.pack(side="right")
+
+        self.meta_frame = ctrl_inner
+
+        # 5. Asosiy ScrollableFrame
         self.scroll = ctk.CTkScrollableFrame(
             self,
             fg_color="transparent",
@@ -203,16 +250,25 @@ class CommandsPage(ctk.CTkFrame):
             scrollbar_button_hover_color=Colors.BG_HOVER,
         )
         self.scroll.pack(fill="both", expand=True, padx=20, pady=(0, 16))
+        self.scroll.bind("<Configure>", self._on_scroll_configure)
 
         self.grid_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         self.grid_frame.pack(fill="both", expand=True)
+
+        # Klaviatura navigatsiyasi hodisalarini bog'lash
+        self.bind("<Down>", self._on_key_down)
+        self.bind("<Up>", self._on_key_up)
+        self.bind("<Left>", self._on_key_left)
+        self.bind("<Right>", self._on_key_right)
+        self.bind("<Return>", self._on_key_return)
+        self.bind("<Escape>", self._on_key_escape)
 
         # 6. Bo'sh holat placeholder (EmptyState)
         self._empty_state_widget = EmptyState(
             self.grid_frame,
             icon="search",
             title="Mos tool topilmadi",
-            description="Qidiruvni qisqartirib ko'ring yoki boshqa kategoriya filtrini tanlang.",
+            description="Qidiruv so'zini o'zgartiring yoki boshqa kategoriya filtrini tanlang.",
         )
 
         # 7. "Ko'proq yuklash" paneli (Katta ro'yxatlar uchun)
@@ -222,7 +278,7 @@ class CommandsPage(ctk.CTkFrame):
             text="Yana ko'proq yuklash",
             icon="refresh",
             font=Fonts.SMALL_BOLD,
-            height=34,
+            height=32,
             corner_radius=Sizing.PILL,
             command=self._load_more_items,
         )
@@ -248,7 +304,7 @@ class CommandsPage(ctk.CTkFrame):
                     tools.append(
                         {
                             "name": name,
-                            "description": description[:120],
+                            "description": description[:160],
                             "category": category,
                             "icon": CAT_ICONS.get(category, "commands"),
                             "color": CAT_COLORS.get(category, Colors.TEXT_MUTED),
@@ -274,7 +330,6 @@ class CommandsPage(ctk.CTkFrame):
         self._all_tools = []
         for t in raw_tools:
             item = dict(t)
-            # Normalized search text (kichik harflar bilan birlashgan qidiruv maydoni)
             item["_search_text"] = f"{item['name'].lower()} {item['category'].lower()} {item['description'].lower()}"
             self._all_tools.append(item)
 
@@ -305,10 +360,8 @@ class CommandsPage(ctk.CTkFrame):
             cat = tool["category"]
             counts[cat] = counts.get(cat, 0) + 1
 
-        # Barchasi chipi
         self._create_category_chip("all", f"Barchasi ({counts['all']})")
 
-        # Kategoriya chiplari (eng ko'p tool bo'lganlari bo'yicha)
         other_cats = [c for c in counts.keys() if c != "all"]
         other_cats.sort(key=lambda c: (-counts[c], c))
 
@@ -331,10 +384,10 @@ class CommandsPage(ctk.CTkFrame):
             border_width=1,
             border_color=bc,
             corner_radius=Sizing.PILL,
-            height=30,
+            height=28,
             command=lambda k=category_key: self._on_category_click(k),
         )
-        chip.pack(side="left", padx=(0, 6), pady=4)
+        chip.pack(side="left", padx=(0, 6), pady=2)
         self._category_chips[category_key] = chip
 
     def _on_category_click(self, category_key: str):
@@ -342,7 +395,6 @@ class CommandsPage(ctk.CTkFrame):
             return
         self._active_category = category_key
 
-        # Chip ko'rinishlarini yangilash
         for key, chip in self._category_chips.items():
             if not chip.winfo_exists():
                 continue
@@ -355,6 +407,7 @@ class CommandsPage(ctk.CTkFrame):
                 font=Fonts.SMALL_BOLD if is_active else Fonts.SMALL,
             )
 
+        self._selected_index = -1
         self._active_window_limit = self.WINDOW_SIZE
         self._execute_search(immediate=True)
 
@@ -365,7 +418,7 @@ class CommandsPage(ctk.CTkFrame):
     def _on_search_keyrelease(self, event=None):
         if event and event.keysym in (
             "Up", "Down", "Left", "Right",
-            "Control_L", "Control_R", "Shift_L", "Shift_R", "Alt_L", "Alt_R",
+            "Control_L", "Control_R", "Shift_L", "Shift_R", "Alt_L", "Alt_R", "Return", "Escape",
         ):
             return
 
@@ -376,14 +429,37 @@ class CommandsPage(ctk.CTkFrame):
                 pass
             self._search_timer = None
 
-        query = self.search.entry.get().strip()
+        query = self.search.entry.get().strip() if hasattr(self, "search") and self.search.entry else ""
+
+        # Clear tugmasini ko'rsatish/yashirish
+        if hasattr(self, "_search_clear_btn"):
+            if query:
+                if not self._search_clear_btn.winfo_ismapped():
+                    if hasattr(self.search, "shortcut_badge") and self.search.shortcut_badge:
+                        self._search_clear_btn.pack(side="right", before=self.search.shortcut_badge, padx=(0, 6))
+                    else:
+                        self._search_clear_btn.pack(side="right", padx=(0, 8))
+            else:
+                if self._search_clear_btn.winfo_ismapped():
+                    self._search_clear_btn.pack_forget()
+
         if not query:
-            # So'z tozalanganda zudlik bilan tiklash
+            self._selected_index = -1
             self._active_window_limit = self.WINDOW_SIZE
             self._execute_search(immediate=True)
         else:
-            # 280ms debounced search
             self._search_timer = self.after(280, lambda: self._execute_search(immediate=False))
+
+    def _clear_search(self):
+        if hasattr(self, "search") and self.search.entry:
+            self.search.entry.delete(0, "end")
+        if hasattr(self, "_search_clear_btn") and self._search_clear_btn.winfo_ismapped():
+            self._search_clear_btn.pack_forget()
+        self._selected_index = -1
+        self._active_window_limit = self.WINDOW_SIZE
+        self._execute_search(immediate=True)
+        if hasattr(self, "search") and self.search.entry:
+            self.search.entry.focus_set()
 
     def _on_search(self, event=None):
         """Backward compatibility helper for tests and external callers"""
@@ -412,7 +488,6 @@ class CommandsPage(ctk.CTkFrame):
         else:
             results = sorted(results, key=lambda t: t["name"])
 
-        # Keshga saqlash (maksimum 100 ta yozuv)
         if len(self._search_cache) > 100:
             self._search_cache.clear()
         self._search_cache[cache_key] = results
@@ -422,21 +497,31 @@ class CommandsPage(ctk.CTkFrame):
         self._search_timer = None
         query = self.search.entry.get().strip().lower() if hasattr(self, "search") and self.search.entry else ""
 
-        # Ma'lumotlarni filtrlash
+        # Clear tugmasini sinxronlash
+        if hasattr(self, "_search_clear_btn"):
+            if query:
+                if not self._search_clear_btn.winfo_ismapped():
+                    if hasattr(self.search, "shortcut_badge") and self.search.shortcut_badge:
+                        self._search_clear_btn.pack(side="right", before=self.search.shortcut_badge, padx=(0, 6))
+                    else:
+                        self._search_clear_btn.pack(side="right", padx=(0, 8))
+            else:
+                if self._search_clear_btn.winfo_ismapped():
+                    self._search_clear_btn.pack_forget()
+
         filtered = self._filter_and_sort_tools(query, self._active_category, self._sort_mode)
         self._current_filtered_tools = filtered
 
-        # Sarlavha va natijalar metani yangilash
         if query:
-            self.results_label.configure(text=f"Qidiruv: {query}")
+            self.results_label.configure(text=f'Qidiruv: "{query}"')
         elif self._active_category != "all":
             self.results_label.configure(text=f"Kategoriya: {self._active_category.title()}")
         else:
             self.results_label.configure(text="Barcha tool'lar")
 
         self.result_meta.configure(text=f"{len(filtered)} ta natija")
+        self._selected_index = -1
 
-        # UI diffing va render
         self._build_tools_grid(filtered, immediate=immediate)
 
     def _on_sort_change(self, choice):
@@ -445,10 +530,20 @@ class CommandsPage(ctk.CTkFrame):
         self._execute_search(immediate=True)
 
     def _toggle_view_mode(self):
+        self._cancel_batch_render()
         self._view_mode = "list" if self._view_mode == "grid" else "grid"
         self.view_btn.configure(icon="chat" if self._view_mode == "list" else "dashboard")
-        # View mode o'zgarganda barcha kartalar yangi layoutga joylashtiriladi
+        for card in list(self._tool_cards.values()):
+            if card and card.winfo_exists():
+                card.grid_forget()
+                card.pack_forget()
+                try:
+                    card.destroy()
+                except Exception:
+                    pass
+        self._tool_cards.clear()
         self._rendered_tool_names.clear()
+        self._selected_index = -1
         self._execute_search(immediate=True)
 
     def _load_more_items(self):
@@ -457,8 +552,42 @@ class CommandsPage(ctk.CTkFrame):
         self._build_tools_grid(self._current_filtered_tools)
 
     # ========================================================
-    # CARD CACHE, RESULT DIFFING & TIME-BUDGET RENDERING
+    # RESPONSIVE GRID & VIRTUALIZED RENDERING
     # ========================================================
+
+    def _get_column_count(self) -> int:
+        if self._view_mode == "list":
+            return 1
+        width = self.scroll.winfo_width() if self.scroll.winfo_exists() else 0
+        if width <= 1:
+            width = self.winfo_width() if self.winfo_exists() else 1440
+        if width >= 1280:
+            return 4
+        elif width >= 860:
+            return 3
+        else:
+            return 2
+
+    def _on_scroll_configure(self, event=None):
+        cols = self._get_column_count()
+        if cols != self._current_columns:
+            self._current_columns = cols
+            self._regrid_visible_cards(cols)
+
+    def _regrid_visible_cards(self, cols: int):
+        for i in range(max(cols, 4)):
+            self.grid_frame.columnconfigure(i, weight=1 if i < cols else 0)
+
+        for idx, name in enumerate(self._rendered_tool_names):
+            card = self._tool_cards.get(name)
+            if card and card.winfo_exists():
+                if cols == 1:
+                    card.grid_forget()
+                    card.pack(fill="x", padx=6, pady=3)
+                else:
+                    card.pack_forget()
+                    row, col = divmod(idx, cols)
+                    card.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
 
     def _cancel_batch_render(self):
         if self._batch_job:
@@ -480,11 +609,10 @@ class CommandsPage(ctk.CTkFrame):
 
         # 1. Bo'sh holat tekshiruvi
         if not tools:
-            # Barcha ochiq kartalarni yashirish
-            for name in self._rendered_tool_names:
-                card = self._tool_cards.get(name)
+            for card in self._tool_cards.values():
                 if card and card.winfo_exists():
-                    card.grid_remove() if self._view_mode == "grid" else card.pack_forget()
+                    card.grid_forget()
+                    card.pack_forget()
             self._rendered_tool_names.clear()
 
             if self._load_more_frame and self._load_more_frame.winfo_exists():
@@ -497,29 +625,29 @@ class CommandsPage(ctk.CTkFrame):
             if self._empty_state_widget and self._empty_state_widget.winfo_exists():
                 self._empty_state_widget.pack_forget()
 
-        # 2. Windowing / Virtualizatsiya (Ko'rinuvchi qism)
+        # 2. Windowing / Virtualizatsiya
         visible_tools = tools[:self._active_window_limit]
         target_names = [t["name"] for t in visible_tools]
 
-        # 3. No-Op tekshiruvi: Agar ko'rinayotgan ro'yxat aynan bir xil bo'lsa — hech narsa o'zgarmaydi (0ms)
+        # 3. No-Op tekshiruvi
         if target_names == self._rendered_tool_names:
             self._update_load_more_visibility(len(tools), len(visible_tools))
             return
 
         # 4. Ustunlar konfiguratsiyasi
-        columns = 1 if self._view_mode == "list" else 3
-        for i in range(columns):
-            self.grid_frame.columnconfigure(i, weight=1)
+        columns = self._get_column_count()
+        self._current_columns = columns
+        for i in range(max(columns, 4)):
+            self.grid_frame.columnconfigure(i, weight=1 if i < columns else 0)
 
-        # 5. Diffing: Ko'rinishdan chiqqan kartalarni yashirish (grid_remove / pack_forget)
+        # 5. Diffing: Ko'rinishdan chiqqan kartalarni to'liq yashirish
         target_name_set = set(target_names)
-        for name in list(self._rendered_tool_names):
-            if name not in target_name_set:
-                card = self._tool_cards.get(name)
-                if card and card.winfo_exists():
-                    card.grid_remove() if self._view_mode == "grid" else card.pack_forget()
+        for name, card in self._tool_cards.items():
+            if name not in target_name_set and card and card.winfo_exists():
+                card.grid_forget()
+                card.pack_forget()
 
-        # 6. Partiyalab render qilish (Time-budgeted yoki immediate)
+        # 6. Partiyalab render qilish
         self._rendered_tool_names = list(target_names)
         self._render_chunk_time_budget(visible_tools, 0, columns, len(tools), synchronous=immediate)
 
@@ -536,23 +664,22 @@ class CommandsPage(ctk.CTkFrame):
             tool = tools[idx]
             name = tool["name"]
 
-            # Kartani keshdan olish yoki bir marta yaratish
             if name in self._tool_cards and self._tool_cards[name].winfo_exists():
                 card = self._tool_cards[name]
             else:
                 card = self._create_tool_card(tool)
                 self._tool_cards[name] = card
 
-            # Geometriyaga joylashtirish
             if columns == 1:
-                card.pack(fill="x", padx=6, pady=4)
+                card.grid_forget()
+                card.pack(fill="x", padx=6, pady=3)
             else:
+                card.pack_forget()
                 row, col = divmod(idx, columns)
                 card.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
 
             idx += 1
 
-            # Agar sinxron bo'lmasa, 12 ms dan oshib ketgan bo'lsa, qolganini keyingi freymga uzatish (Zero UI freeze)
             if not synchronous and (time.perf_counter() - t_start) * 1000.0 >= self.MAX_BATCH_TIME_MS:
                 break
 
@@ -566,7 +693,6 @@ class CommandsPage(ctk.CTkFrame):
             self._update_load_more_visibility(total_tools_count, len(tools))
 
     def _update_load_more_visibility(self, total_count: int, visible_count: int):
-        """Katta ro'yxatlarda 'Ko'proq ko'rsatish' tugmasi boshqaruvi"""
         if not self._load_more_frame or not self._load_more_frame.winfo_exists():
             return
 
@@ -578,113 +704,440 @@ class CommandsPage(ctk.CTkFrame):
             self._load_more_frame.pack_forget()
 
     # ========================================================
-    # CARD COMPONENT (100% Retained Visuals & Styling)
+    # COMPACT CAPABILITY ITEM (Grid & List modes)
     # ========================================================
 
     def _create_tool_card(self, tool: dict) -> ctk.CTkFrame:
+        if self._view_mode == "list":
+            return self._create_list_item(tool)
+        return self._create_grid_card(tool)
+
+    def _create_grid_card(self, tool: dict) -> ctk.CTkFrame:
+        """Ixcham, skanerlash oson Raycast uslubidagi Capability Item"""
         card = ctk.CTkFrame(
             self.grid_frame,
             fg_color=Colors.BG_CARD,
-            corner_radius=Sizing.CARD,
+            corner_radius=Sizing.RADIUS_CARD,
             border_width=1,
             border_color=Colors.BORDER,
+            height=108,
             cursor="hand2",
         )
+        card.pack_propagate(False)
+        card.grid_propagate(False)
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=14, pady=12)
+        inner.pack(fill="both", expand=True, padx=12, pady=10)
 
-        # Yuqori qism: Ikonka + Nom + Kategoriya
+        # 1. Yuqori qator: Ikonka + Nom + Harakat ko'rsatkichi (→)
         top = ctk.CTkFrame(inner, fg_color="transparent")
-        top.pack(fill="x")
+        top.pack(side="top", fill="x")
 
         icon_box = ctk.CTkFrame(
             top,
             fg_color=Colors.BG_SOFT,
-            corner_radius=Sizing.SMALL,
-            width=38,
-            height=38,
+            corner_radius=6,
+            width=28,
+            height=28,
         )
         icon_box.pack(side="left")
         icon_box.pack_propagate(False)
 
-        v_img = get_vector_icon(tool["icon"], size=18, color_dark=tool["color"], color_light=tool["color"], fallback="commands")
+        v_img = get_vector_icon(
+            tool["icon"],
+            size=16,
+            color_dark=tool["color"],
+            color_light=tool["color"],
+            fallback="commands",
+        )
+        icon_lbl = None
         if v_img:
-            ctk.CTkLabel(icon_box, image=v_img, text="").pack(expand=True)
+            icon_lbl = ctk.CTkLabel(icon_box, image=v_img, text="")
+            icon_lbl.pack(expand=True)
 
-        name_wrap = ctk.CTkFrame(top, fg_color="transparent")
-        name_wrap.pack(side="left", fill="x", expand=True, padx=(10, 0))
-
-        ctk.CTkLabel(
-            name_wrap,
+        name_lbl = ctk.CTkLabel(
+            top,
             text=tool["name"],
             font=Fonts.BODY_BOLD,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x")
+        )
+        name_lbl.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
-        InfoChip(
-            name_wrap,
-            text=tool["category"],
-            icon=tool["icon"],
-            fg_color=Colors.BG_PANEL,
+        arrow_lbl = ctk.CTkLabel(
+            top,
+            text="→",
+            font=Fonts.BODY_BOLD,
+            text_color=Colors.TEXT_MUTED,
+        )
+        arrow_lbl.pack(side="right")
+
+        # 2. Pastki qator: Semantik kategoriya nuqtasi + Harakat ko'rsatmasi (Pastki qirraga qat'iy mahkamlangan)
+        footer = ctk.CTkFrame(inner, fg_color="transparent")
+        footer.pack(side="bottom", fill="x")
+
+        cat_wrap = ctk.CTkFrame(footer, fg_color="transparent")
+        cat_wrap.pack(side="left")
+
+        dot_lbl = ctk.CTkLabel(
+            cat_wrap,
+            text="●",
+            font=("Segoe UI", 9),
             text_color=tool["color"],
-        ).pack(anchor="w", pady=(4, 0))
+        )
+        dot_lbl.pack(side="left")
 
-        # O'rta qism: Tavsif
+        cat_lbl = ctk.CTkLabel(
+            cat_wrap,
+            text=f" {tool['category'].title()}",
+            font=Fonts.TINY,
+            text_color=Colors.TEXT_MUTED,
+        )
+        cat_lbl.pack(side="left")
+
+        hint_lbl = ctk.CTkLabel(
+            footer,
+            text="↵ Ishlatish",
+            font=Fonts.TINY,
+            text_color=Colors.TEXT_MUTED,
+        )
+        hint_lbl.pack(side="right")
+
+        # 3. O'rta qism: Qisqa tavsif (1-2 qator, markaziy bo'shliqni to'ldiradi)
+        raw_desc = tool["description"]
+        clean_desc = (raw_desc[:85] + "...") if len(raw_desc) > 88 else raw_desc
+
+        desc_lbl = ctk.CTkLabel(
+            inner,
+            text=clean_desc,
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            justify="left",
+            wraplength=280,
+            anchor="nw",
+        )
+        desc_lbl.pack(side="top", fill="both", expand=True, pady=(4, 2))
+
+        # To'liq ma'lumot tooltip
+        full_text = f"{tool['name']} ({tool['category']})\n\n{tool['description']}"
+        attach_tooltip(card, full_text)
+
+        # Hover & Click boshqaruvi
+        def on_enter(event=None):
+            if card.winfo_exists() and not getattr(card, "_is_selected", False):
+                card.configure(border_color=tool["color"], fg_color=Colors.BG_HOVER)
+                arrow_lbl.configure(text_color=Colors.PRIMARY)
+                hint_lbl.configure(text_color=Colors.TEXT_PRIMARY)
+
+        def on_leave(event=None):
+            if card.winfo_exists() and not getattr(card, "_is_selected", False):
+                card.configure(border_color=Colors.BORDER, fg_color=Colors.BG_CARD)
+                arrow_lbl.configure(text_color=Colors.TEXT_MUTED)
+                hint_lbl.configure(text_color=Colors.TEXT_MUTED)
+
+        def on_click(event=None):
+            self._on_tool_click(tool["name"])
+
+        def on_context_menu(event):
+            self._show_context_menu(event, tool)
+
+        all_widgets = [card, inner, top, icon_box, name_lbl, arrow_lbl, desc_lbl, footer, cat_wrap, dot_lbl, cat_lbl, hint_lbl]
+        if icon_lbl:
+            all_widgets.append(icon_lbl)
+
+        for w in all_widgets:
+            w.bind("<Enter>", on_enter)
+            w.bind("<Leave>", on_leave)
+            w.bind("<Button-1>", on_click)
+            w.bind("<Button-3>", on_context_menu)
+
+        card._arrow_lbl = arrow_lbl
+        card._hint_lbl = hint_lbl
+        card._tool_data = tool
+        card._is_selected = False
+
+        return card
+
+    def _create_list_item(self, tool: dict) -> ctk.CTkFrame:
+        """Ixcham ro'yxat ko'rinishidagi Capability Item (48px)"""
+        card = ctk.CTkFrame(
+            self.grid_frame,
+            fg_color=Colors.BG_CARD,
+            corner_radius=Sizing.RADIUS_CARD,
+            border_width=1,
+            border_color=Colors.BORDER,
+            height=48,
+            cursor="hand2",
+        )
+        card.pack_propagate(False)
+
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=12, pady=6)
+
+        left_box = ctk.CTkFrame(inner, fg_color="transparent")
+        left_box.pack(side="left")
+
+        icon_box = ctk.CTkFrame(
+            left_box,
+            fg_color=Colors.BG_SOFT,
+            corner_radius=6,
+            width=26,
+            height=26,
+        )
+        icon_box.pack(side="left")
+        icon_box.pack_propagate(False)
+
+        v_img = get_vector_icon(
+            tool["icon"],
+            size=14,
+            color_dark=tool["color"],
+            color_light=tool["color"],
+            fallback="commands",
+        )
+        icon_lbl = None
+        if v_img:
+            icon_lbl = ctk.CTkLabel(icon_box, image=v_img, text="")
+            icon_lbl.pack(expand=True)
+
+        name_lbl = ctk.CTkLabel(
+            left_box,
+            text=tool["name"],
+            font=Fonts.BODY_BOLD,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+            width=140,
+        )
+        name_lbl.pack(side="left", padx=(8, 0))
+
+        cat_lbl = ctk.CTkLabel(
+            left_box,
+            text=f"● {tool['category'].title()}",
+            font=Fonts.TINY,
+            text_color=tool["color"],
+            anchor="w",
+        )
+        cat_lbl.pack(side="left", padx=(6, 12))
+
         desc_lbl = ctk.CTkLabel(
             inner,
             text=tool["description"],
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
-            justify="left",
-            wraplength=260 if self._view_mode == "grid" else 680,
             anchor="w",
         )
-        desc_lbl.pack(fill="x", pady=(10, 10))
+        desc_lbl.pack(side="left", fill="x", expand=True)
 
-        # Pastki qism: Status + Harakat tugmasi
-        footer = ctk.CTkFrame(inner, fg_color="transparent")
-        footer.pack(fill="x")
-
-        ctk.CTkLabel(
-            footer,
-            text="Chatga tayyor",
+        arrow_lbl = ctk.CTkLabel(
+            inner,
+            text="↵ Ishlatish",
             font=Fonts.TINY,
             text_color=Colors.TEXT_MUTED,
-        ).pack(side="left")
-
-        act_btn = GlassButton(
-            footer,
-            text="Foydalanish",
-            icon="send",
-            font=Fonts.SMALL,
-            height=28,
-            width=92,
-            corner_radius=Sizing.PILL,
-            command=lambda t=tool["name"]: self._on_tool_click(t),
         )
-        act_btn.pack(side="right")
+        arrow_lbl.pack(side="right", padx=(8, 4))
 
-        # Hover & Click bog'lash (faqat asosiy qatlamlarga)
+        attach_tooltip(card, f"{tool['name']} ({tool['category']})\n\n{tool['description']}")
+
         def on_enter(event=None):
-            if card.winfo_exists():
-                card.configure(border_color=tool["color"])
+            if card.winfo_exists() and not getattr(card, "_is_selected", False):
+                card.configure(border_color=tool["color"], fg_color=Colors.BG_HOVER)
+                arrow_lbl.configure(text_color=Colors.PRIMARY)
 
         def on_leave(event=None):
-            if card.winfo_exists():
-                card.configure(border_color=Colors.BORDER)
+            if card.winfo_exists() and not getattr(card, "_is_selected", False):
+                card.configure(border_color=Colors.BORDER, fg_color=Colors.BG_CARD)
+                arrow_lbl.configure(text_color=Colors.TEXT_MUTED)
 
-        def on_card_click(event=None):
+        def on_click(event=None):
             self._on_tool_click(tool["name"])
 
-        card.bind("<Enter>", on_enter)
-        card.bind("<Leave>", on_leave)
-        card.bind("<Button-1>", on_card_click)
-        inner.bind("<Button-1>", on_card_click)
-        desc_lbl.bind("<Button-1>", on_card_click)
+        def on_context_menu(event):
+            self._show_context_menu(event, tool)
+
+        all_widgets = [card, inner, left_box, icon_box, name_lbl, cat_lbl, desc_lbl, arrow_lbl]
+        if icon_lbl:
+            all_widgets.append(icon_lbl)
+
+        for w in all_widgets:
+            w.bind("<Enter>", on_enter)
+            w.bind("<Leave>", on_leave)
+            w.bind("<Button-1>", on_click)
+            w.bind("<Button-3>", on_context_menu)
+
+        card._arrow_lbl = arrow_lbl
+        card._tool_data = tool
+        card._is_selected = False
 
         return card
+
+    def _show_context_menu(self, event, tool: dict):
+        """O'ng tugma bosilganda tezkor amallar menyusi"""
+        menu = tk.Menu(
+            self,
+            tearoff=0,
+            bg=Colors.BG_PANEL,
+            fg=Colors.TEXT_PRIMARY,
+            activebackground=Colors.PRIMARY,
+            activeforeground="#FFFFFF",
+            font=(Fonts.FAMILY, 9),
+            bd=1,
+            relief="solid",
+        )
+        menu.add_command(
+            label=f"💬 Chatda ishlatish ({tool['name']})",
+            command=lambda: self._on_tool_click(tool["name"]),
+        )
+        menu.add_command(
+            label="📋 Nomini nusxalash",
+            command=lambda: self._copy_tool_name(tool["name"]),
+        )
+        menu.add_separator()
+        menu.add_command(
+            label=f"ℹ️ Kategoriya: {tool['category'].title()}",
+            state="disabled",
+        )
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _copy_tool_name(self, name: str):
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(name)
+            if self.app and hasattr(self.app, "show_toast"):
+                self.app.show_toast(f"'{name}' nusxalandi", icon="check")
+        except Exception:
+            pass
+
+    # ========================================================
+    # KEYBOARD NAVIGATION (Raycast style)
+    # ========================================================
+
+    def _select_card_by_index(self, index: int):
+        visible = self._rendered_tool_names
+        if not visible:
+            return
+
+        if 0 <= self._selected_index < len(visible):
+            old_name = visible[self._selected_index]
+            old_card = self._tool_cards.get(old_name)
+            if old_card and old_card.winfo_exists():
+                old_card._is_selected = False
+                old_card.configure(border_color=Colors.BORDER, border_width=1, fg_color=Colors.BG_CARD)
+                if hasattr(old_card, "_arrow_lbl"):
+                    old_card._arrow_lbl.configure(text_color=Colors.TEXT_MUTED)
+
+        index = max(0, min(index, len(visible) - 1))
+        self._selected_index = index
+
+        new_name = visible[index]
+        new_card = self._tool_cards.get(new_name)
+        if new_card and new_card.winfo_exists():
+            new_card._is_selected = True
+            new_card.configure(border_color=Colors.PRIMARY, border_width=2, fg_color=Colors.BG_HOVER)
+            if hasattr(new_card, "_arrow_lbl"):
+                new_card._arrow_lbl.configure(text_color=Colors.PRIMARY)
+            self._ensure_card_visible(new_card)
+
+    def _ensure_card_visible(self, card):
+        try:
+            scroll_canvas = getattr(self.scroll, "_parent_canvas", None)
+            if scroll_canvas:
+                card_y = card.winfo_y()
+                card_h = card.winfo_height()
+                canvas_h = scroll_canvas.winfo_height()
+                canvas_scroll_y = scroll_canvas.canvasy(0)
+                grid_h = max(1, self.grid_frame.winfo_height())
+                if card_y < canvas_scroll_y:
+                    scroll_canvas.yview_moveto(max(0.0, card_y / grid_h))
+                elif card_y + card_h > canvas_scroll_y + canvas_h:
+                    scroll_canvas.yview_moveto(max(0.0, (card_y + card_h - canvas_h + 16) / grid_h))
+        except Exception:
+            pass
+
+    def _clear_selection(self):
+        visible = self._rendered_tool_names
+        if 0 <= self._selected_index < len(visible):
+            old_name = visible[self._selected_index]
+            old_card = self._tool_cards.get(old_name)
+            if old_card and old_card.winfo_exists():
+                old_card._is_selected = False
+                old_card.configure(border_color=Colors.BORDER, border_width=1, fg_color=Colors.BG_CARD)
+        self._selected_index = -1
+
+    def _on_search_down(self, event=None):
+        if self._rendered_tool_names:
+            self._select_card_by_index(0)
+            self.focus_set()
+            return "break"
+
+    def _on_search_return(self, event=None):
+        if self._selected_index >= 0 and self._selected_index < len(self._rendered_tool_names):
+            name = self._rendered_tool_names[self._selected_index]
+            self._on_tool_click(name)
+        elif self._rendered_tool_names:
+            self._on_tool_click(self._rendered_tool_names[0])
+        else:
+            self._execute_search(immediate=True)
+        return "break"
+
+    def _on_search_escape(self, event=None):
+        query = self.search.entry.get().strip() if self.search and self.search.entry else ""
+        if query:
+            self._clear_search()
+        else:
+            self.focus_set()
+        return "break"
+
+    def _on_key_down(self, event=None):
+        cols = self._get_column_count()
+        if self._selected_index < 0:
+            self._select_card_by_index(0)
+        else:
+            self._select_card_by_index(self._selected_index + cols)
+        return "break"
+
+    def _on_key_up(self, event=None):
+        cols = self._get_column_count()
+        if self._selected_index - cols < 0:
+            self._clear_selection()
+            if hasattr(self, "search") and self.search.entry:
+                self.search.entry.focus_set()
+        else:
+            self._select_card_by_index(self._selected_index - cols)
+        return "break"
+
+    def _on_key_right(self, event=None):
+        if self._selected_index < 0:
+            self._select_card_by_index(0)
+        else:
+            self._select_card_by_index(self._selected_index + 1)
+        return "break"
+
+    def _on_key_left(self, event=None):
+        if self._selected_index <= 0:
+            self._clear_selection()
+            if hasattr(self, "search") and self.search.entry:
+                self.search.entry.focus_set()
+        else:
+            self._select_card_by_index(self._selected_index - 1)
+        return "break"
+
+    def _on_key_return(self, event=None):
+        if 0 <= self._selected_index < len(self._rendered_tool_names):
+            name = self._rendered_tool_names[self._selected_index]
+            self._on_tool_click(name)
+            return "break"
+
+    def _on_key_escape(self, event=None):
+        self._clear_selection()
+        if hasattr(self, "search") and self.search.entry:
+            self.search.entry.focus_set()
+        return "break"
+
+    # ========================================================
+    # TOOL EXECUTION
+    # ========================================================
 
     def _on_tool_click(self, tool_name: str):
         if self.app:
@@ -708,7 +1161,6 @@ class CommandsPage(ctk.CTkFrame):
         if not self._tools_loaded:
             self._init_data()
         else:
-            # Qidiruv inputiga fokus berish
             try:
                 if hasattr(self, "search") and self.search.entry:
                     self.search.entry.focus_set()
