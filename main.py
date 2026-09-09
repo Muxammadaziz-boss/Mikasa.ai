@@ -1,9 +1,9 @@
 # ========== main.py ===============================
 # Mikasa AI — Shaxsiy sun'iy intellekt yordamchi
-# Versiya: 6.0.0
+# Versiya: 7.0.0
 # ========== Ogohlantirishlarni yashirish ==========
 
-VERSION = "6.0.0"
+VERSION = "7.0.0"
 APP_NAME = "Mikasa AI"
 import os
 import logging

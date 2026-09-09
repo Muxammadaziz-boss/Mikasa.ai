@@ -21,7 +21,7 @@ class Config:
 
         # Standart konfiguratsiya
         self.default_config = {
-            "app": {"version": "6.0.0", "name": "Mikasa AI", "debug": False},
+            "app": {"version": "7.0.0", "name": "Mikasa AI", "debug": False},
             "audio": {
                 "sample_rate": 16000,
                 "duration": 5,

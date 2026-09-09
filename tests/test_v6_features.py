@@ -123,11 +123,11 @@ class TestV6VersionAndConfig(unittest.TestCase):
 
     def test_version_number(self):
         from main import VERSION
-        self.assertEqual(VERSION, "6.0.0")
+        self.assertEqual(VERSION, "7.0.0")
 
     def test_config_version(self):
         version = get_config("app.version")
-        self.assertEqual(version, "6.0.0")
+        self.assertEqual(version, "7.0.0")
 
 
 if __name__ == "__main__":

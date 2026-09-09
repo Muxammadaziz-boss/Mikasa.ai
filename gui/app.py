@@ -23,7 +23,7 @@ from gui.backend import BackendBridge
 try:
     from main import VERSION
 except ImportError:
-    VERSION = "6.0.0"
+    VERSION = "7.0.0"
 
 
 class MikasaApp(ctk.CTk):
