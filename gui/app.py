@@ -16,7 +16,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import NavItem, StatusBadge, LoadingSkeleton
+from gui.components import NavItem, StatusBadge, LoadingSkeleton, AccountRow, UserAvatar
 from gui.backend import BackendBridge
 
 # Versiyani bitta joydan olish
@@ -623,7 +623,36 @@ class MikasaApp(ctk.CTk):
 
     def _build_sidebar(self):
         """Sidebar navigatsiya — Command Center hierarchy"""
-        # Navigatsiya paneli
+        # 1. Pastki boshqaruv maydoni (Sozlamalar + Foydalanuvchi Hisobi)
+        self.sidebar_bottom = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        self.sidebar_bottom.pack(side="bottom", fill="x", padx=8, pady=(0, 8))
+
+        # Ajratgich
+        separator = ctk.CTkFrame(self.sidebar_bottom, fg_color=Colors.BORDER, height=1)
+        separator.pack(fill="x", padx=4, pady=(6, 6))
+
+        # Sozlamalar
+        settings_item = NavItem(
+            self.sidebar_bottom,
+            icon=Icons.SETTINGS,
+            label="Sozlamalar",
+            compact=self._compact_mode,
+            command=lambda: self.navigate_to("settings"),
+        )
+        settings_item.pack(fill="x", pady=(0, 4))
+        self._nav_items["settings"] = settings_item
+
+        # Foydalanuvchi hisobi (AccountRow)
+        user_name = self._get_user_name()
+        self.account_row = AccountRow(
+            self.sidebar_bottom,
+            name=user_name,
+            compact=self._compact_mode,
+            command=lambda: self.navigate_to("settings"),
+        )
+        self.account_row.pack(fill="x", pady=(0, 2))
+
+        # 2. Asosiy navigatsiya paneli (Yuqori qism)
         self.nav_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         self.nav_frame.pack(fill="both", expand=True, padx=8, pady=8)
 
@@ -668,21 +697,6 @@ class MikasaApp(ctk.CTk):
                 )
                 nav_item.pack(fill="x", pady=2)
                 self._nav_items[page_id] = nav_item
-
-        # Ajratgich
-        separator = ctk.CTkFrame(self.nav_frame, fg_color=Colors.BORDER, height=1)
-        separator.pack(fill="x", padx=12, pady=(12, 6))
-
-        # Sozlamalar (pastda)
-        settings_item = NavItem(
-            self.nav_frame,
-            icon=Icons.SETTINGS,
-            label="Sozlamalar",
-            compact=self._compact_mode,
-            command=lambda: self.navigate_to("settings"),
-        )
-        settings_item.pack(fill="x", pady=2, side="bottom")
-        self._nav_items["settings"] = settings_item
 
     def _build_statusbar(self):
         """Persistent AI Control Bar — AI holati va tezkor boshqaruv"""
@@ -1048,9 +1062,15 @@ class MikasaApp(ctk.CTk):
         try:
             from config import get_config
 
-            return get_config("user.name", "Foydalanuvchi")
+            return get_config("user.name", "Muxammadaziz")
         except Exception:
-            return "Foydalanuvchi"
+            return "Muxammadaziz"
+
+    def update_account_display(self):
+        """Foydalanuvchi ismi o'zgarganda hisob satrini yangilash"""
+        name = self._get_user_name()
+        if hasattr(self, "account_row") and self.account_row and self.account_row.winfo_exists():
+            self.account_row.update_user_name(name)
 
     def _page_title(self, page_id):
         titles = {

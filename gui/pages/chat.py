@@ -12,6 +12,9 @@ from gui.components import (
     GlassButton,
     MessageBubble,
     TypingBubble,
+    UserAvatar,
+    AssistantAvatar,
+    attach_tooltip,
 )
 
 
@@ -761,6 +764,15 @@ class ChatPage(ctk.CTkFrame):
             pass
         self._update_layout_geometry()
 
+    def _get_user_name(self):
+        if self.app and hasattr(self.app, "_get_user_name"):
+            return self.app._get_user_name()
+        try:
+            from config import get_config
+            return get_config("user.name", "Muxammadaziz")
+        except Exception:
+            return "Muxammadaziz"
+
     def show_typing(self, prefix="yozyapti"):
         if self._typing_bubble:
             self._typing_bubble.set_prefix(prefix)
@@ -774,8 +786,17 @@ class ChatPage(ctk.CTkFrame):
         )
         self._typing_row.pack(fill="x", padx=4, pady=(4, 2))
 
+        prev_is_asst = bool(self._messages and self._messages[-1].get("role") == "assistant")
+        if not prev_is_asst:
+            typing_avatar = AssistantAvatar(self._typing_row, size=28)
+            typing_avatar.pack(side="left", padx=(4, 8), anchor="n")
+        else:
+            spacer = ctk.CTkFrame(self._typing_row, width=40, height=1, fg_color="transparent")
+            spacer.pack(side="left")
+            spacer.pack_propagate(False)
+
         self._typing_bubble = TypingBubble(self._typing_row, prefix=prefix)
-        self._typing_bubble.pack(side="left", padx=(4, 60))
+        self._typing_bubble.pack(side="left", padx=(0, 60))
 
         self.after(50, lambda: self._scroll_to_bottom(force=False))
 
@@ -818,32 +839,78 @@ class ChatPage(ctk.CTkFrame):
 
     def _render_message_widget(self, text, role, timestamp):
         is_user = role == "user"
+        user_name = self._get_user_name()
 
-        # Ritm: bir xil so'zlovchidan bo'lsa 3-4px, turli bo'lsa 14-16px
+        # Ritm va guruhlash: bir xil so'zlovchidan bo'lsa 3-4px, turli bo'lsa 14-16px
         pady = 3
+        is_first_in_group = True
         if len(self._messages) > 1:
             prev_role = self._messages[-2].get("role")
             if prev_role != role:
                 pady = (14, 4)
+                is_first_in_group = True
             else:
                 pady = (2, 3)
+                is_first_in_group = False
 
         msg_row = ctk.CTkFrame(
             self.conversation_column, fg_color="transparent"
         )
         msg_row.pack(fill="x", padx=4, pady=pady)
 
-        bubble_frame = MessageBubble(
-            msg_row,
-            text=text,
-            role=role,
-            timestamp=timestamp,
-        )
+        avatar_size = 28
+        spacer_width = avatar_size + 12  # avatar (28) + padx (8+4=12)
 
         if is_user:
-            bubble_frame.pack(side="right", padx=(80, 4))
+            # 1. User avatar (o'ng tomonda)
+            if is_first_in_group:
+                user_avatar = UserAvatar(
+                    msg_row,
+                    name=user_name,
+                    size=avatar_size,
+                    bg_color="#1E40AF",
+                    fg_color="#FFFFFF",
+                    border_color="#3B82F6",
+                )
+                user_avatar.pack(side="right", padx=(8, 4), anchor="n")
+                attach_tooltip(user_avatar, user_name)
+            else:
+                spacer = ctk.CTkFrame(msg_row, width=spacer_width, height=1, fg_color="transparent")
+                spacer.pack(side="right")
+                spacer.pack_propagate(False)
+
+            # 2. User xabar bubble
+            bubble_frame = MessageBubble(
+                msg_row,
+                text=text,
+                role=role,
+                timestamp=timestamp,
+                user_name=user_name if is_first_in_group else "",
+            )
+            bubble_frame.pack(side="right", padx=(60, 0))
+
         else:
-            bubble_frame.pack(side="left", padx=(4, 60))
+            # 1. Assistant avatar (chap tomonda)
+            if is_first_in_group:
+                asst_avatar = AssistantAvatar(
+                    msg_row,
+                    size=avatar_size,
+                )
+                asst_avatar.pack(side="left", padx=(4, 8), anchor="n")
+                attach_tooltip(asst_avatar, "Mikasa AI")
+            else:
+                spacer = ctk.CTkFrame(msg_row, width=spacer_width, height=1, fg_color="transparent")
+                spacer.pack(side="left")
+                spacer.pack_propagate(False)
+
+            # 2. Assistant xabar bubble
+            bubble_frame = MessageBubble(
+                msg_row,
+                text=text,
+                role=role,
+                timestamp=timestamp,
+            )
+            bubble_frame.pack(side="left", padx=(0, 60))
 
         self.after(50, lambda: self._scroll_to_bottom(force=is_user))
 

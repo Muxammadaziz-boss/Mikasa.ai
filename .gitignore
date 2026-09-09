@@ -35,6 +35,7 @@ eslatmalar.txt
 *.tmp
 *.mp3
 output/
+scratch/
 nul
 
 # IDE

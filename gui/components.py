@@ -4,7 +4,9 @@
 # Unified Button System, Card Architecture, Vector Icons, and AppleSiriOrb
 
 import math
+import os
 import tkinter as tk
+from PIL import Image, ImageDraw, ImageFont
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing, Surfaces
 from gui.icons import VectorIconEngine, get_vector_icon
@@ -862,7 +864,7 @@ class MessageBubble(ctk.CTkFrame):
     Clean distinction between User and Assistant.
     """
 
-    def __init__(self, master, text="", role="user", timestamp="", **kwargs):
+    def __init__(self, master, text="", role="user", timestamp="", user_name="", **kwargs):
         is_user = role == "user"
 
         if is_user:
@@ -938,16 +940,25 @@ class MessageBubble(ctk.CTkFrame):
                 command=lambda t=text: self._copy_to_clipboard(t),
             )
             copy_btn.pack(side="right")
-        elif timestamp:
+        elif timestamp or user_name:
             meta_row = ctk.CTkFrame(container, fg_color="transparent")
             meta_row.pack(fill="x", pady=(0, 2))
-            ctk.CTkLabel(
-                meta_row,
-                text=timestamp,
-                font=Fonts.TINY,
-                text_color=time_color,
-                anchor="e",
-            ).pack(side="right")
+            if user_name:
+                ctk.CTkLabel(
+                    meta_row,
+                    text=user_name,
+                    font=(Fonts.FAMILY, 10, "bold"),
+                    text_color="#E0E7FF",
+                    anchor="w",
+                ).pack(side="left")
+            if timestamp:
+                ctk.CTkLabel(
+                    meta_row,
+                    text=timestamp,
+                    font=Fonts.TINY,
+                    text_color=time_color,
+                    anchor="e",
+                ).pack(side="right")
 
         wrap = kwargs.pop("wraplength", 720 if not is_user else 540)
         self.text_label = ctk.CTkLabel(
@@ -1215,6 +1226,416 @@ class NavItem(ctk.CTkFrame):
             if not self.text_label.winfo_manager():
                 self.text_label.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.indicator.pack_configure(padx=(2, 6))
+
+
+# ==========================================
+# 5.1 AVATAR & ACCOUNT ROW COMPONENTS
+# ==========================================
+
+class UserAvatar(ctk.CTkFrame):
+    """
+    Mikasa AI Reusable Circular User Avatar.
+    Supports:
+    - User initials fallback (e.g. 'MA' for 'Muxammadaziz')
+    - Custom image file path (with circular cropping)
+    - High-DPI supersampled anti-aliasing via PIL & Lanczos
+    - Memory cache for instant rendering with zero performance regression
+    """
+    _CACHE = {}
+
+    @classmethod
+    def _extract_initials(cls, name: str) -> str:
+        if not name:
+            return "U"
+        clean = name.strip()
+        parts = clean.split()
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[1][0]).upper()
+        # Single word: check if CamelCase like 'MuhammadAziz'
+        uppercase = [ch for ch in clean if ch.isupper()]
+        if len(uppercase) >= 2:
+            return "".join(uppercase[:2])
+        # Check Uzbek compound names starting with 'muxammad' or 'muhammad'
+        lower = clean.lower()
+        if lower.startswith("muxammad") and len(lower) > 8:
+            return ("M" + lower[8]).upper()
+        if lower.startswith("muhammad") and len(lower) > 8:
+            return ("M" + lower[8]).upper()
+        if len(clean) >= 2:
+            return clean[:2].upper()
+        return clean[0].upper()
+
+    @classmethod
+    def get_avatar_image(
+        cls,
+        name: str = "Muxammadaziz",
+        image_path: str = None,
+        size: int = 36,
+        bg_color: str = "#1E40AF",
+        fg_color: str = "#FFFFFF",
+        border_color: str = "#3B82F6",
+    ) -> ctk.CTkImage:
+        import tkinter
+        curr_root = getattr(tkinter, "_default_root", None)
+        curr_root_id = id(curr_root) if curr_root is not None else None
+
+        key = (name, image_path, size, bg_color, fg_color, border_color)
+        if key in cls._CACHE:
+            cached_pil, cached_ctk, cached_root_id = cls._CACHE[key]
+            if cached_root_id == curr_root_id:
+                return cached_ctk
+
+        scale = 4
+        canvas_size = size * scale
+
+        if image_path and os.path.isfile(image_path):
+            try:
+                with Image.open(image_path) as src:
+                    src = src.convert("RGBA")
+                    w, h = src.size
+                    min_dim = min(w, h)
+                    left = (w - min_dim) // 2
+                    top = (h - min_dim) // 2
+                    src_cropped = src.crop((left, top, left + min_dim, top + min_dim))
+                    src_scaled = src_cropped.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
+
+                    mask = Image.new("L", (canvas_size, canvas_size), 0)
+                    draw_mask = ImageDraw.Draw(mask)
+                    draw_mask.ellipse([0, 0, canvas_size - 1, canvas_size - 1], fill=255)
+
+                    pil_img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+                    pil_img.paste(src_scaled, (0, 0), mask=mask)
+
+                    if border_color:
+                        draw_border = ImageDraw.Draw(pil_img)
+                        draw_border.ellipse([0, 0, canvas_size - 1, canvas_size - 1], outline=border_color, width=scale)
+
+                    pil_img = pil_img.resize((size, size), Image.Resampling.LANCZOS)
+            except Exception:
+                pil_img = cls._draw_initials_pil(cls._extract_initials(name), size, bg_color, fg_color, border_color)
+        else:
+            initials = cls._extract_initials(name)
+            pil_img = cls._draw_initials_pil(initials, size, bg_color, fg_color, border_color)
+
+        ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(size, size))
+        cls._CACHE[key] = (pil_img, ctk_img, curr_root_id)
+        return ctk_img
+
+    @classmethod
+    def _draw_initials_pil(cls, initials: str, size: int, bg_color: str, fg_color: str, border_color: str) -> Image.Image:
+        scale = 4
+        canvas_size = size * scale
+        img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        # Background circle
+        draw.ellipse([scale, scale, canvas_size - 1 - scale, canvas_size - 1 - scale], fill=bg_color, outline=border_color, width=scale if border_color else 0)
+
+        # Typography
+        font = None
+        font_size = int(size * 0.44 * scale)
+        for font_name in ("segoeui.ttf", "segoeuib.ttf", "arial.ttf", "arialbd.ttf"):
+            try:
+                font = ImageFont.truetype(font_name, font_size)
+                break
+            except Exception:
+                continue
+        if font is None:
+            try:
+                font = ImageFont.load_default()
+            except Exception:
+                pass
+
+        bbox = draw.textbbox((0, 0), initials, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+        x = (canvas_size - text_w) / 2 - bbox[0]
+        y = (canvas_size - text_h) / 2 - bbox[1]
+        draw.text((x, y), initials, fill=fg_color, font=font)
+
+        return img.resize((size, size), Image.Resampling.LANCZOS)
+
+    def __init__(
+        self,
+        master,
+        name: str = "Muxammadaziz",
+        image_path: str = None,
+        size: int = 36,
+        bg_color: str = "#1E40AF",
+        fg_color: str = "#FFFFFF",
+        border_color: str = "#3B82F6",
+        **kwargs,
+    ):
+        super().__init__(
+            master,
+            width=size,
+            height=size,
+            corner_radius=size // 2,
+            fg_color="transparent",
+            border_width=0,
+            **kwargs,
+        )
+        self.pack_propagate(False)
+        self.grid_propagate(False)
+
+        self._name = name or "Muxammadaziz"
+        self._image_path = image_path
+        self._size = size
+        self._avatar_bg = bg_color
+        self._avatar_fg = fg_color
+        self._avatar_border = border_color
+
+        self.avatar_image = self.get_avatar_image(
+            name=self._name,
+            image_path=self._image_path if (self._image_path and os.path.isfile(self._image_path)) else None,
+            size=self._size,
+            bg_color=self._avatar_bg,
+            fg_color=self._avatar_fg,
+            border_color=self._avatar_border,
+        )
+        self.avatar_label = ctk.CTkLabel(
+            self,
+            text="",
+            image=self.avatar_image,
+            fg_color="transparent",
+            width=size,
+            height=size,
+        )
+        self.avatar_label.place(relx=0.5, rely=0.5, anchor="center")
+
+    def set_name(self, new_name: str):
+        self._name = new_name or "Muxammadaziz"
+        self.avatar_image = self.get_avatar_image(
+            name=self._name,
+            image_path=self._image_path if (self._image_path and os.path.isfile(self._image_path)) else None,
+            size=self._size,
+            bg_color=self._avatar_bg,
+            fg_color=self._avatar_fg,
+            border_color=self._avatar_border,
+        )
+        self.avatar_label.configure(image=self.avatar_image, text="")
+
+
+class AssistantAvatar(ctk.CTkFrame):
+    """
+    Mikasa AI Distinct Assistant Vector Avatar.
+    Circular badge featuring the canonical sparkles vector icon.
+    Visually distinct from human user avatars.
+    """
+    _CACHE = {}
+
+    @classmethod
+    def get_assistant_image(
+        cls,
+        size: int = 28,
+        bg_color: str = Colors.BG_CARD,
+        border_color: str = Colors.PRIMARY,
+        icon_color: str = Colors.PRIMARY,
+    ) -> ctk.CTkImage:
+        import tkinter
+        curr_root = getattr(tkinter, "_default_root", None)
+        curr_root_id = id(curr_root) if curr_root is not None else None
+
+        key = (size, bg_color, border_color, icon_color)
+        if key in cls._CACHE:
+            cached_pil, cached_ctk, cached_root_id = cls._CACHE[key]
+            if cached_root_id == curr_root_id:
+                return cached_ctk
+
+        scale = 4
+        canvas_size = size * scale
+        img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        # 1. Circle Background & Border
+        draw.ellipse(
+            [scale, scale, canvas_size - 1 - scale, canvas_size - 1 - scale],
+            fill=bg_color,
+            outline=border_color,
+            width=scale,
+        )
+
+        # 2. Vector Sparkles Icon
+        try:
+            sparkle_pil_light, sparkle_pil_dark = VectorIconEngine.get_pil_images(
+                "sparkles", size=int(size * 0.52 * scale), color=icon_color
+            )
+            w, h = sparkle_pil_dark.size
+            offset_x = (canvas_size - w) // 2
+            offset_y = (canvas_size - h) // 2
+            img.paste(sparkle_pil_dark, (offset_x, offset_y), mask=sparkle_pil_dark)
+        except Exception:
+            pass
+
+        pil_final = img.resize((size, size), Image.Resampling.LANCZOS)
+        ctk_img = ctk.CTkImage(light_image=pil_final, dark_image=pil_final, size=(size, size))
+        cls._CACHE[key] = (pil_final, ctk_img, curr_root_id)
+        return ctk_img
+
+    def __init__(self, master, size: int = 28, **kwargs):
+        super().__init__(
+            master,
+            width=size,
+            height=size,
+            corner_radius=size // 2,
+            fg_color="transparent",
+            border_width=0,
+            border_color=Colors.PRIMARY,
+            **kwargs,
+        )
+        self.pack_propagate(False)
+        self.grid_propagate(False)
+
+        self._size = size
+        self.icon_img = self.get_assistant_image(size=size)
+        self.icon_label = ctk.CTkLabel(
+            self,
+            text="",
+            image=self.icon_img,
+            fg_color="transparent",
+            width=size,
+            height=size,
+        )
+        self.icon_label.place(relx=0.5, rely=0.5, anchor="center")
+
+
+class AccountRow(ctk.CTkFrame):
+    """
+    Mikasa AI Desktop Sidebar Account Row.
+    Displays user avatar, display name, 'Hisob' label, and subtle chevron.
+    Interactions:
+    - Default: transparent surface
+    - Hover: lighter surface (Colors.SIDEBAR_HOVER) + primary chevron
+    - Click: opens Settings (real functionality)
+    """
+    def __init__(
+        self,
+        master,
+        name: str = "Muxammadaziz",
+        image_path: str = None,
+        compact: bool = False,
+        command: callable = None,
+        **kwargs,
+    ):
+        if "bg_color" not in kwargs:
+            kwargs["bg_color"] = Colors.SIDEBAR_BG
+
+        super().__init__(
+            master,
+            fg_color="transparent",
+            corner_radius=Sizing.RADIUS_CARD,
+            border_width=0,
+            border_color=Colors.SIDEBAR_BG,
+            height=46,
+            cursor="hand2",
+            **kwargs,
+        )
+        self.pack_propagate(False)
+
+        self._command = command
+        self._compact = compact
+        self._name = name or "Muxammadaziz"
+        self._image_path = image_path
+
+        # Avatar
+        self.avatar = UserAvatar(
+            self,
+            name=self._name,
+            image_path=self._image_path,
+            size=32,
+            bg_color="#1E40AF",
+            fg_color="#FFFFFF",
+            border_color="#3B82F6",
+        )
+        self.avatar.pack(side="left", padx=(6, 8), pady=7)
+
+        # Matn (Name + Hisob)
+        self.text_frame = ctk.CTkFrame(self, fg_color="transparent")
+        if not compact:
+            self.text_frame.pack(side="left", fill="both", expand=True, pady=5)
+
+        self.name_label = ctk.CTkLabel(
+            self.text_frame,
+            text=self._name,
+            font=Fonts.SMALL_BOLD,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        )
+        self.name_label.pack(fill="x", anchor="w")
+
+        self.sub_label = ctk.CTkLabel(
+            self.text_frame,
+            text="Hisob",
+            font=Fonts.TINY,
+            text_color=Colors.TEXT_MUTED,
+            anchor="w",
+        )
+        self.sub_label.pack(fill="x", anchor="w")
+
+        # Chevron ikonka
+        chevron_img = get_vector_icon("arrow_forward", size=12, color=Colors.TEXT_MUTED, fallback="arrow_forward")
+        self.chevron_label = ctk.CTkLabel(
+            self,
+            text="",
+            image=chevron_img,
+            width=16,
+        )
+        if not compact:
+            self.chevron_label.pack(side="right", padx=(4, 8))
+
+        # Event bindings
+        interactive_widgets = [
+            self,
+            self.text_frame,
+            self.name_label,
+            self.sub_label,
+            self.chevron_label,
+            self.avatar,
+            self.avatar.avatar_label,
+        ]
+        for w in interactive_widgets:
+            w.bind("<Button-1>", self._on_click)
+            w.bind("<Enter>", self._on_enter)
+            w.bind("<Leave>", self._on_leave)
+
+        attach_tooltip(self, f"Hisob: {self._name}")
+
+    def set_compact(self, compact: bool):
+        self._compact = compact
+        if compact:
+            if self.text_frame.winfo_manager():
+                self.text_frame.pack_forget()
+            if self.chevron_label.winfo_manager():
+                self.chevron_label.pack_forget()
+            self.avatar.pack_configure(padx=(14, 14))
+            attach_tooltip(self, f"{self._name} (Hisob)")
+        else:
+            self.avatar.pack_configure(padx=(6, 8))
+            if not self.text_frame.winfo_manager():
+                self.text_frame.pack(side="left", fill="both", expand=True, pady=5)
+            if not self.chevron_label.winfo_manager():
+                self.chevron_label.pack(side="right", padx=(4, 8))
+            attach_tooltip(self, f"Hisob: {self._name}")
+
+    def _on_click(self, event=None):
+        self.configure(fg_color=Colors.BG_ACTIVE, border_width=1, border_color=Colors.PRIMARY)
+        if self._command:
+            self._command()
+
+    def _on_enter(self, event=None):
+        self.configure(fg_color=Colors.SIDEBAR_HOVER, border_width=1, border_color=Colors.BORDER_HOVER)
+        self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.PRIMARY, fallback="arrow_forward"))
+
+    def _on_leave(self, event=None):
+        self.configure(fg_color="transparent", border_width=0, border_color=Colors.SIDEBAR_BG)
+        self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.TEXT_MUTED, fallback="arrow_forward"))
+
+    def update_user_name(self, new_name: str):
+        self._name = new_name or "Muxammadaziz"
+        self.name_label.configure(text=self._name)
+        self.avatar.set_name(self._name)
+        attach_tooltip(self, f"Hisob: {self._name}")
 
 
 # ==========================================
