@@ -27,7 +27,7 @@ export interface NavSectionDef {
 
 export const NAV_SECTIONS: NavSectionDef[] = [
   {
-    title: "",
+    title: "MIKASA",
     items: [
       { id: "home", path: "/", label: "Bosh sahifa", icon: HomeIcon },
       { id: "voice", path: "/voice", label: "Ovozli muloqot", icon: MicIcon },

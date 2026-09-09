@@ -92,7 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           onClick={() => onNavigate("/voice")}
           title="Ovozli muloqotni boshlash"
         >
-          <MikasaOrb size="clamp(145px, 16vw, 180px)" state="idle" />
+          <MikasaOrb size="clamp(150px, 17vw, 185px)" state="idle" />
         </div>
 
         {/* 2. GREETING (Salom, Muxammadaziz / Qanday yordam beray?) */}
@@ -100,11 +100,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <h1
             className="text-metallic-gradient"
             style={{
-              fontSize: "clamp(30px, 3.6vw, 38px)",
+              fontSize: "clamp(32px, 3.8vw, 40px)",
               fontWeight: 700,
               letterSpacing: "-0.02em",
               lineHeight: 1.15,
-              marginBottom: "4px",
+              marginBottom: "6px",
             }}
           >
             Salom, {userName}
@@ -112,7 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <p
             style={{
-              fontSize: "clamp(14.5px, 1.6vw, 16.5px)",
+              fontSize: "clamp(15px, 1.7vw, 17px)",
               color: "var(--text-secondary)",
               fontWeight: 400,
               letterSpacing: "0.01em",
