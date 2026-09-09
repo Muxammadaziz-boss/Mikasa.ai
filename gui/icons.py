@@ -608,12 +608,17 @@ class VectorIconEngine:
         resolved = cls.resolve_icon_name(name, fallback=fallback)
         key = (resolved, px_size, color_dark, color_light)
 
-        curr_root = getattr(tkinter, "_default_root", None)
-        curr_root_id = id(curr_root) if curr_root is not None else None
+        curr_tk = None
+        try:
+            curr_root = getattr(tkinter, "_default_root", None)
+            if curr_root is not None and curr_root.winfo_exists():
+                curr_tk = getattr(curr_root, "tk", None)
+        except Exception:
+            curr_tk = None
 
         if key in cls._CTK_CACHE:
             cached_img = cls._CTK_CACHE[key]
-            if getattr(cached_img, "_tk_root_id", None) == curr_root_id:
+            if getattr(cached_img, "_tk_interp", None) == curr_tk:
                 return cached_img
 
         if key not in cls._PIL_CACHE:
@@ -642,7 +647,7 @@ class VectorIconEngine:
 
         img_light, img_dark = cls._PIL_CACHE[key]
         ctk_img = ctk.CTkImage(light_image=img_light, dark_image=img_dark, size=(px_size, px_size))
-        ctk_img._tk_root_id = curr_root_id
+        ctk_img._tk_interp = curr_tk
         cls._CTK_CACHE[key] = ctk_img
         return ctk_img
 

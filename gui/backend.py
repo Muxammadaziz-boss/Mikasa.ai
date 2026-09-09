@@ -49,6 +49,10 @@ class BackendBridge:
         self._proactive_watcher = None
         self._ready = False
 
+    @property
+    def is_ready(self) -> bool:
+        return self._ready
+
         # Duplikat xabar himoyasi (thread-safe)
         self._pending_lock = threading.Lock()
         self._pending_user_texts = set()

@@ -416,7 +416,7 @@ class MikasaApp(ctk.CTk):
             self.geometry(target_size)
             self.minsize(1000, 600)
 
-    def _build_shell(self, page_id="voice", page_states=None):
+    def _build_shell(self, page_id="home", page_states=None):
         self._build_titlebar()
         self._build_statusbar()
         self._build_layout()
@@ -430,7 +430,7 @@ class MikasaApp(ctk.CTk):
         self._restore_runtime_state()
 
     def _rebuild_shell(self):
-        current_page = self._current_page or "voice"
+        current_page = self._current_page or "home"
         page_states = self._capture_page_states()
         self._current_page = None
         self._is_rebuilding_shell = True
@@ -663,6 +663,7 @@ class MikasaApp(ctk.CTk):
             (
                 "MIKASA",
                 [
+                    ("home", "home", "Bosh sahifa"),
                     ("voice", Icons.VOICE, "Ovozli muloqot"),
                     ("chat", Icons.CHAT, "AI Suhbat"),
                     ("commands", Icons.COMMANDS, "Buyruqlar"),
@@ -825,6 +826,8 @@ class MikasaApp(ctk.CTk):
 
     def _get_page_class(self, page_id):
         page_registry = {
+            "home": ("gui.pages.landing", "LandingPage"),
+            "landing": ("gui.pages.landing", "LandingPage"),
             "dashboard": ("gui.pages.dashboard", "DashboardPage"),
             "voice": ("gui.pages.voice", "VoicePage"),
             "chat": ("gui.pages.chat", "ChatPage"),
@@ -836,7 +839,7 @@ class MikasaApp(ctk.CTk):
         }
         return page_registry.get(page_id)
 
-    def _init_pages(self, initial_page="voice"):
+    def _init_pages(self, initial_page="home"):
         """Dastlabki sahifani yuklash (Lazy loading — qolgan sahifalar talab bo'lganda yaratiladi)"""
         self._get_or_create_page(initial_page)
 
@@ -1074,6 +1077,8 @@ class MikasaApp(ctk.CTk):
 
     def _page_title(self, page_id):
         titles = {
+            "home": "Bosh sahifa",
+            "landing": "Bosh sahifa",
             "voice": "Ovozli dialog",
             "chat": "AI suhbat",
             "commands": "Buyruqlar",
