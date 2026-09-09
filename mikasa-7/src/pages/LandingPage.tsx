@@ -61,7 +61,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         justifyContent: "center",
         width: "100%",
         height: "100%",
-        padding: "20px 24px 30px 24px",
+        padding: "20px 24px 32px 24px",
         overflowY: "auto",
         overflowX: "hidden",
         zIndex: 2,
@@ -74,36 +74,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          maxWidth: "600px",
+          maxWidth: "580px",
           width: "100%",
           margin: "auto 0",
-          gap: "16px",
+          gap: "clamp(10px, 1.7vh, 16px)",
         }}
       >
-        {/* Centered AI Orb with calm breathing animation */}
+        {/* 1. MIKASA ORB (Primary Visual Focal Point) */}
         <div
           className="hero-orb-wrapper"
           style={{
             cursor: "pointer",
-            marginBottom: "4px",
+            marginTop: "2px",
+            marginBottom: "2px",
             transition: "transform 0.2s ease",
           }}
           onClick={() => onNavigate("/voice")}
           title="Ovozli muloqotni boshlash"
         >
-          <MikasaOrb size={145} state="idle" />
+          <MikasaOrb size="clamp(145px, 16vw, 180px)" state="idle" />
         </div>
 
-        {/* Hero Greeting Typography */}
+        {/* 2. GREETING (Salom, Muxammadaziz / Qanday yordam beray?) */}
         <div style={{ textAlign: "center" }}>
           <h1
             className="text-metallic-gradient"
             style={{
-              fontSize: "clamp(28px, 4vw, 38px)",
+              fontSize: "clamp(30px, 3.6vw, 38px)",
               fontWeight: 700,
               letterSpacing: "-0.02em",
               lineHeight: 1.15,
-              marginBottom: "6px",
+              marginBottom: "4px",
             }}
           >
             Salom, {userName}
@@ -111,28 +112,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <p
             style={{
-              fontSize: "clamp(14px, 1.8vw, 17px)",
+              fontSize: "clamp(14.5px, 1.6vw, 16.5px)",
               color: "var(--text-secondary)",
               fontWeight: 400,
               letterSpacing: "0.01em",
             }}
           >
-            Bugun sizga qanday yordam bera olaman?
+            Qanday yordam beray?
           </p>
         </div>
 
-        {/* Real Status Badge */}
+        {/* 3. ONLINE STATUS (Subtle indicator, not a heavy badge) */}
         <div
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: "7px",
-            padding: "4px 14px",
-            borderRadius: "var(--radius-pill)",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
-            border: "1px solid rgba(16, 185, 129, 0.25)",
-            fontSize: "12px",
-            color: "#6EE7B7",
+            padding: "2px 8px",
+            fontSize: "11.5px",
+            color: "var(--text-muted)",
             letterSpacing: "0.02em",
           }}
         >
@@ -142,23 +140,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               height: "6px",
               borderRadius: "50%",
               backgroundColor: "#10B981",
-              boxShadow: "0 0 8px #10B981",
+              boxShadow: "0 0 8px rgba(16, 185, 129, 0.7)",
             }}
           />
-          <span>Online</span>
+          <span style={{ color: "#94A3B8" }}>Online</span>
         </div>
 
-        {/* Primary Voice CTA & Secondary Actions Bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            width: "100%",
-            marginTop: "2px",
-          }}
-        >
+        {/* 4. PRIMARY VOICE ACTION (Tinglashni boshlash) */}
+        <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
           <button
             onClick={() => onNavigate("/voice")}
             style={{
@@ -166,13 +155,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               alignItems: "center",
               justifyContent: "center",
               gap: "10px",
-              padding: "10px 24px",
+              padding: "11px 28px",
               borderRadius: "var(--radius-pill)",
               background: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
-              border: "1px solid rgba(56, 189, 248, 0.4)",
-              boxShadow: "0 4px 20px rgba(2, 132, 199, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3)",
+              border: "1px solid rgba(56, 189, 248, 0.45)",
+              boxShadow: "0 4px 22px rgba(2, 132, 199, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
               color: "#FFFFFF",
-              fontSize: "13.5px",
+              fontSize: "14px",
               fontWeight: 600,
               letterSpacing: "0.02em",
               cursor: "pointer",
@@ -180,17 +169,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 6px 24px rgba(2, 132, 199, 0.45)";
+              e.currentTarget.style.boxShadow = "0 6px 26px rgba(2, 132, 199, 0.55)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 20px rgba(2, 132, 199, 0.35)";
+              e.currentTarget.style.boxShadow = "0 4px 22px rgba(2, 132, 199, 0.4)";
             }}
           >
             <MicIcon size={16} color="#FFFFFF" />
             <span>Tinglashni boshlash</span>
           </button>
+        </div>
 
+        {/* 5. SECONDARY BUTTONS (Tozalash & Chat — quieter visual weight) */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+          }}
+        >
           <button
             onClick={handleClear}
             title="Yozuvni tozalash"
@@ -200,26 +199,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
-              padding: "10px 16px",
+              padding: "8px 16px",
               borderRadius: "var(--radius-pill)",
-              backgroundColor: "rgba(14, 19, 31, 0.55)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              color: "var(--text-secondary)",
-              fontSize: "13px",
+              backgroundColor: "rgba(14, 20, 32, 0.5)",
+              border: "1px solid rgba(255, 255, 255, 0.07)",
+              color: "var(--text-muted)",
+              fontSize: "12.5px",
               fontWeight: 500,
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
               e.currentTarget.style.color = "#FFFFFF";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(14, 19, 31, 0.55)";
-              e.currentTarget.style.color = "var(--text-secondary)";
+              e.currentTarget.style.backgroundColor = "rgba(14, 20, 32, 0.5)";
+              e.currentTarget.style.color = "var(--text-muted)";
             }}
           >
-            <TrashIcon size={14} color="currentColor" />
+            <TrashIcon size={13} color="currentColor" />
             <span>Tozalash</span>
           </button>
 
@@ -232,31 +231,208 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
-              padding: "10px 18px",
+              padding: "8px 18px",
               borderRadius: "var(--radius-pill)",
-              backgroundColor: "rgba(14, 19, 31, 0.55)",
-              border: "1px solid rgba(56, 189, 248, 0.2)",
-              color: "var(--text-primary)",
-              fontSize: "13px",
+              backgroundColor: "rgba(14, 20, 32, 0.5)",
+              border: "1px solid rgba(56, 189, 248, 0.18)",
+              color: "var(--text-secondary)",
+              fontSize: "12.5px",
               fontWeight: 500,
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(2, 132, 199, 0.18)";
-              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+              e.currentTarget.style.backgroundColor = "rgba(2, 132, 199, 0.14)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.35)";
+              e.currentTarget.style.color = "#FFFFFF";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(14, 19, 31, 0.55)";
-              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.2)";
+              e.currentTarget.style.backgroundColor = "rgba(14, 20, 32, 0.5)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.18)";
+              e.currentTarget.style.color = "var(--text-secondary)";
             }}
           >
-            <ChatIcon size={14} color="var(--primary-glow)" />
+            <ChatIcon size={13} color="var(--primary-glow)" />
             <span>Chat</span>
           </button>
         </div>
 
-        {/* Central AI Composer Capsule */}
+        {/* 6. QUICK ACTIONS (So‘rash, Buyruq, Xulosa — placed ABOVE Composer) */}
+        <div
+          className="landing-quick-actions"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "10px",
+            width: "100%",
+            marginTop: "2px",
+          }}
+        >
+          {/* Card 1: So'rash */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => handleQuickAction("ask")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "12px 14px",
+              borderRadius: "14px",
+              backgroundColor: "rgba(12, 18, 30, 0.6)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(56, 189, 248, 0.28)",
+              boxShadow: "0 0 16px rgba(2, 132, 199, 0.12)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.75)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.5)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.6)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.28)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "26px",
+                height: "26px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(2, 132, 199, 0.2)",
+                flexShrink: 0,
+              }}
+            >
+              <SparklesIcon size={14} color="var(--primary-glow)" />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                So‘rash
+              </span>
+              <span style={{ fontSize: "10.5px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                Savol berish
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Buyruq */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => handleQuickAction("command")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "12px 14px",
+              borderRadius: "14px",
+              backgroundColor: "rgba(12, 18, 30, 0.6)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.75)";
+              e.currentTarget.style.borderColor = "rgba(245, 158, 11, 0.4)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.6)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "26px",
+                height: "26px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(245, 158, 11, 0.15)",
+                flexShrink: 0,
+              }}
+            >
+              <CommandsIcon size={13} color="#F59E0B" />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                Buyruq
+              </span>
+              <span style={{ fontSize: "10.5px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                Tizim amallari
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Xulosa */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => handleQuickAction("summary")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "12px 14px",
+              borderRadius: "14px",
+              backgroundColor: "rgba(12, 18, 30, 0.6)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.75)";
+              e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.6)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "26px",
+                height: "26px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(139, 92, 246, 0.15)",
+                flexShrink: 0,
+              }}
+            >
+              <FileTextIcon size={13} color="#A78BFA" />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                Xulosa
+              </span>
+              <span style={{ fontSize: "10.5px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                Matn tahlili
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 7. AI COMPOSER (Floating focused input at the bottom of hero stack) */}
         <form
           onSubmit={handleSubmit}
           className="landing-composer"
@@ -264,24 +440,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             display: "flex",
             alignItems: "center",
             width: "100%",
-            height: "56px",
+            height: "54px",
             borderRadius: "20px",
-            backgroundColor: "rgba(10, 15, 25, 0.72)",
+            backgroundColor: "rgba(10, 15, 25, 0.76)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
-            border: "1px solid rgba(56, 189, 248, 0.25)",
-            boxShadow: "0 10px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(2, 132, 199, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.12)",
-            padding: "6px 8px 6px 16px",
+            border: "1px solid rgba(56, 189, 248, 0.22)",
+            boxShadow: "0 10px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(2, 132, 199, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.1)",
+            padding: "5px 7px 5px 15px",
             gap: "10px",
             transition: "all 0.2s ease",
+            marginTop: "2px",
           }}
           onFocusCapture={(e) => {
-            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.55)";
-            e.currentTarget.style.boxShadow = "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(2, 132, 199, 0.25)";
+            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.5)";
+            e.currentTarget.style.boxShadow = "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 28px rgba(2, 132, 199, 0.22)";
           }}
           onBlurCapture={(e) => {
-            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.25)";
-            e.currentTarget.style.boxShadow = "0 10px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(2, 132, 199, 0.15)";
+            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.22)";
+            e.currentTarget.style.boxShadow = "0 10px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(2, 132, 199, 0.12)";
           }}
         >
           {/* Attachment button */}
@@ -293,8 +470,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "34px",
-              height: "34px",
+              width: "32px",
+              height: "32px",
               borderRadius: "10px",
               color: "rgba(255, 255, 255, 0.6)",
               cursor: "pointer",
@@ -310,23 +487,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               e.currentTarget.style.color = "rgba(255, 255, 255, 0.6)";
             }}
           >
-            <AttachIcon size={19} />
+            <AttachIcon size={18} />
           </button>
 
-          {/* Text input */}
+          {/* Text input with concise placeholder */}
           <input
             ref={inputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Menga yozing..."
+            placeholder="Nima yordam kerak?"
             style={{
               flex: 1,
               background: "transparent",
               border: "none",
               outline: "none",
               color: "#FFFFFF",
-              fontSize: "15px",
+              fontSize: "14.5px",
               fontWeight: 400,
               letterSpacing: "0.01em",
             }}
@@ -342,8 +519,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "36px",
-              height: "36px",
+              width: "34px",
+              height: "34px",
               borderRadius: "10px",
               color: "rgba(255, 255, 255, 0.65)",
               cursor: "pointer",
@@ -359,7 +536,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               e.currentTarget.style.color = "rgba(255, 255, 255, 0.65)";
             }}
           >
-            <MicIcon size={18} />
+            <MicIcon size={17} />
           </button>
 
           {/* Circular Glowing Send Button */}
@@ -371,11 +548,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "38px",
-              height: "38px",
+              width: "36px",
+              height: "36px",
               borderRadius: "50%",
               backgroundColor: "#0284C7",
-              boxShadow: "0 0 16px rgba(56, 189, 248, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
+              boxShadow: "0 0 16px rgba(56, 189, 248, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
               color: "#FFFFFF",
               cursor: "pointer",
               transition: "all 0.15s ease",
@@ -391,184 +568,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            <ArrowUpIcon size={17} color="#FFFFFF" />
+            <ArrowUpIcon size={16} color="#FFFFFF" />
           </button>
         </form>
-
-        {/* 3 Quick Action Suggestion Cards matching the reference layout */}
-        <div
-          className="landing-quick-actions"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "12px",
-            width: "100%",
-            marginTop: "2px",
-          }}
-        >
-          {/* Card 1: So'rash */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleQuickAction("ask")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "14px 16px",
-              borderRadius: "16px",
-              backgroundColor: "rgba(12, 18, 30, 0.65)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(56, 189, 248, 0.3)",
-              boxShadow: "0 0 18px rgba(2, 132, 199, 0.15)",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.8)";
-              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.5)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.65)";
-              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.3)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "28px",
-                height: "28px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(2, 132, 199, 0.2)",
-                flexShrink: 0,
-              }}
-            >
-              <SparklesIcon size={15} color="var(--primary-glow)" />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <span style={{ fontSize: "13.5px", fontWeight: 600, color: "#FFFFFF" }}>
-                So‘rash
-              </span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                Savol berish
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Buyruq */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleQuickAction("command")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "14px 16px",
-              borderRadius: "16px",
-              backgroundColor: "rgba(12, 18, 30, 0.65)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.8)";
-              e.currentTarget.style.borderColor = "rgba(245, 158, 11, 0.4)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.65)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "28px",
-                height: "28px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(245, 158, 11, 0.15)",
-                flexShrink: 0,
-              }}
-            >
-              <CommandsIcon size={14} color="#F59E0B" />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <span style={{ fontSize: "13.5px", fontWeight: 600, color: "#FFFFFF" }}>
-                Buyruq
-              </span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                Tizim amallari
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: Xulosa */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleQuickAction("summary")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "14px 16px",
-              borderRadius: "16px",
-              backgroundColor: "rgba(12, 18, 30, 0.65)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.8)";
-              e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.65)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "28px",
-                height: "28px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(139, 92, 246, 0.15)",
-                flexShrink: 0,
-              }}
-            >
-              <FileTextIcon size={14} color="#A78BFA" />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <span style={{ fontSize: "13.5px", fontWeight: 600, color: "#FFFFFF" }}>
-                Xulosa
-              </span>
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                Matn tahlili
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

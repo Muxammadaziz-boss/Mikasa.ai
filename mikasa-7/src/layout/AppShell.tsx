@@ -13,12 +13,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onNavigate,
   children,
 }) => {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("collapsed=true")) {
-      return true;
-    }
-    return false;
-  });
+  const [collapsed, setCollapsed] = useState(false);
 
 
   return (

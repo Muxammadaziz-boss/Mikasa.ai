@@ -40,13 +40,16 @@ html, body {
   background-repeat: no-repeat;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.82;
 }
 
-/* Subtle dark vignette overlay to ensure text contrast */
+/* Atmospheric vignette: softens orange highlights and dims bottom Mikasa text */
 .cinematic-vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 60% 40%, rgba(5, 7, 11, 0.15) 0%, rgba(5, 7, 11, 0.65) 75%, rgba(5, 7, 11, 0.88) 100%);
+  background:
+    linear-gradient(to top, rgba(5, 7, 11, 0.94) 0%, rgba(5, 7, 11, 0.82) 28%, rgba(5, 7, 11, 0.35) 55%, transparent 100%),
+    radial-gradient(ellipse at 50% 30%, rgba(5, 7, 11, 0.08) 0%, rgba(5, 7, 11, 0.58) 75%, rgba(5, 7, 11, 0.92) 100%);
   pointer-events: none;
   z-index: 1;
 }

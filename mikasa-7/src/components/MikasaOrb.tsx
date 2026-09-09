@@ -3,14 +3,14 @@ import React from "react";
 export type OrbState = "idle" | "listening" | "thinking" | "speaking" | "loading" | "error" | "offline";
 
 interface MikasaOrbProps {
-  size?: number;
+  size?: number | string;
   state?: OrbState;
   className?: string;
   onClick?: () => void;
 }
 
 export const MikasaOrb: React.FC<MikasaOrbProps> = ({
-  size = 150,
+  size = 170,
   state = "idle",
   className = "",
   onClick,
@@ -72,8 +72,8 @@ export const MikasaOrb: React.FC<MikasaOrbProps> = ({
       className={`mikasa-orb ${className}`}
       style={{
         position: "relative",
-        width: `${size}px`,
-        height: `${size}px`,
+        width: typeof size === "number" ? `${size}px` : size,
+        height: typeof size === "number" ? `${size}px` : size,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
