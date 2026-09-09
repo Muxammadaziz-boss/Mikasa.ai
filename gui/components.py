@@ -1537,6 +1537,7 @@ class AccountRow(ctk.CTkFrame):
         self._compact = compact
         self._name = name or "Muxammadaziz"
         self._image_path = image_path
+        self._is_active = False
 
         # Avatar
         self.avatar = UserAvatar(
@@ -1596,6 +1597,7 @@ class AccountRow(ctk.CTkFrame):
         ]
         for w in interactive_widgets:
             w.bind("<Button-1>", self._on_click)
+            w.bind("<Button-3>", self._show_context_menu)
             w.bind("<Enter>", self._on_enter)
             w.bind("<Leave>", self._on_leave)
 
@@ -1618,18 +1620,54 @@ class AccountRow(ctk.CTkFrame):
                 self.chevron_label.pack(side="right", padx=(4, 8))
             attach_tooltip(self, f"Hisob: {self._name}")
 
+    def set_active(self, active: bool):
+        self._is_active = bool(active)
+        if self._is_active:
+            self.configure(fg_color=Colors.BG_ACTIVE, border_width=1, border_color=Colors.PRIMARY)
+            self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.PRIMARY, fallback="arrow_forward"))
+        else:
+            self.configure(fg_color="transparent", border_width=0, border_color=Colors.SIDEBAR_BG)
+            self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.TEXT_MUTED, fallback="arrow_forward"))
+
     def _on_click(self, event=None):
-        self.configure(fg_color=Colors.BG_ACTIVE, border_width=1, border_color=Colors.PRIMARY)
+        self.set_active(True)
         if self._command:
             self._command()
 
     def _on_enter(self, event=None):
-        self.configure(fg_color=Colors.SIDEBAR_HOVER, border_width=1, border_color=Colors.BORDER_HOVER)
-        self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.PRIMARY, fallback="arrow_forward"))
+        if not self._is_active:
+            self.configure(fg_color=Colors.SIDEBAR_HOVER, border_width=1, border_color=Colors.BORDER_HOVER)
+            self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.PRIMARY, fallback="arrow_forward"))
 
     def _on_leave(self, event=None):
-        self.configure(fg_color="transparent", border_width=0, border_color=Colors.SIDEBAR_BG)
-        self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.TEXT_MUTED, fallback="arrow_forward"))
+        if not self._is_active:
+            self.configure(fg_color="transparent", border_width=0, border_color=Colors.SIDEBAR_BG)
+            self.chevron_label.configure(image=get_vector_icon("arrow_forward", size=12, color=Colors.TEXT_MUTED, fallback="arrow_forward"))
+
+    def _show_context_menu(self, event):
+        menu = tk.Menu(
+            self,
+            tearoff=0,
+            bg=Colors.BG_PANEL,
+            fg=Colors.TEXT_PRIMARY,
+            activebackground=Colors.PRIMARY,
+            activeforeground="#FFFFFF",
+            font=(Fonts.FAMILY, 9),
+            bd=1,
+            relief="solid",
+        )
+        menu.add_command(
+            label=f"Hisob: {self._name}",
+            command=self._on_click,
+        )
+        menu.add_command(
+            label="Sozlamalar",
+            command=self._on_click,
+        )
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def update_user_name(self, new_name: str):
         self._name = new_name or "Muxammadaziz"

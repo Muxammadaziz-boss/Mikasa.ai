@@ -11,17 +11,23 @@ from gui.pages.chat import ChatPage
 class TestUserAccountAndChatAvatar(unittest.TestCase):
     """Foydalanuvchi hisob maydoni va Chat avatari testlari"""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.root = ctk.CTk()
-        cls.root.withdraw()
+    def setUp(self):
+        from gui.icons import VectorIconEngine
+        VectorIconEngine.clear_cache()
+        UserAvatar._CACHE.clear()
+        AssistantAvatar._CACHE.clear()
+        self.root = ctk.CTk()
+        self.root.withdraw()
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         try:
-            cls.root.destroy()
+            self.root.destroy()
         except Exception:
             pass
+        from gui.icons import VectorIconEngine
+        VectorIconEngine.clear_cache()
+        UserAvatar._CACHE.clear()
+        AssistantAvatar._CACHE.clear()
 
     def test_user_avatar_initials_extraction(self):
         self.assertEqual(UserAvatar._extract_initials("Muxammadaziz"), "MA")
@@ -129,6 +135,64 @@ class TestUserAccountAndChatAvatar(unittest.TestCase):
         self.assertEqual(len(assistant_avatars), 1)
 
         page.destroy()
+
+
+class TestCleanShellAndNavigation(unittest.TestCase):
+    """Clean Shell, minimal top bar va Account orqali Sozlamalarga kirish testlari"""
+
+    def setUp(self):
+        from gui.icons import VectorIconEngine
+        from gui.components import UserAvatar, AssistantAvatar
+        VectorIconEngine.clear_cache()
+        UserAvatar._CACHE.clear()
+        AssistantAvatar._CACHE.clear()
+
+    def tearDown(self):
+        from gui.icons import VectorIconEngine
+        VectorIconEngine.clear_cache()
+
+    def test_clean_shell_minimal_topbar_and_sidebar(self):
+        from gui.app import MikasaApp
+        from gui.components import WindowControls
+
+        app = MikasaApp(connect_backend=False)
+        app.update()
+
+        # 1. Top bar faqat logo va window controls'dan iborat
+        self.assertTrue(hasattr(app, "titlebar"))
+        self.assertTrue(hasattr(app, "logo_label"))
+        self.assertTrue(hasattr(app, "window_controls"))
+        self.assertIsInstance(app.window_controls, WindowControls)
+
+        # Ortiqcha elementlar (status_badge, page_label, search_hint) butunlay olib tashlangan
+        self.assertFalse(hasattr(app, "status_badge"))
+        self.assertFalse(hasattr(app, "page_label"))
+        self.assertFalse(hasattr(app, "search_hint"))
+
+        # 2. Sidebar bottom'da standalone "settings" NavItem yo'q
+        self.assertNotIn("settings", app._nav_items)
+
+        # 3. AccountRow yagona sozlamalar kirish nuqtasi
+        self.assertTrue(hasattr(app, "account_row"))
+        self.assertEqual(app.account_row.sub_label.cget("text"), "Hisob")
+
+        # Hisob maydoniga klik qilinganda Sozlamalar sahifasi ochiladi
+        app.navigate_to("chat", sync=True)
+        self.assertEqual(app._current_page, "chat")
+        self.assertFalse(app.account_row._is_active)
+
+        # Account row bosilganda
+        app.account_row._on_click()
+        app.navigate_to("settings", sync=True)
+        self.assertEqual(app._current_page, "settings")
+        self.assertTrue(app.account_row._is_active)
+
+        # Boshqa sahifaga o'tganda account row faol holatdan chiqadi
+        app.navigate_to("commands", sync=True)
+        self.assertEqual(app._current_page, "commands")
+        self.assertFalse(app.account_row._is_active)
+
+        app._on_closing()
 
 
 if __name__ == "__main__":

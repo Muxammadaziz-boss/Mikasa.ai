@@ -16,7 +16,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 from gui.theme import Colors, Fonts, Sizing, Icons
-from gui.components import NavItem, StatusBadge, LoadingSkeleton, AccountRow, UserAvatar
+from gui.components import NavItem, LoadingSkeleton, AccountRow, UserAvatar
 from gui.backend import BackendBridge
 
 # Versiyani bitta joydan olish
@@ -538,25 +538,7 @@ class MikasaApp(ctk.CTk):
         )
         self.logo_label.pack(side="left", padx=(14, 6))
 
-        # 2. Status badge (subtle)
-        self.status_badge = StatusBadge(
-            self.titlebar,
-            status=self._status_state["status"],
-            text=self._status_state["text"],
-            bg_color=Colors.BG_DARKEST,
-        )
-        self.status_badge.pack(side="left", padx=6)
-
-        # 3. Joriy sahifa/rejim sarlavhasi
-        self.page_label = ctk.CTkLabel(
-            self.titlebar,
-            text="Ovozli muloqot",
-            font=Fonts.STATUS,
-            text_color=Colors.TEXT_SECONDARY,
-        )
-        self.page_label.pack(side="left", padx=8 if self._compact_mode else 10)
-
-        # 4. O'ng tomon: Desktop Native Window Controls (Minimize, Maximize/Restore, Close)
+        # 2. O'ng tomon: Desktop Native Window Controls (Minimize, Maximize/Restore, Close)
         self.window_controls = WindowControls(self.titlebar, app=self, height=36, btn_width=44)
         self.window_controls.pack(side="right", fill="y")
         try:
@@ -564,19 +546,8 @@ class MikasaApp(ctk.CTk):
         except Exception:
             pass
 
-        # 5. Ctrl+K qidiruv indikatori (controls'dan chaproqda)
-        self.search_hint = ctk.CTkLabel(
-            self.titlebar,
-            text="⌘K",
-            font=Fonts.TINY,
-            text_color=Colors.TEXT_MUTED,
-            cursor="hand2",
-        )
-        self.search_hint.pack(side="right", padx=(0, 16))
-        self.search_hint.bind("<Button-1>", lambda e: self._on_global_search())
-
-        # 6. Sarlavhadan ushlab oynani surish (Dragging) va Double-Click Maximize
-        for widget in (self.titlebar, self.logo_label, self.page_label):
+        # 3. Sarlavhadan ushlab oynani surish (Dragging) va Double-Click Maximize
+        for widget in (self.titlebar, self.logo_label):
             widget.bind("<ButtonPress-1>", self._start_window_drag)
             widget.bind("<B1-Motion>", self._on_window_drag)
             widget.bind("<ButtonRelease-1>", self._end_window_drag)
@@ -623,7 +594,7 @@ class MikasaApp(ctk.CTk):
 
     def _build_sidebar(self):
         """Sidebar navigatsiya — Command Center hierarchy"""
-        # 1. Pastki boshqaruv maydoni (Sozlamalar + Foydalanuvchi Hisobi)
+        # 1. Pastki boshqaruv maydoni (Foydalanuvchi Hisobi / Sozlamalar)
         self.sidebar_bottom = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         self.sidebar_bottom.pack(side="bottom", fill="x", padx=8, pady=(0, 8))
 
@@ -631,18 +602,7 @@ class MikasaApp(ctk.CTk):
         separator = ctk.CTkFrame(self.sidebar_bottom, fg_color=Colors.BORDER, height=1)
         separator.pack(fill="x", padx=4, pady=(6, 6))
 
-        # Sozlamalar
-        settings_item = NavItem(
-            self.sidebar_bottom,
-            icon=Icons.SETTINGS,
-            label="Sozlamalar",
-            compact=self._compact_mode,
-            command=lambda: self.navigate_to("settings"),
-        )
-        settings_item.pack(fill="x", pady=(0, 4))
-        self._nav_items["settings"] = settings_item
-
-        # Foydalanuvchi hisobi (AccountRow)
+        # Foydalanuvchi hisobi (AccountRow — Sozlamalar va Profil yagona kirish nuqtasi)
         user_name = self._get_user_name()
         self.account_row = AccountRow(
             self.sidebar_bottom,
@@ -907,11 +867,12 @@ class MikasaApp(ctk.CTk):
                 except Exception as e:
                     logger.error(f"on_hide da xatolik ({self._current_page}): {e}")
 
-        # 2. Tezkor vizual aks-sado (<10ms): sidebar nav va titlebar
+        # 2. Tezkor vizual aks-sado (<10ms): sidebar nav va hisob paneli
         for nav_id, nav_item in self._nav_items.items():
             nav_item.set_active(nav_id == page_id)
 
-        self.page_label.configure(text=self._page_title(page_id))
+        if hasattr(self, "account_row") and self.account_row:
+            self.account_row.set_active(page_id == "settings")
 
         # 3. Bekor qilinmagan oldingi lazy nav jobini to'xtatish
         if self._lazy_nav_job:
@@ -1051,9 +1012,6 @@ class MikasaApp(ctk.CTk):
     def set_status(self, status, text=None):
         """Global holatni o'zgartirish"""
         self._status_state = {"status": status, "text": text or status.capitalize()}
-        if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
-            self.status_badge.set_status(status, text)
-        # Update AI Control Bar
         display_text = self._status_state["text"]
         is_listening = status == "listening"
         self.update_ai_control_bar(f"Mikasa: {display_text}", is_listening)
