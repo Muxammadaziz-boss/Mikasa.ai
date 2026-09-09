@@ -1,0 +1,71 @@
+/* ========== mikasa-7: design tokens ========== */
+/* Mikasa AI 7.0 Design System — Dark, Minimal, Desktop-Native */
+
+:root {
+  /* 1. Base Backgrounds (Near-Black & Deep Navy) */
+  --bg-darkest: #07090E;
+  --bg-dark: #0B0E14;
+  --bg-input: #101522;
+  
+  /* 2. Surfaces (80% Solid Rule) */
+  --surface: #0E131F;
+  --surface-elevated: #141A29;
+  --surface-hover: #1A2235;
+  --surface-active: #202B42;
+
+  /* 3. Primary Accents */
+  --primary: #0284C7;
+  --primary-hover: #0369A1;
+  --primary-glow: #38BDF8;
+  --primary-soft: rgba(2, 132, 199, 0.15);
+
+  /* 4. Secondary & Accent Tones */
+  --secondary: #06B6D4;
+  --accent: #8B5CF6;
+  --accent-glow: rgba(139, 92, 246, 0.25);
+
+  /* 5. Functional Status Colors */
+  --success: #10B981;
+  --success-glow: rgba(16, 185, 129, 0.2);
+  --error: #EF4444;
+  --error-glow: rgba(239, 68, 68, 0.2);
+  --warning: #F59E0B;
+
+  /* 6. Typography High-Contrast Scale */
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-accent: #38BDF8;
+
+  /* 7. Borders (Hairline 1px discipline) */
+  --border: #1E293B;
+  --border-subtle: #141A28;
+  --border-hover: #334155;
+  --border-focus: #0284C7;
+
+  /* 8. 20% Glassmorphism Tokens (Translucent, Non-Aggressive) */
+  --glass-bg: rgba(14, 19, 31, 0.65);
+  --glass-bg-hover: rgba(22, 29, 44, 0.75);
+  --glass-border: rgba(56, 189, 248, 0.15);
+  --glass-border-hover: rgba(56, 189, 248, 0.35);
+  --glass-hero-bg: #0284C7;
+  --glass-hero-border: #38BDF8;
+
+  /* 9. Typography Tokens */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-size-display: 26px;
+  --font-size-heading: 18px;
+  --font-size-title: 15px;
+  --font-size-body: 13px;
+  --font-size-caption: 11px;
+  --font-size-label: 10px;
+
+  /* 10. Geometry & Spacing */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+
+  --sidebar-width: 220px;
+  --topbar-height: 38px;
+}
