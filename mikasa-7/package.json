@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "desktop": "powershell -ExecutionPolicy Bypass -File ./run_desktop.ps1",
+    "desktop": "node run_desktop.js",
     "tauri": "tauri"
   },
   "dependencies": {
