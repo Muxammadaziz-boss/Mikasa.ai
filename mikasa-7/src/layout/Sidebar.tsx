@@ -7,7 +7,10 @@ import {
   MemoryIcon,
   SchedulerIcon,
   PluginsIcon,
+  CollapseSidebarIcon,
+  ExpandSidebarIcon,
 } from "../components/icons/Icons";
+import { MikasaLogo } from "../components/MikasaLogo";
 import { AccountRow } from "./AccountRow";
 
 export interface NavItemDef {
@@ -24,7 +27,7 @@ export interface NavSectionDef {
 
 export const NAV_SECTIONS: NavSectionDef[] = [
   {
-    title: "MIKASA",
+    title: "",
     items: [
       { id: "home", path: "/", label: "Bosh sahifa", icon: HomeIcon },
       { id: "voice", path: "/voice", label: "Ovozli muloqot", icon: MicIcon },
@@ -44,112 +47,218 @@ export const NAV_SECTIONS: NavSectionDef[] = [
 
 interface SidebarProps {
   currentPath: string;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onNavigate: (path: string) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPath, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentPath,
+  collapsed = false,
+  onToggleCollapse,
+  onNavigate,
+}) => {
   return (
     <aside
       className="mikasa-sidebar"
       style={{
-        width: "var(--sidebar-width)",
+        width: collapsed ? "var(--sidebar-width-collapsed)" : "var(--sidebar-width-expanded)",
         height: "100%",
-        backgroundColor: "var(--surface)",
+        backgroundColor: "var(--glass-sidebar)",
+        backdropFilter: "blur(28px)",
+        WebkitBackdropFilter: "blur(28px)",
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        padding: "12px 8px 8px 8px",
+        padding: collapsed ? "16px 8px 14px 8px" : "16px 12px 14px 12px",
         userSelect: "none",
         flexShrink: 0,
+        zIndex: 20,
+        transition: "width 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease",
       }}
     >
-      {/* Top Nav Sections */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.title} style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-            <span
+      {/* Top Header & Navigation */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        {/* Sidebar Header: Logo + Collapse Button */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "space-between",
+            padding: collapsed ? "0" : "0 4px",
+            minHeight: "36px",
+          }}
+        >
+          <MikasaLogo compact={collapsed} onClick={() => onNavigate("/")} />
+
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              title={collapsed ? "Yon panelni kengaytirish" : "Yon panelni yig‘ish"}
+              aria-label={collapsed ? "Yon panelni kengaytirish" : "Yon panelni yig‘ish"}
               style={{
-                fontSize: "var(--font-size-label)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-                padding: "2px 12px 4px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "28px",
+                height: "28px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.currentTarget.style.color = "#FFFFFF";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+                e.currentTarget.style.color = "var(--text-secondary)";
               }}
             >
-              {section.title}
-            </span>
+              {collapsed ? (
+                <ExpandSidebarIcon size={13} color="currentColor" />
+              ) : (
+                <CollapseSidebarIcon size={13} color="currentColor" />
+              )}
+            </button>
+          )}
+        </div>
 
-            {section.items.map((item) => {
-              const isActive = currentPath === item.path;
-              const IconComp = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onNavigate(item.path)}
+        {/* Navigation Sections */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", overflowX: "hidden" }}>
+          {NAV_SECTIONS.map((section, sIdx) => (
+            <div key={sIdx} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {section.title && !collapsed && (
+                <span
                   style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "9px 12px",
-                    borderRadius: "var(--radius-md)",
-                    backgroundColor: isActive ? "var(--surface-active)" : "transparent",
-                    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                    fontWeight: isActive ? 600 : 500,
-                    fontSize: "var(--font-size-body)",
-                    transition: "all 0.12s ease",
-                    cursor: "pointer",
-                    border: "none",
-                    textAlign: "left",
-                    width: "100%",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = "var(--surface-hover)";
-                      e.currentTarget.style.color = "var(--text-primary)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                      e.currentTarget.style.color = "var(--text-secondary)";
-                    }
+                    fontSize: "var(--font-size-label)",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    letterSpacing: "0.09em",
+                    padding: "6px 12px 2px 12px",
                   }}
                 >
-                  {/* Left Active indicator bar */}
-                  {isActive && (
+                  {section.title}
+                </span>
+              )}
+
+              {section.items.map((item) => {
+                const isActive = currentPath === item.path;
+                const IconComp = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.path)}
+                    title={collapsed ? item.label : undefined}
+                    aria-label={item.label}
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: collapsed ? "center" : "flex-start",
+                      gap: "12px",
+                      padding: collapsed ? "10px 0" : "9px 12px",
+                      borderRadius: "12px",
+                      backgroundColor: isActive
+                        ? "rgba(14, 25, 45, 0.75)"
+                        : "transparent",
+                      border: isActive
+                        ? "1px solid rgba(56, 189, 248, 0.35)"
+                        : "1px solid transparent",
+                      boxShadow: isActive
+                        ? "0 0 16px rgba(2, 132, 199, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.1)"
+                        : "none",
+                      color: isActive ? "#FFFFFF" : "var(--text-secondary)",
+                      fontWeight: isActive ? 600 : 500,
+                      fontSize: "13.5px",
+                      transition: "all 0.15s ease",
+                      cursor: "pointer",
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
+                        e.currentTarget.style.color = "#FFFFFF";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--text-secondary)";
+                      }
+                    }}
+                  >
                     <div
                       style={{
-                        position: "absolute",
-                        left: "3px",
-                        top: "8px",
-                        bottom: "8px",
-                        width: "3px",
-                        borderRadius: "2px",
-                        backgroundColor: "var(--primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "7px",
+                        backgroundColor: isActive ? "rgba(2, 132, 199, 0.25)" : "transparent",
+                        flexShrink: 0,
                       }}
-                    />
-                  )}
-                  <IconComp
-                    size={16}
-                    color={isActive ? "var(--primary-glow)" : "var(--text-muted)"}
-                  />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
+                    >
+                      <IconComp
+                        size={17}
+                        color={isActive ? "var(--primary-glow)" : "rgba(255, 255, 255, 0.6)"}
+                      />
+                    </div>
+
+                    {!collapsed && (
+                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {item.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Bottom User Account Area */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px" }}>
-        <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", margin: "0 4px" }} />
+      {/* Bottom User Account & App Readiness Status */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingTop: "8px" }}>
         <AccountRow
+          collapsed={collapsed}
           active={currentPath === "/account"}
           onClick={() => onNavigate("/account")}
         />
+
+        {/* Real Status Indicator */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: "8px",
+            padding: collapsed ? "4px 0" : "4px 8px",
+            fontSize: "11.5px",
+            color: "var(--text-muted)",
+          }}
+          title="Mikasa: Tayyor (Tizim holati barqaror)"
+        >
+          <div
+            style={{
+              width: "7px",
+              height: "7px",
+              borderRadius: "50%",
+              backgroundColor: "var(--success)",
+              boxShadow: "0 0 8px rgba(16, 185, 129, 0.6)",
+              flexShrink: 0,
+            }}
+          />
+          {!collapsed && <span>Mikasa: Tayyor</span>}
+        </div>
       </div>
     </aside>
   );

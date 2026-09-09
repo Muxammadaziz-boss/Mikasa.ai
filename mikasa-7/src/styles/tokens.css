@@ -3,69 +3,80 @@
 
 :root {
   /* 1. Base Backgrounds (Near-Black & Deep Navy) */
-  --bg-darkest: #07090E;
-  --bg-dark: #0B0E14;
-  --bg-input: #101522;
+  --bg-darkest: #05070B;
+  --bg-dark: #080C14;
+  --bg-input: rgba(12, 17, 27, 0.85);
   
-  /* 2. Surfaces (80% Solid Rule) */
-  --surface: #0E131F;
-  --surface-elevated: #141A29;
-  --surface-hover: #1A2235;
-  --surface-active: #202B42;
+  /* 2. Surfaces (80% Solid / 20% Translucent) */
+  --surface: #0E1422;
+  --surface-elevated: #131A2B;
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-active: rgba(56, 189, 248, 0.12);
 
   /* 3. Primary Accents */
   --primary: #0284C7;
   --primary-hover: #0369A1;
   --primary-glow: #38BDF8;
-  --primary-soft: rgba(2, 132, 199, 0.15);
+  --primary-soft: rgba(2, 132, 199, 0.18);
 
-  /* 4. Secondary & Accent Tones */
+  /* 4. Secondary & Ambient Tones */
   --secondary: #06B6D4;
   --accent: #8B5CF6;
   --accent-glow: rgba(139, 92, 246, 0.25);
+  --copper-ambient: rgba(245, 158, 11, 0.15);
 
   /* 5. Functional Status Colors */
   --success: #10B981;
-  --success-glow: rgba(16, 185, 129, 0.2);
+  --success-glow: rgba(16, 185, 129, 0.25);
   --error: #EF4444;
-  --error-glow: rgba(239, 68, 68, 0.2);
+  --error-glow: rgba(239, 68, 68, 0.25);
   --warning: #F59E0B;
 
   /* 6. Typography High-Contrast Scale */
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  --text-primary: #FFFFFF;
+  --text-secondary: #CBD5E1;
+  --text-muted: #8E9BAE;
   --text-accent: #38BDF8;
 
-  /* 7. Borders (Hairline 1px discipline) */
-  --border: #1E293B;
-  --border-subtle: #141A28;
-  --border-hover: #334155;
+  /* 7. Borders (Subtle hairline glass) */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --border-active: rgba(56, 189, 248, 0.45);
   --border-focus: #0284C7;
 
-  /* 8. 20% Glassmorphism Tokens (Translucent, Non-Aggressive) */
-  --glass-bg: rgba(14, 19, 31, 0.65);
-  --glass-bg-hover: rgba(22, 29, 44, 0.75);
-  --glass-border: rgba(56, 189, 248, 0.15);
-  --glass-border-hover: rgba(56, 189, 248, 0.35);
-  --glass-hero-bg: #0284C7;
-  --glass-hero-border: #38BDF8;
+  /* 8. Glassmorphic Tokens */
+  --glass-sidebar: rgba(7, 10, 17, 0.65);
+  --glass-composer: rgba(12, 17, 28, 0.72);
+  --glass-card: rgba(13, 19, 31, 0.55);
+  --glass-card-hover: rgba(20, 28, 45, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-cyan: rgba(56, 189, 248, 0.25);
+  --glass-blur: blur(24px);
 
-  /* 9. Typography Tokens */
+  /* 9. Glow & Shadows */
+  --glow-subtle: 0 4px 24px rgba(2, 132, 199, 0.12);
+  --glow-active: 0 0 20px rgba(56, 189, 248, 0.22);
+  --glow-composer: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.2);
+  --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.6);
+
+  /* 10. Typography Scale */
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-size-display: 26px;
+  --font-size-display: 34px;
   --font-size-heading: 18px;
   --font-size-title: 15px;
-  --font-size-body: 13px;
-  --font-size-caption: 11px;
-  --font-size-label: 10px;
+  --font-size-body: 13.5px;
+  --font-size-caption: 12px;
+  --font-size-label: 10.5px;
 
-  /* 10. Geometry & Spacing */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* 11. Geometry & Layout */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-pill: 9999px;
 
-  --sidebar-width: 220px;
+  --sidebar-width-expanded: 250px;
+  --sidebar-width-collapsed: 72px;
   --topbar-height: 38px;
 }

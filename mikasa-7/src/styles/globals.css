@@ -25,13 +25,36 @@ html, body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-dark);
+  background-color: var(--bg-darkest);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Artwork Layer */
+.cinematic-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../assets/mikasa-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Subtle dark vignette overlay to ensure text contrast */
+.cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 60% 40%, rgba(5, 7, 11, 0.15) 0%, rgba(5, 7, 11, 0.65) 75%, rgba(5, 7, 11, 0.88) 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -39,12 +62,12 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-hover);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Accessible focus outlines */
@@ -60,6 +83,7 @@ button {
   background: transparent;
   cursor: pointer;
   color: inherit;
+  user-select: none;
 }
 
 input {
@@ -67,4 +91,13 @@ input {
   font-size: inherit;
   border: none;
   outline: none;
+  background: transparent;
+  color: inherit;
+}
+
+/* Typography Gradient utility */
+.text-metallic-gradient {
+  background: linear-gradient(180deg, #FFFFFF 0%, #D2DEED 70%, #9EB5D0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

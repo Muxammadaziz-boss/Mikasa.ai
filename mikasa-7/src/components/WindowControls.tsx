@@ -9,7 +9,6 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    // Check Tauri environment safely
     let unlisten: (() => void) | undefined;
     const initTauri = async () => {
       try {
@@ -23,7 +22,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
           setIsMaximized(state);
         });
       } catch {
-        // Browser dev fallback
+        // Browser fallback
       }
     };
     initTauri();
@@ -38,7 +37,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       await getCurrentWindow().minimize();
     } catch {
-      console.log("[WindowControls] Minimize clicked (browser mode)");
+      console.log("[WindowControls] Minimize");
     }
   };
 
@@ -50,7 +49,6 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
       setIsMaximized(state);
     } catch {
       setIsMaximized(!isMaximized);
-      console.log("[WindowControls] Maximize toggled (browser mode)");
     }
   };
 
@@ -59,7 +57,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       await getCurrentWindow().close();
     } catch {
-      console.log("[WindowControls] Close clicked (browser mode)");
+      console.log("[WindowControls] Close");
     }
   };
 
@@ -69,50 +67,55 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
       style={{
         display: "flex",
         alignItems: "center",
-        height: "100%",
+        height: "36px",
+        paddingRight: "8px",
+        gap: "2px",
         ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
       }}
     >
       <button
         onClick={handleMinimize}
         title="Kichraytirish"
+        aria-label="Kichraytirish"
         style={buttonStyle}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--surface-hover)")}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        <MinimizeIcon size={14} color="var(--text-secondary)" />
+        <MinimizeIcon size={12} color="rgba(255, 255, 255, 0.75)" />
       </button>
 
       <button
         onClick={handleMaximize}
         title={isMaximized ? "Oldingi o‘lchamga qaytarish" : "Kattalashtirish"}
+        aria-label={isMaximized ? "Oldingi o‘lchamga qaytarish" : "Kattalashtirish"}
         style={buttonStyle}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--surface-hover)")}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         {isMaximized ? (
-          <RestoreIcon size={14} color="var(--text-secondary)" />
+          <RestoreIcon size={12} color="rgba(255, 255, 255, 0.75)" />
         ) : (
-          <MaximizeIcon size={14} color="var(--text-secondary)" />
+          <MaximizeIcon size={12} color="rgba(255, 255, 255, 0.75)" />
         )}
       </button>
 
       <button
         onClick={handleClose}
         title="Yopish"
+        aria-label="Yopish"
         style={buttonStyle}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#DC2626";
+          e.currentTarget.style.backgroundColor = "#EF4444";
           const svg = e.currentTarget.querySelector("svg");
           if (svg) svg.style.stroke = "#FFFFFF";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = "transparent";
           const svg = e.currentTarget.querySelector("svg");
-          if (svg) svg.style.stroke = "var(--text-secondary)";
+          if (svg) svg.style.stroke = "rgba(255, 255, 255, 0.75)";
         }}
       >
-        <CloseIcon size={14} color="var(--text-secondary)" />
+        <CloseIcon size={12} color="rgba(255, 255, 255, 0.75)" />
       </button>
     </div>
   );
@@ -122,8 +125,9 @@ const buttonStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: "44px",
-  height: "100%",
-  transition: "background-color 0.15s ease",
+  width: "36px",
+  height: "28px",
+  borderRadius: "6px",
+  transition: "all 0.15s ease",
   cursor: "pointer",
 };
