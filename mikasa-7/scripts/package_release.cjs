@@ -76,6 +76,11 @@ function copyFileWithLog(src, dest, friendlyName) {
 // 4. Copy Standalone Executable
 copyFileWithLog(exeSource, exeTarget, "Mustaqil (.exe)");
 
+// 4.1 Copy WebView2Loader.dll (required for native Windows execution on MinGW)
+const dllSource = path.join(tauriReleaseDir, "WebView2Loader.dll");
+const dllTarget = path.join(releaseVersionDir, "WebView2Loader.dll");
+copyFileWithLog(dllSource, dllTarget, "WebView2 Loader DLL");
+
 // 5. Copy MSI Installer if exists
 const msiDir = path.join(tauriBundleDir, "msi");
 if (fs.existsSync(msiDir)) {
