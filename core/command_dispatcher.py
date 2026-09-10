@@ -19,6 +19,57 @@ except ImportError:
     SMART_ALGO_AVAILABLE = False
 
 
+def get_system_specs_summary() -> str:
+    """Kompyuterning asosiy apparat va tizim parametrlarini olish"""
+    try:
+        import platform
+        import psutil
+
+        os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
+        node_name = platform.node()
+        cpu_name = platform.processor() or "Standart protsessor"
+        cores_p = psutil.cpu_count(logical=False) or 1
+        cores_l = psutil.cpu_count(logical=True) or 1
+        cpu_usage = psutil.cpu_percent(interval=0.1)
+
+        mem = psutil.virtual_memory()
+        total_ram = round(mem.total / (1024**3), 1)
+        used_ram = round(mem.used / (1024**3), 1)
+        free_ram = round(mem.available / (1024**3), 1)
+
+        disks = []
+        for part in psutil.disk_partitions(all=False):
+            if "cdrom" in part.opts or part.fstype == "":
+                continue
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+                free_gb = round(usage.free / (1024**3), 1)
+                total_gb = round(usage.total / (1024**3), 1)
+                drive = part.mountpoint.rstrip("\\")
+                disks.append(f"{drive} ({free_gb} GB bo'sh / {total_gb} GB)")
+            except Exception:
+                pass
+        disks_str = ", ".join(disks) if disks else "Aniqlanmadi"
+
+        lines = [
+            "🖥️ Kompyuteringiz parametrlari:",
+            f"• Operatsion tizim: {os_info}",
+            f"• Kompyuter nomi: {node_name}",
+            f"• Protsessor (CPU): {cpu_name} ({cores_p} fiz / {cores_l} mantiqiy yadro, {cpu_usage}% band)",
+            f"• Tezkor xotira (RAM): {total_ram} GB (Ishlatilmoqda: {used_ram} GB, Bo'sh: {free_ram} GB, {mem.percent}%)",
+            f"• Disk xotirasi: {disks_str}"
+        ]
+
+        bat = psutil.sensors_battery()
+        if bat:
+            plug = "tarmoqqa ulangan" if bat.power_plugged else "batareyada"
+            lines.append(f"• Batareya quvvati: {bat.percent}% ({plug})")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Tizim parametrlarini aniqlashda xatolik: {e}"
+
+
 class CommandDispatcher:
     """
     Buyruqlarni tezkor mahalliy bajarish va AI agentiga yo'naltirish xizmati.
@@ -106,7 +157,32 @@ class CommandDispatcher:
             except Exception as e:
                 logger.error(f"Ovozni sozlashda xatolik: {e}")
 
-        # 6. Maxsus ro'yxatdan o'tgan handlerlar
+        # 6. Kompyuter va Tizim Parametrlari (PC Specs / System Info)
+        pc_specs_keywords = [
+            "kompyuterim parametrlarini aytib ber",
+            "pc parametrlarini aytib ber",
+            "kompyuterim parametrlarini ayt",
+            "kompyuter parametrlarini ayt",
+            "pc parametrlarini ayt",
+            "kompyuterim parametrlari",
+            "kompyuter parametrlari",
+            "pc parametrlari",
+            "tizim parametrlari",
+            "tizim ma'lumotlari",
+            "tizim malumotlari",
+            "kompyuter xususiyatlari",
+            "kompyuterim xususiyatlari",
+            "pc xususiyatlari",
+            "kompyuter haqida ma'lumot",
+            "kompyuterim haqida",
+        ]
+        if clean_text in pc_specs_keywords or (
+            any(w in clean_text for w in ["kompyuter", "pc", "tizim", "sistema"]) and
+            any(p in clean_text for p in ["parametr", "xususiyat", "ma'lumot", "malumot", "xarakteristika", "info", "spesifikatsiya"])
+        ) or clean_text in ["ram qancha", "operativka qancha", "protsessor qanday", "diskda qancha joy bor"]:
+            return True, get_system_specs_summary()
+
+        # 7. Maxsus ro'yxatdan o'tgan handlerlar
         for intent, handler in self._custom_handlers.items():
             try:
                 handled, result = handler(clean_text)

@@ -170,8 +170,10 @@ def _gemini_yuborish(matn, system_prompt=None):
     prompt = system_prompt or SYSTEM_PROMPT
     GEMINI_MODELS = [
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
+        "gemini-flash-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
     ]
     
     suhbat_tarixi_gemini.append({"role": "user", "parts": [{"text": matn}]})
@@ -274,7 +276,7 @@ def _openrouter_yuborish(matn, system_prompt=None):
             json={
                 "model": OPENROUTER_MODEL,
                 "messages": messages,
-                "max_tokens": 300,
+                "max_tokens": 1024,
                 "temperature": 0.3,
             },
             timeout=15
@@ -300,14 +302,29 @@ def _openrouter_yuborish(matn, system_prompt=None):
 
 
 def _javob_tahlil(ai_text):
-    """AI javobini tahlil qilish"""
+    """AI javobini tahlil qilish (mustahkam himoya va tiklash bilan)"""
     javob = _json_ajratish(ai_text)
     
     if javob:
         logging.info(f"AI natija: type={javob.get('type')}, intent={javob.get('intent', '-')}")
         return javob
     else:
-        # Agar buzilgan JSON bo'lsa — xom matnni TTS ga bermaslik
+        # 1. Qisman uzilib qolgan JSON dan 'response' matnini chiqarib olish
+        import re
+        resp_match = re.search(r'"response"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)', ai_text)
+        if resp_match:
+            clean_resp = resp_match.group(1).replace('\\"', '"').replace('\\n', '\n').strip()
+            if clean_resp:
+                return {"type": "answer", "response": clean_resp}
+
+        # 2. Agar matnda JSON belgilari bo'lsa ham foydali matn qismini tozalab olish
+        tozalangan = re.sub(r'[{}\[\]"]', ' ', ai_text)
+        tozalangan = re.sub(r'\b(type|response|intent|params|answer)\b\s*:\s*', ' ', tozalangan)
+        tozalangan = re.sub(r'\s+', ' ', tozalangan).strip()
+        if len(tozalangan) > 15:
+            return {"type": "answer", "response": tozalangan}
+
+        # 3. Agar haqiqatdan ham foydali matn topilmasa
         if ai_text.strip().startswith("{"):
             logging.warning(f"Buzilgan JSON: {ai_text[:100]}")
             return {"type": "answer", "response": "Kechirasiz, javobni tayyorlashda xatolik bo'ldi. Qaytadan urinib ko'ring."}

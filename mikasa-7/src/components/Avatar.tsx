@@ -7,7 +7,7 @@ interface AvatarProps {
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
-  initials = "MA",
+  initials = "U",
   size = 32,
   className = "",
 }) => {

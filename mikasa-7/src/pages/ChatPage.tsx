@@ -42,6 +42,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const initialSentRef = useRef(false);
 
+  const userInitials = (userName || backendStatus.user || "Ustoz")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "U";
+
   // Status kuzatish
   useEffect(() => {
     const unsub = backendService.onStatusChange((s) => setBackendStatus(s));
@@ -338,7 +346,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                     flexShrink: 0,
                   }}
                 >
-                  {msg.sender === "user" ? "MA" : <SparklesIcon size={14} color="#38BDF8" />}
+                  {msg.sender === "user" ? userInitials : <SparklesIcon size={14} color="#38BDF8" />}
                 </div>
 
                 {/* Message Bubble */}
