@@ -180,7 +180,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {backendStatus.status === "online" ? "Online (v7.0.0)" : "Offline"}
+                {backendStatus.status === "online"
+                  ? `Online (v${backendStatus.version || "7.1.0"})`
+                  : "Offline"}
               </span>
             </div>
             <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>

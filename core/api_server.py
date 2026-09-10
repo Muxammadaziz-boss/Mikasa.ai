@@ -147,6 +147,136 @@ async def handle_status(request):
 
 
 # ========== 2. CHAT & VOICE HANDLERS ==========
+def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask") -> str:
+    """
+    Mikasa AI 7.1.0 — Unified Command & AI Pipeline
+    Mahalliy buyruqlarni darhol kompyuterda bajaradi, murakkab savollarni AI ga yo'naltiradi.
+    """
+    clean_text = text.strip()
+    if not clean_text:
+        return "Bo'sh so'rov."
+
+    m, ai, mem, _, _, dispatcher = get_modules()
+    last_gui_messages = []
+
+    def _gui_collector(msg):
+        last_gui_messages.append(str(msg))
+
+    if m and hasattr(m, "gui_bilan_integratsiya"):
+        m.gui_bilan_integratsiya(_gui_collector)
+
+    # 1. Tezkor Mahalliy Buyruqlar Dispatcheri (command_dispatcher)
+    if dispatcher:
+        try:
+            handled, res_msg = dispatcher.dispatch_local(clean_text)
+            if handled and res_msg:
+                logger.info(f"CommandDispatcher bajardi: '{clean_text}' -> {res_msg}")
+                return res_msg
+        except Exception as e:
+            logger.warning(f"Dispatcher xatosi: {e}")
+
+    # 2. Mahalliy Intent tekshirish (buyruqni_aniqla)
+    intent = "unknown"
+    if m and hasattr(m, "buyruqni_aniqla"):
+        try:
+            intent = m.buyruqni_aniqla(clean_text)
+        except Exception:
+            intent = "unknown"
+
+    if isinstance(intent, tuple):
+        cmd, val = intent[0], intent[1]
+        try:
+            if cmd == "volume_set" and hasattr(m, "ovoz_sozlash"):
+                m.ovoz_sozlash(val)
+                return f"🔊 Ovoz {val}% ga sozlandi."
+            elif cmd == "volume_up" and hasattr(m, "ovoz_oshir"):
+                m.ovoz_oshir(val)
+                return f"🔊 Ovoz {val}% oshirildi."
+            elif cmd == "volume_down" and hasattr(m, "ovoz_pasaytir"):
+                m.ovoz_pasaytir(val)
+                return f"🔉 Ovoz {val}% pasaytirildi."
+            elif cmd == "video_number" and hasattr(m, "youtube_video_boshla_koordinata"):
+                m.youtube_video_boshla_koordinata(val)
+                return f"▶️ {val}-video ochilmoqda."
+        except Exception as e:
+            return f"Ovozni sozlashda xatolik: {e}"
+
+    if intent != "unknown" and m and hasattr(m, "_intent_bajar"):
+        try:
+            logger.info(f"Mahalliy intent bajarilmoqda: {intent} (matn: '{clean_text}')")
+            m._intent_bajar(intent, params=None, matn=clean_text, foydalanuvchi_ismi=user)
+            if last_gui_messages:
+                return last_gui_messages[-1]
+            
+            intent_messages = {
+                "open_youtube": "✅ YouTube ochildi.",
+                "open_telegram": "✅ Telegram ochildi.",
+                "open_chrome": "✅ Chrome ochildi.",
+                "open_code": "✅ VS Code ochildi.",
+                "open_brave": "✅ Brave brauzeri ochildi.",
+                "open_discord": "✅ Discord ochildi.",
+                "music_play": "▶️ Musiqa davom etmoqda.",
+                "music_pause": "⏸️ Musiqa to'xtatildi.",
+                "music_restart": "🔄 Musiqa boshidan boshlandi.",
+                "play_video": "▶️ Video qo'yildi.",
+                "pause_video": "⏸️ Video to'xtatildi.",
+                "next_video": "⏭️ Keyingi videoga o'tildi.",
+                "prev_video": "⏮️ Oldingi videoga o'tildi.",
+                "show_desktop": "🖥️ Ish stoli ko'rsatildi.",
+                "switch_window": "🔄 Oyna almashtirildi.",
+                "open_explorer": "📁 Fayl menejeri ochildi.",
+                "open_cmd": "💻 Terminal ochildi.",
+                "open_taskmanager": "📊 Vazifa menejeri ochildi.",
+                "take_screenshot": "📸 Ekran rasmi olindi.",
+                "minimize_all": "🗕 Barcha oynalar kichraytirildi.",
+                "close_window": "❌ Oyna yopildi.",
+                "close_chrome": "🗑️ Chrome oynasi yopildi.",
+                "open_settings": "⚙️ Sozlamalar paneli ochildi."
+            }
+            return intent_messages.get(intent, f"✅ Buyruq muvaffaqiyatli bajarildi ({intent}).")
+        except Exception as e:
+            logger.error(f"Intent bajarishda xatolik: {e}")
+            return f"Buyruq bajarishda xatolik: {e}"
+
+    # 3. AI ga yo'naltirish
+    if mode == "summary" and ai:
+        prompt = f"Quyidagi matnni tahlil qilib, eng muhim jihatlarini qisqa va aniq xulosalab ber:\n\n{clean_text}"
+        reply = ai.ai_savol_yuborish(prompt, user)
+        return reply if isinstance(reply, str) else str(reply)
+    elif ai:
+        try:
+            reply = ai.ai_savol_yuborish(clean_text, user)
+            
+            # Agar AI bu buyruq deb topsa, kompyuterda haqiqatdan bajarish!
+            if isinstance(reply, dict) and reply.get("type") == "command":
+                ai_intent = reply.get("intent")
+                ai_params = reply.get("params", {})
+                ai_resp = reply.get("response", "Buyruq bajarildi.")
+                
+                if m and hasattr(m, "_intent_bajar") and ai_intent:
+                    try:
+                        logger.info(f"AI command bajarilmoqda: {ai_intent} (params: {ai_params})")
+                        m._intent_bajar(ai_intent, params=ai_params, matn=clean_text, foydalanuvchi_ismi=user)
+                        if last_gui_messages:
+                            return last_gui_messages[-1]
+                    except Exception as e:
+                        logger.error(f"AI intent bajarishda xatolik: {e}")
+                
+                return ai_resp
+
+            elif isinstance(reply, dict):
+                return reply.get("response") or reply.get("javob") or str(reply)
+            elif reply:
+                return str(reply)
+        except Exception as e:
+            logger.error(f"AI savolida xatolik: {e}")
+            return f"Xatolik yuz berdi: {e}"
+    else:
+        return "Kechirasiz, sun'iy intellekt moduli mavjud emas."
+
+    return "Kechirasiz, buyruqni tushunib bo'lmadi."
+
+
 async def handle_chat(request):
     """POST /api/chat - Matnli savol yoki buyruq yuborish"""
     global _voice_state
@@ -161,7 +291,7 @@ async def handle_chat(request):
     if not text:
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)
 
-    m, ai, mem, _, _, _ = get_modules()
+    m, _, mem, _, _, _ = get_modules()
     user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
     ovoz = m.ovoz_turi_ol() if m else "ayol"
 
@@ -172,37 +302,19 @@ async def handle_chat(request):
     def _execute():
         global _voice_state
         try:
-            if mode == "command" and m:
-                res = m.buyruqni_tushun(text, user, ovoz)
-                reply = res if isinstance(res, str) and res else "Buyruq bajarildi."
-            elif mode == "summary" and ai:
-                prompt = f"Quyidagi matnni tahlil qilib, eng muhim jihatlarini qisqa va aniq xulosalab ber:\n\n{text}"
-                reply = ai.ai_savol_yuborish(prompt, user)
-            else:
-                if ai:
-                    reply = ai.ai_savol_yuborish(text, user)
-                else:
-                    reply = "Kechirasiz, sun'iy intellekt moduli mavjud emas."
-            
-            # Xotiraga saqlash
+            reply_text = execute_command_pipeline(text, user, ovoz, mode)
             if mem:
                 try:
-                    rep_str = reply if isinstance(reply, str) else str(reply)
-                    mem.add_conversation(text, rep_str[:500])
+                    mem.add_conversation(text, reply_text[:500])
                 except Exception:
                     pass
+            return reply_text
         except Exception as e:
             logger.error(f"Chat bajarishda xatolik: {e}")
-            reply = f"Xatolik yuz berdi: {str(e)}"
+            return f"Xatolik yuz berdi: {e}"
         finally:
             _voice_state = "idle"
             sync_broadcast("voice_state", {"state": "idle"}, loop)
-        
-        if isinstance(reply, dict):
-            reply_text = reply.get("response") or reply.get("javob") or reply.get("text") or str(reply)
-        else:
-            reply_text = str(reply)
-        return reply_text
 
     response_text = await loop.run_in_executor(None, _execute)
     await broadcast_ws("ai_response", {"text": response_text, "mode": mode})
@@ -333,24 +445,7 @@ async def handle_commands_execute(request):
     loop = asyncio.get_running_loop()
 
     def _run():
-        # Avval tezkor buyruqlar dispatcherida tekshirish
-        if dispatcher:
-            try:
-                handled, res_msg = dispatcher.dispatch_local(cmd_text)
-                if handled and res_msg:
-                    return res_msg
-            except Exception as e:
-                logger.warning(f"Dispatcher xatosi: {e}")
-
-        # Standart buyruqni tushun pipeline
-        if m:
-            try:
-                res = m.buyruqni_tushun(cmd_text, user, ovoz)
-                return res if isinstance(res, str) and res else "Buyruq muvaffaqiyatli bajarildi."
-            except Exception as e:
-                return f"Buyruq bajarilmadi: {e}"
-
-        return "Buyruq qabul qilindi."
+        return execute_command_pipeline(cmd_text, user, ovoz, mode="command")
 
     result_message = await loop.run_in_executor(None, _run)
     await broadcast_ws("command_executed", {"command": cmd_text, "result": result_message})

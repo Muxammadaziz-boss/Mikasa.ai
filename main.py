@@ -2120,8 +2120,10 @@ def _intent_bajar(intent, params=None, matn="", foydalanuvchi_ismi=""):
             ctypes.windll.user32.keybd_event(0xB3, 0, 0, 0)
             ctypes.windll.user32.keybd_event(0xB3, 0, 2, 0)
             if intent == "music_pause":
+                gui_ga_xabar_yuborish("⏸️ Musiqa to'xtatildi")
                 ovoz_chiqar_tez("Musiqa to'xtatildi")
             else:
+                gui_ga_xabar_yuborish("▶️ Musiqa davom etmoqda")
                 ovoz_chiqar_tez("Musiqa davom etmoqda")
         elif intent == "music_restart":
             ctypes.windll.user32.keybd_event(0xB2, 0, 0, 0)  # STOP

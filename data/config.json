@@ -14,7 +14,7 @@
     "vad_enabled": true,
     "vad_threshold": 0.015,
     "silence_duration": 1.2,
-    "tts_speed": 2.0,
+    "tts_speed": 1.6,
     "tts_engine": "silero"
   },
   "gui": {
