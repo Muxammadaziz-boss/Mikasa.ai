@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { MikasaOrb } from "../components/MikasaOrb";
 import {
   MicIcon,
@@ -10,6 +10,7 @@ import {
   ArrowUpIcon,
   TrashIcon,
 } from "../components/icons/Icons";
+import { backendService, BackendStatus, VoiceState } from "../services/backendService";
 
 interface LandingPageProps {
   userName?: string;
@@ -21,21 +22,60 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onNavigate,
 }) => {
   const [inputText, setInputText] = useState("");
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
+  const [orbState, setOrbState] = useState<VoiceState>("idle");
+  const [lastResponse, setLastResponse] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const unsubStatus = backendService.onStatusChange((status) => {
+      setBackendStatus(status);
+    });
+    const unsubVoice = backendService.onVoiceStateChange((state) => {
+      setOrbState(state);
+    });
+    const unsubResp = backendService.onResponse((data) => {
+      setLastResponse(data.text);
+      setIsLoading(false);
+    });
+    return () => {
+      unsubStatus();
+      unsubVoice();
+      unsubResp();
+    };
+  }, []);
 
   const handleClear = () => {
     setInputText("");
+    setLastResponse(null);
+    backendService.clearChat();
     if (inputRef.current) {
       inputRef.current.focus();
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleVoiceToggle = async () => {
+    if (orbState === "listening") {
+      await backendService.stopVoice();
+    } else {
+      await backendService.startVoice();
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = inputText.trim();
     if (!query) return;
     setInputText("");
-    onNavigate("/chat", query);
+    setIsLoading(true);
+    const res = await backendService.sendChat(query, "ask");
+    if (res.ok) {
+      setLastResponse(res.response);
+    } else {
+      setLastResponse(res.error || "Xatolik yuz berdi.");
+    }
+    setIsLoading(false);
   };
 
   const handleQuickAction = (mode: "ask" | "command" | "summary") => {
@@ -89,10 +129,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             marginBottom: "2px",
             transition: "transform 0.2s ease",
           }}
-          onClick={() => onNavigate("/voice")}
-          title="Ovozli muloqotni boshlash"
+          onClick={handleVoiceToggle}
+          title={orbState === "listening" ? "Tinglashni to'xtatish" : "Ovozli muloqotni boshlash"}
         >
-          <MikasaOrb size="clamp(150px, 17vw, 185px)" state="idle" />
+          <MikasaOrb size="clamp(150px, 17vw, 185px)" state={orbState} />
         </div>
 
         {/* 2. GREETING (Salom, Muxammadaziz / Qanday yordam beray?) */}
@@ -107,7 +147,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               marginBottom: "6px",
             }}
           >
-            Salom, {userName}
+            Salom, {backendStatus.user || userName}
           </h1>
 
           <p
@@ -122,7 +162,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </p>
         </div>
 
-        {/* 3. ONLINE STATUS (Subtle indicator, not a heavy badge) */}
+        {/* 3. ONLINE STATUS (Real-time backend status) */}
         <div
           style={{
             display: "inline-flex",
@@ -133,23 +173,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             color: "var(--text-muted)",
             letterSpacing: "0.02em",
           }}
+          title={backendStatus.status === "online" ? "Python AI yadrosi ulangan" : "Backend xizmatiga ulanilmoqda..."}
         >
           <span
             style={{
               width: "6px",
               height: "6px",
               borderRadius: "50%",
-              backgroundColor: "#10B981",
-              boxShadow: "0 0 8px rgba(16, 185, 129, 0.7)",
+              backgroundColor:
+                backendStatus.status === "online"
+                  ? "#10B981"
+                  : backendStatus.status === "connecting"
+                  ? "#F59E0B"
+                  : "#EF4444",
+              boxShadow:
+                backendStatus.status === "online"
+                  ? "0 0 8px rgba(16, 185, 129, 0.7)"
+                  : backendStatus.status === "connecting"
+                  ? "0 0 8px rgba(245, 158, 11, 0.7)"
+                  : "0 0 8px rgba(239, 68, 68, 0.7)",
             }}
           />
-          <span style={{ color: "#94A3B8" }}>Online</span>
+          <span style={{ color: "#94A3B8" }}>
+            {backendStatus.status === "online" ? "Online" : backendStatus.status === "connecting" ? "Ulanmoqda..." : "Offline"}
+          </span>
         </div>
 
-        {/* 4. PRIMARY VOICE ACTION (Tinglashni boshlash) */}
+        {/* 4. PRIMARY VOICE ACTION (Tinglashni boshlash / to'xtatish) */}
         <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
           <button
-            onClick={() => onNavigate("/voice")}
+            onClick={handleVoiceToggle}
             style={{
               display: "flex",
               alignItems: "center",
@@ -157,9 +210,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               gap: "10px",
               padding: "11px 28px",
               borderRadius: "var(--radius-pill)",
-              background: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
-              border: "1px solid rgba(56, 189, 248, 0.45)",
-              boxShadow: "0 4px 22px rgba(2, 132, 199, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
+              background: orbState === "listening"
+                ? "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)"
+                : "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+              border: orbState === "listening"
+                ? "1px solid rgba(239, 68, 68, 0.55)"
+                : "1px solid rgba(56, 189, 248, 0.45)",
+              boxShadow: orbState === "listening"
+                ? "0 4px 22px rgba(239, 68, 68, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35)"
+                : "0 4px 22px rgba(2, 132, 199, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
               color: "#FFFFFF",
               fontSize: "14px",
               fontWeight: 600,
@@ -169,15 +228,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 6px 26px rgba(2, 132, 199, 0.55)";
+              e.currentTarget.style.boxShadow = orbState === "listening"
+                ? "0 6px 26px rgba(239, 68, 68, 0.55)"
+                : "0 6px 26px rgba(2, 132, 199, 0.55)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 22px rgba(2, 132, 199, 0.4)";
+              e.currentTarget.style.boxShadow = orbState === "listening"
+                ? "0 4px 22px rgba(239, 68, 68, 0.4)"
+                : "0 4px 22px rgba(2, 132, 199, 0.4)";
             }}
           >
             <MicIcon size={16} color="#FFFFFF" />
-            <span>Tinglashni boshlash</span>
+            <span>{orbState === "listening" ? "Tinglashni to'xtatish" : "Tinglashni boshlash"}</span>
           </button>
         </div>
 
@@ -431,6 +494,65 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
         </div>
+
+        {/* 6.5. AI LIVE RESPONSE OR LOADING CARD */}
+        {(isLoading || lastResponse) && (
+          <div
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: "16px",
+              backgroundColor: "rgba(10, 15, 26, 0.78)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              border: "1px solid rgba(56, 189, 248, 0.3)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+              color: "#FFFFFF",
+              fontSize: "13.5px",
+              lineHeight: 1.5,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+            }}
+          >
+            <div style={{ marginTop: "2px", flexShrink: 0 }}>
+              <SparklesIcon size={16} color="var(--primary-glow)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "var(--primary-glow)",
+                  fontWeight: 600,
+                  marginBottom: "2px",
+                }}
+              >
+                {isLoading ? "Mikasa javob tayyorlamoqda..." : "Mikasa"}
+              </div>
+              <div style={{ color: "#E2E8F0", whiteSpace: "pre-wrap" }}>
+                {isLoading ? "O'ylamoqda..." : lastResponse}
+              </div>
+            </div>
+            {!isLoading && (
+              <button
+                type="button"
+                onClick={() => setLastResponse(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                }}
+                title="Yopish"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 7. AI COMPOSER (Floating focused input at the bottom of hero stack) */}
         <form

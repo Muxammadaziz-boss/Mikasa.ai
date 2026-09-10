@@ -1,14 +1,16 @@
 {
   "name": "mikasa-7",
   "private": true,
-  "version": "0.1.0",
+  "version": "7.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "desktop": "node run_desktop.js",
-    "tauri": "node scripts/tauri.js"
+    "tauri": "node scripts/tauri.js",
+    "release": "node scripts/package_release.cjs",
+    "build:release": "npm run tauri build && node scripts/package_release.cjs"
   },
   "dependencies": {
     "react": "^19.1.0",
