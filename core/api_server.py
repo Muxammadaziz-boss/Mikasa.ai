@@ -126,11 +126,56 @@ def sync_broadcast(event_type: str, data: dict, loop=None):
         asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, data), target_loop)
 
 
+# ========== Helper functions for User & Voice ==========
+def get_current_user_name() -> str:
+    """Foydalanuvchi ismini olish (birinchi navbatda foydalanuvchi_ismi.txt, keyin config.json)"""
+    txt_file = os.path.join(BASE_DIR, "data", "foydalanuvchi_ismi.txt")
+    if os.path.exists(txt_file):
+        try:
+            with open(txt_file, "r", encoding="utf-8") as f:
+                name = f.read().strip()
+                if name:
+                    return name
+        except Exception:
+            pass
+    cfg = _read_config()
+    cfg_name = cfg.get("user", {}).get("name")
+    if cfg_name:
+        return cfg_name
+    m, _, _, _, _, _ = get_modules()
+    if m and hasattr(m, "foydalanuvchi_ismi_ol"):
+        try:
+            m_name = m.foydalanuvchi_ismi_ol()
+            if m_name:
+                return m_name
+        except Exception:
+            pass
+    return "Ustoz"
+
+
+def get_current_voice_type() -> str:
+    """Ovoz turini olish (ayol yoki erkak)"""
+    txt_file = os.path.join(BASE_DIR, "data", "ovoz_turi.txt")
+    if os.path.exists(txt_file):
+        try:
+            with open(txt_file, "r", encoding="utf-8") as f:
+                voice = f.read().strip()
+                if voice in ["ayol", "erkak"]:
+                    return voice
+        except Exception:
+            pass
+    cfg = _read_config()
+    cfg_voice = cfg.get("user", {}).get("voice_type")
+    if cfg_voice in ["ayol", "erkak"]:
+        return cfg_voice
+    return "ayol"
+
+
 # ========== 1. STATUS HANDLER ==========
 async def handle_status(request):
     """GET /api/status - Tizim holati"""
     m, ai, mem, sched, tools, _ = get_modules()
-    user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
+    user = get_current_user_name()
     ai_ok = ai.ai_mavjudmi() if ai else False
     
     return web.json_response({
@@ -144,6 +189,7 @@ async def handle_status(request):
         "scheduled_tasks": sched.active_count if sched else 0,
         "timestamp": datetime.now().isoformat()
     })
+
 
 
 # ========== 2. CHAT & VOICE HANDLERS ==========
@@ -292,8 +338,8 @@ async def handle_chat(request):
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)
 
     m, _, mem, _, _, _ = get_modules()
-    user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
-    ovoz = m.ovoz_turi_ol() if m else "ayol"
+    user = get_current_user_name()
+    ovoz = get_current_voice_type()
 
     loop = asyncio.get_running_loop()
     _voice_state = "thinking"
@@ -345,8 +391,8 @@ async def handle_voice_start(request):
     def _listen():
         global _voice_state
         try:
-            user = m.foydalanuvchi_ismi_ol()
-            ovoz = m.ovoz_turi_ol()
+            user = get_current_user_name()
+            ovoz = get_current_voice_type()
             m.global_state.tinglash_faol = True
             m.fon_xizmat(user, ovoz, _voice_callback)
         except Exception as e:
@@ -439,8 +485,8 @@ async def handle_commands_execute(request):
         return web.json_response({"ok": False, "error": "Buyruq kiritilmadi"}, status=400)
 
     m, _, _, _, _, dispatcher = get_modules()
-    user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
-    ovoz = m.ovoz_turi_ol() if m else "ayol"
+    user = get_current_user_name()
+    ovoz = get_current_voice_type()
 
     loop = asyncio.get_running_loop()
 
@@ -737,9 +783,8 @@ def _write_config(cfg):
 
 async def handle_account_get(request):
     """GET /api/account - Foydalanuvchi profili va tizim sozlamalari"""
-    m, _, _, _, _, _ = get_modules()
-    user_name = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
-    voice_type = m.ovoz_turi_ol() if m else "ayol"
+    user_name = get_current_user_name()
+    voice_type = get_current_voice_type()
     cfg = _read_config()
 
     user_cfg = cfg.get("user", {})
@@ -748,7 +793,7 @@ async def handle_account_get(request):
 
     return web.json_response({
         "ok": True,
-        "name": user_name or user_cfg.get("name", "Muxammadaziz"),
+        "name": user_name or user_cfg.get("name", "Ustoz"),
         "voice_type": voice_type or user_cfg.get("voice_type", "ayol"),
         "theme": gui_cfg.get("theme", "dark"),
         "tts_speed": audio_cfg.get("tts_speed", 2.0),
@@ -808,6 +853,23 @@ async def handle_account_update(request):
 
     _write_config(cfg)
 
+    # In-memory config.py singletonini ham yangilash
+    try:
+        from config import set_config
+        if new_name:
+            set_config("user.name", new_name)
+        if new_voice in ["ayol", "erkak"]:
+            set_config("user.voice_type", new_voice)
+        if new_speed is not None:
+            try:
+                set_config("audio.tts_speed", float(new_speed))
+            except Exception:
+                pass
+        if new_theme:
+            set_config("gui.theme", new_theme)
+    except Exception as e:
+        logger.warning(f"config.set_config xatoligi: {e}")
+
     # Runtime state ni ham yangilash
     m, _, mem, _, _, _ = get_modules()
     if mem and new_name:
@@ -816,18 +878,21 @@ async def handle_account_update(request):
         except Exception:
             pass
 
+    saved_user = new_name or get_current_user_name()
+    saved_voice = new_voice or get_current_voice_type()
+
     await broadcast_ws("account_updated", {
-        "name": new_name,
-        "voice_type": new_voice,
+        "name": saved_user,
+        "voice_type": saved_voice,
         "tts_speed": new_speed
     })
 
     return web.json_response({
         "ok": True,
         "message": "Sozlamalar muvaffaqiyatli saqlandi",
-        "name": new_name or cfg["user"].get("name"),
-        "voice_type": new_voice or cfg["user"].get("voice_type"),
-        "tts_speed": cfg["audio"].get("tts_speed")
+        "name": saved_user,
+        "voice_type": saved_voice,
+        "tts_speed": cfg["audio"].get("tts_speed", 2.0)
     })
 
 

@@ -47,6 +47,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
 
 interface SidebarProps {
   currentPath: string;
+  userName?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onNavigate: (path: string) => void;
@@ -54,6 +55,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentPath,
+  userName = "Ustoz",
   collapsed = false,
   onToggleCollapse,
   onNavigate,
@@ -229,6 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Bottom User Account & App Readiness Status */}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingTop: "8px" }}>
         <AccountRow
+          name={userName}
           collapsed={collapsed}
           active={currentPath === "/account"}
           onClick={() => onNavigate("/account")}

@@ -8,10 +8,35 @@ import { MemoryPage } from "./pages/MemoryPage";
 import { SchedulerPage } from "./pages/SchedulerPage";
 import { PluginsPage } from "./pages/PluginsPage";
 import { AccountPage } from "./pages/AccountPage";
+import { backendService } from "./services/backendService";
 
 export function App() {
   const [currentPath, setCurrentPath] = useState<string>("/");
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string>("");
+  const [userName, setUserName] = useState<string>(() => {
+    return localStorage.getItem("mikasa_user_name") || "Ustoz";
+  });
+
+  // Listen to status updates to keep username synchronized
+  useEffect(() => {
+    const unsub = backendService.onStatusChange((status) => {
+      if (status.user && status.user.trim()) {
+        const freshUser = status.user.trim();
+        setUserName((prev) => (prev !== freshUser ? freshUser : prev));
+        try {
+          localStorage.setItem("mikasa_user_name", freshUser);
+        } catch {}
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleUserUpdated = (newName: string) => {
+    setUserName(newName);
+    try {
+      localStorage.setItem("mikasa_user_name", newName);
+    } catch {}
+  };
 
   const handleNavigate = (path: string, initialPrompt?: string) => {
     if (initialPrompt !== undefined) {
@@ -38,10 +63,11 @@ export function App() {
   const renderContent = () => {
     switch (currentPath) {
       case "/":
-        return <LandingPage onNavigate={handleNavigate} />;
+        return <LandingPage userName={userName} onNavigate={handleNavigate} />;
       case "/voice":
         return (
           <VoicePage
+            userName={userName}
             onNavigateHome={() => handleNavigate("/")}
             onNavigateChat={() => handleNavigate("/chat")}
           />
@@ -50,6 +76,7 @@ export function App() {
         return (
           <ChatPage
             initialPrompt={chatInitialPrompt}
+            userName={userName}
             onNavigateHome={() => handleNavigate("/")}
             onNavigateVoice={() => handleNavigate("/voice")}
           />
@@ -63,14 +90,19 @@ export function App() {
       case "/plugins":
         return <PluginsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/account":
-        return <AccountPage onNavigateHome={() => handleNavigate("/")} />;
+        return (
+          <AccountPage
+            onNavigateHome={() => handleNavigate("/")}
+            onUserUpdated={handleUserUpdated}
+          />
+        );
       default:
-        return <LandingPage onNavigate={handleNavigate} />;
+        return <LandingPage userName={userName} onNavigate={handleNavigate} />;
     }
   };
 
   return (
-    <AppShell currentPath={currentPath} onNavigate={handleNavigate}>
+    <AppShell currentPath={currentPath} userName={userName} onNavigate={handleNavigate}>
       {renderContent()}
     </AppShell>
   );

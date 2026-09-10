@@ -205,6 +205,13 @@ class BackendService {
                 console.error(e);
               }
             });
+          } else if (payload.type === "account_updated" && payload.data) {
+            if (payload.data.name) {
+              try {
+                localStorage.setItem("mikasa_user_name", payload.data.name);
+              } catch {}
+              this.notifyStatus({ ...this.currentStatus, user: payload.data.name });
+            }
           }
         } catch (e) {
           console.debug("WS parse error", e);
@@ -250,13 +257,19 @@ class BackendService {
       });
       if (!res.ok) throw new Error("Status HTTP " + res.status);
       const data: BackendStatus = await res.json();
+      if (data.user) {
+        try {
+          localStorage.setItem("mikasa_user_name", data.user);
+        } catch {}
+      }
       this.notifyStatus(data);
       if (data.voice_state) {
         this.notifyVoiceState(data.voice_state);
       }
       return data;
     } catch {
-      const offlineStatus: BackendStatus = { status: "offline" };
+      const cachedUser = localStorage.getItem("mikasa_user_name") || undefined;
+      const offlineStatus: BackendStatus = { status: "offline", user: cachedUser };
       this.notifyStatus(offlineStatus);
       return offlineStatus;
     }
@@ -473,14 +486,21 @@ class BackendService {
 
   // ========== 6. HISOB VA SOZLAMALAR ==========
   public async getAccount(): Promise<AccountSettings> {
+    const cachedName = localStorage.getItem("mikasa_user_name") || "Ustoz";
     try {
       const res = await fetch(`${API_BASE}/api/account`, { method: "GET" });
       if (!res.ok) throw new Error("HTTP " + res.status);
-      return await res.json();
+      const data: AccountSettings = await res.json();
+      if (data.name) {
+        try {
+          localStorage.setItem("mikasa_user_name", data.name);
+        } catch {}
+      }
+      return data;
     } catch {
       return {
         ok: false,
-        name: "Muxammadaziz",
+        name: cachedName,
         voice_type: "ayol",
         theme: "dark",
         tts_speed: 2.0,
@@ -500,13 +520,28 @@ class BackendService {
     tts_speed?: number;
     theme?: string;
   }): Promise<{ ok: boolean; message: string }> {
+    if (data.name) {
+      try {
+        localStorage.setItem("mikasa_user_name", data.name);
+      } catch {}
+      this.currentStatus.user = data.name;
+      this.notifyStatus({ ...this.currentStatus, user: data.name });
+    }
     try {
       const res = await fetch(`${API_BASE}/api/account`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      return await res.json();
+      const result = await res.json();
+      if (result.name) {
+        try {
+          localStorage.setItem("mikasa_user_name", result.name);
+        } catch {}
+        this.currentStatus.user = result.name;
+        this.notifyStatus({ ...this.currentStatus, user: result.name });
+      }
+      return result;
     } catch (err: any) {
       return { ok: false, message: String(err) };
     }
@@ -516,9 +551,14 @@ class BackendService {
     return this.currentStatus;
   }
 
+  public getUserName(): string {
+    return this.currentStatus.user || localStorage.getItem("mikasa_user_name") || "Ustoz";
+  }
+
   public getVoiceState(): VoiceState {
     return this.currentVoiceState;
   }
 }
 
 export const backendService = new BackendService();
+

@@ -12,13 +12,21 @@ interface AccountRowProps {
 }
 
 export const AccountRow: React.FC<AccountRowProps> = ({
-  name = "Muxammadaziz",
-  initials = "MA",
+  name = "Ustoz",
+  initials,
   active = false,
   collapsed = false,
   onClick,
   className = "",
 }) => {
+  const effectiveInitials = initials || (() => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.trim().slice(0, 2).toUpperCase() || "U";
+  })();
+
   if (collapsed) {
     return (
       <button
@@ -42,7 +50,7 @@ export const AccountRow: React.FC<AccountRowProps> = ({
         onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.3)")}
         onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)")}
       >
-        <Avatar initials={initials} size={32} />
+        <Avatar initials={effectiveInitials} size={32} />
       </button>
     );
   }
@@ -85,7 +93,7 @@ export const AccountRow: React.FC<AccountRowProps> = ({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-        <Avatar initials={initials} size={32} />
+        <Avatar initials={effectiveInitials} size={32} />
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
           <span
             style={{

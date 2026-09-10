@@ -15,10 +15,11 @@ import {
 
 interface AccountPageProps {
   onNavigateHome: () => void;
+  onUserUpdated?: (name: string) => void;
 }
 
-export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome }) => {
-  const [name, setName] = useState("Muxammadaziz");
+export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUserUpdated }) => {
+  const [name, setName] = useState(() => localStorage.getItem("mikasa_user_name") || "Ustoz");
   const [voiceType, setVoiceType] = useState<"ayol" | "erkak">("ayol");
   const [ttsSpeed, setTtsSpeed] = useState<number>(2.0);
   const [theme, setTheme] = useState<string>("dark");
@@ -33,7 +34,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome }) => {
       setLoading(true);
       const data: AccountSettings = await backendService.getAccount();
       if (mounted && data.ok) {
-        setName(data.name || "Muxammadaziz");
+        const freshName = data.name || localStorage.getItem("mikasa_user_name") || "Ustoz";
+        setName(freshName);
         setVoiceType(data.voice_type || "ayol");
         setTtsSpeed(data.tts_speed || 2.0);
         setTheme(data.theme || "dark");
@@ -53,8 +55,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome }) => {
     setIsSaving(true);
     setSaveSuccess(false);
 
+    const trimmedName = name.trim() || "Ustoz";
     const res = await backendService.updateAccount({
-      name: name.trim(),
+      name: trimmedName,
       voice_type: voiceType,
       tts_speed: ttsSpeed,
       theme,
@@ -62,6 +65,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome }) => {
 
     if (res.ok) {
       setSaveSuccess(true);
+      onUserUpdated?.(trimmedName);
       setTimeout(() => setSaveSuccess(false), 4000);
     }
     setIsSaving(false);

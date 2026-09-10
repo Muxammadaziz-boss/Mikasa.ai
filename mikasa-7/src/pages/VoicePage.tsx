@@ -18,7 +18,7 @@ interface VoicePageProps {
 }
 
 export const VoicePage: React.FC<VoicePageProps> = ({
-  userName = "Muxammadaziz",
+  userName = "Ustoz",
   onNavigateHome,
   onNavigateChat,
 }) => {

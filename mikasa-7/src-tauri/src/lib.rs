@@ -39,36 +39,78 @@ fn app_is_maximized(window: tauri::Window) -> Result<bool, String> {
 fn ensure_backend_running() {
     use std::net::TcpStream;
     use std::time::Duration;
+    use std::path::PathBuf;
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-    // Check if 127.0.0.1:18420 is already reachable
+    // 1. Check if 127.0.0.1:18420 is already reachable
     if let Ok(addr) = "127.0.0.1:18420".parse() {
         if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
             return; // Already running!
         }
     }
 
-    let py_candidates = [
-        r"D:\Ishchi stoli\Mikasa\.venv\Scripts\python.exe",
-        r"..\..\.venv\Scripts\python.exe",
-        r"..\.venv\Scripts\python.exe",
-        "python",
-    ];
+    // 2. Dynamically resolve base_dir containing core/api_server.py
+    let mut resolved_base: Option<PathBuf> = None;
+    if let Ok(exe_path) = std::env::current_exe() {
+        let mut curr = exe_path.as_path();
+        while let Some(parent) = curr.parent() {
+            if parent.join("core").join("api_server.py").exists() {
+                resolved_base = Some(parent.to_path_buf());
+                break;
+            }
+            if parent.join("yordamchi_7.0.0").join("core").join("api_server.py").exists() {
+                resolved_base = Some(parent.join("yordamchi_7.0.0"));
+                break;
+            }
+            curr = parent;
+        }
+    }
 
-    let base_dir = r"D:\Ishchi stoli\Mikasa\yordamchi_7.0.0";
+    let base_dir = resolved_base.unwrap_or_else(|| {
+        PathBuf::from(r"D:\Ishchi stoli\Mikasa\yordamchi_7.0.0")
+    });
 
-    for py in py_candidates {
-        if std::path::Path::new(py).exists() || py == "python" {
-            let res = Command::new(py)
+    // 3. Find Python executable
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Some(parent) = base_dir.parent() {
+        candidates.push(parent.join(".venv").join("Scripts").join("python.exe"));
+    }
+    candidates.push(base_dir.join(".venv").join("Scripts").join("python.exe"));
+    candidates.push(PathBuf::from(r"D:\Ishchi stoli\Mikasa\.venv\Scripts\python.exe"));
+
+    let mut launched = false;
+    for py in candidates {
+        if py.exists() {
+            let res = Command::new(&py)
                 .arg("core/api_server.py")
-                .current_dir(base_dir)
+                .current_dir(&base_dir)
                 .creation_flags(CREATE_NO_WINDOW)
                 .spawn();
             if res.is_ok() {
+                launched = true;
                 break;
             }
+        }
+    }
+
+    if !launched {
+        let _ = Command::new("python")
+            .arg("core/api_server.py")
+            .current_dir(&base_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+
+    // 4. Give it a moment to bind to the port
+    if let Ok(addr) = "127.0.0.1:18420".parse() {
+        for _ in 0..10 {
+            if TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(250));
         }
     }
 }

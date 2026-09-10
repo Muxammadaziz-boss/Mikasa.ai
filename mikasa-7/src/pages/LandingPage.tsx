@@ -18,7 +18,7 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
-  userName = "Muxammadaziz",
+  userName = "Ustoz",
   onNavigate,
 }) => {
   const [inputText, setInputText] = useState("");
@@ -147,7 +147,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               marginBottom: "6px",
             }}
           >
-            Salom, {backendStatus.user || userName}
+            Salom, {userName || backendStatus.user || "Ustoz"}
           </h1>
 
           <p

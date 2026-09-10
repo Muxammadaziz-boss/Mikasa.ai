@@ -30,7 +30,7 @@ interface ChatPageProps {
 
 export const ChatPage: React.FC<ChatPageProps> = ({
   initialPrompt,
-  userName = "Muxammadaziz",
+  userName = "Ustoz",
   onNavigateHome,
   onNavigateVoice,
 }) => {
