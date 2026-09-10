@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "MIKASA AI",
         "width": 1280,
         "height": 800,
@@ -20,6 +21,7 @@
         "resizable": true,
         "center": true,
         "decorations": false,
+        "transparent": false,
         "shadow": true,
         "theme": "Dark"
       }
