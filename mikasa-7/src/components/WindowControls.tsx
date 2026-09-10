@@ -10,22 +10,34 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    const initTauri = async () => {
+    const checkMaximized = async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const max = await invoke<boolean>("app_is_maximized");
+        setIsMaximized(max);
+      } catch {
+        try {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          const max = await getCurrentWindow().isMaximized();
+          setIsMaximized(max);
+        } catch {
+          // Browser fallback
+        }
+      }
+    };
+    checkMaximized();
+
+    const setupListener = async () => {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const appWindow = getCurrentWindow();
-        const maxState = await appWindow.isMaximized();
-        setIsMaximized(maxState);
-
-        unlisten = await appWindow.onResized(async () => {
-          const state = await appWindow.isMaximized();
-          setIsMaximized(state);
+        unlisten = await getCurrentWindow().onResized(async () => {
+          checkMaximized();
         });
       } catch {
         // Browser fallback
       }
     };
-    initTauri();
+    setupListener();
 
     return () => {
       if (unlisten) unlisten();
@@ -34,30 +46,46 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
 
   const handleMinimize = async () => {
     try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().minimize();
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("app_minimize");
     } catch {
-      console.log("[WindowControls] Minimize");
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        await getCurrentWindow().minimize();
+      } catch (err) {
+        console.error("[WindowControls] Minimize error:", err);
+      }
     }
   };
 
   const handleMaximize = async () => {
     try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().toggleMaximize();
-      const state = await getCurrentWindow().isMaximized();
-      setIsMaximized(state);
+      const { invoke } = await import("@tauri-apps/api/core");
+      const max = await invoke<boolean>("app_toggle_maximize");
+      setIsMaximized(max);
     } catch {
-      setIsMaximized(!isMaximized);
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        await getCurrentWindow().toggleMaximize();
+        const max = await getCurrentWindow().isMaximized();
+        setIsMaximized(max);
+      } catch {
+        setIsMaximized((prev) => !prev);
+      }
     }
   };
 
   const handleClose = async () => {
     try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().close();
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("app_close");
     } catch {
-      console.log("[WindowControls] Close");
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        await getCurrentWindow().close();
+      } catch (err) {
+        console.error("[WindowControls] Close error:", err);
+      }
     }
   };
 

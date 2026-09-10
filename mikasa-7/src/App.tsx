@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { AppShell } from "./layout/AppShell";
 import { LandingPage } from "./pages/LandingPage";
+import { ChatPage } from "./pages/ChatPage";
+import { VoicePage } from "./pages/VoicePage";
 import { RoutePlaceholder } from "./pages/RoutePlaceholder";
 import {
-  MicIcon,
-  ChatIcon,
   CommandsIcon,
   MemoryIcon,
   SchedulerIcon,
@@ -44,24 +44,17 @@ export function App() {
         return <LandingPage onNavigate={handleNavigate} />;
       case "/voice":
         return (
-          <RoutePlaceholder
-            title="Ovozli muloqot"
-            subtitle="Mikasa bilan tabiiy ovozli muloqot drayveri keyingi bosqichda ulanadi."
-            icon={<MicIcon size={26} color="var(--primary-glow)" />}
+          <VoicePage
             onNavigateHome={() => handleNavigate("/")}
+            onNavigateChat={() => handleNavigate("/chat")}
           />
         );
       case "/chat":
         return (
-          <RoutePlaceholder
-            title="AI Suhbat"
-            subtitle={
-              chatInitialPrompt
-                ? `Yuborilgan so‘rov: "${chatInitialPrompt}". Agent konversiya oqimi keyingi bosqichda ulanadi.`
-                : "Kuchli matnli muloqot, agent fikrlash tizimi va tahlil vositalari keyingi bosqichda ulanadi."
-            }
-            icon={<ChatIcon size={26} color="var(--primary-glow)" />}
+          <ChatPage
+            initialPrompt={chatInitialPrompt}
             onNavigateHome={() => handleNavigate("/")}
+            onNavigateVoice={() => handleNavigate("/voice")}
           />
         );
       case "/commands":
