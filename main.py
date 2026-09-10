@@ -500,76 +500,119 @@ def kayfiyat_aniqla(matn):
 
 
 def ovoz_chiqar_tez(text):
-    """Tez ovozli javob — Streaming TTS: gaplarni ajratib ketma-ket gapirish"""
+    """
+    Mikasa AI 7.1.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
+    Edge TTS (uz-UZ-MadinaNeural / uz-UZ-SardorNeural) orqali ovoz yaratadi
+    va sounddevice / pygame orqali ijro etadi.
+    """
+    if not text:
+        return
 
     def _ijro_et():
         try:
             global_state.gapirmoqda = True
             logging.debug(f"Audio playing request: {text}")
 
-            sentences = re.split(r"[.!?।]", text)
-            sentences = [s.strip() for s in sentences if s.strip()]
+            # 1. Matnni keraksiz belgilardan tozalash (Markdown, URL, emojilar)
+            clean_text = re.sub(r"\[.*?\]\(.*?\)", "", text)  # Markdown linklar
+            clean_text = re.sub(r"```[\s\S]*?```", "", clean_text)  # Code blocklar
+            clean_text = re.sub(r"`.*?`", "", clean_text)  # Inline code
+            clean_text = re.sub(r"[\*\_~#>]", "", clean_text)  # Markdown format
+            clean_text = re.sub(r"[🎤🗣️📝🎯✅❌⚠️💡📊🎵▶️⏸️🔊🔉🔇📌🤖✨🔹👋]", "", clean_text)
+            clean_text = clean_text.strip()
 
-            if not sentences:
+            if not clean_text:
                 return
 
-            rate_full, pitch_full, volume_full = kayfiyat_aniqla(text)
+            sentences = [s.strip() for s in re.split(r"[.!?\n।]+", clean_text) if s.strip()]
+            if not sentences:
+                sentences = [clean_text]
 
-            async def speak():
-                import pygame
-
-                voice = (
-                    "uz-UZ-MadinaNeural"
-                    if global_state.ovoz_turi_global == "ayol"
-                    else "uz-UZ-SardorNeural"
-                )
-
+            # 2. Ovoz turini aniqlash
+            ovoz_turi = getattr(global_state, "ovoz_turi_global", "ayol")
+            fayl = os.path.join(BASE_DIR, "data", "ovoz_turi.txt")
+            if os.path.exists(fayl):
                 try:
-                    pygame.mixer.init()
+                    with open(fayl, "r", encoding="utf-8") as f:
+                        v = f.read().strip()
+                        if v in ["ayol", "erkak"]:
+                            ovoz_turi = v
                 except Exception:
                     pass
 
-                for i, sentence in enumerate(sentences):
-                    if global_state.gapirmoqda == False:
+            voice = "uz-UZ-MadinaNeural" if ovoz_turi == "ayol" else "uz-UZ-SardorNeural"
+
+            # 3. Tezlik (speed) ni config.json dan olish
+            speed_mult = 1.0
+            try:
+                from config import get_config
+                cfg_speed = get_config("audio.tts_speed")
+                if cfg_speed is not None:
+                    speed_mult = float(cfg_speed)
+            except Exception:
+                speed_mult = 1.0
+
+            speed_pct = int((speed_mult - 1.0) * 100)
+            sign = "+" if speed_pct >= 0 else ""
+            rate_str = f"{sign}{speed_pct}%"
+
+            async def _speak():
+                import edge_tts
+
+                for sentence in sentences:
+                    if not global_state.gapirmoqda:
                         break
 
-                    rate, pitch, volume = kayfiyat_aniqla(sentence)
-                    if i > 0:
-                        rate = min(rate + 10, 50)
-
+                    filename = os.path.join(
+                        tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.mp3"
+                    )
                     try:
                         communicate = edge_tts.Communicate(
-                            sentence, voice, rate=rate, pitch=pitch, volume=volume
-                        )
-                        filename = os.path.join(
-                            tempfile.gettempdir(), f"tts_{uuid.uuid4()}.mp3"
+                            sentence, voice, rate=rate_str, volume="+0%"
                         )
                         await communicate.save(filename)
 
+                        # Audio ijro: 1-variant sounddevice
+                        played = False
                         try:
-                            pygame.mixer.init()
-                            pygame.mixer.music.load(filename)
-                            pygame.mixer.music.play()
-                            while pygame.mixer.music.get_busy():
-                                await asyncio.sleep(0.1)
-                            pygame.mixer.music.unload()
+                            import soundfile as sf
+                            import sounddevice as sd
+                            data, fs = sf.read(filename)
+                            sd.play(data, fs)
+                            sd.wait()
+                            played = True
                         except Exception as e:
-                            logging.warning(f"Pygame play error: {e}")
-                        finally:
+                            logging.debug(f"sounddevice ijro xatosi: {e}")
+
+                        # 2-variant pygame fallback
+                        if not played:
                             try:
-                                os.remove(filename)
-                            except Exception:
-                                pass
+                                import pygame
+                                if not pygame.mixer.get_init():
+                                    pygame.mixer.init(frequency=24000)
+                                pygame.mixer.music.load(filename)
+                                pygame.mixer.music.play()
+                                while pygame.mixer.music.get_busy() and global_state.gapirmoqda:
+                                    await asyncio.sleep(0.05)
+                                pygame.mixer.music.unload()
+                            except Exception as e:
+                                logging.warning(f"Pygame ijro xatosi: {e}")
+
                     except Exception as e:
-                        logging.error(f"TTS sentence error: {e}")
-                        continue
+                        logging.error(f"TTS generatsiya xatosi: {e}")
+                    finally:
+                        try:
+                            if os.path.exists(filename):
+                                os.remove(filename)
+                        except Exception:
+                            pass
 
             try:
-                asyncio.run(speak())
+                asyncio.run(_speak())
             except RuntimeError:
                 loop = asyncio.new_event_loop()
                 try:
-                    loop.run_until_complete(speak())
+                    loop.run_until_complete(_speak())
                 finally:
                     loop.close()
 
@@ -581,7 +624,7 @@ def ovoz_chiqar_tez(text):
             global_state.gapirmoqda = False
             logging.debug("Speech finished, microphone re-enabled")
 
-    threading.Thread(target=_ijro_et, daemon=True).start()
+    threading.Thread(target=_ijro_et, daemon=True, name="TTSPlaybackThread").start()
 
 
 # ========== Foydalanuvchi ma'lumotlarini olish ==========

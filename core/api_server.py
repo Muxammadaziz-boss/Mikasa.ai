@@ -333,6 +333,7 @@ async def handle_chat(request):
 
     text = body.get("text", "").strip()
     mode = body.get("mode", "ask")
+    speak_out = body.get("speak", False) or mode == "voice"
 
     if not text:
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)
@@ -354,13 +355,19 @@ async def handle_chat(request):
                     mem.add_conversation(text, reply_text[:500])
                 except Exception:
                     pass
+
+            if speak_out and m and hasattr(m, "ovoz_chiqar_tez"):
+                sync_broadcast("voice_state", {"state": "speaking"}, loop)
+                m.ovoz_chiqar_tez(reply_text)
+
             return reply_text
         except Exception as e:
             logger.error(f"Chat bajarishda xatolik: {e}")
             return f"Xatolik yuz berdi: {e}"
         finally:
-            _voice_state = "idle"
-            sync_broadcast("voice_state", {"state": "idle"}, loop)
+            if not speak_out:
+                _voice_state = "idle"
+                sync_broadcast("voice_state", {"state": "idle"}, loop)
 
     response_text = await loop.run_in_executor(None, _execute)
     await broadcast_ws("ai_response", {"text": response_text, "mode": mode})
@@ -386,7 +393,26 @@ async def handle_voice_start(request):
     await broadcast_ws("voice_state", {"state": "listening"})
 
     def _voice_callback(msg):
-        sync_broadcast("voice_event", {"message": str(msg)}, loop)
+        import re
+        msg_str = str(msg).strip()
+        sync_broadcast("voice_event", {"message": msg_str}, loop)
+
+        # 1. Foydalanuvchi gapirganini aniqlash
+        if "🗣️ Siz:" in msg_str:
+            user_text = msg_str.split("🗣️ Siz:", 1)[1].strip()
+            sync_broadcast("voice_state", {"state": "thinking"}, loop)
+            sync_broadcast("voice_transcript", {"text": user_text, "sender": "user"}, loop)
+        # 2. Agent yoki AI javobi
+        elif any(marker in msg_str for marker in ["🤖 Agent:", "🤖 AI:", "✨", "✅", "👋 Salom"]):
+            clean_reply = re.sub(r"^[🤖✨✅⚠️❌]\s*(?:Agent:|AI:)?\s*", "", msg_str).strip()
+            sync_broadcast("voice_state", {"state": "speaking"}, loop)
+            sync_broadcast("ai_response", {"text": clean_reply, "mode": "voice"}, loop)
+            sync_broadcast("voice_transcript", {"text": clean_reply, "sender": "mikasa"}, loop)
+        # 3. Tinglash holatiga qaytish
+        elif "🎙️ Tinglash boshlandi" in msg_str or "Tinglash davom" in msg_str:
+            sync_broadcast("voice_state", {"state": "listening"}, loop)
+        elif "🛑 Tinglash to'xtatildi" in msg_str:
+            sync_broadcast("voice_state", {"state": "idle"}, loop)
 
     def _listen():
         global _voice_state
@@ -394,6 +420,7 @@ async def handle_voice_start(request):
             user = get_current_user_name()
             ovoz = get_current_voice_type()
             m.global_state.tinglash_faol = True
+            m.global_state.gapirmoqda = False
             m.fon_xizmat(user, ovoz, _voice_callback)
         except Exception as e:
             logger.error(f"Ovozli tinglashda xato: {e}")
@@ -412,9 +439,30 @@ async def handle_voice_stop(request):
     m, _, _, _, _, _ = get_modules()
     if m:
         m.global_state.tinglash_faol = False
+        m.global_state.gapirmoqda = False
     _voice_state = "idle"
     await broadcast_ws("voice_state", {"state": "idle"})
     return web.json_response({"ok": True, "status": "stopped"})
+
+
+async def handle_voice_speak(request):
+    """POST /api/voice/speak - Istalgan matnni ovoz chiqarib o'qish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    text = body.get("text", "").strip()
+    if not text:
+        return web.json_response({"ok": False, "error": "Matn kiritilmadi"}, status=400)
+
+    m, _, _, _, _, _ = get_modules()
+    if m and hasattr(m, "ovoz_chiqar_tez"):
+        loop = asyncio.get_running_loop()
+        sync_broadcast("voice_state", {"state": "speaking"}, loop)
+        m.ovoz_chiqar_tez(text)
+        return web.json_response({"ok": True, "message": "Ovoz chiqarilmoqda"})
+    return web.json_response({"ok": False, "error": "Audio moduli mavjud emas"}, status=500)
 
 
 async def handle_chat_clear(request):
@@ -801,7 +849,7 @@ async def handle_account_get(request):
         "version": "7.1.0",
         "voices_available": [
             {"id": "ayol", "name": "Madina (Ayol)", "lang": "uz-UZ-MadinaNeural"},
-            {"id": "erkak", "name": "Sardar (Erkak)", "lang": "uz-UZ-SardarNeural"}
+            {"id": "erkak", "name": "Sardor (Erkak)", "lang": "uz-UZ-SardorNeural"}
         ]
     })
 
@@ -963,6 +1011,7 @@ def create_app():
     app.router.add_post("/api/chat/clear", handle_chat_clear)
     app.router.add_post("/api/voice/start", handle_voice_start)
     app.router.add_post("/api/voice/stop", handle_voice_stop)
+    app.router.add_post("/api/voice/speak", handle_voice_speak)
 
     # Buyruqlar (Commands)
     app.router.add_get("/api/commands", handle_commands_list)

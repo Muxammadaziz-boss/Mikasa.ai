@@ -481,7 +481,7 @@ export const MemoryPage: React.FC<MemoryPageProps> = ({ onNavigateHome }) => {
               <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 12, borderRadius: 8 }}>
                 <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Ovoz turi</span>
                 <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
-                  {profile.ovoz_turi === "erkak" ? "Sardar (Erkak)" : "Madina (Ayol)"}
+                  {profile.ovoz_turi === "erkak" ? "Sardor (Erkak)" : "Madina (Ayol)"}
                 </div>
               </div>
               <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 12, borderRadius: 8 }}>

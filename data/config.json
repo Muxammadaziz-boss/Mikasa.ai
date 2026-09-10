@@ -8,14 +8,14 @@
     "sample_rate": 44100,
     "duration": 5,
     "channels": 1,
-    "tts_voice_male": "uz-UZ-SardarNeural",
+    "tts_voice_male": "uz-UZ-SardorNeural",
     "tts_voice_female": "uz-UZ-MadinaNeural",
     "tts_rate": 200,
     "vad_enabled": true,
     "vad_threshold": 0.015,
     "silence_duration": 1.2,
-    "tts_speed": 2.0,
-    "tts_engine": "silero"
+    "tts_speed": 1.6,
+    "tts_engine": "edge_tts"
   },
   "gui": {
     "theme": "dark",
@@ -53,7 +53,7 @@
     "voice_type": "ayol"
   },
   "voice": {
-    "tts_engine": "silero",
+    "tts_engine": "edge_tts",
     "silero_model": "uz-UZ-MadinaNeural",
     "speed": 2.0,
     "sample_rate": 44100

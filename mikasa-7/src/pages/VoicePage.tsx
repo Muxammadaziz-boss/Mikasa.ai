@@ -24,6 +24,7 @@ export const VoicePage: React.FC<VoicePageProps> = ({
 }) => {
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
+  const [userTranscript, setUserTranscript] = useState<string>("");
   const [lastTranscript, setLastTranscript] = useState<string>("");
 
   useEffect(() => {
@@ -36,10 +37,18 @@ export const VoicePage: React.FC<VoicePageProps> = ({
     const unsubResp = backendService.onResponse((data) => {
       setLastTranscript(data.text);
     });
+    const unsubTranscript = backendService.onTranscript((data) => {
+      if (data.sender === "user") {
+        setUserTranscript(data.text);
+      } else {
+        setLastTranscript(data.text);
+      }
+    });
     return () => {
       unsubVoice();
       unsubStatus();
       unsubResp();
+      unsubTranscript();
     };
   }, []);
 
@@ -47,7 +56,15 @@ export const VoicePage: React.FC<VoicePageProps> = ({
     if (voiceState === "listening") {
       await backendService.stopVoice();
     } else {
+      setUserTranscript("");
+      setLastTranscript("");
       await backendService.startVoice();
+    }
+  };
+
+  const handleReplayVoice = async () => {
+    if (lastTranscript) {
+      await backendService.speakText(lastTranscript);
     }
   };
 
@@ -151,6 +168,7 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           padding: "32px",
           gap: "24px",
           textAlign: "center",
+          overflowY: "auto",
         }}
       >
         <div
@@ -158,7 +176,7 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           style={{
             cursor: "pointer",
             transition: "transform 0.2s ease",
-            transform: voiceState === "listening" ? "scale(1.05)" : "scale(1)",
+            transform: voiceState === "listening" || voiceState === "speaking" ? "scale(1.05)" : "scale(1)",
           }}
           title={voiceState === "listening" ? "Tinglashni to'xtatish" : "Tinglashni boshlash"}
         >
@@ -170,12 +188,12 @@ export const VoicePage: React.FC<VoicePageProps> = ({
             className="text-metallic-gradient"
             style={{ fontSize: "28px", fontWeight: 700, margin: "0 0 8px 0" }}
           >
-            Salom, {backendStatus.user || userName}
+            Salom, {userName || backendStatus.user || "Ustoz"}
           </h2>
           <p
             style={{
               fontSize: "15px",
-              color: voiceState === "listening" ? "var(--primary-glow)" : "var(--text-secondary)",
+              color: voiceState === "listening" ? "var(--primary-glow)" : voiceState === "speaking" ? "#10B981" : "var(--text-secondary)",
               fontWeight: 500,
               margin: 0,
               transition: "color 0.2s ease",
@@ -185,7 +203,29 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           </p>
         </div>
 
-        {/* So'nggi xabar / transkript kartochkasi */}
+        {/* Foydalanuvchi aytgan so'z */}
+        {userTranscript && (
+          <div
+            style={{
+              maxWidth: "520px",
+              width: "100%",
+              padding: "10px 16px",
+              borderRadius: "14px",
+              backgroundColor: "rgba(2, 132, 199, 0.15)",
+              border: "1px solid rgba(56, 189, 248, 0.3)",
+              color: "#FFFFFF",
+              fontSize: "13.5px",
+              textAlign: "left",
+            }}
+          >
+            <div style={{ fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600, marginBottom: "3px" }}>
+              🗣️ Siz aytgan buyruq:
+            </div>
+            {userTranscript}
+          </div>
+        )}
+
+        {/* So'nggi javob / transkript kartochkasi */}
         {lastTranscript && (
           <div
             style={{
@@ -202,8 +242,28 @@ export const VoicePage: React.FC<VoicePageProps> = ({
               textAlign: "left",
             }}
           >
-            <div style={{ fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600, marginBottom: "4px" }}>
-              Mikasa javobi:
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+              <div style={{ fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600 }}>
+                🤖 Mikasa javobi:
+              </div>
+              <button
+                onClick={handleReplayVoice}
+                title="Ovozni qayta tinglash"
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  borderRadius: "6px",
+                  padding: "2px 8px",
+                  color: "#38BDF8",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                🔊 Qayta eshitish
+              </button>
             </div>
             {lastTranscript}
           </div>

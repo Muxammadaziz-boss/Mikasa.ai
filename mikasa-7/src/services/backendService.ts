@@ -117,6 +117,7 @@ class BackendService {
   private voiceStateListeners: Set<(state: VoiceState) => void> = new Set();
   private responseListeners: Set<(data: { text: string; mode: string }) => void> = new Set();
   private alarmListeners: Set<(data: { id: string; text: string; type: string }) => void> = new Set();
+  private transcriptListeners: Set<(data: { text: string; sender: "user" | "mikasa" }) => void> = new Set();
 
   constructor() {
     this.connectWs();
@@ -144,6 +145,11 @@ class BackendService {
   public onSchedulerAlarm(cb: (data: { id: string; text: string; type: string }) => void): () => void {
     this.alarmListeners.add(cb);
     return () => this.alarmListeners.delete(cb);
+  }
+
+  public onTranscript(cb: (data: { text: string; sender: "user" | "mikasa" }) => void): () => void {
+    this.transcriptListeners.add(cb);
+    return () => this.transcriptListeners.delete(cb);
   }
 
   private notifyStatus(status: BackendStatus) {
@@ -199,6 +205,14 @@ class BackendService {
             });
           } else if (payload.type === "scheduler_alarm" && payload.data) {
             this.alarmListeners.forEach((cb) => {
+              try {
+                cb(payload.data);
+              } catch (e) {
+                console.error(e);
+              }
+            });
+          } else if (payload.type === "voice_transcript" && payload.data?.text) {
+            this.transcriptListeners.forEach((cb) => {
               try {
                 cb(payload.data);
               } catch (e) {
@@ -508,9 +522,22 @@ class BackendService {
         version: "7.1.0",
         voices_available: [
           { id: "ayol", name: "Madina (Ayol)", lang: "uz-UZ-MadinaNeural" },
-          { id: "erkak", name: "Sardar (Erkak)", lang: "uz-UZ-SardarNeural" },
+          { id: "erkak", name: "Sardor (Erkak)", lang: "uz-UZ-SardorNeural" },
         ],
       };
+    }
+  }
+
+  public async speakText(text: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/voice/speak`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 

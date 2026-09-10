@@ -317,7 +317,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>
-                        Sardar (Erkak)
+                        Sardor (Erkak)
                       </strong>
                       {voiceType === "erkak" && (
                         <span style={{ color: "var(--primary-glow)", fontSize: 14 }}>✓</span>
