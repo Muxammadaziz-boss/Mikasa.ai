@@ -1,7 +1,8 @@
 # ========== api_server.py ==========
-# Mikasa AI 7.0 — Desktop Background Backend API Server
-# Ushbu server Tauri frontend (React) va Python AI yadrosi (main.py, ai_engine)
-# orasidagi asinxron ko'prik (REST + WebSocket) hisoblanadi.
+# Mikasa AI 7.1.0 — Desktop Background Backend API Server
+# Ushbu server Tauri frontend (React) va Python AI yadrosi (main.py, ai_engine,
+# agent_memory, agent_scheduler, agent_tools, command_dispatcher) orasidagi
+# to'liq asinxron ko'prik (REST + WebSocket) hisoblanadi.
 # Port: 127.0.0.1:18420
 
 import os
@@ -24,16 +25,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MikasaAPIServer")
 
-# Backend modullarini yuklash
+# Backend modullari kesh singletonlari
 _main = None
 _ai_engine = None
 _agent_memory = None
+_agent_scheduler = None
+_tool_registry = None
+_command_dispatcher = None
+
 _active_ws_clients = set()
 _voice_state = "idle"  # idle | listening | thinking | speaking
-_lock = threading.Lock()
+_main_loop = None
 
 def get_modules():
-    global _main, _ai_engine, _agent_memory
+    global _main, _ai_engine, _agent_memory, _agent_scheduler, _tool_registry, _command_dispatcher
     if _main is None:
         try:
             import main as m
@@ -52,10 +57,49 @@ def get_modules():
         try:
             from core.agent_memory import get_memory
             _agent_memory = get_memory()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"agent_memory yuklashda xatolik: {e}")
 
-    return _main, _ai_engine, _agent_memory
+    if _agent_scheduler is None:
+        try:
+            from core.agent_scheduler import get_scheduler
+            _agent_scheduler = get_scheduler()
+            _agent_scheduler.start()
+            
+            def _scheduler_callback(task):
+                text = task.data.get("text", "Eslatma!")
+                logger.info(f"Rejalashtirilgan vazifa bajarildi: {task.task_id} -> {text}")
+                sync_broadcast("scheduler_alarm", {
+                    "id": task.task_id,
+                    "text": text,
+                    "type": task.task_type,
+                    "time": datetime.now().isoformat()
+                }, _main_loop)
+                if _main and hasattr(_main, "gui_ga_xabar_yuborish"):
+                    try:
+                        _main.gui_ga_xabar_yuborish(f"⏰ Eslatma: {text}", ovoz=True)
+                    except Exception:
+                        pass
+
+            _agent_scheduler.set_callback(_scheduler_callback)
+        except Exception as e:
+            logger.error(f"agent_scheduler yuklashda xatolik: {e}")
+
+    if _tool_registry is None:
+        try:
+            from core.agent_tools import get_registry
+            _tool_registry = get_registry()
+        except Exception as e:
+            logger.error(f"tool_registry yuklashda xatolik: {e}")
+
+    if _command_dispatcher is None:
+        try:
+            from core.command_dispatcher import CommandDispatcher
+            _command_dispatcher = CommandDispatcher()
+        except Exception as e:
+            logger.error(f"command_dispatcher yuklashda xatolik: {e}")
+
+    return _main, _ai_engine, _agent_memory, _agent_scheduler, _tool_registry, _command_dispatcher
 
 
 # ========== WebSocket Broadcaster ==========
@@ -64,7 +108,7 @@ async def broadcast_ws(event_type: str, data: dict):
         return
     message = json.dumps({"type": event_type, "data": data, "timestamp": datetime.now().isoformat()})
     dead_clients = set()
-    for ws in _active_ws_clients:
+    for ws in list(_active_ws_clients):
         try:
             if not ws.closed:
                 await ws.send_str(message)
@@ -77,33 +121,34 @@ async def broadcast_ws(event_type: str, data: dict):
 
 def sync_broadcast(event_type: str, data: dict, loop=None):
     """Thread-safe usulda WebSocket xabar tarqatish"""
-    if loop and loop.is_running():
-        asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, data), loop)
+    target_loop = loop or _main_loop
+    if target_loop and target_loop.is_running():
+        asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, data), target_loop)
 
 
-# ========== HTTP Handlers ==========
+# ========== 1. STATUS HANDLER ==========
 async def handle_status(request):
     """GET /api/status - Tizim holati"""
-    m, ai, _ = get_modules()
+    m, ai, mem, sched, tools, _ = get_modules()
     user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
     ai_ok = ai.ai_mavjudmi() if ai else False
     
     return web.json_response({
         "status": "online",
         "app": "MIKASA AI",
-        "version": getattr(m, "VERSION", "7.0.0") if m else "7.0.0",
+        "version": "7.1.0",
         "user": user,
         "ai_available": ai_ok,
         "voice_state": _voice_state,
+        "tools_count": tools.count if tools else 0,
+        "scheduled_tasks": sched.active_count if sched else 0,
         "timestamp": datetime.now().isoformat()
     })
 
 
+# ========== 2. CHAT & VOICE HANDLERS ==========
 async def handle_chat(request):
-    """
-    POST /api/chat - Matnli savol yoki buyruq yuborish
-    Body: {"text": "...", "mode": "ask" | "command" | "summary"}
-    """
+    """POST /api/chat - Matnli savol yoki buyruq yuborish"""
     global _voice_state
     try:
         body = await request.json()
@@ -116,7 +161,7 @@ async def handle_chat(request):
     if not text:
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)
 
-    m, ai, _ = get_modules()
+    m, ai, mem, _, _, _ = get_modules()
     user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
     ovoz = m.ovoz_turi_ol() if m else "ayol"
 
@@ -128,18 +173,24 @@ async def handle_chat(request):
         global _voice_state
         try:
             if mode == "command" and m:
-                # Buyruqni tushun va bajar
                 res = m.buyruqni_tushun(text, user, ovoz)
                 reply = res if isinstance(res, str) and res else "Buyruq bajarildi."
             elif mode == "summary" and ai:
                 prompt = f"Quyidagi matnni tahlil qilib, eng muhim jihatlarini qisqa va aniq xulosalab ber:\n\n{text}"
                 reply = ai.ai_savol_yuborish(prompt, user)
             else:
-                # Standart AI savoli
                 if ai:
                     reply = ai.ai_savol_yuborish(text, user)
                 else:
                     reply = "Kechirasiz, sun'iy intellekt moduli mavjud emas."
+            
+            # Xotiraga saqlash
+            if mem:
+                try:
+                    rep_str = reply if isinstance(reply, str) else str(reply)
+                    mem.add_conversation(text, rep_str[:500])
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"Chat bajarishda xatolik: {e}")
             reply = f"Xatolik yuz berdi: {str(e)}"
@@ -147,7 +198,6 @@ async def handle_chat(request):
             _voice_state = "idle"
             sync_broadcast("voice_state", {"state": "idle"}, loop)
         
-        # Javobni toza matn ko'rinishiga keltirish
         if isinstance(reply, dict):
             reply_text = reply.get("response") or reply.get("javob") or reply.get("text") or str(reply)
         else:
@@ -155,8 +205,6 @@ async def handle_chat(request):
         return reply_text
 
     response_text = await loop.run_in_executor(None, _execute)
-
-    # Natijani broadcast qilish
     await broadcast_ws("ai_response", {"text": response_text, "mode": mode})
 
     return web.json_response({
@@ -171,7 +219,7 @@ async def handle_chat(request):
 async def handle_voice_start(request):
     """POST /api/voice/start - Ovozli tinglashni boshlash"""
     global _voice_state
-    m, _, _ = get_modules()
+    m, _, _, _, _, _ = get_modules()
     if not m:
         return web.json_response({"ok": False, "error": "Backend moduli yuklanmagan"}, status=500)
 
@@ -197,14 +245,13 @@ async def handle_voice_start(request):
 
     t = threading.Thread(target=_listen, daemon=True, name="ApiVoiceThread")
     t.start()
-
     return web.json_response({"ok": True, "status": "listening"})
 
 
 async def handle_voice_stop(request):
     """POST /api/voice/stop - Ovozli tinglashni to'xtatish"""
     global _voice_state
-    m, _, _ = get_modules()
+    m, _, _, _, _, _ = get_modules()
     if m:
         m.global_state.tinglash_faol = False
     _voice_state = "idle"
@@ -214,13 +261,482 @@ async def handle_voice_stop(request):
 
 async def handle_chat_clear(request):
     """POST /api/chat/clear - Suhbat tarixini tozalash"""
-    _, ai, _ = get_modules()
+    _, ai, mem, _, _, _ = get_modules()
     if ai:
         ai.suhbat_tarixini_tozalash()
+    if mem:
+        mem.clear_context()
     await broadcast_ws("chat_cleared", {})
     return web.json_response({"ok": True, "message": "Suhbat tarixi tozalandi"})
 
 
+# ========== 3. BUYRUQLAR (COMMANDS) HANDLERS ==========
+DEFAULT_COMMANDS_CATALOG = [
+    {"id": "c1", "name": "Telegramni och", "query": "telegram", "category": "Ilovalar", "icon": "send", "desc": "Telegram messenjerini ishga tushiradi"},
+    {"id": "c2", "name": "YouTube-ni och", "query": "youtube", "category": "Multimedia", "icon": "video", "desc": "Brauzerda YouTube portalini ochadi"},
+    {"id": "c3", "name": "VS Code-ni och", "query": "vs code", "category": "Ilovalar", "icon": "code", "desc": "Dasturlash muhitini ishga tushiradi"},
+    {"id": "c4", "name": "Brauzerni och", "query": "brauzerni och", "category": "Ilovalar", "icon": "globe", "desc": "Standart internet brauzerini ishga tushiradi"},
+    {"id": "c5", "name": "Fayl menejeri", "query": "fayllar", "category": "Tizim", "icon": "folder", "desc": "Windows Explorer fayl menejerini ochadi"},
+    {"id": "c6", "name": "Task Menejer", "query": "vazifa menejeri", "category": "Tizim", "icon": "activity", "desc": "Tizim jarayonlari dispetcherini ochadi"},
+    {"id": "c7", "name": "Terminal (CMD)", "query": "terminal", "category": "Tizim", "icon": "terminal", "desc": "Windows buyruq satrini ochadi"},
+    {"id": "c8", "name": "Skrinshot olish", "query": "skrinshot", "category": "Tizim", "icon": "camera", "desc": "Butun ekranni rasmga olib saqlaydi"},
+    {"id": "c9", "name": "Ish stoli", "query": "ish stoli", "category": "Tizim", "icon": "monitor", "desc": "Barcha oynalarni yashirib ish stolini ko'rsatadi"},
+    {"id": "c10", "name": "Ovoz 50%", "query": "ovoz 50", "category": "Ovoz", "icon": "volume-2", "desc": "Kompyuter tovush darajasini 50% ga sozlaydi"},
+    {"id": "c11", "name": "Ovozni oshir", "query": "ovozni oshir 20", "category": "Ovoz", "icon": "volume-1", "desc": "Tovush balandligini 20 foizga ko'taradi"},
+    {"id": "c12", "name": "Ovozni pasaytir", "query": "ovozni pasaytir 20", "category": "Ovoz", "icon": "volume-x", "desc": "Tovush balandligini 20 foizga pasaytiradi"},
+    {"id": "c13", "name": "Musiqani to'xtat", "query": "musiqani to'xtat", "category": "Multimedia", "icon": "pause", "desc": "Ijro etilayotgan musiqani to'xtatadi"},
+    {"id": "c14", "name": "Musiqani davom et", "query": "davom et", "category": "Multimedia", "icon": "play", "desc": "To'xtatilgan musiqani qayta ijro etadi"},
+    {"id": "c15", "name": "Soat necha", "query": "soat necha", "category": "Vaqt", "icon": "clock", "desc": "Hozirgi aniq vaqtni aytadi"},
+    {"id": "c16", "name": "Bugungi sana", "query": "bugungi sana", "category": "Vaqt", "icon": "calendar", "desc": "Bugungi kun, oy va yilni aytadi"},
+    {"id": "c17", "name": "Ob-havo ma'lumoti", "query": "ob-havo", "category": "Qidiruv", "icon": "cloud", "desc": "Joriy shahar bo'yicha ob-havoni aytadi"},
+    {"id": "c18", "name": "Tizim sozlamalari", "query": "sozlamalar", "category": "Tizim", "icon": "settings", "desc": "Windows tizim sozlamalari panelini ochadi"}
+]
+
+async def handle_commands_list(request):
+    """GET /api/commands - Barcha mavjud buyruqlar ro'yxati"""
+    categories = ["Barchasi", "Ilovalar", "Tizim", "Multimedia", "Ovoz", "Vaqt", "Qidiruv"]
+    
+    # commands.json dan ham qo'shimchalarni yuklash
+    commands_file = os.path.join(BASE_DIR, "data", "commands.json")
+    custom_count = 0
+    if os.path.exists(commands_file):
+        try:
+            with open(commands_file, "r", encoding="utf-8") as f:
+                c_data = json.load(f)
+                custom_count = len(c_data)
+        except Exception:
+            pass
+
+    return web.json_response({
+        "ok": True,
+        "categories": categories,
+        "commands": DEFAULT_COMMANDS_CATALOG,
+        "total_commands": max(len(DEFAULT_COMMANDS_CATALOG), custom_count)
+    })
+
+
+async def handle_commands_execute(request):
+    """POST /api/commands/execute - Buyruqni darhol ishga tushirish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    cmd_text = body.get("command", "").strip()
+    if not cmd_text:
+        return web.json_response({"ok": False, "error": "Buyruq kiritilmadi"}, status=400)
+
+    m, _, _, _, _, dispatcher = get_modules()
+    user = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
+    ovoz = m.ovoz_turi_ol() if m else "ayol"
+
+    loop = asyncio.get_running_loop()
+
+    def _run():
+        # Avval tezkor buyruqlar dispatcherida tekshirish
+        if dispatcher:
+            try:
+                handled, res_msg = dispatcher.dispatch_local(cmd_text)
+                if handled and res_msg:
+                    return res_msg
+            except Exception as e:
+                logger.warning(f"Dispatcher xatosi: {e}")
+
+        # Standart buyruqni tushun pipeline
+        if m:
+            try:
+                res = m.buyruqni_tushun(cmd_text, user, ovoz)
+                return res if isinstance(res, str) and res else "Buyruq muvaffaqiyatli bajarildi."
+            except Exception as e:
+                return f"Buyruq bajarilmadi: {e}"
+
+        return "Buyruq qabul qilindi."
+
+    result_message = await loop.run_in_executor(None, _run)
+    await broadcast_ws("command_executed", {"command": cmd_text, "result": result_message})
+
+    return web.json_response({
+        "ok": True,
+        "command": cmd_text,
+        "result": result_message,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+# ========== 4. XOTIRA (MEMORY) HANDLERS ==========
+async def handle_memory_get(request):
+    """GET /api/memory - Xotira, bilimlar bazasi va suhbatlar tarixi"""
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli yuklanmagan"}, status=500)
+
+    profile = mem.get_profile()
+    raw_knowledge = mem.get_knowledge()
+    conversations = mem.get_conversations(last_n=30)
+    stats = mem.stats
+
+    # Bilimlarni qulay array formatga o'tkazish
+    knowledge_list = []
+    if isinstance(raw_knowledge, dict):
+        for k, v in raw_knowledge.items():
+            if isinstance(v, dict):
+                knowledge_list.append({
+                    "key": k,
+                    "value": v.get("value", ""),
+                    "saved_at": v.get("saved_at", ""),
+                    "access_count": v.get("access_count", 0)
+                })
+            else:
+                knowledge_list.append({
+                    "key": k,
+                    "value": str(v),
+                    "saved_at": datetime.now().isoformat(),
+                    "access_count": 0
+                })
+
+    return web.json_response({
+        "ok": True,
+        "profile": profile,
+        "knowledge": knowledge_list,
+        "conversations": conversations,
+        "stats": stats
+    })
+
+
+async def handle_memory_knowledge_save(request):
+    """POST /api/memory/knowledge - Yangi bilim yoki fakt qo'shish/yangilash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    key = body.get("key", "").strip()
+    value = body.get("value", "").strip()
+
+    if not key or not value:
+        return web.json_response({"ok": False, "error": "Kalit so'z va qiymat talab qilinadi"}, status=400)
+
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    mem.save_knowledge(key, value)
+    await broadcast_ws("memory_updated", {"action": "save", "key": key, "value": value})
+
+    return web.json_response({
+        "ok": True,
+        "message": f"'{key}' muvaffaqiyatli saqlandi",
+        "key": key,
+        "value": value
+    })
+
+
+async def handle_memory_knowledge_delete(request):
+    """DELETE /api/memory/knowledge - Bilimni o'chirish"""
+    key = request.query.get("key", "").strip()
+    if not key:
+        try:
+            body = await request.json()
+            key = body.get("key", "").strip()
+        except Exception:
+            pass
+
+    if not key:
+        return web.json_response({"ok": False, "error": "O'chirish uchun 'key' kiritilmadi"}, status=400)
+
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    success = mem.delete_knowledge(key)
+    if success:
+        await broadcast_ws("memory_updated", {"action": "delete", "key": key})
+        return web.json_response({"ok": True, "message": f"'{key}' o'chirildi"})
+    else:
+        return web.json_response({"ok": False, "error": f"'{key}' topilmadi"}, status=404)
+
+
+# ========== 5. REJALASHTIRUVCHI (SCHEDULER) HANDLERS ==========
+async def handle_scheduler_list(request):
+    """GET /api/scheduler - Vazifalar va eslatmalar ro'yxati"""
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi yuklanmagan"}, status=500)
+
+    tasks = sched.list_tasks(include_completed=True)
+    return web.json_response({
+        "ok": True,
+        "tasks": tasks,
+        "active_count": sched.active_count
+    })
+
+
+async def handle_scheduler_add(request):
+    """POST /api/scheduler/add - Yangi eslatma yoki vaqtli vazifa qo'shish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    text = body.get("text", "").strip()
+    delay_minutes = int(body.get("delay_minutes", 15))
+    repeat_minutes = int(body.get("repeat_minutes", 0))
+    task_type = body.get("type", "reminder")
+
+    if not text:
+        return web.json_response({"ok": False, "error": "Eslatma matni kiritilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    delay_seconds = max(5, delay_minutes * 60)
+    repeat_seconds = max(0, repeat_minutes * 60)
+
+    task_id = sched.add(
+        task_type=task_type,
+        data={"text": text},
+        delay_seconds=delay_seconds,
+        repeat_seconds=repeat_seconds
+    )
+
+    await broadcast_ws("scheduler_updated", {"action": "add", "task_id": task_id, "text": text})
+
+    return web.json_response({
+        "ok": True,
+        "task_id": task_id,
+        "message": f"Vazifa muvaffaqiyatli rejalashtirildi ({delay_minutes} daqiqadan keyin)",
+        "delay_minutes": delay_minutes,
+        "repeat_minutes": repeat_minutes
+    })
+
+
+async def handle_scheduler_remove(request):
+    """DELETE /api/scheduler/task - Vazifani o'chirish"""
+    task_id = request.query.get("task_id", "").strip()
+    if not task_id:
+        try:
+            body = await request.json()
+            task_id = body.get("task_id", "").strip()
+        except Exception:
+            pass
+
+    if not task_id:
+        return web.json_response({"ok": False, "error": "'task_id' ko'rsatilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    success = sched.remove(task_id)
+    if success:
+        await broadcast_ws("scheduler_updated", {"action": "remove", "task_id": task_id})
+        return web.json_response({"ok": True, "message": f"Vazifa '{task_id}' o'chirildi"})
+    else:
+        return web.json_response({"ok": False, "error": f"Vazifa topilmadi: {task_id}"}, status=404)
+
+
+async def handle_scheduler_clear_completed(request):
+    """POST /api/scheduler/clear-completed - Bajarilgan vazifalarni tozalash"""
+    _, _, _, sched, _, _ = get_modules()
+    if sched:
+        sched.clear_completed()
+    await broadcast_ws("scheduler_updated", {"action": "clear_completed"})
+    return web.json_response({"ok": True, "message": "Bajarilgan vazifalar tozalandi"})
+
+
+# ========== 6. PLAGINLAR VA TOOLS HANDLERS ==========
+async def handle_plugins_list(request):
+    """GET /api/plugins - Barcha agent vositalari va plaginlar ro'yxati"""
+    _, _, _, _, tools, _ = get_modules()
+    if not tools:
+        return web.json_response({"ok": False, "error": "Tools registry yuklanmagan"}, status=500)
+
+    raw_tools = tools.list_tools()
+    
+    # Har bir tool uchun toifa va status belgilash
+    category_map = {
+        "web_search": "Qidiruv", "calculator": "Hisoblash", "system_control": "Tizim",
+        "music": "Multimedia", "weather": "Qidiruv", "reminder": "Rejalashtirish",
+        "file_manager": "Fayllar", "knowledge": "Xotira", "datetime": "Tizim",
+        "scheduler": "Rejalashtirish", "rag": "AI Bilim", "currency": "Hisoblash",
+        "translator": "AI Bilim", "screenshot": "Multimedia", "file_write": "Fayllar",
+        "app_check": "Tizim", "ask_user": "Muloqot", "screen_click": "Avtomatlashtirish",
+        "keyboard_type": "Avtomatlashtirish", "keyboard_shortcut": "Avtomatlashtirish",
+        "clipboard": "Tizim", "process_manager": "Tizim", "audio_control": "Tizim",
+        "system_info": "Tizim", "window_manager": "Tizim", "notification": "Tizim",
+        "vector_search": "AI Bilim", "sandbox": "Xavfsizlik", "secret_vault": "Xavfsizlik"
+    }
+
+    enriched_tools = []
+    for t in raw_tools:
+        name = t.get("name", "")
+        cat = category_map.get(name, "Umumiy")
+        enriched_tools.append({
+            "name": name,
+            "description": t.get("description", ""),
+            "parameters": t.get("parameters", {}),
+            "category": cat,
+            "enabled": True,
+            "version": "1.0.0"
+        })
+
+    return web.json_response({
+        "ok": True,
+        "tools": enriched_tools,
+        "total_count": len(enriched_tools),
+        "categories": ["Barchasi", "Tizim", "Qidiruv", "Multimedia", "Avtomatlashtirish", "Hisoblash", "AI Bilim", "Fayllar", "Xavfsizlik"]
+    })
+
+
+async def handle_plugins_execute(request):
+    """POST /api/plugins/execute - Toolni bevosita chaqirib sinash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    tool_name = body.get("name", "").strip()
+    params = body.get("params", {})
+
+    if not tool_name:
+        return web.json_response({"ok": False, "error": "Tool nomi ko'rsatilmadi"}, status=400)
+
+    _, _, _, _, tools, _ = get_modules()
+    if not tools:
+        return web.json_response({"ok": False, "error": "Tools registry mavjud emas"}, status=500)
+
+    loop = asyncio.get_running_loop()
+    
+    def _call():
+        return tools.call(tool_name, **params)
+
+    res = await loop.run_in_executor(None, _call)
+    return web.json_response({
+        "ok": True,
+        "tool": tool_name,
+        "result": res
+    })
+
+
+# ========== 7. HISOB VA SOZLAMALAR (ACCOUNT) HANDLERS ==========
+CONFIG_FILE = os.path.join(BASE_DIR, "data", "config.json")
+USER_NAME_FILE = os.path.join(BASE_DIR, "data", "foydalanuvchi_ismi.txt")
+VOICE_TYPE_FILE = os.path.join(BASE_DIR, "data", "ovoz_turi.txt")
+
+def _read_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def _write_config(cfg):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Config saqlash xatosi: {e}")
+
+async def handle_account_get(request):
+    """GET /api/account - Foydalanuvchi profili va tizim sozlamalari"""
+    m, _, _, _, _, _ = get_modules()
+    user_name = m.foydalanuvchi_ismi_ol() if m else "Muxammadaziz"
+    voice_type = m.ovoz_turi_ol() if m else "ayol"
+    cfg = _read_config()
+
+    user_cfg = cfg.get("user", {})
+    audio_cfg = cfg.get("audio", {})
+    gui_cfg = cfg.get("gui", {})
+
+    return web.json_response({
+        "ok": True,
+        "name": user_name or user_cfg.get("name", "Muxammadaziz"),
+        "voice_type": voice_type or user_cfg.get("voice_type", "ayol"),
+        "theme": gui_cfg.get("theme", "dark"),
+        "tts_speed": audio_cfg.get("tts_speed", 2.0),
+        "ai_model": cfg.get("ai", {}).get("model", "gemini"),
+        "version": "7.1.0",
+        "voices_available": [
+            {"id": "ayol", "name": "Madina (Ayol)", "lang": "uz-UZ-MadinaNeural"},
+            {"id": "erkak", "name": "Sardar (Erkak)", "lang": "uz-UZ-SardarNeural"}
+        ]
+    })
+
+
+async def handle_account_update(request):
+    """POST /api/account - Profil va sozlamalarni yangilash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    new_name = body.get("name", "").strip()
+    new_voice = body.get("voice_type", "").strip()
+    new_speed = body.get("tts_speed")
+    new_theme = body.get("theme", "dark")
+
+    cfg = _read_config()
+    if "user" not in cfg:
+        cfg["user"] = {}
+    if "audio" not in cfg:
+        cfg["audio"] = {}
+    if "gui" not in cfg:
+        cfg["gui"] = {}
+
+    if new_name:
+        cfg["user"]["name"] = new_name
+        try:
+            with open(USER_NAME_FILE, "w", encoding="utf-8") as f:
+                f.write(new_name)
+        except Exception:
+            pass
+
+    if new_voice in ["ayol", "erkak"]:
+        cfg["user"]["voice_type"] = new_voice
+        try:
+            with open(VOICE_TYPE_FILE, "w", encoding="utf-8") as f:
+                f.write(new_voice)
+        except Exception:
+            pass
+
+    if new_speed is not None:
+        try:
+            cfg["audio"]["tts_speed"] = float(new_speed)
+        except ValueError:
+            pass
+
+    if new_theme:
+        cfg["gui"]["theme"] = new_theme
+
+    _write_config(cfg)
+
+    # Runtime state ni ham yangilash
+    m, _, mem, _, _, _ = get_modules()
+    if mem and new_name:
+        try:
+            mem.set_profile("ism", new_name)
+        except Exception:
+            pass
+
+    await broadcast_ws("account_updated", {
+        "name": new_name,
+        "voice_type": new_voice,
+        "tts_speed": new_speed
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": "Sozlamalar muvaffaqiyatli saqlandi",
+        "name": new_name or cfg["user"].get("name"),
+        "voice_type": new_voice or cfg["user"].get("voice_type"),
+        "tts_speed": cfg["audio"].get("tts_speed")
+    })
+
+
+# ========== 8. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
     ws = web.WebSocketResponse()
@@ -229,10 +745,13 @@ async def handle_ws(request):
     _active_ws_clients.add(ws)
     logger.info(f"Yangi WebSocket mijozi ulandi. Jami: {len(_active_ws_clients)}")
 
-    # Boshlang'ich holatni yuborish
     await ws.send_str(json.dumps({
         "type": "init",
-        "data": {"status": "online", "voice_state": _voice_state},
+        "data": {
+            "status": "online",
+            "voice_state": _voice_state,
+            "version": "7.1.0"
+        },
         "timestamp": datetime.now().isoformat()
     }))
 
@@ -272,22 +791,51 @@ async def cors_middleware(request, handler):
     return response
 
 
-# ========== Ilovani sozlash va ishga tushirish ==========
+# ========== Ilovani sozlash va marshrutlash ==========
 def create_app():
     app = web.Application(middlewares=[cors_middleware])
+    # Tizim va Bosh sahifa
     app.router.add_get("/api/status", handle_status)
+    app.router.add_get("/api/ws", handle_ws)
+    
+    # AI Chat va Ovoz
     app.router.add_post("/api/chat", handle_chat)
+    app.router.add_post("/api/chat/clear", handle_chat_clear)
     app.router.add_post("/api/voice/start", handle_voice_start)
     app.router.add_post("/api/voice/stop", handle_voice_stop)
-    app.router.add_post("/api/chat/clear", handle_chat_clear)
-    app.router.add_get("/api/ws", handle_ws)
+
+    # Buyruqlar (Commands)
+    app.router.add_get("/api/commands", handle_commands_list)
+    app.router.add_post("/api/commands/execute", handle_commands_execute)
+
+    # Xotira (Memory)
+    app.router.add_get("/api/memory", handle_memory_get)
+    app.router.add_post("/api/memory/knowledge", handle_memory_knowledge_save)
+    app.router.add_delete("/api/memory/knowledge", handle_memory_knowledge_delete)
+
+    # Rejalashtiruvchi (Scheduler)
+    app.router.add_get("/api/scheduler", handle_scheduler_list)
+    app.router.add_post("/api/scheduler/add", handle_scheduler_add)
+    app.router.add_delete("/api/scheduler/task", handle_scheduler_remove)
+    app.router.add_post("/api/scheduler/clear-completed", handle_scheduler_clear_completed)
+
+    # Plaginlar (Plugins & Tools)
+    app.router.add_get("/api/plugins", handle_plugins_list)
+    app.router.add_post("/api/plugins/execute", handle_plugins_execute)
+
+    # Hisob va Sozlamalar (Account & Settings)
+    app.router.add_get("/api/account", handle_account_get)
+    app.router.add_post("/api/account", handle_account_update)
+
     return app
 
 
 def run_server(host="127.0.0.1", port=18420):
-    logger.info(f"MIKASA AI 7.0 Background API Server boshlanmoqda: http://{host}:{port}")
+    global _main_loop
+    logger.info(f"MIKASA AI 7.1.0 Background API Server boshlanmoqda: http://{host}:{port}")
     get_modules()
     app = create_app()
+    _main_loop = asyncio.get_event_loop()
     web.run_app(app, host=host, port=port, print=None)
 
 

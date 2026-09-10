@@ -3,14 +3,11 @@ import { AppShell } from "./layout/AppShell";
 import { LandingPage } from "./pages/LandingPage";
 import { ChatPage } from "./pages/ChatPage";
 import { VoicePage } from "./pages/VoicePage";
-import { RoutePlaceholder } from "./pages/RoutePlaceholder";
-import {
-  CommandsIcon,
-  MemoryIcon,
-  SchedulerIcon,
-  PluginsIcon,
-  UserIcon,
-} from "./components/icons/Icons";
+import { CommandsPage } from "./pages/CommandsPage";
+import { MemoryPage } from "./pages/MemoryPage";
+import { SchedulerPage } from "./pages/SchedulerPage";
+import { PluginsPage } from "./pages/PluginsPage";
+import { AccountPage } from "./pages/AccountPage";
 
 export function App() {
   const [currentPath, setCurrentPath] = useState<string>("/");
@@ -58,50 +55,15 @@ export function App() {
           />
         );
       case "/commands":
-        return (
-          <RoutePlaceholder
-            title="Buyruqlar"
-            subtitle="Tizim amallari va avtomatlashtirish buyruqlari keyingi bosqichda ulanadi."
-            icon={<CommandsIcon size={26} color="var(--secondary)" />}
-            onNavigateHome={() => handleNavigate("/")}
-          />
-        );
+        return <CommandsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/memory":
-        return (
-          <RoutePlaceholder
-            title="Xotira"
-            subtitle="Agent konteksti va uzoq muddatli xotira boshqaruvi keyingi bosqichda ulanadi."
-            icon={<MemoryIcon size={26} color="var(--accent)" />}
-            onNavigateHome={() => handleNavigate("/")}
-          />
-        );
+        return <MemoryPage onNavigateHome={() => handleNavigate("/")} />;
       case "/scheduler":
-        return (
-          <RoutePlaceholder
-            title="Rejalashtiruvchi"
-            subtitle="Vaqtli topshiriqlar va avtomatik rejalashtiruvchi keyingi bosqichda ulanadi."
-            icon={<SchedulerIcon size={26} color="var(--text-secondary)" />}
-            onNavigateHome={() => handleNavigate("/")}
-          />
-        );
+        return <SchedulerPage onNavigateHome={() => handleNavigate("/")} />;
       case "/plugins":
-        return (
-          <RoutePlaceholder
-            title="Plaginlar"
-            subtitle="Kengaytmalar va tashqi vositalar integratsiyasi keyingi bosqichda ulanadi."
-            icon={<PluginsIcon size={26} color="var(--text-secondary)" />}
-            onNavigateHome={() => handleNavigate("/")}
-          />
-        );
+        return <PluginsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/account":
-        return (
-          <RoutePlaceholder
-            title="Foydalanuvchi Hisobi va Sozlamalar"
-            subtitle="Shaxsiy profil va ilova sozlamalari yagona hisob markazida joylashadi."
-            icon={<UserIcon size={26} color="var(--primary-glow)" />}
-            onNavigateHome={() => handleNavigate("/")}
-          />
-        );
+        return <AccountPage onNavigateHome={() => handleNavigate("/")} />;
       default:
         return <LandingPage onNavigate={handleNavigate} />;
     }
