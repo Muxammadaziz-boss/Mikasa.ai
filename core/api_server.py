@@ -221,9 +221,16 @@ def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask")
         except Exception as e:
             logger.warning(f"Dispatcher xatosi: {e}")
 
-    # 2. Mahalliy Intent tekshirish (buyruqni_aniqla)
+    # 2. Mahalliy Intent tekshirish (buyruqni_aniqla) — faqat BUYRUQLAR uchun, savollar AI ga yo'naltiriladi
+    has_question = "?" in clean_text or any(w in clean_text for w in [
+        "bormi", "bormikan", "o'rnatilganmi", "ornatilganmi", "mavjudmi",
+        "shunga o'xshash", "shunga oxshash", "o'xshash", "oxshash",
+        "nima", "qanday", "qanaqa", "necha", "qachon", "kim", "nega",
+        "haqida", "tavsiya", "maslahat", "fikr", "bilasanmi"
+    ])
+
     intent = "unknown"
-    if m and hasattr(m, "buyruqni_aniqla"):
+    if not has_question and m and hasattr(m, "buyruqni_aniqla"):
         try:
             intent = m.buyruqni_aniqla(clean_text)
         except Exception:

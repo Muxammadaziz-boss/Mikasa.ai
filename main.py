@@ -1591,6 +1591,15 @@ def buyruqni_aniqla(matn):
     matn_lower = matn.lower().strip()
     matn_toza = matnni_tozalash(matn)  # Apostrofsiz versiya
 
+    # Agar bu savol yoki mantiqiy so'rov bo'lsa, buyruq sifatida noto'g'ri bajarmay AI ga o'tkazish
+    if "?" in matn_lower or any(w in matn_toza for w in [
+        "bormi", "bormikan", "ornatilganmi", "mavjudmi",
+        "oxshash", "shunga", "nima", "qanday", "qanaqa", "kim", "nega",
+        "haqida", "tavsiya", "maslahat", "fikr"
+    ]):
+        if "soat necha" not in matn_toza and "vaqt necha" not in matn_toza:
+            return "unknown"
+
     # ===== Ovoz boshqaruvi =====
     ovoz_bor = "ovoz" in matn_toza or "oboz" in matn_toza
 

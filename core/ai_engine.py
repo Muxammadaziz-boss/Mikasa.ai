@@ -133,20 +133,63 @@ FAQAT JSON QAYTARING. BOSHQA HECH NARSA YOZMANG.
 
 
 def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
-    """AI ga savol yuborish — avval Gemini, keyin OpenRouter"""
+    """AI ga savol yuborish — avval Gemini, keyin OpenRouter (to'liq kontekst va mantiqiy fikrlash bilan)"""
     
-    # AgentMemory dan foydalanuvchi bilimlarini promptga qo'shish
     global SYSTEM_PROMPT
     enriched_prompt = SYSTEM_PROMPT
+    
+    # 1. Foydalanuvchi ismi
+    enriched_prompt += f"\n\nJoriy foydalanuvchi ismi: {foydalanuvchi_ismi}."
+    
+    # 2. Kompyuter va dasturlar konteksti
+    try:
+        from core.command_dispatcher import KNOWN_APPS, find_installed_app
+        app_status = []
+        for app_k, cfg in KNOWN_APPS.items():
+            installed, running, _, title = find_installed_app(app_k)
+            if running:
+                app_status.append(f"{title}: o'rnatilgan va ishlab turibdi")
+            elif installed:
+                app_status.append(f"{title}: o'rnatilgan")
+            else:
+                app_status.append(f"{title}: o'rnatilmagan")
+        app_context = "; ".join(app_status)
+        enriched_prompt += f"\n\nKOMPYUTER VA ILOVALAR HOLATI:\n- Operatsion tizim: Windows 10 (KernelOS-PC, 16GB RAM, i5-6500, RX 580)\n- Aniqlangan dasturlar: {app_context}\n"
+    except Exception:
+        pass
+
+    # 3. AgentMemory dan bilimlar va so'nggi suhbat tarixi
     try:
         from core.agent_memory import get_memory
         memory = get_memory()
+        
+        # Bilimlar
         knowledge = memory.get_knowledge()
         if knowledge:
             bilimlar = "\n".join(f"- {k}: {v.get('value', v)}" for k, v in list(knowledge.items())[:10])
-            enriched_prompt += f"\n\nFOYDALANUVCHI HAQIDA BILIMLAR:\n{bilimlar}\nBu ma'lumotlarni suhbatda ishlat!"
+            enriched_prompt += f"\n\nFOYDALANUVCHI HAQIDA BILIMLAR:\n{bilimlar}\n"
+            
+        # So'nggi suhbat tarixi
+        conversations = memory.get_conversations(last_n=6)
+        if conversations:
+            tarix_lines = []
+            for c in conversations:
+                u = c.get("user", "").strip()
+                a = c.get("agent", "").strip()
+                if u and a:
+                    tarix_lines.append(f"Foydalanuvchi: {u}")
+                    tarix_lines.append(f"Mikasa: {a}")
+            if tarix_lines:
+                enriched_prompt += f"\nSO'NGGI SUHBAT TARIXI (Kontekst uchun):\n" + "\n".join(tarix_lines) + "\n"
     except Exception:
         pass
+
+    enriched_prompt += """
+\nMUHIM MANTIQ VA FIKRLASH QOIDALARI:
+- Agar foydalanuvchi 'shunga o'xshash', 'boshqa', 'u', 'yana' kabi so'zlarni ishlatsa, avvalgi suhbat mavzusi va kompyuterdagi mavjud dasturlar holatini bog'lab, chuqur mantiqiy, do'stona va foydali maslahat ber!
+- Masalan: Agar foydalanuvchi Telegram haqida so'ragan bo'lsa va keyin 'shunga o'xshash bormi?' desa, unga Telegramga o'xshash messenjerlar (WhatsApp, Discord, Signal) haqida ma'lumot ber, kompyuteridagi holatini ayt va qulay yechimlarni taklif qil.
+- Doimo foydalanuvchiga chin dildan yordam beradigan, mantiqan o'ylaydigan sun'iy intellekt bo'l!
+"""
     
     # 1-urinish: Google Gemini
     if GOOGLE_API_KEY:
@@ -166,7 +209,7 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
 
 
 def _gemini_yuborish(matn, system_prompt=None):
-    """Google Gemini API orqali so'rov — Google Search Grounding bilan"""
+    """Google Gemini API orqali so'rov — Google Search Grounding va Thinking Mode bilan"""
     prompt = system_prompt or SYSTEM_PROMPT
     GEMINI_MODELS = [
         "gemini-2.5-flash",
@@ -184,10 +227,7 @@ def _gemini_yuborish(matn, system_prompt=None):
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             
-            gen_config = {"maxOutputTokens": 1024, "temperature": 0.3}
-            # gemini-2.5 uchun thinking o'chirish
-            if "2.5" in model:
-                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+            gen_config = {"maxOutputTokens": 2048, "temperature": 0.4}
             
             request_body = {
                 "system_instruction": {"parts": [{"text": prompt}]},
@@ -225,10 +265,12 @@ def _gemini_yuborish(matn, system_prompt=None):
                     continue
             
             data = response.json()
-            # Grounded javobda bir nechta parts bo'lishi mumkin
             parts = data["candidates"][0]["content"]["parts"]
             ai_text = ""
             for part in parts:
+                # Agar modelning ichki o'ylash (thought) qismi bo'lsa, uni o'tkazib yuboramiz
+                if part.get("thought", False):
+                    continue
                 if "text" in part:
                     ai_text += part["text"]
             ai_text = ai_text.strip()

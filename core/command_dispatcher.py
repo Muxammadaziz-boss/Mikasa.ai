@@ -416,27 +416,35 @@ class CommandDispatcher:
         # -------------------------------------------------------------
         # 3. Ilova Mavjudligini Tekshirish (Mantiqiy Savol: "menda X bormi?")
         # -------------------------------------------------------------
-        app_inquiry_match = re.search(
-            r"(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam)\s*(?:ilovasi|dasturi)?\s*(?:bormi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)",
-            clean_text
-        )
-        if app_inquiry_match:
-            target_app = app_inquiry_match.group(1).strip()
-            if target_app == "tg":
-                target_app = "telegram"
-            elif target_app in ["vs code", "vscode"]:
-                target_app = "code"
-            elif target_app == "google chrome":
-                target_app = "chrome"
+        # Agar so'rov qiyosiy, maslahat, tahliliy yoki avvalgi mavzuga bog'liq bo'lsa -> AI agentga o'tkazish!
+        is_comparative = any(w in clean_text for w in [
+            "shunga o'xshash", "shunga oxshash", "o'xshash", "oxshash", "boshqa",
+            "muqobil", "alternativ", "variant", "tavsiya", "maslahat", "qaysi",
+            "farqi", "nima uchun", "qanday qilib", "solishtir", "taqqosla"
+        ])
 
-            installed, running, path, title = find_installed_app(target_app)
-            if running:
-                return True, f"✅ Ha, kompyuteringizda {title} o'rnatilgan va ayni paytda ishlab turibdi."
-            elif installed:
-                loc_info = f" ({path})" if path else ""
-                return True, f"✅ Ha, kompyuteringizda {title} ilovasi o'rnatilgan{loc_info}. Uni ochishni xohlaysizmi?"
-            else:
-                return True, f"❌ Yo'q, kompyuteringizda {title} ilovasi topilmadi (o'rnatilmagan)."
+        if not is_comparative:
+            app_inquiry_match = re.search(
+                r"^(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam)\s*(?:ilovasi|dasturi)?\s*(?:bormi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)\??$",
+                clean_text
+            )
+            if app_inquiry_match:
+                target_app = app_inquiry_match.group(1).strip()
+                if target_app == "tg":
+                    target_app = "telegram"
+                elif target_app in ["vs code", "vscode"]:
+                    target_app = "code"
+                elif target_app == "google chrome":
+                    target_app = "chrome"
+
+                installed, running, path, title = find_installed_app(target_app)
+                if running:
+                    return True, f"✅ Ha, kompyuteringizda {title} o'rnatilgan va ayni paytda ishlab turibdi."
+                elif installed:
+                    loc_info = f" ({path})" if path else ""
+                    return True, f"✅ Ha, kompyuteringizda {title} ilovasi o'rnatilgan{loc_info}. Uni ochishni xohlaysizmi?"
+                else:
+                    return True, f"❌ Yo'q, kompyuteringizda {title} ilovasi topilmadi (o'rnatilmagan)."
 
         # -------------------------------------------------------------
         # 4. Ilovalarni Ochish Buyruqlari (Faqatgina BUYRUQ bo'lganda, savol EMAS!)
