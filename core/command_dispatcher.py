@@ -210,14 +210,26 @@ def get_system_specs_detailed() -> str:
 
 KNOWN_APPS: Dict[str, Dict[str, Any]] = {
     "telegram": {
-        "title": "Telegram",
-        "protocol": "telegram:",
-        "exe_names": ["telegram.exe"],
+        "title": "Telegram Desktop",
+        "protocol": "tg:",
+        "exe_names": ["telegram.exe", "ayugram.exe", "kotatogram.exe", "64gram.exe"],
         "paths": [
+            r"D:\Telegram akklar\AyuGram\AyuGram.exe",
             r"%APPDATA%\Telegram Desktop\Telegram.exe",
             r"%LOCALAPPDATA%\Programs\Telegram Desktop\Telegram.exe",
             r"%PROGRAMFILES%\Telegram Desktop\Telegram.exe",
             r"%PROGRAMFILES(X86)%\Telegram Desktop\Telegram.exe",
+        ],
+        "web_url": "https://web.telegram.org"
+    },
+    "ayugram": {
+        "title": "AyuGram Desktop (Telegram)",
+        "protocol": "tg:",
+        "exe_names": ["ayugram.exe"],
+        "paths": [
+            r"D:\Telegram akklar\AyuGram\AyuGram.exe",
+            r"%APPDATA%\AyuGram Desktop\AyuGram.exe",
+            r"%LOCALAPPDATA%\Programs\AyuGram Desktop\AyuGram.exe",
         ],
         "web_url": "https://web.telegram.org"
     },
@@ -270,7 +282,27 @@ def find_installed_app(app_key: str) -> Tuple[bool, bool, str, str]:
     Qaytaradi: (o'rnatilganmi, ishlab_turibdimi, joylashgan_yo'li, rasmiy_nomi)
     """
     app_key_clean = app_key.lower().strip()
+    is_tg_related = any(k in app_key_clean for k in ["telegram", "tg", "ayugram", "kotatogram", "ayu"])
 
+    # 1. Ishlab turgan jarayonlardan qidirish (Ayni paytda faol dasturlar)
+    for p in psutil.process_iter(['name', 'exe']):
+        try:
+            pname = (p.info.get('name') or '').lower()
+            pexe = p.info.get('exe') or ''
+            
+            # Agar telegram yoki ayugram so'ralsa va ayugram ishlayotgan bo'lsa
+            if is_tg_related and ('ayugram' in pname or 'ayugram' in pexe.lower()):
+                return True, True, pexe or pname, "AyuGram Desktop (Telegram mijozi)"
+            if is_tg_related and ('telegram' in pname or 'kotatogram' in pname or '64gram' in pname):
+                return True, True, pexe or pname, "Telegram Desktop"
+
+            if app_key_clean in pname or (pexe and app_key_clean in os.path.basename(pexe).lower()):
+                title = os.path.splitext(p.info.get('name') or app_key_clean)[0]
+                return True, True, pexe or pname, title
+        except Exception:
+            pass
+
+    # 2. KNOWN_APPS ro'yxatidan yo'llarni tekshirish
     matched_config = None
     canonical_key = app_key_clean
     for k, cfg in KNOWN_APPS.items():
@@ -279,31 +311,40 @@ def find_installed_app(app_key: str) -> Tuple[bool, bool, str, str]:
             canonical_key = k
             break
 
-    title = matched_config["title"] if matched_config else app_key.capitalize()
-
-    # 1. Ishlab turgan jarayonlardan qidirish
-    for p in psutil.process_iter(['name', 'exe']):
-        try:
-            pname = (p.info['name'] or '').lower()
-            if canonical_key in pname:
-                exe = p.info.get('exe') or pname
-                return True, True, exe, title
-        except Exception:
-            pass
-
-    # 2. PATH orqali
-    which_path = shutil.which(canonical_key)
-    if which_path:
-        return True, False, which_path, title
-
-    # 3. Standart papkalardan qidirish
     if matched_config and "paths" in matched_config:
         for p in matched_config["paths"]:
             expanded = os.path.expandvars(p)
             if os.path.exists(expanded):
-                return True, False, expanded, title
+                return True, False, expanded, matched_config["title"]
 
-    # 4. Windows Registry orqali
+    # 3. Start Menu va Desktop yorliqlari (.lnk)
+    shortcut_dirs = [
+        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
+        r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+        os.path.expandvars(r"%USERPROFILE%\Desktop"),
+        r"C:\Users\Public\Desktop",
+    ]
+    for sdir in shortcut_dirs:
+        if not os.path.exists(sdir):
+            continue
+        try:
+            for root, _, files in os.walk(sdir):
+                for f in files:
+                    fl = f.lower()
+                    if (is_tg_related and any(k in fl for k in ["telegram", "ayugram"])) or (app_key_clean in fl):
+                        full_path = os.path.join(root, f)
+                        title = os.path.splitext(f)[0]
+                        return True, False, full_path, title
+        except Exception:
+            pass
+
+    # 4. PATH orqali
+    which_path = shutil.which(canonical_key)
+    if which_path:
+        title = matched_config["title"] if matched_config else app_key_clean.capitalize()
+        return True, False, which_path, title
+
+    # 5. Windows Registry orqali
     reg_keys = [
         (winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall'),
         (winreg.HKEY_LOCAL_MACHINE, r'Software\Microsoft\Windows\CurrentVersion\Uninstall'),
@@ -318,7 +359,8 @@ def find_installed_app(app_key: str) -> Tuple[bool, bool, str, str]:
                         sub = winreg.EnumKey(key, i)
                         with winreg.OpenKey(key, sub) as app_key_reg:
                             disp, _ = winreg.QueryValueEx(app_key_reg, 'DisplayName')
-                            if canonical_key in str(disp).lower():
+                            displ = str(disp).lower()
+                            if (is_tg_related and any(k in displ for k in ["telegram", "ayugram"])) or (app_key_clean in displ):
                                 loc = ""
                                 try:
                                     loc, _ = winreg.QueryValueEx(app_key_reg, 'InstallLocation')
@@ -330,6 +372,7 @@ def find_installed_app(app_key: str) -> Tuple[bool, bool, str, str]:
         except Exception:
             pass
 
+    title = matched_config["title"] if matched_config else app_key_clean.capitalize()
     return False, False, "", title
 
 
@@ -425,7 +468,7 @@ class CommandDispatcher:
 
         if not is_comparative:
             app_inquiry_match = re.search(
-                r"^(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam)\s*(?:ilovasi|dasturi)?\s*(?:bormi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)\??$",
+                r"(?:kel\s+undan\s+oldin|avval)?\s*(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|ayugram|kotatogram|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam)\s*(?:ilovasi|dasturi)?\s*(?:bormi|brmi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)\s*(?:tekshir|ayt|ko['']rsat)?\??$",
                 clean_text
             )
             if app_inquiry_match:
@@ -450,16 +493,16 @@ class CommandDispatcher:
         # 4. Ilovalarni Ochish Buyruqlari (Faqatgina BUYRUQ bo'lganda, savol EMAS!)
         # -------------------------------------------------------------
         if not has_question:
-            # Telegram
-            if re.match(r"^(telegramni\s+och|telegram\s+och|telegram\s+dasturini\s+och|telegramni\s+ishga\s+tushir|telegram)$", clean_text):
+            # Telegram / AyuGram
+            if re.match(r"^(telegramni\s+och|telegram\s+och|ayugramni\s+och|ayugram\s+och|telegram\s+dasturini\s+och|telegramni\s+ishga\s+tushir|ayugram|telegram)$", clean_text):
                 installed, _, path, title = find_installed_app("telegram")
                 if installed:
                     try:
                         if path and os.path.exists(path):
                             os.startfile(path)
                         else:
-                            os.system("start telegram:")
-                        return True, "✅ Telegram ochilmoqda."
+                            os.system("start tg:")
+                        return True, f"✅ {title} ochilmoqda."
                     except Exception as e:
                         return True, f"Telegramni ochishda xatolik: {e}"
                 else:
