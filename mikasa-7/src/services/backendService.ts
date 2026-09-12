@@ -283,9 +283,29 @@ class BackendService {
       return data;
     } catch {
       const cachedUser = localStorage.getItem("mikasa_user_name") || undefined;
+      // Agar HTTP hali javob bermasa, Rust Tauri supervisoridan xizmat ishga tushayotganini tekshirish
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const tauriStatus = await invoke<{ running: boolean; port: number; pid?: number; managed: boolean }>("backend_get_status");
+        if (tauriStatus && tauriStatus.managed && !tauriStatus.running) {
+          const connectingStatus: BackendStatus = { status: "connecting", user: cachedUser };
+          this.notifyStatus(connectingStatus);
+          return connectingStatus;
+        }
+      } catch {}
+
       const offlineStatus: BackendStatus = { status: "offline", user: cachedUser };
       this.notifyStatus(offlineStatus);
       return offlineStatus;
+    }
+  }
+
+  public async restartBackend(): Promise<boolean> {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<boolean>("backend_restart");
+    } catch {
+      return false;
     }
   }
 
