@@ -61,19 +61,28 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
   const [customTarget, setCustomTarget] = useState("");
   const [isSubmittingInstall, setIsSubmittingInstall] = useState(false);
 
+  const mountedRef = React.useRef(true);
+
   const fetchPlugins = useCallback(async () => {
+    if (!mountedRef.current) return;
     setLoading(true);
     const res: PluginsResponse = await backendService.getPlugins();
-    if (res.ok) {
+    if (mountedRef.current && res.ok) {
       const list = res.plugins || res.tools || [];
       setPlugins(list);
       setCategories(res.categories || ["Barchasi"]);
     }
-    setLoading(false);
+    if (mountedRef.current) {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchPlugins();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchPlugins]);
 
   const handleToggle = async (plugin: PluginItem) => {

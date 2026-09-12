@@ -108,6 +108,7 @@ class AgentScheduler:
         self._tasks = {}  # {task_id: ScheduledTask}
         self._file = os.path.join(BASE_DIR, "data", "scheduled_tasks.json")
         self._running = False
+        self._stop_event = threading.Event()
         self._thread = None
         self._callback = None  # Vazifa bajarilganda chaqiriladigan funksiya
         self._counter = 0
@@ -125,6 +126,7 @@ class AgentScheduler:
         if self._running:
             return
         self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._loop, daemon=True, name="Scheduler"
         )
@@ -134,8 +136,9 @@ class AgentScheduler:
     def stop(self):
         """To'xtatish"""
         self._running = False
-        if self._thread:
-            self._thread.join(timeout=10)
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3)
         self._save()
         logger.info("Scheduler to'xtatildi")
 
@@ -299,7 +302,8 @@ class AgentScheduler:
                 self._check_tasks()
             except Exception as e:
                 logger.error(f"Scheduler loop xatolik: {e}")
-            time.sleep(5)  # 5 soniyada bir tekshirish
+            if self._stop_event.wait(timeout=5.0):
+                break
 
     def _check_tasks(self):
         """Vaqti kelgan vazifalarni bajarish"""

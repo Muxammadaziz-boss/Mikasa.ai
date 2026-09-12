@@ -53,27 +53,38 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
   const [editRepeatMinutes, setEditRepeatMinutes] = useState(0);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  const mountedRef = React.useRef(true);
+
   const fetchTasks = async () => {
+    if (!mountedRef.current) return;
     setLoading(true);
     const res: SchedulerResponse = await backendService.getScheduler();
-    if (res.ok) {
+    if (mountedRef.current && res.ok) {
       setTasks(res.tasks || []);
       setActiveCount(res.active_count || 0);
     }
-    setLoading(false);
+    if (mountedRef.current) {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchTasks();
-    const interval = setInterval(fetchTasks, 6000);
+    const interval = setInterval(() => {
+      if (mountedRef.current) fetchTasks();
+    }, 6000);
 
     // Jonli eslatma signali kelganda bildirishnoma
     const unsubAlarm = backendService.onSchedulerAlarm((data) => {
-      setActiveAlarm(data.text);
-      fetchTasks();
+      if (mountedRef.current) {
+        setActiveAlarm(data.text);
+        fetchTasks();
+      }
     });
 
     return () => {
+      mountedRef.current = false;
       clearInterval(interval);
       unsubAlarm();
     };
