@@ -4,6 +4,7 @@ import { ChevronRightIcon } from "../components/icons/Icons";
 
 interface AccountRowProps {
   name?: string;
+  avatarStyle?: string;
   initials?: string;
   active?: boolean;
   collapsed?: boolean;
@@ -13,12 +14,14 @@ interface AccountRowProps {
 
 export const AccountRow: React.FC<AccountRowProps> = ({
   name = "Ustoz",
+  avatarStyle,
   initials,
   active = false,
   collapsed = false,
   onClick,
   className = "",
 }) => {
+  const currentAvatarStyle = avatarStyle || localStorage.getItem("mikasa_user_avatar") || "emerald";
   const effectiveInitials = initials || (() => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
@@ -50,7 +53,7 @@ export const AccountRow: React.FC<AccountRowProps> = ({
         onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.3)")}
         onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)")}
       >
-        <Avatar initials={effectiveInitials} size={32} />
+        <Avatar initials={effectiveInitials} size={32} avatarStyle={currentAvatarStyle} />
       </button>
     );
   }
@@ -93,7 +96,7 @@ export const AccountRow: React.FC<AccountRowProps> = ({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-        <Avatar initials={effectiveInitials} size={32} />
+        <Avatar initials={effectiveInitials} size={32} avatarStyle={currentAvatarStyle} />
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
           <span
             style={{

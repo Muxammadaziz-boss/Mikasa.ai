@@ -1234,18 +1234,100 @@ async def handle_account_get(request):
     user_cfg = cfg.get("user", {})
     audio_cfg = cfg.get("audio", {})
     gui_cfg = cfg.get("gui", {})
+    ai_cfg = cfg.get("ai", {})
+    notif_cfg = cfg.get("notifications", {})
+    priv_cfg = cfg.get("privacy", {})
+
+    # AgentMemory bilan sinxronlash
+    _, _, mem, _, _, _ = get_modules()
+    mem_profile = mem.get_profile() if mem else {}
+
+    name = user_name or user_cfg.get("name") or mem_profile.get("ism", "Ustoz")
+    avatar = user_cfg.get("avatar") or mem_profile.get("avatar", "emerald")
+    role = user_cfg.get("role") or mem_profile.get("kasb", "Dasturchi / Muhandis")
+    bio = user_cfg.get("bio") or mem_profile.get("bio", "Mikasa AI shaxsiy sun'iy intellekt yordamchisi")
+    language = user_cfg.get("language") or mem_profile.get("til", "uz")
+
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY") or ai_cfg.get("gemini_api_key"))
 
     return web.json_response({
         "ok": True,
-        "name": user_name or user_cfg.get("name", "Ustoz"),
+        "name": name,
+        "avatar": avatar,
+        "role": role,
+        "bio": bio,
+        "language": language,
         "voice_type": voice_type or user_cfg.get("voice_type", "ayol"),
+        "tts_speed": float(audio_cfg.get("tts_speed", 2.0)),
+        "tts_engine": audio_cfg.get("tts_engine", "edge_tts"),
+        "auto_speak": audio_cfg.get("auto_speak", True),
+        "vad_enabled": audio_cfg.get("vad_enabled", True),
         "theme": gui_cfg.get("theme", "dark"),
-        "tts_speed": audio_cfg.get("tts_speed", 2.0),
-        "ai_model": cfg.get("ai", {}).get("model", "gemini"),
+        "color_scheme": gui_cfg.get("color_scheme", "green"),
+        "animations": gui_cfg.get("animations", True),
+        "compact_mode": gui_cfg.get("compact_mode", False),
+        "glassmorphism": gui_cfg.get("glassmorphism", True),
+        "ai_model": ai_cfg.get("model", "gemini"),
+        "ai_mode": ai_cfg.get("mode", "balanced"),
+        "thinking_enabled": ai_cfg.get("thinking_enabled", True),
+        "has_gemini_key": has_gemini,
         "version": "7.1.0",
+        "app_info": {
+            "name": "Mikasa AI",
+            "version": "7.1.0",
+            "codename": "Quiet Intelligence",
+            "engine": "Tauri 2.0 (Native Rust) + Python 3.11+",
+            "architecture": "Windows x64 Native Desktop",
+            "developer": "Mikasa Core Team",
+            "license": "Personal / Commercial AI Assistant"
+        },
+        "notifications": {
+            "scheduler": notif_cfg.get("scheduler", True),
+            "voice": notif_cfg.get("voice", True),
+            "sound_effects": notif_cfg.get("sound_effects", True),
+            "system_status": notif_cfg.get("system_status", True)
+        },
+        "privacy": {
+            "local_storage_only": priv_cfg.get("local_storage_only", True),
+            "telemetry_disabled": priv_cfg.get("telemetry_disabled", True),
+            "save_conversations": priv_cfg.get("save_conversations", True)
+        },
         "voices_available": [
-            {"id": "ayol", "name": "Madina (Ayol)", "lang": "uz-UZ-MadinaNeural"},
-            {"id": "erkak", "name": "Sardor (Erkak)", "lang": "uz-UZ-SardorNeural"}
+            {
+                "id": "ayol",
+                "name": "Madina (Ayol)",
+                "lang": "uz-UZ-MadinaNeural",
+                "desc": "Yumshoq, muloyim va tabiiy intonatsiya"
+            },
+            {
+                "id": "erkak",
+                "name": "Sardor (Erkak)",
+                "lang": "uz-UZ-SardorNeural",
+                "desc": "Jiddiy, ishonchli va chuqur tembr"
+            }
+        ],
+        "ai_models_available": [
+            {
+                "id": "gemini",
+                "name": "Google Gemini 1.5 (Flash / Pro)",
+                "provider": "Google DeepMind",
+                "badge": "Tavsiya etiladi",
+                "desc": "Yuqori tezlik, keng kontekst va fikrlovchi AI modeli"
+            },
+            {
+                "id": "openrouter",
+                "name": "OpenRouter (GPT-4o / Claude)",
+                "provider": "OpenRouter Cloud",
+                "badge": "Universal",
+                "desc": "Universal yirik til modellari tarmog'i"
+            },
+            {
+                "id": "local",
+                "name": "Mikasa Local Dispatcher",
+                "provider": "Mahalliy Tizim",
+                "badge": "Oflayn",
+                "desc": "Internetga ulanmasdan tizim buyruqlarini boshqarish"
+            }
         ]
     })
 
@@ -1257,18 +1339,19 @@ async def handle_account_update(request):
     except Exception:
         return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
 
-    new_name = body.get("name", "").strip()
-    new_voice = body.get("voice_type", "").strip()
-    new_speed = body.get("tts_speed")
-    new_theme = body.get("theme", "dark")
-
     cfg = _read_config()
-    if "user" not in cfg:
-        cfg["user"] = {}
-    if "audio" not in cfg:
-        cfg["audio"] = {}
-    if "gui" not in cfg:
-        cfg["gui"] = {}
+    for section in ["user", "audio", "voice", "gui", "ai", "notifications", "privacy"]:
+        if section not in cfg:
+            cfg[section] = {}
+
+    m, ai, mem, _, _, _ = get_modules()
+
+    # 1. User & Profil
+    new_name = body.get("name", "").strip() if "name" in body and body["name"] is not None else None
+    new_avatar = body.get("avatar", "").strip() if "avatar" in body and body["avatar"] is not None else None
+    new_role = body.get("role", "").strip() if "role" in body and body["role"] is not None else None
+    new_bio = body.get("bio", "").strip() if "bio" in body and body["bio"] is not None else None
+    new_lang = body.get("language", "").strip() if "language" in body and body["language"] is not None else None
 
     if new_name:
         cfg["user"]["name"] = new_name
@@ -1277,7 +1360,46 @@ async def handle_account_update(request):
                 f.write(new_name)
         except Exception:
             pass
+        if mem:
+            try:
+                mem.set_profile("ism", new_name)
+            except Exception:
+                pass
 
+    if new_avatar:
+        cfg["user"]["avatar"] = new_avatar
+        if mem:
+            try:
+                mem.set_profile("avatar", new_avatar)
+            except Exception:
+                pass
+
+    if new_role is not None:
+        cfg["user"]["role"] = new_role
+        if mem:
+            try:
+                mem.set_profile("kasb", new_role)
+            except Exception:
+                pass
+
+    if new_bio is not None:
+        cfg["user"]["bio"] = new_bio
+        if mem:
+            try:
+                mem.set_profile("bio", new_bio)
+            except Exception:
+                pass
+
+    if new_lang:
+        cfg["user"]["language"] = new_lang
+        if mem:
+            try:
+                mem.set_profile("til", new_lang)
+            except Exception:
+                pass
+
+    # 2. Voice & Ovoz
+    new_voice = body.get("voice_type", "").strip() if "voice_type" in body and body["voice_type"] is not None else None
     if new_voice in ["ayol", "erkak"]:
         cfg["user"]["voice_type"] = new_voice
         try:
@@ -1285,15 +1407,64 @@ async def handle_account_update(request):
                 f.write(new_voice)
         except Exception:
             pass
+        if mem:
+            try:
+                mem.set_profile("ovoz_turi", new_voice)
+            except Exception:
+                pass
 
-    if new_speed is not None:
+    if "tts_speed" in body and body["tts_speed"] is not None:
         try:
-            cfg["audio"]["tts_speed"] = float(new_speed)
-        except ValueError:
+            spd = float(body["tts_speed"])
+            cfg["audio"]["tts_speed"] = spd
+            cfg["voice"]["speed"] = spd
+        except (ValueError, TypeError):
             pass
 
-    if new_theme:
-        cfg["gui"]["theme"] = new_theme
+    if "auto_speak" in body:
+        cfg["audio"]["auto_speak"] = bool(body["auto_speak"])
+
+    if "vad_enabled" in body:
+        cfg["audio"]["vad_enabled"] = bool(body["vad_enabled"])
+
+    # 3. GUI & Tashqi ko'rinish
+    if "theme" in body and body["theme"]:
+        cfg["gui"]["theme"] = str(body["theme"])
+    if "color_scheme" in body and body["color_scheme"]:
+        cfg["gui"]["color_scheme"] = str(body["color_scheme"])
+    if "animations" in body:
+        cfg["gui"]["animations"] = bool(body["animations"])
+    if "compact_mode" in body:
+        cfg["gui"]["compact_mode"] = bool(body["compact_mode"])
+    if "glassmorphism" in body:
+        cfg["gui"]["glassmorphism"] = bool(body["glassmorphism"])
+
+    # 4. AI Engine
+    if "ai_model" in body and body["ai_model"]:
+        cfg["ai"]["model"] = str(body["ai_model"])
+    if "ai_mode" in body and body["ai_mode"]:
+        cfg["ai"]["mode"] = str(body["ai_mode"])
+    if "thinking_enabled" in body:
+        cfg["ai"]["thinking_enabled"] = bool(body["thinking_enabled"])
+    if "gemini_api_key" in body and body["gemini_api_key"]:
+        key = str(body["gemini_api_key"]).strip()
+        if key:
+            cfg["ai"]["gemini_api_key"] = key
+            os.environ["GEMINI_API_KEY"] = key
+            try:
+                env_path = os.path.join(BASE_DIR, ".env")
+                with open(env_path, "a", encoding="utf-8") as f:
+                    f.write(f"\nGEMINI_API_KEY={key}\n")
+            except Exception:
+                pass
+
+    # 5. Bildirishnomalar
+    if "notifications" in body and isinstance(body["notifications"], dict):
+        cfg["notifications"].update(body["notifications"])
+
+    # 6. Maxfiylik
+    if "privacy" in body and isinstance(body["privacy"], dict):
+        cfg["privacy"].update(body["privacy"])
 
     _write_config(cfg)
 
@@ -1304,39 +1475,38 @@ async def handle_account_update(request):
             set_config("user.name", new_name)
         if new_voice in ["ayol", "erkak"]:
             set_config("user.voice_type", new_voice)
-        if new_speed is not None:
+        if "tts_speed" in body and body["tts_speed"] is not None:
             try:
-                set_config("audio.tts_speed", float(new_speed))
+                set_config("audio.tts_speed", float(body["tts_speed"]))
             except Exception:
                 pass
-        if new_theme:
-            set_config("gui.theme", new_theme)
+        if "theme" in body and body["theme"]:
+            set_config("gui.theme", str(body["theme"]))
     except Exception as e:
         logger.warning(f"config.set_config xatoligi: {e}")
 
-    # Runtime state ni ham yangilash
-    m, _, mem, _, _, _ = get_modules()
-    if mem and new_name:
-        try:
-            mem.set_profile("ism", new_name)
-        except Exception:
-            pass
-
     saved_user = new_name or get_current_user_name()
+    saved_avatar = cfg["user"].get("avatar", "emerald")
     saved_voice = new_voice or get_current_voice_type()
+    saved_speed = cfg["audio"].get("tts_speed", 2.0)
+    saved_theme = cfg["gui"].get("theme", "dark")
 
     await broadcast_ws("account_updated", {
         "name": saved_user,
+        "avatar": saved_avatar,
         "voice_type": saved_voice,
-        "tts_speed": new_speed
+        "tts_speed": saved_speed,
+        "theme": saved_theme
     })
 
     return web.json_response({
         "ok": True,
         "message": "Sozlamalar muvaffaqiyatli saqlandi",
         "name": saved_user,
+        "avatar": saved_avatar,
         "voice_type": saved_voice,
-        "tts_speed": cfg["audio"].get("tts_speed", 2.0)
+        "tts_speed": saved_speed,
+        "theme": saved_theme
     })
 
 

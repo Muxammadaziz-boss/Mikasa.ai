@@ -132,15 +132,56 @@ export interface PluginsResponse {
   categories: string[];
 }
 
+export interface AccountNotificationSettings {
+  scheduler: boolean;
+  voice: boolean;
+  sound_effects: boolean;
+  system_status: boolean;
+}
+
+export interface AccountPrivacySettings {
+  local_storage_only: boolean;
+  telemetry_disabled: boolean;
+  save_conversations: boolean;
+}
+
+export interface AccountAppInfo {
+  name: string;
+  version: string;
+  codename: string;
+  engine: string;
+  architecture: string;
+  developer: string;
+  license?: string;
+}
+
 export interface AccountSettings {
   ok: boolean;
   name: string;
+  avatar?: string;
+  role?: string;
+  bio?: string;
+  language?: string;
   voice_type: "ayol" | "erkak";
-  theme: string;
   tts_speed: number;
+  tts_engine?: string;
+  auto_speak?: boolean;
+  vad_enabled?: boolean;
+  theme: string;
+  color_scheme?: string;
+  animations?: boolean;
+  compact_mode?: boolean;
+  glassmorphism?: boolean;
   ai_model: string;
+  ai_mode?: string;
+  thinking_enabled?: boolean;
+  has_gemini_key?: boolean;
   version: string;
-  voices_available: Array<{ id: string; name: string; lang: string }>;
+  app_info?: AccountAppInfo;
+  notifications?: AccountNotificationSettings;
+  privacy?: AccountPrivacySettings;
+  voices_available: Array<{ id: string; name: string; lang: string; desc?: string }>;
+  ai_models_available?: Array<{ id: string; name: string; provider: string; badge: string; desc: string }>;
 }
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
@@ -160,6 +201,7 @@ class BackendService {
   private responseListeners: Set<(data: { text: string; mode: string }) => void> = new Set();
   private alarmListeners: Set<(data: { id: string; text: string; type: string }) => void> = new Set();
   private transcriptListeners: Set<(data: { text: string; sender: "user" | "mikasa" }) => void> = new Set();
+  private accountListeners: Set<(data: any) => void> = new Set();
 
   constructor() {
     this.connectWs();
@@ -171,6 +213,11 @@ class BackendService {
     this.statusListeners.add(cb);
     cb(this.currentStatus);
     return () => this.statusListeners.delete(cb);
+  }
+
+  public onAccountChange(cb: (data: any) => void): () => void {
+    this.accountListeners.add(cb);
+    return () => this.accountListeners.delete(cb);
   }
 
   public onVoiceStateChange(cb: (state: VoiceState) => void): () => void {
@@ -268,6 +315,18 @@ class BackendService {
               } catch {}
               this.notifyStatus({ ...this.currentStatus, user: payload.data.name });
             }
+            if (payload.data.avatar) {
+              try {
+                localStorage.setItem("mikasa_user_avatar", payload.data.avatar);
+              } catch {}
+            }
+            this.accountListeners.forEach((cb) => {
+              try {
+                cb(payload.data);
+              } catch (e) {
+                console.error(e);
+              }
+            });
           }
         } catch (e) {
           console.debug("WS parse error", e);
@@ -766,18 +825,20 @@ class BackendService {
     }
   }
 
-  public async updateAccount(data: {
-    name?: string;
-    voice_type?: string;
-    tts_speed?: number;
-    theme?: string;
-  }): Promise<{ ok: boolean; message: string }> {
+  public async updateAccount(
+    data: Partial<AccountSettings> & { gemini_api_key?: string }
+  ): Promise<{ ok: boolean; message: string; [key: string]: any }> {
     if (data.name) {
       try {
         localStorage.setItem("mikasa_user_name", data.name);
       } catch {}
       this.currentStatus.user = data.name;
       this.notifyStatus({ ...this.currentStatus, user: data.name });
+    }
+    if (data.avatar) {
+      try {
+        localStorage.setItem("mikasa_user_avatar", data.avatar);
+      } catch {}
     }
     try {
       const res = await fetch(`${API_BASE}/api/account`, {
@@ -792,6 +853,11 @@ class BackendService {
         } catch {}
         this.currentStatus.user = result.name;
         this.notifyStatus({ ...this.currentStatus, user: result.name });
+      }
+      if (result.avatar) {
+        try {
+          localStorage.setItem("mikasa_user_avatar", result.avatar);
+        } catch {}
       }
       return result;
     } catch (err: any) {

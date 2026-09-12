@@ -5,6 +5,7 @@ import { WindowControls } from "../components/WindowControls";
 interface AppShellProps {
   currentPath: string;
   userName?: string;
+  userAvatar?: string;
   onNavigate: (path: string, initialPrompt?: string) => void;
   onOpenCommandPalette?: () => void;
   children: React.ReactNode;
@@ -13,6 +14,7 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({
   currentPath,
   userName,
+  userAvatar,
   onNavigate,
   onOpenCommandPalette,
   children,
@@ -42,6 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       <Sidebar
         currentPath={currentPath}
         userName={userName}
+        userAvatar={userAvatar}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(!collapsed)}
         onNavigate={onNavigate}

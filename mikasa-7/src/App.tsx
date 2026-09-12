@@ -48,6 +48,9 @@ export function App() {
   const [userName, setUserName] = useState<string>(() => {
     return localStorage.getItem("mikasa_user_name") || "Ustoz";
   });
+  const [userAvatar, setUserAvatar] = useState<string>(() => {
+    return localStorage.getItem("mikasa_user_avatar") || "emerald";
+  });
 
   // Listen to status updates to keep username synchronized
   useEffect(() => {
@@ -63,11 +66,26 @@ export function App() {
     return () => unsub();
   }, []);
 
-  const handleUserUpdated = (newName: string) => {
+  // Listen to account updates (avatar & name)
+  useEffect(() => {
+    const unsub = backendService.onAccountChange((data) => {
+      if (data.name) setUserName(data.name);
+      if (data.avatar) setUserAvatar(data.avatar);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleUserUpdated = (newName: string, newAvatar?: string) => {
     setUserName(newName);
     try {
       localStorage.setItem("mikasa_user_name", newName);
     } catch {}
+    if (newAvatar) {
+      setUserAvatar(newAvatar);
+      try {
+        localStorage.setItem("mikasa_user_avatar", newAvatar);
+      } catch {}
+    }
   };
 
   const handleNavigate = (path: string, initialPrompt?: string) => {
@@ -135,6 +153,7 @@ export function App() {
       <AppShell
         currentPath={currentPath}
         userName={userName}
+        userAvatar={userAvatar}
         onNavigate={handleNavigate}
         onOpenCommandPalette={() => setIsPaletteOpen(true)}
       >
