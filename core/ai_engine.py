@@ -141,22 +141,15 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
     # 1. Foydalanuvchi ismi
     enriched_prompt += f"\n\nJoriy foydalanuvchi ismi: {foydalanuvchi_ismi}."
     
-    # 2. Kompyuter va dasturlar konteksti
+    # 2. Kompyuter va dasturlar konteksti (Real-time Windows Inventory & Specs)
     try:
-        from core.command_dispatcher import KNOWN_APPS, find_installed_app
-        app_status = []
-        for app_k, cfg in KNOWN_APPS.items():
-            installed, running, _, title = find_installed_app(app_k)
-            if running:
-                app_status.append(f"{title}: o'rnatilgan va ishlab turibdi")
-            elif installed:
-                app_status.append(f"{title}: o'rnatilgan")
-            else:
-                app_status.append(f"{title}: o'rnatilmagan")
-        app_context = "; ".join(app_status)
-        enriched_prompt += f"\n\nKOMPYUTER VA ILOVALAR HOLATI:\n- Operatsion tizim: Windows 10 (KernelOS-PC, 16GB RAM, i5-6500, RX 580)\n- Aniqlangan dasturlar: {app_context}\n"
-    except Exception:
-        pass
+        from core.app_detector import get_app_detector
+        detector = get_app_detector()
+        specs = detector.get_realtime_system_specs()
+        inventory = detector.get_realtime_inventory_summary()
+        enriched_prompt += f"\n\nKOMPYUTER VA ILOVALAR HOLATI (REAL-TIME WINDOWS INVENTORY):\n{specs}\n\nAniqlangan dasturlar holati:\n{inventory}\n"
+    except Exception as e:
+        logging.warning(f"AI kontekstiga dasturlar va tizim ma'lumotlarini yuklashda xatolik: {e}")
 
     # 3. AgentMemory dan bilimlar va so'nggi suhbat tarixi
     try:

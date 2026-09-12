@@ -1572,6 +1572,23 @@ def _app_check(category: str = "code_editor", app_name: str = "") -> dict:
 
     # Aniq ilova nomi berilgan bo'lsa
     if app_name:
+        try:
+            from core.app_detector import get_app_detector
+            info = get_app_detector().detect_app(app_name)
+            if info.found:
+                return {
+                    "name": info.name,
+                    "found": True,
+                    "running": info.running,
+                    "pid": info.pid,
+                    "path": info.exe_path,
+                    "family": info.family,
+                    "canonical_name": info.canonical_name,
+                    "message": info.format_uzbek_response(app_name),
+                }
+        except Exception as e:
+            logger.warning(f"AppDetector xatosi _app_check da: {e}")
+
         app_name_lower = app_name.lower().strip()
         for cat_name, apps in APP_DATABASE.items():
             if app_name_lower in apps:

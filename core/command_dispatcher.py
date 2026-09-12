@@ -34,6 +34,31 @@ def get_system_specs_summary() -> str:
         os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
         node_name = platform.node()
         cpu_name = platform.processor() or "Standart protsessor"
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                if reg_name:
+                    cpu_name = str(reg_name).strip()
+        except Exception:
+            pass
+
+        gpus = []
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+                count_gpu = winreg.QueryInfoKey(root_gpu)[0]
+                for i in range(count_gpu):
+                    sub = winreg.EnumKey(root_gpu, i)
+                    if sub.isdigit():
+                        try:
+                            with winreg.OpenKey(root_gpu, sub) as k:
+                                desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                                if desc and desc not in gpus:
+                                    gpus.append(str(desc))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         cores_p = psutil.cpu_count(logical=False) or 1
         cores_l = psutil.cpu_count(logical=True) or 1
         cpu_usage = psutil.cpu_percent(interval=0.1)
@@ -62,9 +87,13 @@ def get_system_specs_summary() -> str:
             f"• Operatsion tizim: {os_info}",
             f"• Kompyuter nomi: {node_name}",
             f"• Protsessor (CPU): {cpu_name} ({cores_p} fiz / {cores_l} mantiqiy yadro, {cpu_usage}% band)",
+        ]
+        if gpus:
+            lines.append(f"• Videokarta (GPU): {', '.join(gpus)}")
+        lines.extend([
             f"• Tezkor xotira (RAM): {total_ram} GB (Ishlatilmoqda: {used_ram} GB, Bo'sh: {free_ram} GB, {mem.percent}%)",
             f"• Disk xotirasi: {disks_str}"
-        ]
+        ])
 
         bat = psutil.sensors_battery()
         if bat:
@@ -278,102 +307,16 @@ KNOWN_APPS: Dict[str, Dict[str, Any]] = {
 
 def find_installed_app(app_key: str) -> Tuple[bool, bool, str, str]:
     """
-    Ilovaning kompyuterda mavjudligini aniqlash.
+    Ilovaning kompyuterda mavjudligini aniqlash (chuqur jarayonlar, registri va disk qidiruvi).
     Qaytaradi: (o'rnatilganmi, ishlab_turibdimi, joylashgan_yo'li, rasmiy_nomi)
     """
-    app_key_clean = app_key.lower().strip()
-    is_tg_related = any(k in app_key_clean for k in ["telegram", "tg", "ayugram", "kotatogram", "ayu"])
-
-    # 1. Ishlab turgan jarayonlardan qidirish (Ayni paytda faol dasturlar)
-    for p in psutil.process_iter(['name', 'exe']):
-        try:
-            pname = (p.info.get('name') or '').lower()
-            pexe = p.info.get('exe') or ''
-            
-            # Agar telegram yoki ayugram so'ralsa va ayugram ishlayotgan bo'lsa
-            if is_tg_related and ('ayugram' in pname or 'ayugram' in pexe.lower()):
-                return True, True, pexe or pname, "AyuGram Desktop (Telegram mijozi)"
-            if is_tg_related and ('telegram' in pname or 'kotatogram' in pname or '64gram' in pname):
-                return True, True, pexe or pname, "Telegram Desktop"
-
-            if app_key_clean in pname or (pexe and app_key_clean in os.path.basename(pexe).lower()):
-                title = os.path.splitext(p.info.get('name') or app_key_clean)[0]
-                return True, True, pexe or pname, title
-        except Exception:
-            pass
-
-    # 2. KNOWN_APPS ro'yxatidan yo'llarni tekshirish
-    matched_config = None
-    canonical_key = app_key_clean
-    for k, cfg in KNOWN_APPS.items():
-        if k in app_key_clean or app_key_clean in k or cfg["title"].lower() in app_key_clean:
-            matched_config = cfg
-            canonical_key = k
-            break
-
-    if matched_config and "paths" in matched_config:
-        for p in matched_config["paths"]:
-            expanded = os.path.expandvars(p)
-            if os.path.exists(expanded):
-                return True, False, expanded, matched_config["title"]
-
-    # 3. Start Menu va Desktop yorliqlari (.lnk)
-    shortcut_dirs = [
-        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
-        r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
-        os.path.expandvars(r"%USERPROFILE%\Desktop"),
-        r"C:\Users\Public\Desktop",
-    ]
-    for sdir in shortcut_dirs:
-        if not os.path.exists(sdir):
-            continue
-        try:
-            for root, _, files in os.walk(sdir):
-                for f in files:
-                    fl = f.lower()
-                    if (is_tg_related and any(k in fl for k in ["telegram", "ayugram"])) or (app_key_clean in fl):
-                        full_path = os.path.join(root, f)
-                        title = os.path.splitext(f)[0]
-                        return True, False, full_path, title
-        except Exception:
-            pass
-
-    # 4. PATH orqali
-    which_path = shutil.which(canonical_key)
-    if which_path:
-        title = matched_config["title"] if matched_config else app_key_clean.capitalize()
-        return True, False, which_path, title
-
-    # 5. Windows Registry orqali
-    reg_keys = [
-        (winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall'),
-        (winreg.HKEY_LOCAL_MACHINE, r'Software\Microsoft\Windows\CurrentVersion\Uninstall'),
-        (winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'),
-    ]
-    for root, subkey in reg_keys:
-        try:
-            with winreg.OpenKey(root, subkey) as key:
-                count = winreg.QueryInfoKey(key)[0]
-                for i in range(count):
-                    try:
-                        sub = winreg.EnumKey(key, i)
-                        with winreg.OpenKey(key, sub) as app_key_reg:
-                            disp, _ = winreg.QueryValueEx(app_key_reg, 'DisplayName')
-                            displ = str(disp).lower()
-                            if (is_tg_related and any(k in displ for k in ["telegram", "ayugram"])) or (app_key_clean in displ):
-                                loc = ""
-                                try:
-                                    loc, _ = winreg.QueryValueEx(app_key_reg, 'InstallLocation')
-                                except Exception:
-                                    pass
-                                return True, False, loc or str(disp), str(disp)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-    title = matched_config["title"] if matched_config else app_key_clean.capitalize()
-    return False, False, "", title
+    try:
+        from core.app_detector import get_app_detector
+        info = get_app_detector().detect_app(app_key)
+        return info.found, info.running, info.exe_path, info.name
+    except Exception as e:
+        logger.warning(f"App detector xatolik ({app_key}): {e}")
+        return False, False, "", app_key.capitalize()
 
 
 def is_question_phrase(text: str) -> bool:
@@ -468,7 +411,7 @@ class CommandDispatcher:
 
         if not is_comparative:
             app_inquiry_match = re.search(
-                r"(?:kel\s+undan\s+oldin|avval)?\s*(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|ayugram|kotatogram|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam)\s*(?:ilovasi|dasturi)?\s*(?:bormi|brmi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)\s*(?:tekshir|ayt|ko['']rsat)?\??$",
+                r"(?:kel\s+undan\s+oldin|avval)?\s*(?:menda|kompyuterimda|kompyuterda|pcda)?\s*(telegram|tg|ayugram|kotatogram|chrome|google chrome|vs code|vscode|code|discord|brave|python|spotify|steam|cursor)\s*(?:ilovasi|dasturi)?\s*(?:bormi|brmi|bormikan|o['']rnatilganmi|ornatilganmi|mavjudmi)\s*(?:tekshir|ayt|ko['']rsat)?\??$",
                 clean_text
             )
             if app_inquiry_match:
@@ -480,14 +423,19 @@ class CommandDispatcher:
                 elif target_app == "google chrome":
                     target_app = "chrome"
 
-                installed, running, path, title = find_installed_app(target_app)
-                if running:
-                    return True, f"✅ Ha, kompyuteringizda {title} o'rnatilgan va ayni paytda ishlab turibdi."
-                elif installed:
-                    loc_info = f" ({path})" if path else ""
-                    return True, f"✅ Ha, kompyuteringizda {title} ilovasi o'rnatilgan{loc_info}. Uni ochishni xohlaysizmi?"
-                else:
-                    return True, f"❌ Yo'q, kompyuteringizda {title} ilovasi topilmadi (o'rnatilmagan)."
+                try:
+                    from core.app_detector import get_app_detector
+                    info = get_app_detector().detect_app(target_app)
+                    return True, info.format_uzbek_response(target_app)
+                except Exception:
+                    installed, running, path, title = find_installed_app(target_app)
+                    if running:
+                        return True, f"✅ Ha, kompyuteringizda {title} o'rnatilgan va ayni paytda ishlab turibdi."
+                    elif installed:
+                        loc_info = f" ({path})" if path else ""
+                        return True, f"✅ Ha, kompyuteringizda {title} ilovasi o'rnatilgan{loc_info}. Uni ochishni xohlaysizmi?"
+                    else:
+                        return True, f"❌ Yo'q, kompyuteringizda {title} ilovasi topilmadi (o'rnatilmagan)."
 
         # -------------------------------------------------------------
         # 4. Ilovalarni Ochish Buyruqlari (Faqatgina BUYRUQ bo'lganda, savol EMAS!)
