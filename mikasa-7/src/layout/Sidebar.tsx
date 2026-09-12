@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   HomeIcon,
   MicIcon,
@@ -13,6 +13,7 @@ import {
 } from "../components/icons/Icons";
 import { MikasaLogo } from "../components/MikasaLogo";
 import { AccountRow } from "./AccountRow";
+import { backendService, BackendStatus } from "../services/backendService";
 
 export interface NavItemDef {
   id: string;
@@ -28,17 +29,22 @@ export interface NavSectionDef {
 
 export const NAV_SECTIONS: NavSectionDef[] = [
   {
-    title: "MIKASA",
+    title: "ASOSIY",
     items: [
-      { id: "home", path: "/", label: "Bosh sahifa", icon: HomeIcon },
-      { id: "voice", path: "/voice", label: "Ovozli muloqot", icon: MicIcon },
+      { id: "home", path: "/", label: "Home", icon: HomeIcon },
       { id: "chat", path: "/chat", label: "AI Suhbat", icon: ChatIcon },
+      { id: "voice", path: "/voice", label: "Ovozli muloqot", icon: MicIcon },
+    ],
+  },
+  {
+    title: "INTELLIGENCE",
+    items: [
       { id: "commands", path: "/commands", label: "Buyruqlar", icon: CommandsIcon },
       { id: "memory", path: "/memory", label: "Xotira", icon: MemoryIcon },
     ],
   },
   {
-    title: "AGENT",
+    title: "SYSTEM",
     items: [
       { id: "scheduler", path: "/scheduler", label: "Rejalashtiruvchi", icon: SchedulerIcon },
       { id: "plugins", path: "/plugins", label: "Plaginlar", icon: PluginsIcon },
@@ -63,15 +69,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   onOpenCommandPalette,
 }) => {
+  const [backendState, setBackendState] = useState<"online" | "offline" | "connecting">("connecting");
+
+  useEffect(() => {
+    const unsub = backendService.onStatusChange((status: BackendStatus) => {
+      setBackendState(status.status);
+    });
+    return () => unsub();
+  }, []);
+
   return (
     <aside
       className="mikasa-sidebar"
       style={{
         width: collapsed ? "var(--sidebar-width-collapsed)" : "var(--sidebar-width-expanded)",
         height: "100%",
-        backgroundColor: "var(--glass-sidebar)",
-        backdropFilter: "blur(28px)",
-        WebkitBackdropFilter: "blur(28px)",
+        backgroundColor: "var(--surface)",
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
@@ -289,7 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => onNavigate("/account")}
         />
 
-        {/* Real Status Indicator */}
+        {/* Real Dynamic Status Indicator */}
         <div
           style={{
             display: "flex",
@@ -300,19 +313,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
             fontSize: "11.5px",
             color: "var(--text-muted)",
           }}
-          title="Mikasa: Tayyor (Tizim holati barqaror)"
+          title={
+            backendState === "online"
+              ? "Mikasa: Tayyor (Backend barqaror ishlamoqda)"
+              : backendState === "connecting"
+              ? "Mikasa: Ulanmoqda..."
+              : "Mikasa: Backend oflayn"
+          }
         >
           <div
             style={{
               width: "7px",
               height: "7px",
               borderRadius: "50%",
-              backgroundColor: "var(--success)",
-              boxShadow: "0 0 8px rgba(16, 185, 129, 0.6)",
+              backgroundColor:
+                backendState === "online"
+                  ? "var(--success)"
+                  : backendState === "connecting"
+                  ? "var(--warning)"
+                  : "var(--error)",
+              boxShadow:
+                backendState === "online"
+                  ? "0 0 8px rgba(16, 185, 129, 0.6)"
+                  : backendState === "connecting"
+                  ? "0 0 8px rgba(245, 158, 11, 0.6)"
+                  : "0 0 8px rgba(239, 68, 68, 0.6)",
               flexShrink: 0,
             }}
           />
-          {!collapsed && <span>Mikasa: Tayyor</span>}
+          {!collapsed && (
+            <span>
+              {backendState === "online"
+                ? "Mikasa: Tayyor"
+                : backendState === "connecting"
+                ? "Ulanmoqda..."
+                : "Oflayn"}
+            </span>
+          )}
         </div>
       </div>
     </aside>
