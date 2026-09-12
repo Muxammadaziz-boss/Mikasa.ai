@@ -374,7 +374,7 @@ async def handle_chat(request):
     except Exception:
         return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
 
-    text = body.get("text", "").strip()
+    text = (body.get("text") or body.get("query") or "").strip()
     mode = body.get("mode", "ask")
     speak_out = body.get("speak", False) or mode == "voice"
 
