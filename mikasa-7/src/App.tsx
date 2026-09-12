@@ -1,18 +1,50 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { AppShell } from "./layout/AppShell";
-import { LandingPage } from "./pages/LandingPage";
-import { ChatPage } from "./pages/ChatPage";
-import { VoicePage } from "./pages/VoicePage";
-import { CommandsPage } from "./pages/CommandsPage";
-import { MemoryPage } from "./pages/MemoryPage";
-import { SchedulerPage } from "./pages/SchedulerPage";
-import { PluginsPage } from "./pages/PluginsPage";
-import { AccountPage } from "./pages/AccountPage";
+import { CommandPalette } from "./components/CommandPalette";
 import { backendService } from "./services/backendService";
+
+const LandingPage = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
+const ChatPage = lazy(() => import("./pages/ChatPage").then(m => ({ default: m.ChatPage })));
+const VoicePage = lazy(() => import("./pages/VoicePage").then(m => ({ default: m.VoicePage })));
+const CommandsPage = lazy(() => import("./pages/CommandsPage").then(m => ({ default: m.CommandsPage })));
+const MemoryPage = lazy(() => import("./pages/MemoryPage").then(m => ({ default: m.MemoryPage })));
+const SchedulerPage = lazy(() => import("./pages/SchedulerPage").then(m => ({ default: m.SchedulerPage })));
+const PluginsPage = lazy(() => import("./pages/PluginsPage").then(m => ({ default: m.PluginsPage })));
+const AccountPage = lazy(() => import("./pages/AccountPage").then(m => ({ default: m.AccountPage })));
+
+const PageLoadingFallback = () => (
+  <div
+    style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      height: "100%",
+      minHeight: "400px",
+      color: "var(--text-muted, #94A3B8)",
+      fontSize: "14px",
+      gap: "14px",
+    }}
+  >
+    <div
+      style={{
+        width: "28px",
+        height: "28px",
+        border: "2px solid rgba(16, 185, 129, 0.2)",
+        borderTopColor: "#10B981",
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }}
+    />
+    <span>Yuklanmoqda...</span>
+  </div>
+);
 
 export function App() {
   const [currentPath, setCurrentPath] = useState<string>("/");
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string>("");
+  const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>(() => {
     return localStorage.getItem("mikasa_user_name") || "Ustoz";
   });
@@ -45,15 +77,12 @@ export function App() {
     setCurrentPath(path);
   };
 
-  // Keyboard navigation shortcuts
+  // Global Ctrl+K Command Palette shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        const input = document.querySelector<HTMLInputElement>(".landing-composer input");
-        if (input) {
-          input.focus();
-        }
+        setIsPaletteOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -102,10 +131,25 @@ export function App() {
   };
 
   return (
-    <AppShell currentPath={currentPath} userName={userName} onNavigate={handleNavigate}>
-      {renderContent()}
-    </AppShell>
+    <>
+      <AppShell
+        currentPath={currentPath}
+        userName={userName}
+        onNavigate={handleNavigate}
+        onOpenCommandPalette={() => setIsPaletteOpen(true)}
+      >
+        <Suspense fallback={<PageLoadingFallback />}>
+          {renderContent()}
+        </Suspense>
+      </AppShell>
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onNavigate={handleNavigate}
+      />
+    </>
   );
 }
 
 export default App;
+

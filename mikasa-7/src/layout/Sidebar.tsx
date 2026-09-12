@@ -9,6 +9,7 @@ import {
   PluginsIcon,
   CollapseSidebarIcon,
   ExpandSidebarIcon,
+  SearchIcon,
 } from "../components/icons/Icons";
 import { MikasaLogo } from "../components/MikasaLogo";
 import { AccountRow } from "./AccountRow";
@@ -51,6 +52,7 @@ interface SidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onNavigate: (path: string) => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
   onToggleCollapse,
   onNavigate,
+  onOpenCommandPalette,
 }) => {
   return (
     <aside
@@ -81,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }}
     >
       {/* Top Header & Navigation */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {/* Sidebar Header: Logo + Collapse Button */}
         <div
           style={{
@@ -130,6 +133,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
+
+        {/* Quick Search / Command Palette Button */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            title={collapsed ? "Qidiruv va buyruqlar (Ctrl+K)" : undefined}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: collapsed ? "center" : "space-between",
+              padding: collapsed ? "8px" : "8px 12px",
+              borderRadius: "8px",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              color: "var(--text-muted, #94A3B8)",
+              cursor: "pointer",
+              fontSize: "13px",
+              transition: "all 0.15s ease",
+              width: "100%",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.color = "#FFFFFF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+              e.currentTarget.style.color = "var(--text-muted, #94A3B8)";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <SearchIcon size={15} color="currentColor" />
+              {!collapsed && <span>Qidiruv...</span>}
+            </div>
+            {!collapsed && (
+              <kbd
+                style={{
+                  fontSize: "10px",
+                  backgroundColor: "rgba(255, 255, 255, 0.06)",
+                  padding: "2px 5px",
+                  borderRadius: "4px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  color: "var(--text-muted, #94A3B8)",
+                }}
+              >
+                Ctrl+K
+              </kbd>
+            )}
+          </button>
+        )}
 
         {/* Navigation Sections */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto", overflowX: "hidden" }}>

@@ -6,6 +6,7 @@ interface AppShellProps {
   currentPath: string;
   userName?: string;
   onNavigate: (path: string, initialPrompt?: string) => void;
+  onOpenCommandPalette?: () => void;
   children: React.ReactNode;
 }
 
@@ -13,6 +14,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   currentPath,
   userName,
   onNavigate,
+  onOpenCommandPalette,
   children,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,6 +45,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(!collapsed)}
         onNavigate={onNavigate}
+        onOpenCommandPalette={onOpenCommandPalette}
       />
 
       {/* 2. Main Workspace Layout */}
