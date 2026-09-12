@@ -83,15 +83,15 @@ export const VoicePage: React.FC<VoicePageProps> = ({
       case "listening":
         return "Sizni eshitmoqdaman... Gapiring";
       case "thinking":
-        return "Mikasa o‘ylamoqda...";
+        return "Mikasa o'ylamoqda...";
       case "speaking":
         return "Mikasa gapirmoqda...";
       case "offline":
-        return "Audio xizmati oflayn. Bog'lanish kutilmoqda...";
+        return "Ovoz tizimi hozirda mavjud emas. Backend serveriga ulanishda muammo. Qayta ulanish kutilmoqda...";
       case "loading":
         return "Audio tizimiga ulanilmoqda...";
       case "error":
-        return "Ovoz tizimida xatolik yuz berdi.";
+        return "Ovoz tizimida xatolik yuz berdi. Mikrofon ruxsatini tekshiring yoki qayta urinib ko'ring.";
       case "idle":
       default:
         return "Muloqotni boshlash uchun tugmani bosing";

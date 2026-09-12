@@ -135,15 +135,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "mikasa",
-        text: res.ok ? res.response : res.error || "Kechirasiz, javob olishda xatolik yuz berdi.",
+        text: res.ok ? res.response : `**Javob qaytarishda xatolik**\n\n${res.error || "Backend so'rovni qayta ishlay olmadi."}\n\nQayta urinib ko'ring yoki boshqa savolni so'rang.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err: any) {
+      const errorDetail = err.message || String(err);
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "mikasa",
-        text: "Aloqa xatosi: " + (err.message || String(err)),
+        text: `**Javob olishda xatolik yuz berdi**\n\nSabab: ${errorDetail}\n\nBackend serveriga ulanishda muammo bo'lishi mumkin. Iltimos, qayta urinib ko'ring yoki backend holatini tekshiring.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, errMsg]);

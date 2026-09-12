@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { AppShell } from "./layout/AppShell";
 import { CommandPalette } from "./components/CommandPalette";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { backendService } from "./services/backendService";
 
 const LandingPage = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
@@ -157,9 +158,11 @@ export function App() {
         onNavigate={handleNavigate}
         onOpenCommandPalette={() => setIsPaletteOpen(true)}
       >
-        <Suspense fallback={<PageLoadingFallback />}>
-          {renderContent()}
-        </Suspense>
+        <ErrorBoundary fallbackNavigate={() => handleNavigate("/")}>
+          <Suspense fallback={<PageLoadingFallback />}>
+            {renderContent()}
+          </Suspense>
+        </ErrorBoundary>
       </AppShell>
       <CommandPalette
         isOpen={isPaletteOpen}

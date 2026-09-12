@@ -53,18 +53,28 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
   const [editRepeatMinutes, setEditRepeatMinutes] = useState(0);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const mountedRef = React.useRef(true);
 
   const fetchTasks = async () => {
     if (!mountedRef.current) return;
     setLoading(true);
-    const res: SchedulerResponse = await backendService.getScheduler();
-    if (mountedRef.current && res.ok) {
-      setTasks(res.tasks || []);
-      setActiveCount(res.active_count || 0);
-    }
-    if (mountedRef.current) {
-      setLoading(false);
+    setLoadError(null);
+    try {
+      const res: SchedulerResponse = await backendService.getScheduler();
+      if (mountedRef.current && res.ok) {
+        setTasks(res.tasks || []);
+        setActiveCount(res.active_count || 0);
+      }
+    } catch (err: any) {
+      if (mountedRef.current) {
+        setLoadError(err.message || "Backend serveriga ulanib bo'lmadi");
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -764,6 +774,25 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px", color: "var(--text-secondary)" }}>
               Vazifalar yuklanmoqda...
+            </div>
+          ) : loadError ? (
+            <div
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center",
+                justifyContent: "center", padding: "48px 24px", gap: "14px", textAlign: "center",
+              }}
+              role="alert"
+            >
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(239, 68, 68, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <span style={{ fontSize: "15px", fontWeight: 600, color: "#F1F5F9" }}>Rejalashtiruvchi yuklanmadi</span>
+              <span style={{ fontSize: "13px", color: "#94A3B8", maxWidth: "380px", lineHeight: 1.5 }}>{loadError}. Backend server ishga tushganligini tekshiring.</span>
+              <button onClick={() => fetchTasks()} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "9px 18px", borderRadius: "8px", border: "none", background: "#10B981", color: "#fff", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}>
+                Qayta yuklash
+              </button>
             </div>
           ) : filteredTasks.length === 0 ? (
             <div
