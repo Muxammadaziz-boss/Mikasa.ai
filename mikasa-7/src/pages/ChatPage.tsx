@@ -1,9 +1,10 @@
 // ========== ChatPage.tsx ==========
-// Mikasa AI 7.0 — To'liq Funksional AI Suhbat Sahifasi
-// Python Backend (core.ai_engine, main.py) bilan real vaqtda ishlaydi
+// Mikasa AI 7.x — Production AI Messaging Interface [Phase 9]
+// Inspired by Quiet Intelligence, modern messaging layouts, and desktop speed
 
 import React, { useState, useEffect, useRef } from "react";
 import { MikasaOrb } from "../components/MikasaOrb";
+import { MarkdownView } from "../components/MarkdownView";
 import {
   SparklesIcon,
   MicIcon,
@@ -11,6 +12,9 @@ import {
   TrashIcon,
   HomeIcon,
   AttachIcon,
+  CopyIcon,
+  CheckIcon,
+  RefreshIcon,
 } from "../components/icons/Icons";
 import { backendService, BackendStatus } from "../services/backendService";
 
@@ -38,11 +42,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialSentRef = useRef(false);
 
-  const userInitials = (userName || backendStatus.user || "Ustoz")
+  const userDisplayName = userName || backendStatus.user || "Ustoz";
+  const userInitials = userDisplayName
     .trim()
     .split(/\s+/)
     .map((w) => w[0])
@@ -50,13 +57,45 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     .slice(0, 2)
     .toUpperCase() || "U";
 
-  // Status kuzatish
+  // Backend status subscription
   useEffect(() => {
     const unsub = backendService.onStatusChange((s) => setBackendStatus(s));
     return () => unsub();
   }, []);
 
-  // Avtomatik pastga skroll
+  // Initial load: fetch existing memory conversation history
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const mem = await backendService.getMemory();
+        if (mem.ok && mem.conversations && mem.conversations.length > 0) {
+          const loaded: Message[] = [];
+          mem.conversations.forEach((c, idx) => {
+            if (c.user) {
+              loaded.push({
+                id: `hist-u-${idx}`,
+                sender: "user",
+                text: c.user,
+                timestamp: c.time || "",
+              });
+            }
+            if (c.agent) {
+              loaded.push({
+                id: `hist-a-${idx}`,
+                sender: "mikasa",
+                text: c.agent,
+                timestamp: c.time || "",
+              });
+            }
+          });
+          setMessages((prev) => (prev.length === 0 ? loaded : prev));
+        }
+      } catch {}
+    };
+    loadHistory();
+  }, []);
+
+  // Auto-scroll to bottom on new messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -65,7 +104,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Agar Bosh sahifadan so'rov bilan o'tilgan bo'lsa, uni avtomatik jo'natish
+  // Handle initial prompt from landing page or command palette
   useEffect(() => {
     if (initialPrompt && !initialSentRef.current) {
       initialSentRef.current = true;
@@ -74,7 +113,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   }, [initialPrompt]);
 
   const handleSendMessage = async (textToSend?: string) => {
-    const query = (textToSend || input).trim();
+    const query = (textToSend !== undefined ? textToSend : input).trim();
     if (!query || isLoading) return;
 
     const userMsg: Message = {
@@ -86,6 +125,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     setIsLoading(true);
 
     try {
@@ -107,8 +149,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => textareaRef.current?.focus(), 50);
     }
+  };
+
+  const handleRegenerate = async () => {
+    if (isLoading || messages.length === 0) return;
+    // Find last user query
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === "user") {
+        await handleSendMessage(messages[i].text);
+        break;
+      }
+    }
+  };
+
+  const handleCopyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
   };
 
   const handleClearHistory = async () => {
@@ -116,10 +177,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     await backendService.clearChat();
   };
 
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 130)}px`;
+    }
+  };
+
   const quickPrompts = [
     "Salom Mikasa, nimalarga qodirsan?",
     "Kompyuterim parametrlarini aytib ber",
-    "Bugungi sana va vaqt qanday?",
+    "Menda qanday ilovalar o'rnatilgan?",
     "Dasturlash bo'yicha maslahat ber",
   ];
 
@@ -134,36 +210,46 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         position: "relative",
         zIndex: 2,
         overflow: "hidden",
+        backgroundColor: "var(--bg-darkest)",
       }}
     >
-      {/* 1. Yuqori sarlavha paneli (Header) */}
+      {/* 1. Header Toolbar */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 24px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          backgroundColor: "rgba(8, 12, 20, 0.65)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          padding: "12px 24px",
+          borderBottom: "1px solid var(--border)",
+          backgroundColor: "var(--surface)",
+          zIndex: 10,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <button
             onClick={onNavigateHome}
             title="Bosh sahifaga qaytish"
+            aria-label="Bosh sahifaga qaytish"
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               width: "32px",
               height: "32px",
-              borderRadius: "10px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "8px",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid var(--border)",
               color: "var(--text-secondary)",
               cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.color = "#FFFFFF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+              e.currentTarget.style.color = "var(--text-secondary)";
             }}
           >
             <HomeIcon size={16} />
@@ -182,47 +268,104 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   backgroundColor:
                     backendStatus.status === "online"
                       ? "rgba(16, 185, 129, 0.15)"
+                      : backendStatus.status === "connecting"
+                      ? "rgba(245, 158, 11, 0.15)"
                       : "rgba(239, 68, 68, 0.15)",
                   color:
-                    backendStatus.status === "online" ? "#10B981" : "#EF4444",
+                    backendStatus.status === "online"
+                      ? "#10B981"
+                      : backendStatus.status === "connecting"
+                      ? "#F59E0B"
+                      : "#EF4444",
                   fontWeight: 600,
                 }}
               >
                 {backendStatus.status === "online"
-                  ? `Online (v${backendStatus.version || "7.1.0"})`
+                  ? "Online"
+                  : backendStatus.status === "connecting"
+                  ? "Ulanmoqda..."
                   : "Offline"}
               </span>
             </div>
             <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              Mikasa AI intellektual yordamchisi bilan to'g'ridan-to'g'ri muloqot
+              Mikasa AI bilan to'g'ridan-to'g'ri intellektual muloqot
             </span>
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {messages.length > 0 && (
+            <button
+              onClick={handleRegenerate}
+              disabled={isLoading}
+              title="Oxirgi javobni qayta olish"
+              aria-label="Oxirgi javobni qayta olish"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+                fontSize: "12px",
+                cursor: isLoading ? "default" : "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+                  e.currentTarget.style.color = "#FFFFFF";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                }
+              }}
+            >
+              <RefreshIcon size={13} />
+              <span>Qayta olish</span>
+            </button>
+          )}
+
           <button
             onClick={handleClearHistory}
-            title="Suhbatni tozalash"
+            title="Suhbat tarixini tozalash"
+            aria-label="Suhbat tarixini tozalash"
             style={{
               display: "flex",
               alignItems: "center",
               gap: "6px",
               padding: "6px 12px",
               borderRadius: "8px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid var(--border)",
               color: "var(--text-muted)",
               fontSize: "12px",
               cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
+              e.currentTarget.style.color = "#EF4444";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+              e.currentTarget.style.borderColor = "var(--border)";
+              e.currentTarget.style.color = "var(--text-muted)";
             }}
           >
-            <TrashIcon size={14} />
+            <TrashIcon size={13} />
             <span>Tozalash</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Xabarlar maydoni (Messages Scroll Area) */}
+      {/* 2. Messages Scroll Area */}
       <div
         style={{
           flex: 1,
@@ -230,7 +373,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           padding: "24px 32px",
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
+          gap: "20px",
         }}
       >
         {messages.length === 0 ? (
@@ -247,8 +390,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               alignSelf: "center",
             }}
           >
-            <div style={{ marginBottom: "8px" }}>
-              <MikasaOrb size={110} state={isLoading ? "thinking" : "idle"} />
+            <div style={{ marginBottom: "6px" }}>
+              <MikasaOrb size="100px" state={isLoading ? "thinking" : "idle"} />
             </div>
 
             <h2
@@ -259,7 +402,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             </h2>
 
             <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
-              Salom, <strong>{backendStatus.user || userName}</strong>! Istalgan savolingizni bering, matnlarni tahlil qiling yoki kompyuteringiz boshqaruviga oid buyruqlarni yuboring.
+              Salom, <strong>{userDisplayName}</strong>! Istalgan savolingizni bering, dasturlash va apparat holatini so'rang yoki kompyuteringiz boshqaruviga oid buyruqlarni yuboring.
             </p>
 
             {/* Quick Prompts */}
@@ -269,7 +412,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                 gridTemplateColumns: "1fr 1fr",
                 gap: "8px",
                 width: "100%",
-                marginTop: "12px",
+                marginTop: "8px",
               }}
             >
               {quickPrompts.map((p, idx) => (
@@ -277,10 +420,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   key={idx}
                   onClick={() => handleSendMessage(p)}
                   style={{
-                    padding: "10px 14px",
+                    padding: "11px 14px",
                     borderRadius: "12px",
-                    backgroundColor: "rgba(12, 18, 30, 0.6)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    backgroundColor: "var(--surface)",
+                    border: "1px solid var(--border)",
                     color: "var(--text-secondary)",
                     fontSize: "12px",
                     textAlign: "left",
@@ -288,13 +431,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(20, 28, 45, 0.75)";
-                    e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.35)";
+                    e.currentTarget.style.backgroundColor = "var(--surface-elevated)";
+                    e.currentTarget.style.borderColor = "var(--primary-glow)";
                     e.currentTarget.style.color = "#FFFFFF";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(12, 18, 30, 0.6)";
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                    e.currentTarget.style.backgroundColor = "var(--surface)";
+                    e.currentTarget.style.borderColor = "var(--border)";
                     e.currentTarget.style.color = "var(--text-secondary)";
                   }}
                 >
@@ -304,97 +447,144 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             </div>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: msg.sender === "user" ? "flex-end" : "flex-start",
-                width: "100%",
-              }}
-            >
+          messages.map((msg) => {
+            const isUser = msg.sender === "user";
+            const isCopied = copiedId === msg.id;
+
+            return (
               <div
+                key={msg.id}
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  maxWidth: "80%",
-                  flexDirection: msg.sender === "user" ? "row-reverse" : "row",
+                  flexDirection: "column",
+                  alignItems: isUser ? "flex-end" : "flex-start",
+                  width: "100%",
+                  position: "relative",
                 }}
               >
-                {/* Avatar / Icon */}
+                {/* Sender Title and Time Header */}
                 <div
                   style={{
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "50%",
-                    backgroundColor:
-                      msg.sender === "user"
-                        ? "rgba(2, 132, 199, 0.2)"
-                        : "rgba(14, 165, 233, 0.25)",
-                    border:
-                      msg.sender === "user"
-                        ? "1px solid rgba(56, 189, 248, 0.4)"
-                        : "1px solid rgba(56, 189, 248, 0.6)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#FFFFFF",
-                    flexShrink: 0,
+                    gap: "8px",
+                    marginBottom: "4px",
+                    padding: isUser ? "0 4px 0 0" : "0 0 0 4px",
                   }}
                 >
-                  {msg.sender === "user" ? userInitials : <SparklesIcon size={14} color="#38BDF8" />}
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: isUser ? "var(--primary-glow)" : "#FFFFFF" }}>
+                    {isUser ? userDisplayName : "Mikasa AI"}
+                  </span>
+                  <span style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>
+                    {msg.timestamp}
+                  </span>
                 </div>
 
-                {/* Message Bubble */}
                 <div
                   style={{
-                    padding: "12px 16px",
-                    borderRadius:
-                      msg.sender === "user"
-                        ? "18px 4px 18px 18px"
-                        : "4px 18px 18px 18px",
-                    backgroundColor:
-                      msg.sender === "user"
-                        ? "rgba(2, 132, 199, 0.25)"
-                        : "rgba(14, 20, 32, 0.78)",
-                    border:
-                      msg.sender === "user"
-                        ? "1px solid rgba(56, 189, 248, 0.35)"
-                        : "1px solid rgba(255, 255, 255, 0.08)",
-                    backdropFilter: "blur(20px)",
-                    WebkitBackdropFilter: "blur(20px)",
-                    color: "#FFFFFF",
-                    fontSize: "14px",
-                    lineHeight: 1.55,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                    maxWidth: "84%",
+                    flexDirection: isUser ? "row-reverse" : "row",
                   }}
                 >
-                  {msg.text}
+                  {/* Avatar Icon */}
+                  <div
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "50%",
+                      backgroundColor: isUser
+                        ? "rgba(2, 132, 199, 0.2)"
+                        : "rgba(14, 165, 233, 0.25)",
+                      border: isUser
+                        ? "1px solid rgba(56, 189, 248, 0.4)"
+                        : "1px solid rgba(56, 189, 248, 0.6)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#FFFFFF",
+                      flexShrink: 0,
+                      boxShadow: isUser ? "none" : "0 0 12px rgba(2, 132, 199, 0.25)",
+                    }}
+                  >
+                    {isUser ? userInitials : <SparklesIcon size={14} color="#38BDF8" />}
+                  </div>
+
+                  {/* Message Bubble Container */}
+                  <div
+                    style={{
+                      position: "relative",
+                      padding: "12px 18px",
+                      borderRadius: isUser
+                        ? "18px 4px 18px 18px"
+                        : "4px 18px 18px 18px",
+                      backgroundColor: isUser
+                        ? "rgba(2, 132, 199, 0.28)"
+                        : "var(--surface)",
+                      border: isUser
+                        ? "1px solid rgba(56, 189, 248, 0.35)"
+                        : "1px solid var(--border)",
+                      color: "#FFFFFF",
+                      fontSize: "14px",
+                      lineHeight: 1.6,
+                      boxShadow: isUser
+                        ? "0 4px 20px rgba(2, 132, 199, 0.15)"
+                        : "0 4px 20px rgba(0, 0, 0, 0.3)",
+                    }}
+                  >
+                    {isUser ? (
+                      <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{msg.text}</div>
+                    ) : (
+                      <MarkdownView content={msg.text} />
+                    )}
+
+                    {/* Copy action button at bottom right of bubble */}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginTop: "6px",
+                      }}
+                    >
+                      <button
+                        onClick={() => handleCopyMessage(msg.id, msg.text)}
+                        title="Xabarni nusxalash"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: "transparent",
+                          border: "none",
+                          color: isCopied ? "#10B981" : "rgba(255, 255, 255, 0.4)",
+                          cursor: "pointer",
+                          fontSize: "11px",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isCopied) e.currentTarget.style.color = "#FFFFFF";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isCopied) e.currentTarget.style.color = "rgba(255, 255, 255, 0.4)";
+                        }}
+                      >
+                        {isCopied ? <CheckIcon size={12} color="#10B981" /> : <CopyIcon size={12} color="currentColor" />}
+                        <span>{isCopied ? "Nusxalandi" : "Nusxa"}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Timestamp */}
-              <span
-                style={{
-                  fontSize: "10.5px",
-                  color: "var(--text-muted)",
-                  marginTop: "4px",
-                  marginRight: msg.sender === "user" ? "38px" : 0,
-                  marginLeft: msg.sender === "mikasa" ? "38px" : 0,
-                }}
-              >
-                {msg.timestamp}
-              </span>
-            </div>
-          ))
+            );
+          })
         )}
 
-        {/* Typing indicator */}
+        {/* Thinking Indicator */}
         {isLoading && (
           <div
             style={{
@@ -406,22 +596,23 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           >
             <div
               style={{
-                width: "28px",
-                height: "28px",
+                width: "30px",
+                height: "30px",
                 borderRadius: "50%",
                 backgroundColor: "rgba(14, 165, 233, 0.25)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                boxShadow: "0 0 12px rgba(56, 189, 248, 0.35)",
               }}
             >
-              <SparklesIcon size={14} color="#38BDF8" />
+              <SparklesIcon size={15} color="#38BDF8" />
             </div>
             <div
               style={{
                 padding: "10px 16px",
                 borderRadius: "4px 18px 18px 18px",
-                backgroundColor: "rgba(14, 20, 32, 0.78)",
+                backgroundColor: "var(--surface)",
                 border: "1px solid rgba(56, 189, 248, 0.3)",
                 color: "var(--primary-glow)",
                 fontSize: "13px",
@@ -430,6 +621,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                 gap: "8px",
               }}
             >
+              <div
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: "var(--primary-glow)",
+                  animation: "pulse 1s infinite",
+                }}
+              />
               <span>Mikasa o‘ylamoqda...</span>
             </div>
           </div>
@@ -438,14 +638,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 3. Pastki Kompozer paneli (Composer Bar) */}
+      {/* 3. Composer Section (Multiline, Enter to Send, Shift+Enter for Newline) */}
       <div
         style={{
-          padding: "16px 24px 20px 24px",
-          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-          backgroundColor: "rgba(8, 12, 20, 0.65)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          padding: "12px 24px 16px 24px",
+          borderTop: "1px solid var(--border)",
+          backgroundColor: "var(--surface)",
         }}
       >
         <form
@@ -455,42 +653,64 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           }}
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-end",
             width: "100%",
-            height: "52px",
-            borderRadius: "18px",
-            backgroundColor: "rgba(10, 15, 25, 0.76)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
+            minHeight: "48px",
+            borderRadius: "16px",
+            backgroundColor: "var(--bg-darkest)",
             border: "1px solid rgba(56, 189, 248, 0.22)",
-            boxShadow:
-              "0 10px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(2, 132, 199, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.1)",
-            padding: "5px 7px 5px 15px",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05)",
+            padding: "6px 8px 6px 14px",
             gap: "8px",
+            transition: "all 0.15s ease",
+          }}
+          onFocusCapture={(e) => {
+            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.55)";
+            e.currentTarget.style.boxShadow = "0 6px 28px rgba(0, 0, 0, 0.5), 0 0 18px rgba(2, 132, 199, 0.25)";
+          }}
+          onBlurCapture={(e) => {
+            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.22)";
+            e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.4)";
           }}
         >
+          {/* Attachment Button */}
           <button
             type="button"
             title="Fayl biriktirish"
+            aria-label="Fayl biriktirish"
             style={{
               background: "transparent",
               border: "none",
-              color: "rgba(255, 255, 255, 0.6)",
+              color: "rgba(255, 255, 255, 0.5)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              padding: "8px",
+              borderRadius: "8px",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
+              e.currentTarget.style.color = "#FFFFFF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)";
             }}
           >
-            <AttachIcon size={18} />
+            <AttachIcon size={17} />
           </button>
 
-          <input
-            ref={inputRef}
-            type="text"
+          {/* Multiline auto-expanding textarea */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Mikasa bilan suhbatlashing... (Enter yuborish)"
+            onChange={handleTextareaChange}
+            onKeyDown={handleTextareaKeyDown}
+            placeholder="Mikasa bilan suhbatlashing... (Enter yuborish, Shift+Enter yangi qator)"
             disabled={isLoading}
             style={{
               flex: 1,
@@ -499,48 +719,82 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               outline: "none",
               color: "#FFFFFF",
               fontSize: "14px",
+              fontFamily: "inherit",
+              resize: "none",
+              maxHeight: "130px",
+              lineHeight: 1.5,
+              padding: "6px 0",
+              overflowY: "auto",
             }}
           />
 
+          {/* Voice Page Jump Button */}
           <button
             type="button"
             onClick={onNavigateVoice}
             title="Ovozli muloqot rejimiga o‘tish"
+            aria-label="Ovozli muloqot rejimiga o‘tish"
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               width: "34px",
               height: "34px",
-              borderRadius: "10px",
+              borderRadius: "8px",
               color: "rgba(255, 255, 255, 0.65)",
               background: "transparent",
               border: "none",
               cursor: "pointer",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.color = "var(--primary-glow)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.65)";
             }}
           >
             <MicIcon size={17} />
           </button>
 
+          {/* Glowing Circular Send Button */}
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
             title="Yuborish"
+            aria-label="Yuborish"
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "36px",
-              height: "36px",
+              width: "34px",
+              height: "34px",
               borderRadius: "50%",
               backgroundColor: input.trim() && !isLoading ? "#0284C7" : "rgba(255, 255, 255, 0.08)",
               color: "#FFFFFF",
               border: input.trim() && !isLoading ? "1px solid rgba(56, 189, 248, 0.5)" : "none",
+              boxShadow: input.trim() && !isLoading ? "0 0 14px rgba(56, 189, 248, 0.45)" : "none",
               cursor: input.trim() && !isLoading ? "pointer" : "default",
               transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              if (input.trim() && !isLoading) {
+                e.currentTarget.style.backgroundColor = "#0369A1";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (input.trim() && !isLoading) {
+                e.currentTarget.style.backgroundColor = "#0284C7";
+                e.currentTarget.style.transform = "scale(1)";
+              }
             }}
           >
-            <ArrowUpIcon size={16} />
+            <ArrowUpIcon size={15} />
           </button>
         </form>
       </div>
