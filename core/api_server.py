@@ -1048,46 +1048,130 @@ async def handle_scheduler_execute(request):
 
 # ========== 6. PLAGINLAR VA TOOLS HANDLERS ==========
 async def handle_plugins_list(request):
-    """GET /api/plugins - Barcha agent vositalari va plaginlar ro'yxati"""
+    """GET /api/plugins - Barcha agent vositalari va plaginlar ro'yxati (5 holat: installed, available, disabled, error, updates)"""
     _, _, _, _, tools, _ = get_modules()
     if not tools:
         return web.json_response({"ok": False, "error": "Tools registry yuklanmagan"}, status=500)
 
-    raw_tools = tools.list_tools()
-    
-    # Har bir tool uchun toifa va status belgilash
-    category_map = {
-        "web_search": "Qidiruv", "calculator": "Hisoblash", "system_control": "Tizim",
-        "music": "Multimedia", "weather": "Qidiruv", "reminder": "Rejalashtirish",
-        "file_manager": "Fayllar", "knowledge": "Xotira", "datetime": "Tizim",
-        "scheduler": "Rejalashtirish", "rag": "AI Bilim", "currency": "Hisoblash",
-        "translator": "AI Bilim", "screenshot": "Multimedia", "file_write": "Fayllar",
-        "app_check": "Tizim", "ask_user": "Muloqot", "screen_click": "Avtomatlashtirish",
-        "keyboard_type": "Avtomatlashtirish", "keyboard_shortcut": "Avtomatlashtirish",
-        "clipboard": "Tizim", "process_manager": "Tizim", "audio_control": "Tizim",
-        "system_info": "Tizim", "window_manager": "Tizim", "notification": "Tizim",
-        "vector_search": "AI Bilim", "sandbox": "Xavfsizlik", "secret_vault": "Xavfsizlik"
-    }
-
-    enriched_tools = []
-    for t in raw_tools:
-        name = t.get("name", "")
-        cat = category_map.get(name, "Umumiy")
-        enriched_tools.append({
-            "name": name,
-            "description": t.get("description", ""),
-            "parameters": t.get("parameters", {}),
-            "category": cat,
-            "enabled": True,
-            "version": "1.0.0"
-        })
+    try:
+        from core.agent_plugins import get_plugin_manager
+        pm = get_plugin_manager()
+        plugins, stats = pm.get_all_plugins(tools)
+    except Exception as e:
+        logger.error(f"Pluginlarni olishda xatolik: {e}")
+        raw_tools = tools.list_tools()
+        plugins = [{
+            "id": t.get("name"), "name": t.get("name"),
+            "description": t.get("description"), "category": "Tizim",
+            "parameters": t.get("parameters", {}), "version": "1.0.0",
+            "status": "installed", "enabled": True, "type": "builtin"
+        } for t in raw_tools]
+        stats = {"total": len(plugins), "installed": len(plugins), "available": 0, "disabled": 0, "error": 0, "updates": 0}
 
     return web.json_response({
         "ok": True,
-        "tools": enriched_tools,
-        "total_count": len(enriched_tools),
-        "categories": ["Barchasi", "Tizim", "Qidiruv", "Multimedia", "Avtomatlashtirish", "Hisoblash", "AI Bilim", "Fayllar", "Xavfsizlik"]
+        "plugins": plugins,
+        "tools": plugins,  # orqaga moslik (backwards compatibility)
+        "stats": stats,
+        "total_count": len(plugins),
+        "categories": [
+            "Barchasi", "Tizim", "Qidiruv", "Multimedia",
+            "Avtomatlashtirish", "Hisoblash", "AI Bilim",
+            "Fayllar", "Dasturlash", "Muloqot", "Xavfsizlik"
+        ]
     })
+
+
+async def handle_plugins_toggle(request):
+    """POST /api/plugins/toggle - Plaginni yoqish yoki o'chirish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    name = body.get("name", "").strip()
+    enabled = bool(body.get("enabled", True))
+    if not name:
+        return web.json_response({"ok": False, "error": "Plagin nomi ko'rsatilmadi"}, status=400)
+
+    _, _, _, _, tools, _ = get_modules()
+    from core.agent_plugins import get_plugin_manager
+    pm = get_plugin_manager()
+    success = pm.toggle(name, enabled, tools)
+
+    await broadcast_ws("plugins_updated", {"action": "toggle", "name": name, "enabled": enabled})
+    status_txt = "yoqildi" if enabled else "to'xtatildi"
+    return web.json_response({
+        "ok": success,
+        "message": f"Plagin '{name}' {status_txt}"
+    })
+
+
+async def handle_plugins_install(request):
+    """POST /api/plugins/install - Plagin o'rnatish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    name = body.get("name", "").strip()
+    custom_data = body.get("data")
+    if not name:
+        return web.json_response({"ok": False, "error": "Plagin nomi ko'rsatilmadi"}, status=400)
+
+    _, _, _, _, tools, _ = get_modules()
+    from core.agent_plugins import get_plugin_manager
+    pm = get_plugin_manager()
+    success = pm.install(name, custom_data, tools)
+
+    if success:
+        await broadcast_ws("plugins_updated", {"action": "install", "name": name})
+        return web.json_response({"ok": True, "message": f"Plagin '{name}' muvaffaqiyatli o'rnatildi"})
+    return web.json_response({"ok": False, "error": f"Plagin '{name}' o'rnatishda xatolik"}, status=400)
+
+
+async def handle_plugins_uninstall(request):
+    """POST /api/plugins/uninstall - Plaginni butunlay o'chirish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    name = body.get("name", "").strip() or request.query.get("name", "").strip()
+    if not name:
+        return web.json_response({"ok": False, "error": "Plagin nomi ko'rsatilmadi"}, status=400)
+
+    _, _, _, _, tools, _ = get_modules()
+    from core.agent_plugins import get_plugin_manager
+    pm = get_plugin_manager()
+    success = pm.uninstall(name, tools)
+
+    if success:
+        await broadcast_ws("plugins_updated", {"action": "uninstall", "name": name})
+        return web.json_response({"ok": True, "message": f"Plagin '{name}' o'chirildi"})
+    return web.json_response({"ok": False, "error": f"Plagin '{name}' topilmadi"}, status=404)
+
+
+async def handle_plugins_update(request):
+    """POST /api/plugins/update - Plaginni yangilash"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    name = body.get("name", "").strip() or request.query.get("name", "").strip()
+    if not name:
+        return web.json_response({"ok": False, "error": "Plagin nomi ko'rsatilmadi"}, status=400)
+
+    _, _, _, _, tools, _ = get_modules()
+    from core.agent_plugins import get_plugin_manager
+    pm = get_plugin_manager()
+    success = pm.update(name, tools)
+
+    if success:
+        await broadcast_ws("plugins_updated", {"action": "update", "name": name})
+        return web.json_response({"ok": True, "message": f"Plagin '{name}' yangilandi"})
+    return web.json_response({"ok": False, "error": f"Plagin '{name}' yangilash topilmadi"}, status=404)
 
 
 async def handle_plugins_execute(request):
@@ -1350,6 +1434,10 @@ def create_app():
 
     # Plaginlar (Plugins & Tools)
     app.router.add_get("/api/plugins", handle_plugins_list)
+    app.router.add_post("/api/plugins/toggle", handle_plugins_toggle)
+    app.router.add_post("/api/plugins/install", handle_plugins_install)
+    app.router.add_post("/api/plugins/uninstall", handle_plugins_uninstall)
+    app.router.add_post("/api/plugins/update", handle_plugins_update)
     app.router.add_post("/api/plugins/execute", handle_plugins_execute)
 
     # Hisob va Sozlamalar (Account & Settings)

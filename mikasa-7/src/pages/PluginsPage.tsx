@@ -1,18 +1,38 @@
 // ========== PluginsPage.tsx ==========
 // Mikasa AI 7.1.0 — Plaginlar va Agent Vositalari Katalogi
-// agent_tools.py (29 ta tool registry) va agent_plugins.py bilan real vaqtda bog'langan
+// 5 ta holat: installed, available, disabled, error, updates
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   PluginsIcon,
   HomeIcon,
   SparklesIcon,
   CloseIcon,
+  PlayIcon,
+  PauseIcon,
+  TrashIcon,
+  RefreshIcon,
+  SearchIcon,
+  CheckIcon,
+  CheckCircleIcon,
+  AlertCircleIcon,
+  GlobeIcon,
+  CodeIcon,
+  DatabaseIcon,
+  TerminalIcon,
+  CalculatorIcon,
+  CpuIcon,
+  SunIcon,
+  VolumeIcon,
+  CameraIcon,
+  ClockIcon,
+  FolderIcon,
 } from "../components/icons/Icons";
 import {
   backendService,
   PluginItem,
   PluginsResponse,
+  PluginStatus,
 } from "../services/backendService";
 
 interface PluginsPageProps {
@@ -24,6 +44,7 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("Barchasi");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(true);
 
   // Tool sinov modal holati
@@ -32,22 +53,83 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<any>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchPlugins = async () => {
-      setLoading(true);
-      const res: PluginsResponse = await backendService.getPlugins();
-      if (mounted) {
-        setPlugins(res.tools || []);
-        setCategories(res.categories || ["Barchasi"]);
-        setLoading(false);
-      }
-    };
-    fetchPlugins();
-    return () => {
-      mounted = false;
-    };
+  // Plagin o'rnatish modali
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customDesc, setCustomDesc] = useState("");
+  const [customType, setCustomType] = useState<"url" | "command">("url");
+  const [customTarget, setCustomTarget] = useState("");
+  const [isSubmittingInstall, setIsSubmittingInstall] = useState(false);
+
+  const fetchPlugins = useCallback(async () => {
+    setLoading(true);
+    const res: PluginsResponse = await backendService.getPlugins();
+    if (res.ok) {
+      const list = res.plugins || res.tools || [];
+      setPlugins(list);
+      setCategories(res.categories || ["Barchasi"]);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchPlugins();
+  }, [fetchPlugins]);
+
+  const handleToggle = async (plugin: PluginItem) => {
+    const newStatus = !plugin.enabled;
+    const res = await backendService.togglePlugin(plugin.name, newStatus);
+    if (res.ok) {
+      await fetchPlugins();
+    }
+  };
+
+  const handleInstallTemplate = async (templateName: string) => {
+    const res = await backendService.installPlugin(templateName);
+    if (res.ok) {
+      await fetchPlugins();
+      setIsInstallModalOpen(false);
+    }
+  };
+
+  const handleCreateCustom = async () => {
+    if (!customName.trim() || !customTarget.trim() || isSubmittingInstall) return;
+    setIsSubmittingInstall(true);
+
+    const data = {
+      name: customName.trim(),
+      description: customDesc.trim() || "Foydalanuvchi maxsus plagini",
+      category: "Foydalanuvchi",
+      type: customType,
+      parameters: { query: { type: "string", description: "Parametr" } },
+      version: "1.0.0",
+      ...(customType === "url" ? { url: customTarget.trim() } : { command: customTarget.trim() }),
+    };
+
+    const res = await backendService.installPlugin(customName.trim(), data);
+    if (res.ok) {
+      setCustomName("");
+      setCustomDesc("");
+      setCustomTarget("");
+      setIsInstallModalOpen(false);
+      await fetchPlugins();
+    }
+    setIsSubmittingInstall(false);
+  };
+
+  const handleUninstall = async (name: string) => {
+    const res = await backendService.uninstallPlugin(name);
+    if (res.ok) {
+      await fetchPlugins();
+    }
+  };
+
+  const handleUpdate = async (name: string) => {
+    const res = await backendService.updatePlugin(name);
+    if (res.ok) {
+      await fetchPlugins();
+    }
+  };
 
   const openToolModal = (tool: PluginItem) => {
     setSelectedTool(tool);
@@ -70,14 +152,167 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
     setIsExecuting(false);
   };
 
-  const filteredPlugins = plugins.filter((p) => {
-    const matchesCat =
-      selectedCategory === "Barchasi" || p.category.toLowerCase() === selectedCategory.toLowerCase();
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
-    return matchesCat && matchesSearch;
-  });
+  // Status statistikasi
+  const stats = useMemo(() => {
+    const total = plugins.length;
+    let installed = 0;
+    let available = 0;
+    let disabled = 0;
+    let error = 0;
+    let updates = 0;
+
+    plugins.forEach((p) => {
+      const s = p.status || (p.enabled ? "installed" : "disabled");
+      if (s === "installed") installed++;
+      else if (s === "available") available++;
+      else if (s === "disabled") disabled++;
+      else if (s === "error") error++;
+      else if (s === "updates") updates++;
+    });
+
+    return { total, installed, available, disabled, error, updates };
+  }, [plugins]);
+
+  // Filtrlash
+  const filteredPlugins = useMemo(() => {
+    return plugins.filter((p) => {
+      const s = p.status || (p.enabled ? "installed" : "disabled");
+      if (filterStatus !== "all" && s !== filterStatus) return false;
+      if (selectedCategory !== "Barchasi" && p.category.toLowerCase() !== selectedCategory.toLowerCase()) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const nameMatch = p.name.toLowerCase().includes(q);
+        const descMatch = (p.description || "").toLowerCase().includes(q);
+        if (!nameMatch && !descMatch) return false;
+      }
+      return true;
+    });
+  }, [plugins, filterStatus, selectedCategory, searchQuery]);
+
+  const getPluginIcon = (name: string, category: string) => {
+    const n = name.toLowerCase();
+    const c = category.toLowerCase();
+    if (n.includes("calculator") || n.includes("currency")) return <CalculatorIcon size={18} color="#38bdf8" />;
+    if (n.includes("weather") || n.includes("sun")) return <SunIcon size={18} color="#fbbf24" />;
+    if (n.includes("search") || n.includes("wikipedia") || n.includes("web")) return <GlobeIcon size={18} color="#60a5fa" />;
+    if (n.includes("code") || n.includes("github") || n.includes("script")) return <CodeIcon size={18} color="#34d399" />;
+    if (n.includes("audio") || n.includes("music")) return <VolumeIcon size={18} color="#ec4899" />;
+    if (n.includes("screenshot") || n.includes("camera")) return <CameraIcon size={18} color="#a855f7" />;
+    if (n.includes("file")) return <FolderIcon size={18} color="#f59e0b" />;
+    if (n.includes("system") || n.includes("cpu") || n.includes("process")) return <CpuIcon size={18} color="#38bdf8" />;
+    if (n.includes("time") || n.includes("schedule") || n.includes("remind")) return <ClockIcon size={18} color="#f59e0b" />;
+    if (c.includes("xotira") || c.includes("bilim") || c.includes("rag")) return <DatabaseIcon size={18} color="#818cf8" />;
+    return <TerminalIcon size={18} color="#a855f7" />;
+  };
+
+  const renderStatusBadge = (status: PluginStatus | string) => {
+    switch (status) {
+      case "installed":
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 6,
+              background: "rgba(16, 185, 129, 0.15)",
+              color: "#34d399",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+            }}
+          >
+            <CheckCircleIcon size={11} color="#34d399" />
+            <span>O'rnatilgan</span>
+          </span>
+        );
+      case "available":
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 6,
+              background: "rgba(59, 130, 246, 0.15)",
+              color: "#60a5fa",
+              border: "1px solid rgba(59, 130, 246, 0.3)",
+            }}
+          >
+            <SparklesIcon size={11} color="#60a5fa" />
+            <span>Mavjud</span>
+          </span>
+        );
+      case "disabled":
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 6,
+              background: "rgba(100, 116, 139, 0.15)",
+              color: "#94a3b8",
+              border: "1px solid rgba(100, 116, 139, 0.3)",
+            }}
+          >
+            <PauseIcon size={11} color="#94a3b8" />
+            <span>Nofaol</span>
+          </span>
+        );
+      case "updates":
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 6,
+              background: "rgba(245, 158, 11, 0.15)",
+              color: "#fbbf24",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+            }}
+          >
+            <RefreshIcon size={11} color="#fbbf24" />
+            <span>Yangilanish</span>
+          </span>
+        );
+      case "error":
+        return (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 6,
+              background: "rgba(239, 68, 68, 0.15)",
+              color: "#f87171",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+            }}
+          >
+            <AlertCircleIcon size={11} color="#f87171" />
+            <span>Xatolik</span>
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div
@@ -125,7 +360,7 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                Plaginlar va AI Vositalar
+                Plaginlar Markazi
               </h1>
               <span
                 style={{
@@ -138,42 +373,57 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                   border: "1px solid rgba(168, 85, 247, 0.2)",
                 }}
               >
-                {plugins.length} ta faol vosita
+                {stats.installed} ta faol plagin
               </span>
             </div>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-secondary)" }}>
-              AI Agent qo'ng'iroq qilishi mumkin bo'lgan dasturiy instrumentlar va kengaytmalar
+              5 holatli modulli arxitektura: installed, available, disabled, error, updates
             </p>
           </div>
         </div>
 
-        <button
-          onClick={onNavigateHome}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid var(--border-subtle)",
-            color: "var(--text-secondary)",
-            padding: "8px 14px",
-            borderRadius: 8,
-            fontSize: 12,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--text-primary)";
-            e.currentTarget.style.borderColor = "var(--border-strong)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-secondary)";
-            e.currentTarget.style.borderColor = "var(--border-subtle)";
-          }}
-        >
-          <HomeIcon size={14} />
-          <span>Bosh sahifa</span>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => setIsInstallModalOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(168, 85, 247, 0.15)",
+              border: "1px solid rgba(168, 85, 247, 0.3)",
+              color: "#c084fc",
+              padding: "8px 14px",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <SparklesIcon size={14} color="#c084fc" />
+            <span>Yangi plagin qo'shish</span>
+          </button>
+
+          <button
+            onClick={onNavigateHome}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-secondary)",
+              padding: "8px 14px",
+              borderRadius: 8,
+              fontSize: 12,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <HomeIcon size={14} />
+            <span>Bosh sahifa</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Container */}
@@ -185,70 +435,124 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
           padding: "24px 28px 48px",
           display: "flex",
           flexDirection: "column",
-          gap: 22,
+          gap: 20,
         }}
       >
-        {/* Search and Category Filters */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="text"
-            placeholder="Plagin yoki tool nomini qidirish..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: 10,
-              padding: "10px 16px",
-              color: "var(--text-primary)",
-              fontSize: 13,
-              outline: "none",
-            }}
-          />
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {categories.map((cat) => (
+        {/* Status Tabs Bar */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { id: "all", label: `Barchasi (${stats.total})` },
+            { id: "installed", label: `O'rnatilgan (${stats.installed})` },
+            { id: "available", label: `Mavjud (${stats.available})` },
+            { id: "disabled", label: `Nofaol (${stats.disabled})` },
+            { id: "updates", label: `Yangilanishlar (${stats.updates})` },
+            { id: "error", label: `Xatoliklar (${stats.error})` },
+          ].map((tab) => {
+            const active = filterStatus === tab.id;
+            return (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
                 style={{
-                  background:
-                    selectedCategory === cat ? "#a855f7" : "rgba(255, 255, 255, 0.04)",
-                  color: selectedCategory === cat ? "#ffffff" : "var(--text-secondary)",
-                  border: `1px solid ${
-                    selectedCategory === cat ? "#a855f7" : "var(--border-subtle)"
-                  }`,
-                  borderRadius: 20,
-                  padding: "6px 14px",
+                  background: active ? "rgba(168, 85, 247, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                  border: active ? "1px solid rgba(168, 85, 247, 0.4)" : "1px solid var(--border-subtle)",
+                  color: active ? "#c084fc" : "var(--text-secondary)",
+                  borderRadius: 8,
+                  padding: "8px 14px",
                   fontSize: 12,
-                  fontWeight: selectedCategory === cat ? 500 : 400,
+                  fontWeight: active ? 600 : 400,
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                 }}
               >
-                {cat}
+                {tab.label}
               </button>
-            ))}
+            );
+          })}
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {/* Categories */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {categories.slice(0, 8).map((cat) => {
+              const active = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    background: active ? "rgba(255, 255, 255, 0.1)" : "transparent",
+                    border: active ? "1px solid var(--border-strong)" : "1px solid transparent",
+                    color: active ? "var(--text-primary)" : "var(--text-muted)",
+                    borderRadius: 6,
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Box */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 8,
+              padding: "6px 12px",
+              width: 260,
+            }}
+          >
+            <SearchIcon size={14} color="var(--text-muted)" />
+            <input
+              type="text"
+              placeholder="Plagin nomidan izlash..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: "var(--text-primary)",
+                fontSize: 12,
+                width: "100%",
+              }}
+            />
           </div>
         </div>
 
-        {/* Plugin Cards Grid */}
+        {/* Plugins Grid */}
         {loading ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-secondary)" }}>
-            Plaginlar katalogi yuklanmoqda...
+          <div style={{ textAlign: "center", padding: "60px", color: "var(--text-secondary)" }}>
+            Plaginlar yuklanmoqda...
           </div>
         ) : filteredPlugins.length === 0 ? (
           <div
             style={{
               textAlign: "center",
-              padding: "48px 0",
+              padding: "60px 20px",
               color: "var(--text-muted)",
-              background: "rgba(255, 255, 255, 0.02)",
-              borderRadius: 12,
               border: "1px dashed var(--border-subtle)",
+              borderRadius: 12,
+              fontSize: 13,
             }}
           >
-            "{searchQuery}" bo'yicha plagin topilmadi
+            Ushbu filtr bo'yicha hech qanday plagin topilmadi.
           </div>
         ) : (
           <div
@@ -258,121 +562,238 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
               gap: 14,
             }}
           >
-            {filteredPlugins.map((tool) => (
-              <div
-                key={tool.name}
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 12,
-                  padding: "16px 18px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.4)";
-                  e.currentTarget.style.background = "rgba(168, 85, 247, 0.04)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border-subtle)";
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div>
+            {filteredPlugins.map((p) => {
+              const status = p.status || (p.enabled ? "installed" : "disabled");
+              const isCustom = p.type === "json" || p.type === "python";
+
+              return (
+                <div
+                  key={p.name}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.025)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 12,
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    position: "relative",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {/* Card Header */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "rgba(255, 255, 255, 0.04)",
+                            border: "1px solid var(--border-subtle)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {getPluginIcon(p.name, p.category)}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                              {p.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "1px 5px",
+                                borderRadius: 4,
+                                background: "rgba(255, 255, 255, 0.06)",
+                                color: "var(--text-muted)",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              v{p.version || "1.0.0"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                            {p.category} {p.type ? `• ${p.type}` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      {renderStatusBadge(status)}
+                    </div>
+
+                    {/* Description */}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {p.description || "Tavsif mavjud emas"}
+                    </p>
+
+                    {/* Error info */}
+                    {p.error && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#f87171",
+                          background: "rgba(239, 68, 68, 0.1)",
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                        }}
+                      >
+                        Xatolik: {p.error}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions Footer */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginBottom: 6,
+                      paddingTop: 10,
+                      borderTop: "1px solid var(--border-subtle)",
+                      marginTop: 4,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                      {tool.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        padding: "2px 6px",
-                        borderRadius: 6,
-                        background: "rgba(168, 85, 247, 0.12)",
-                        color: "#c084fc",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {tool.category}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Sinash / Run */}
+                      {status !== "available" && status !== "error" && (
+                        <button
+                          onClick={() => openToolModal(p)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            background: "rgba(255, 255, 255, 0.05)",
+                            border: "1px solid var(--border-subtle)",
+                            color: "var(--text-primary)",
+                            borderRadius: 6,
+                            padding: "5px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <PlayIcon size={11} color="#34d399" />
+                          <span>Sinash</span>
+                        </button>
+                      )}
+
+                      {/* Updates button */}
+                      {status === "updates" && (
+                        <button
+                          onClick={() => handleUpdate(p.name)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            background: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            color: "#fbbf24",
+                            borderRadius: 6,
+                            padding: "5px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <RefreshIcon size={11} color="#fbbf24" />
+                          <span>Yangilash</span>
+                        </button>
+                      )}
+
+                      {/* Install Available */}
+                      {status === "available" && (
+                        <button
+                          onClick={() => handleInstallTemplate(p.name)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            background: "rgba(59, 130, 246, 0.15)",
+                            border: "1px solid rgba(59, 130, 246, 0.3)",
+                            color: "#60a5fa",
+                            borderRadius: 6,
+                            padding: "5px 10px",
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <SparklesIcon size={11} color="#60a5fa" />
+                          <span>O'rnatish</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Enable / Disable toggle */}
+                      {status !== "available" && status !== "error" && (
+                        <button
+                          onClick={() => handleToggle(p)}
+                          title={p.enabled ? "To'xtatish" : "Yoqish"}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            background: "transparent",
+                            border: "1px solid var(--border-subtle)",
+                            color: p.enabled ? "#fbbf24" : "#34d399",
+                            borderRadius: 6,
+                            padding: "5px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {p.enabled ? <PauseIcon size={12} /> : <CheckIcon size={12} />}
+                          <span>{p.enabled ? "O'chirish" : "Yoqish"}</span>
+                        </button>
+                      )}
+
+                      {/* Custom plugin uninstall */}
+                      {isCustom && (
+                        <button
+                          onClick={() => handleUninstall(p.name)}
+                          title="Butunlay o'chirish"
+                          style={{
+                            background: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.2)",
+                            color: "#f87171",
+                            borderRadius: 6,
+                            padding: "5px 7px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <TrashIcon size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.4,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {tool.description}
-                  </p>
                 </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-                    paddingTop: 10,
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    Parametrlar: {Object.keys(tool.parameters || {}).length} ta
-                  </span>
-
-                  <button
-                    onClick={() => openToolModal(tool)}
-                    style={{
-                      background: "rgba(168, 85, 247, 0.12)",
-                      border: "1px solid rgba(168, 85, 247, 0.3)",
-                      color: "#c084fc",
-                      borderRadius: 8,
-                      padding: "6px 12px",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#a855f7";
-                      e.currentTarget.style.color = "#ffffff";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(168, 85, 247, 0.12)";
-                      e.currentTarget.style.color = "#c084fc";
-                    }}
-                  >
-                    Sinab ko'rish
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Tool Tester Modal */}
+      {/* Tool Test Modal */}
       {selectedTool && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(8px)",
+            background: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -383,23 +804,25 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
         >
           <div
             style={{
-              background: "var(--bg-card)",
+              background: "#0e1422",
               border: "1px solid var(--border-subtle)",
-              borderRadius: 16,
-              maxWidth: 540,
-              width: "100%",
+              borderRadius: 14,
               padding: 24,
+              width: "100%",
+              maxWidth: 520,
               display: "flex",
               flexDirection: "column",
               gap: 16,
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
+              boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5)",
+              maxHeight: "85vh",
+              overflowY: "auto",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <SparklesIcon size={18} color="#a855f7" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{selectedTool.name}</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <PlayIcon size={16} color="#34d399" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{selectedTool.name} — Sinash</h3>
               </div>
               <button
                 onClick={closeToolModal}
@@ -408,47 +831,41 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                   border: "none",
                   color: "var(--text-muted)",
                   cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "4px",
                 }}
               >
-                <CloseIcon size={16} color="currentColor" />
+                <CloseIcon size={14} />
               </button>
             </div>
 
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
               {selectedTool.description}
             </p>
 
-            {/* Parameters input */}
-            {Object.keys(selectedTool.parameters || {}).length > 0 ? (
+            {/* Parameters */}
+            {selectedTool.parameters && Object.keys(selectedTool.parameters).length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>
-                  Kirish parametrlari:
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>
+                  Parametrlar:
                 </span>
-                {Object.entries(selectedTool.parameters).map(([paramName, paramMeta]: [string, any]) => (
-                  <div key={paramName} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "var(--text-primary)", fontWeight: 500 }}>
-                      {paramName}{" "}
-                      <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
-                        ({paramMeta.type || "string"} - {paramMeta.description || ""})
-                      </span>
+                {Object.entries(selectedTool.parameters).map(([key, val]: [string, any]) => (
+                  <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "var(--text-primary)" }}>
+                      {key} ({val.type || "string"}):
                     </label>
                     <input
                       type="text"
-                      placeholder={`Kiriting... masalan: ${paramName}`}
-                      value={paramValues[paramName] || ""}
+                      placeholder={val.description || key}
+                      value={paramValues[key] || ""}
                       onChange={(e) =>
-                        setParamValues({ ...paramValues, [paramName]: e.target.value })
+                        setParamValues((prev) => ({ ...prev, [key]: e.target.value }))
                       }
                       style={{
-                        background: "rgba(0, 0, 0, 0.25)",
+                        background: "rgba(0, 0, 0, 0.3)",
                         border: "1px solid var(--border-subtle)",
                         borderRadius: 8,
                         padding: "8px 12px",
                         color: "var(--text-primary)",
-                        fontSize: 13,
+                        fontSize: 12,
                         outline: "none",
                       }}
                     />
@@ -456,32 +873,24 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                 ))}
               </div>
             ) : (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  padding: "8px 12px",
-                  background: "rgba(255, 255, 255, 0.02)",
-                  borderRadius: 6,
-                }}
-              >
-                Ushbu tool parametr talab qilmaydi. To'g'ridan-to'g'ri ishga tushirish mumkin.
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                Ushbu vosita qo'shimcha parametrlar talab qilmaydi.
               </div>
             )}
 
-            {/* Execution Result */}
+            {/* Result Box */}
             {executionResult && (
               <div
                 style={{
                   background: "rgba(0, 0, 0, 0.4)",
                   border: "1px solid var(--border-subtle)",
                   borderRadius: 8,
-                  padding: 12,
-                  maxHeight: 180,
-                  overflowY: "auto",
+                  padding: "12px",
                   fontSize: 12,
                   fontFamily: "monospace",
-                  color: "#34d399",
+                  maxHeight: 180,
+                  overflowY: "auto",
+                  color: executionResult.ok ? "#34d399" : "#f87171",
                 }}
               >
                 <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
@@ -496,10 +905,10 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                 style={{
                   background: "rgba(255, 255, 255, 0.05)",
                   border: "1px solid var(--border-subtle)",
-                  borderRadius: 8,
-                  padding: "8px 16px",
                   color: "var(--text-secondary)",
-                  fontSize: 13,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
                   cursor: "pointer",
                 }}
               >
@@ -509,17 +918,187 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                 onClick={handleRunTool}
                 disabled={isExecuting}
                 style={{
-                  background: "#a855f7",
+                  background: "#34d399",
+                  color: "#022c22",
                   border: "none",
+                  padding: "8px 18px",
                   borderRadius: 8,
-                  padding: "8px 20px",
-                  color: "#ffffff",
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: 600,
-                  cursor: isExecuting ? "default" : "pointer",
+                  cursor: isExecuting ? "not-allowed" : "pointer",
                 }}
               >
-                {isExecuting ? "Bajarilmoqda..." : "Bajarish"}
+                {isExecuting ? "Bajarilmoqda..." : "Ishga tushirish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Install Modal */}
+      {isInstallModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 20,
+          }}
+          onClick={() => setIsInstallModalOpen(false)}
+        >
+          <div
+            style={{
+              background: "#0e1422",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 14,
+              padding: 24,
+              width: "100%",
+              maxWidth: 480,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <SparklesIcon size={16} color="#c084fc" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Maxsus Plagin Yaratish</h3>
+              </div>
+              <button
+                onClick={() => setIsInstallModalOpen(false)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                <CloseIcon size={14} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Plagin nomi (lotincha):</label>
+              <input
+                type="text"
+                placeholder="my_custom_tool"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                style={{
+                  background: "rgba(0, 0, 0, 0.3)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Tavsifi:</label>
+              <input
+                type="text"
+                placeholder="Veb-saytni ochish yoki skript chaqirish..."
+                value={customDesc}
+                onChange={(e) => setCustomDesc(e.target.value)}
+                style={{
+                  background: "rgba(0, 0, 0, 0.3)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Turi:</label>
+                <select
+                  value={customType}
+                  onChange={(e) => setCustomType(e.target.value as any)}
+                  style={{
+                    background: "rgba(0, 0, 0, 0.3)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                >
+                  <option value="url">URL (Brauzerda ochish)</option>
+                  <option value="command">CLI Buyruq (Terminal)</option>
+                </select>
+              </div>
+
+              <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  {customType === "url" ? "URL shablon:" : "CLI Buyruq shabloni:"}
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    customType === "url"
+                      ? "https://example.com/search?q={query}"
+                      : "python script.py {query}"
+                  }
+                  value={customTarget}
+                  onChange={(e) => setCustomTarget(e.target.value)}
+                  style={{
+                    background: "rgba(0, 0, 0, 0.3)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setIsInstallModalOpen(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={handleCreateCustom}
+                disabled={!customName.trim() || !customTarget.trim() || isSubmittingInstall}
+                style={{
+                  background: "#c084fc",
+                  color: "#18181b",
+                  border: "none",
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: !customName.trim() || !customTarget.trim() || isSubmittingInstall ? "not-allowed" : "pointer",
+                }}
+              >
+                {isSubmittingInstall ? "Yaratilmoqda..." : "Yaratish va O'rnatish"}
               </button>
             </div>
           </div>

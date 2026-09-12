@@ -74,6 +74,14 @@ class ToolRegistry:
         self._tools[tool.name] = tool
         logger.debug(f"Tool ro'yxatdan o'tdi: {tool.name}")
 
+    def unregister(self, name: str) -> bool:
+        """Toolni ro'yxatdan o'chirish"""
+        if name in self._tools:
+            del self._tools[name]
+            logger.debug(f"Tool ro'yxatdan o'chirildi: {name}")
+            return True
+        return False
+
     def get(self, name: str) -> Optional[Tool]:
         """Tool ni nomi bo'yicha olish"""
         return self._tools.get(name)

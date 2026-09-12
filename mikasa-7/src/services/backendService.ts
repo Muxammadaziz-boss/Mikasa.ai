@@ -96,18 +96,38 @@ export interface SchedulerResponse {
   active_count: number;
 }
 
+export type PluginStatus = "installed" | "available" | "disabled" | "error" | "updates";
+
 export interface PluginItem {
+  id?: string;
   name: string;
   description: string;
   parameters: Record<string, any>;
   category: string;
   enabled: boolean;
   version: string;
+  status: PluginStatus;
+  type?: "builtin" | "json" | "python" | "url" | "command";
+  author?: string;
+  error?: string;
+  has_update?: boolean;
+  file_name?: string;
+}
+
+export interface PluginStats {
+  total: number;
+  installed: number;
+  available: number;
+  disabled: number;
+  error: number;
+  updates: number;
 }
 
 export interface PluginsResponse {
   ok: boolean;
-  tools: PluginItem[];
+  plugins?: PluginItem[];
+  tools?: PluginItem[];
+  stats?: PluginStats;
   total_count: number;
   categories: string[];
 }
@@ -634,7 +654,59 @@ class BackendService {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return await res.json();
     } catch {
-      return { ok: false, tools: [], total_count: 0, categories: [] };
+      return { ok: false, tools: [], plugins: [], total_count: 0, categories: [] };
+    }
+  }
+
+  public async togglePlugin(name: string, enabled: boolean): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, enabled }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
+    }
+  }
+
+  public async installPlugin(name: string, data?: any): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/install`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, data }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
+    }
+  }
+
+  public async uninstallPlugin(name: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/uninstall`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
+    }
+  }
+
+  public async updatePlugin(name: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
     }
   }
 
