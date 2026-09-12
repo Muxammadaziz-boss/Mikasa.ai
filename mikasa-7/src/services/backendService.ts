@@ -69,13 +69,25 @@ export interface MemoryResponse {
   };
 }
 
+export type TaskStatus = "active" | "completed" | "repeating" | "failed" | "cancelled";
+
 export interface ScheduledTaskItem {
   id: string;
+  task_id?: string;
   type: string;
+  task_type?: string;
   run_at: string;
+  run_at_iso?: string;
   data: { text?: string; [key: string]: any };
   completed: boolean;
+  enabled: boolean;
+  cancelled?: boolean;
   repeat: boolean;
+  repeat_seconds?: number;
+  last_run?: string | null;
+  last_error?: string | null;
+  status: TaskStatus;
+  created_at?: string;
 }
 
 export interface SchedulerResponse {
@@ -528,6 +540,68 @@ class BackendService {
       return await res.json();
     } catch (err: any) {
       return { ok: false, message: String(err) };
+    }
+  }
+
+  public async editSchedulerTask(
+    taskId: string,
+    text?: string,
+    delayMinutes?: number,
+    repeatMinutes?: number
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const body: Record<string, any> = { task_id: taskId };
+      if (text !== undefined) body.text = text;
+      if (delayMinutes !== undefined) body.delay_minutes = delayMinutes;
+      if (repeatMinutes !== undefined) body.repeat_minutes = repeatMinutes;
+
+      const res = await fetch(`${API_BASE}/api/scheduler/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
+    }
+  }
+
+  public async enableSchedulerTask(taskId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/scheduler/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async disableSchedulerTask(taskId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/scheduler/disable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async executeSchedulerTask(taskId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/scheduler/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId }),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 

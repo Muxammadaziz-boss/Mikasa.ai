@@ -948,6 +948,104 @@ async def handle_scheduler_clear_completed(request):
     return web.json_response({"ok": True, "message": "Bajarilgan vazifalar tozalandi"})
 
 
+async def handle_scheduler_edit(request):
+    """POST /api/scheduler/edit - Vazifani tahrirlash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    task_id = body.get("task_id", "").strip()
+    if not task_id:
+        return web.json_response({"ok": False, "error": "'task_id' ko'rsatilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    text = body.get("text", "").strip() if "text" in body else None
+    delay_seconds = int(body.get("delay_minutes", 0)) * 60 if "delay_minutes" in body else None
+    repeat_seconds = int(body.get("repeat_minutes", 0)) * 60 if "repeat_minutes" in body else None
+
+    success = sched.edit(
+        task_id=task_id,
+        text=text,
+        delay_seconds=delay_seconds,
+        repeat_seconds=repeat_seconds,
+    )
+
+    if success:
+        await broadcast_ws("scheduler_updated", {"action": "edit", "task_id": task_id})
+        return web.json_response({"ok": True, "message": f"Vazifa '{task_id}' tahrirlandi"})
+    return web.json_response({"ok": False, "error": f"Vazifa topilmadi: {task_id}"}, status=404)
+
+
+async def handle_scheduler_enable(request):
+    """POST /api/scheduler/enable - Vazifani faollashtirish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    task_id = body.get("task_id", "").strip() or request.query.get("task_id", "").strip()
+    if not task_id:
+        return web.json_response({"ok": False, "error": "'task_id' ko'rsatilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    success = sched.enable(task_id)
+    if success:
+        await broadcast_ws("scheduler_updated", {"action": "enable", "task_id": task_id})
+        return web.json_response({"ok": True, "message": f"Vazifa '{task_id}' faollashtirildi"})
+    return web.json_response({"ok": False, "error": f"Vazifa topilmadi: {task_id}"}, status=404)
+
+
+async def handle_scheduler_disable(request):
+    """POST /api/scheduler/disable - Vazifani to'xtatib turish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    task_id = body.get("task_id", "").strip() or request.query.get("task_id", "").strip()
+    if not task_id:
+        return web.json_response({"ok": False, "error": "'task_id' ko'rsatilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    success = sched.disable(task_id)
+    if success:
+        await broadcast_ws("scheduler_updated", {"action": "disable", "task_id": task_id})
+        return web.json_response({"ok": True, "message": f"Vazifa '{task_id}' to'xtatildi"})
+    return web.json_response({"ok": False, "error": f"Vazifa topilmadi: {task_id}"}, status=404)
+
+
+async def handle_scheduler_execute(request):
+    """POST /api/scheduler/execute - Vazifani darhol bajarish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    task_id = body.get("task_id", "").strip() or request.query.get("task_id", "").strip()
+    if not task_id:
+        return web.json_response({"ok": False, "error": "'task_id' ko'rsatilmadi"}, status=400)
+
+    _, _, _, sched, _, _ = get_modules()
+    if not sched:
+        return web.json_response({"ok": False, "error": "Rejalashtiruvchi mavjud emas"}, status=500)
+
+    success = sched.execute(task_id)
+    if success:
+        await broadcast_ws("scheduler_updated", {"action": "execute", "task_id": task_id})
+        return web.json_response({"ok": True, "message": f"Vazifa '{task_id}' darhol bajarildi"})
+    return web.json_response({"ok": False, "error": f"Vazifa topilmadi: {task_id}"}, status=404)
+
+
 # ========== 6. PLAGINLAR VA TOOLS HANDLERS ==========
 async def handle_plugins_list(request):
     """GET /api/plugins - Barcha agent vositalari va plaginlar ro'yxati"""
@@ -1243,6 +1341,10 @@ def create_app():
     # Rejalashtiruvchi (Scheduler)
     app.router.add_get("/api/scheduler", handle_scheduler_list)
     app.router.add_post("/api/scheduler/add", handle_scheduler_add)
+    app.router.add_post("/api/scheduler/edit", handle_scheduler_edit)
+    app.router.add_post("/api/scheduler/enable", handle_scheduler_enable)
+    app.router.add_post("/api/scheduler/disable", handle_scheduler_disable)
+    app.router.add_post("/api/scheduler/execute", handle_scheduler_execute)
     app.router.add_delete("/api/scheduler/task", handle_scheduler_remove)
     app.router.add_post("/api/scheduler/clear-completed", handle_scheduler_clear_completed)
 
