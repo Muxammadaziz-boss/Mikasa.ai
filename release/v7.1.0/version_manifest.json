@@ -2,13 +2,13 @@
   "app": "Mikasa AI",
   "version": "7.1.0",
   "version_name": "v7.1.0",
-  "release_date": "2026-09-12T16:34:43.986Z",
+  "release_date": "2026-09-12T20:41:51.221Z",
   "files": [
     {
       "name": "Mikasa-AI-v7.1.0.exe",
-      "size_bytes": 4982784,
-      "size_mb": 4.75,
-      "sha256": "565df102fd57fa9a8c84945a7a309fb9a0b12741152b7411224381a760bb526c"
+      "size_bytes": 4495360,
+      "size_mb": 4.29,
+      "sha256": "43d20b83065f44787872ace329ea1d5f15c8b996a499c1a5cb9f29345fa575e5"
     },
     {
       "name": "WebView2Loader.dll",
