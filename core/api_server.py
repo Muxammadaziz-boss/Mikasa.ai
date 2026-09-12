@@ -718,7 +718,8 @@ async def handle_memory_get(request):
 
     profile = mem.get_profile()
     raw_knowledge = mem.get_knowledge()
-    conversations = mem.get_conversations(last_n=30)
+    conversations = mem.get_conversations(last_n=50)
+    context_turns = mem.get_context(last_n=30)
     stats = mem.stats
 
     # Bilimlarni qulay array formatga o'tkazish
@@ -745,7 +746,30 @@ async def handle_memory_get(request):
         "profile": profile,
         "knowledge": knowledge_list,
         "conversations": conversations,
+        "context": context_turns,
         "stats": stats
+    })
+
+
+async def handle_memory_profile_save(request):
+    """POST /api/memory/profile - Foydalanuvchi profili maydonlarini yangilash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    for k, v in body.items():
+        mem.set_profile(k, v)
+
+    await broadcast_ws("memory_updated", {"action": "profile_update", "profile": mem.get_profile()})
+    return web.json_response({
+        "ok": True,
+        "message": "Profil muvaffaqiyatli yangilandi",
+        "profile": mem.get_profile()
     })
 
 
@@ -800,6 +824,39 @@ async def handle_memory_knowledge_delete(request):
         return web.json_response({"ok": True, "message": f"'{key}' o'chirildi"})
     else:
         return web.json_response({"ok": False, "error": f"'{key}' topilmadi"}, status=404)
+
+
+async def handle_memory_knowledge_clear(request):
+    """POST /api/memory/knowledge/clear - Barcha saqlangan bilimlarni tozalash"""
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    mem.clear_knowledge()
+    await broadcast_ws("memory_updated", {"action": "knowledge_cleared"})
+    return web.json_response({"ok": True, "message": "Barcha bilimlar bazasi tozalandi"})
+
+
+async def handle_memory_context_clear(request):
+    """POST /api/memory/context/clear - Joriy suhbat kontekstini (RAM) tozalash"""
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    mem.clear_context()
+    await broadcast_ws("memory_updated", {"action": "context_cleared"})
+    return web.json_response({"ok": True, "message": "Joriy suhbat konteksti (RAM) tozalandi"})
+
+
+async def handle_memory_history_clear(request):
+    """POST /api/memory/history/clear - Suhbatlar arxivini tozalash"""
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    mem.clear_conversations()
+    await broadcast_ws("memory_updated", {"action": "history_cleared"})
+    return web.json_response({"ok": True, "message": "Suhbatlar tarixi arxivi tozalandi"})
 
 
 # ========== 5. REJALASHTIRUVCHI (SCHEDULER) HANDLERS ==========
@@ -1176,8 +1233,12 @@ def create_app():
 
     # Xotira (Memory)
     app.router.add_get("/api/memory", handle_memory_get)
+    app.router.add_post("/api/memory/profile", handle_memory_profile_save)
     app.router.add_post("/api/memory/knowledge", handle_memory_knowledge_save)
     app.router.add_delete("/api/memory/knowledge", handle_memory_knowledge_delete)
+    app.router.add_post("/api/memory/knowledge/clear", handle_memory_knowledge_clear)
+    app.router.add_post("/api/memory/context/clear", handle_memory_context_clear)
+    app.router.add_post("/api/memory/history/clear", handle_memory_history_clear)
 
     # Rejalashtiruvchi (Scheduler)
     app.router.add_get("/api/scheduler", handle_scheduler_list)

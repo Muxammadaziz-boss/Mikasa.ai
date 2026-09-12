@@ -49,11 +49,18 @@ export interface KnowledgeItem {
   access_count?: number;
 }
 
+export interface ContextTurn {
+  role: string;
+  content: string;
+  time: string;
+}
+
 export interface MemoryResponse {
   ok: boolean;
   profile: Record<string, any>;
   knowledge: KnowledgeItem[];
   conversations: Array<{ user: string; agent: string; time: string }>;
+  context?: ContextTurn[];
   stats: {
     kontekst_hajmi?: number;
     suhbatlar_soni?: number;
@@ -442,6 +449,52 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/memory/knowledge?key=${encodeURIComponent(key)}`, {
         method: "DELETE",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async saveProfile(data: Record<string, any>): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async clearKnowledge(): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/knowledge/clear`, {
+        method: "POST",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async clearContext(): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/context/clear`, {
+        method: "POST",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async clearHistory(): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/history/clear`, {
+        method: "POST",
       });
       return res.ok;
     } catch {

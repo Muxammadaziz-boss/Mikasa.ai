@@ -134,6 +134,12 @@ class AgentMemory:
             history.append({"role": "assistant", "content": conv["agent"]})
         return history
 
+    def clear_conversations(self):
+        """Barcha suhbatlar tarixini tozalash"""
+        with self._lock:
+            self._conversations.clear()
+            self._save_conversations()
+
     # ========== FOYDALANUVCHI PROFILI ==========
 
     def set_profile(self, key: str, value):
@@ -192,6 +198,12 @@ class AgentMemory:
                 self._save_json(self._knowledge_file, self._knowledge)
                 return True
             return False
+
+    def clear_knowledge(self):
+        """Barcha saqlangan bilimlarni tozalash"""
+        with self._lock:
+            self._knowledge.clear()
+            self._save_json(self._knowledge_file, self._knowledge)
 
     # ========== STATISTIKA ==========
 
