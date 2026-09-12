@@ -432,6 +432,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-label="Buyruqlar va asboblar qidiruvi"
+            aria-autocomplete="list"
+            aria-expanded={filteredActions.length > 0}
+            aria-controls="palette-results-list"
+            aria-activedescendant={
+              filteredActions[selectedIndex] ? `palette-item-${filteredActions[selectedIndex].id}` : undefined
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Mikasa... (Ctrl+K)"
@@ -498,6 +506,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Results List */}
         <div
           ref={listRef}
+          id="palette-results-list"
+          role="listbox"
+          aria-label="Qidiruv natijalari"
           style={{
             flex: 1,
             overflowY: "auto",
@@ -523,6 +534,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               return (
                 <div
                   key={action.id}
+                  id={`palette-item-${action.id}`}
+                  role="option"
+                  aria-selected={isSelected}
                   data-index={idx}
                   onClick={async () => {
                     const res = await action.run();

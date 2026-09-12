@@ -336,7 +336,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div
             role="button"
             tabIndex={0}
+            aria-label="So'rash - Savol berish"
             onClick={() => handleQuickAction("ask")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleQuickAction("ask");
+              }
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -391,7 +398,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div
             role="button"
             tabIndex={0}
+            aria-label="Buyruq - Tizim amallari"
             onClick={() => handleQuickAction("command")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleQuickAction("command");
+              }
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -445,7 +459,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div
             role="button"
             tabIndex={0}
+            aria-label="Xulosa - Matn tahlili"
             onClick={() => handleQuickAction("summary")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleQuickAction("summary");
+              }
+            }}
             style={{
               display: "flex",
               alignItems: "center",

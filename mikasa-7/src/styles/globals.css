@@ -147,3 +147,48 @@ input {
   }
 }
 
+/* ========== Phase 18 — Accessibility (a11y) Styles ========== */
+/* Focus rings: visible high-contrast ring for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--primary-glow, #10B981) !important;
+  outline-offset: 2px !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced Motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast text ratio helpers */
+.text-high-contrast {
+  color: #FFFFFF !important;
+}
+
+.text-subtle-contrast {
+  color: #CBD5E1 !important;
+}
+

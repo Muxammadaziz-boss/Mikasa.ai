@@ -154,6 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onOpenCommandPalette}
             title={collapsed ? "Qidiruv va buyruqlar (Ctrl+K)" : undefined}
+            aria-label="Buyruqlar palitrasi va qidiruv (Ctrl+K)"
             style={{
               display: "flex",
               alignItems: "center",
@@ -226,6 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => onNavigate(item.path)}
                     title={collapsed ? item.label : undefined}
                     aria-label={item.label}
+                    aria-current={isActive ? "page" : undefined}
                     style={{
                       position: "relative",
                       display: "flex",
