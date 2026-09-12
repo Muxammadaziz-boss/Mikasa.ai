@@ -8,6 +8,7 @@ import {
   HomeIcon,
   SparklesIcon,
   ArrowUpIcon,
+  CloseIcon,
 } from "../components/icons/Icons";
 import {
   backendService,
@@ -281,10 +282,12 @@ export const CommandsPage: React.FC<CommandsPageProps> = ({ onNavigateHome }) =>
                   border: "none",
                   color: "inherit",
                   cursor: "pointer",
-                  fontSize: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "2px",
                 }}
               >
-                ✕
+                <CloseIcon size={14} color="currentColor" />
               </button>
             </div>
           )}

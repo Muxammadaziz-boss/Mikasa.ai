@@ -9,6 +9,7 @@ import {
   AttachIcon,
   ArrowUpIcon,
   TrashIcon,
+  CloseIcon,
 } from "../components/icons/Icons";
 import { backendService, BackendStatus, VoiceState } from "../services/backendService";
 
@@ -542,13 +543,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   border: "none",
                   color: "var(--text-muted)",
                   cursor: "pointer",
-                  padding: "2px 6px",
+                  padding: "4px",
                   borderRadius: "6px",
-                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
                 }}
                 title="Yopish"
               >
-                ✕
+                <CloseIcon size={12} color="currentColor" />
               </button>
             )}
           </div>

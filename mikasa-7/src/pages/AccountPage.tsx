@@ -7,6 +7,7 @@ import {
   UserIcon,
   HomeIcon,
   SparklesIcon,
+  CheckIcon,
 } from "../components/icons/Icons";
 import {
   backendService,
@@ -288,7 +289,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
                         Madina (Ayol)
                       </strong>
                       {voiceType === "ayol" && (
-                        <span style={{ color: "var(--primary-glow)", fontSize: 14 }}>✓</span>
+                        <CheckIcon size={14} color="var(--primary-glow)" />
                       )}
                     </div>
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -320,7 +321,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
                         Sardor (Erkak)
                       </strong>
                       {voiceType === "erkak" && (
-                        <span style={{ color: "var(--primary-glow)", fontSize: 14 }}>✓</span>
+                        <CheckIcon size={14} color="var(--primary-glow)" />
                       )}
                     </div>
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>

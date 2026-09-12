@@ -8,6 +8,7 @@ import {
   HomeIcon,
   SparklesIcon,
   TrashIcon,
+  CommandsIcon,
 } from "../components/icons/Icons";
 import {
   backendService,
@@ -264,10 +265,11 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 8,
               }}
             >
-              <span>💧 Suv ichish (30 daq)</span>
+              <SchedulerIcon size={14} color="#38BDF8" />
+              <span>Suv ichish (30 daq)</span>
             </button>
             <button
               onClick={() => handleAddTask("Ko'zlarni 2 daqiqa dam oldiring!", 20, true)}
@@ -281,10 +283,11 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 8,
               }}
             >
-              <span>👀 Ko'zlarni dam oldirish (20 daq)</span>
+              <SchedulerIcon size={14} color="#10B981" />
+              <span>Ko'zlarni dam oldirish (20 daq)</span>
             </button>
             <button
               onClick={() => handleAddTask("Muhim vazifani tekshirish", 15, false)}
@@ -298,10 +301,11 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 8,
               }}
             >
-              <span>⚡ 15 daqiqadan keyin eslat</span>
+              <CommandsIcon size={14} color="#F59E0B" />
+              <span>15 daqiqadan keyin eslat</span>
             </button>
             <button
               onClick={() => handleAddTask("1 soatlik reja yakuni", 60, false)}

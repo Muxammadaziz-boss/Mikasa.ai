@@ -7,6 +7,7 @@ import {
   PluginsIcon,
   HomeIcon,
   SparklesIcon,
+  CloseIcon,
 } from "../components/icons/Icons";
 import {
   backendService,
@@ -406,11 +407,13 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                   background: "transparent",
                   border: "none",
                   color: "var(--text-muted)",
-                  fontSize: 18,
                   cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "4px",
                 }}
               >
-                ✕
+                <CloseIcon size={16} color="currentColor" />
               </button>
             </div>
 

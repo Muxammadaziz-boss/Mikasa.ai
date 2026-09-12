@@ -205,3 +205,10 @@ export const SettingsIcon: React.FC<IconProps> = ({ size = 16, color = "currentC
   </svg>
 );
 
+export const CheckIcon: React.FC<IconProps> = ({ size = 14, color = "currentColor", className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+

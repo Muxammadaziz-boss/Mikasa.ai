@@ -8,6 +8,9 @@ import {
   MicIcon,
   HomeIcon,
   ChatIcon,
+  UserIcon,
+  SparklesIcon,
+  RefreshIcon,
 } from "../components/icons/Icons";
 import { backendService, VoiceState, BackendStatus } from "../services/backendService";
 
@@ -218,8 +221,9 @@ export const VoicePage: React.FC<VoicePageProps> = ({
               textAlign: "left",
             }}
           >
-            <div style={{ fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600, marginBottom: "3px" }}>
-              🗣️ Siz aytgan buyruq:
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600, marginBottom: "4px" }}>
+              <UserIcon size={13} color="var(--primary-glow)" />
+              <span>Siz aytgan buyruq:</span>
             </div>
             {userTranscript}
           </div>
@@ -243,8 +247,9 @@ export const VoicePage: React.FC<VoicePageProps> = ({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-              <div style={{ fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600 }}>
-                🤖 Mikasa javobi:
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600 }}>
+                <SparklesIcon size={13} color="var(--primary-glow)" />
+                <span>Mikasa javobi:</span>
               </div>
               <button
                 onClick={handleReplayVoice}
@@ -253,16 +258,17 @@ export const VoicePage: React.FC<VoicePageProps> = ({
                   background: "rgba(255, 255, 255, 0.08)",
                   border: "1px solid rgba(255, 255, 255, 0.15)",
                   borderRadius: "6px",
-                  padding: "2px 8px",
+                  padding: "3px 8px",
                   color: "#38BDF8",
                   fontSize: "11px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px",
+                  gap: "5px",
                 }}
               >
-                🔊 Qayta eshitish
+                <RefreshIcon size={12} color="#38BDF8" />
+                <span>Qayta eshitish</span>
               </button>
             </div>
             {lastTranscript}
