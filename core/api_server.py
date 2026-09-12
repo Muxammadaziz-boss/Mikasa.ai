@@ -1541,9 +1541,34 @@ async def handle_ws(request):
     return ws
 
 
-# ========== CORS Middleware ==========
+# ========== CORS & Origin Security Middleware ==========
+ALLOWED_REMOTE_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
+
 @web.middleware
 async def cors_middleware(request, handler):
+    # Remote IP tekshiruvi: faqat lokal mijozlar qabul qilinadi
+    if request.remote and request.remote not in ALLOWED_REMOTE_IPS:
+        logger.warning(f"Xavfsizlik: Begona tarmoqdan so'rov rad etildi: {request.remote}")
+        return web.HTTPForbidden(text="Xavfsizlik: Begona tarmoqdan murojaat taqiqlangan.")
+
+    origin = request.headers.get("Origin", "")
+    if origin:
+        origin_clean = origin.strip().lower()
+        is_allowed = (
+            origin_clean in ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
+            or origin_clean == "http://localhost"
+            or origin_clean.startswith("http://localhost:")
+            or origin_clean == "http://127.0.0.1"
+            or origin_clean.startswith("http://127.0.0.1:")
+            or origin_clean == "https://localhost"
+            or origin_clean.startswith("https://localhost:")
+            or origin_clean == "https://127.0.0.1"
+            or origin_clean.startswith("https://127.0.0.1:")
+        )
+        if not is_allowed:
+            logger.warning(f"Xavfsizlik: Begona veb-sayt Origin rad etildi: {origin}")
+            return web.HTTPForbidden(text="Xavfsizlik: Begona Origin orqali kirish taqiqlangan.")
+
     if request.method == "OPTIONS":
         response = web.Response()
     else:
@@ -1552,7 +1577,8 @@ async def cors_middleware(request, handler):
         except web.HTTPException as ex:
             response = ex
 
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    allowed_header_origin = origin if origin else "tauri://localhost"
+    response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response

@@ -7,6 +7,7 @@ import json
 import logging
 import datetime
 import importlib.util
+import re
 
 logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Loyiha ildizi
@@ -443,8 +444,17 @@ class PluginManager:
 
     def install(self, name: str, custom_data: dict = None, registry=None) -> bool:
         """Plagin o'rnatish"""
+        # Xavfsizlik: faqat xavfsiz identifikator nomlari qabul qilinadi
+        if not name or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+            logger.warning(f"Xavfsizlik: Noto'g'ri yoki xavfli plagin nomi rad etildi: '{name}'")
+            return False
+
         os.makedirs(self.plugins_dir, exist_ok=True)
-        target_path = os.path.join(self.plugins_dir, f"{name}.json")
+        real_plugins = os.path.realpath(self.plugins_dir)
+        target_path = os.path.realpath(os.path.join(self.plugins_dir, f"{name}.json"))
+        if not target_path.startswith(real_plugins):
+            logger.error(f"Xavfsizlik: Path traversal urinishi rad etildi: '{name}'")
+            return False
 
         if custom_data:
             data = custom_data
@@ -470,12 +480,16 @@ class PluginManager:
 
     def uninstall(self, name: str, registry=None) -> bool:
         """Plaginni butunlay o'chirish"""
+        if not name or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+            logger.warning(f"Xavfsizlik: Noto'g'ri yoki xavfli plagin nomi rad etildi: '{name}'")
+            return False
+
         deleted = False
         if os.path.exists(self.plugins_dir):
             for fname in os.listdir(self.plugins_dir):
-                clean_name = fname.lstrip("_")
-                base_name, _ = os.path.splitext(clean_name)
-                if base_name == name:
+                f_clean = fname.lstrip("_")
+                base_name, _ = os.path.splitext(f_clean)
+                if base_name == name or f_clean == name:
                     fpath = os.path.join(self.plugins_dir, fname)
                     try:
                         os.remove(fpath)
