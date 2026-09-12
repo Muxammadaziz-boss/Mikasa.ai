@@ -56,7 +56,7 @@ class Config:
             "logging": {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                "file_name": "yordamchi.log",
+                "file_name": "mikasa.log",
                 "max_file_size": 10 * 1024 * 1024,  # 10MB
                 "backup_count": 5,
             },
@@ -147,31 +147,36 @@ class Config:
 
     def setup_logging(self):
         """Logging tizimini sozlash"""
-        log_config = self.get("logging")
-        log_file = self.logs_dir / log_config["file_name"]
-
-        # Log format
-        formatter = logging.Formatter(log_config["format"])
-
-        # File handler
-        from logging.handlers import RotatingFileHandler
-
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=log_config["max_file_size"],
-            backupCount=log_config["backup_count"],
-            encoding="utf-8",
-        )
-        file_handler.setFormatter(formatter)
-
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-
-        # Root logger sozlash (dublikatsiya oldini olish)
         root_logger = logging.getLogger()
-        root_logger.setLevel(getattr(logging, log_config["level"]))
-        if not root_logger.handlers:  # Faqat bo'sh bo'lsagina qo'shish
+        log_config = self.get("logging")
+        root_logger.setLevel(getattr(logging, log_config.get("level", "INFO")))
+
+        if not root_logger.handlers:
+            try:
+                from core.logger import SensitiveDataFilter
+                sens_filter = SensitiveDataFilter()
+            except ImportError:
+                sens_filter = None
+
+            log_file = self.logs_dir / log_config.get("file_name", "mikasa.log")
+            formatter = logging.Formatter(log_config.get("format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+
+            from logging.handlers import RotatingFileHandler
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=log_config.get("max_file_size", 10 * 1024 * 1024),
+                backupCount=log_config.get("backup_count", 5),
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(formatter)
+            if sens_filter:
+                file_handler.addFilter(sens_filter)
+
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            if sens_filter:
+                console_handler.addFilter(sens_filter)
+
             root_logger.addHandler(file_handler)
             root_logger.addHandler(console_handler)
 

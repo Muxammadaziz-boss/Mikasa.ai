@@ -24,6 +24,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("MikasaAPIServer")
+try:
+    from core.logger import get_backend_handler, install_crash_handlers
+    logger.addHandler(get_backend_handler())
+    install_crash_handlers()
+except Exception:
+    pass
 
 # Backend modullari kesh singletonlari
 _main = None
