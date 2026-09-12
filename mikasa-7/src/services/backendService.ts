@@ -26,10 +26,13 @@ export interface ChatResponse {
 export interface CommandItem {
   id: string;
   name: string;
+  tool_name?: string;
   query: string;
   category: string;
   icon: string;
   desc: string;
+  parameters?: Record<string, any>;
+  is_tool?: boolean;
 }
 
 export interface CommandsResponse {
@@ -388,12 +391,15 @@ class BackendService {
     }
   }
 
-  public async executeCommand(command: string): Promise<{ ok: boolean; result: string }> {
+  public async executeCommand(
+    command: string,
+    parameters?: Record<string, any>
+  ): Promise<{ ok: boolean; result: string }> {
     try {
       const res = await fetch(`${API_BASE}/api/commands/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ command, parameters }),
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
       return await res.json();

@@ -221,6 +221,36 @@ def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask")
         except Exception as e:
             logger.warning(f"Dispatcher xatosi: {e}")
 
+    # 1.5. ToolRegistry dagi vositalarni to'g'ridan-to'g'ri chaqirish
+    try:
+        from core.agent_tools import get_registry
+        reg = get_registry()
+        candidate = clean_text.split()[0].lower() if " " in clean_text else clean_text.lower()
+        tool = reg.get(candidate)
+        if tool:
+            args_str = clean_text[len(candidate):].strip()
+            kwargs = {}
+            if candidate == "calculator" and args_str:
+                kwargs["expression"] = args_str
+            elif candidate == "weather" and args_str:
+                kwargs["city"] = args_str
+            elif candidate == "app_check" and args_str:
+                kwargs["app_name"] = args_str
+            elif candidate == "system_info" and args_str:
+                kwargs["category"] = args_str
+            elif candidate == "notification" and args_str:
+                kwargs["message"] = args_str
+            elif candidate == "currency" and args_str:
+                parts = args_str.split()
+                if len(parts) >= 2:
+                    kwargs["from_currency"], kwargs["to_currency"] = parts[0], parts[1]
+                elif len(parts) == 1:
+                    kwargs["from_currency"] = parts[0]
+            call_res = tool.call(**kwargs)
+            return format_tool_result(candidate, call_res)
+    except Exception as e:
+        logger.error(f"ToolRegistry chaqirishda xatolik: {e}")
+
     # 2. Mahalliy Intent tekshirish (buyruqni_aniqla) — faqat BUYRUQLAR uchun, savollar AI ga yo'naltiriladi
     has_question = "?" in clean_text or any(w in clean_text for w in [
         "bormi", "bormikan", "o'rnatilganmi", "ornatilganmi", "mavjudmi",
@@ -483,72 +513,192 @@ async def handle_chat_clear(request):
     return web.json_response({"ok": True, "message": "Suhbat tarixi tozalandi"})
 
 
-# ========== 3. BUYRUQLAR (COMMANDS) HANDLERS ==========
-DEFAULT_COMMANDS_CATALOG = [
-    {"id": "c1", "name": "Telegramni och", "query": "telegram", "category": "Ilovalar", "icon": "send", "desc": "Telegram messenjerini ishga tushiradi"},
-    {"id": "c2", "name": "YouTube-ni och", "query": "youtube", "category": "Multimedia", "icon": "video", "desc": "Brauzerda YouTube portalini ochadi"},
-    {"id": "c3", "name": "VS Code-ni och", "query": "vs code", "category": "Ilovalar", "icon": "code", "desc": "Dasturlash muhitini ishga tushiradi"},
-    {"id": "c4", "name": "Brauzerni och", "query": "brauzerni och", "category": "Ilovalar", "icon": "globe", "desc": "Standart internet brauzerini ishga tushiradi"},
-    {"id": "c5", "name": "Fayl menejeri", "query": "fayllar", "category": "Tizim", "icon": "folder", "desc": "Windows Explorer fayl menejerini ochadi"},
-    {"id": "c6", "name": "Task Menejer", "query": "vazifa menejeri", "category": "Tizim", "icon": "activity", "desc": "Tizim jarayonlari dispetcherini ochadi"},
-    {"id": "c7", "name": "Terminal (CMD)", "query": "terminal", "category": "Tizim", "icon": "terminal", "desc": "Windows buyruq satrini ochadi"},
-    {"id": "c8", "name": "Skrinshot olish", "query": "skrinshot", "category": "Tizim", "icon": "camera", "desc": "Butun ekranni rasmga olib saqlaydi"},
-    {"id": "c9", "name": "Ish stoli", "query": "ish stoli", "category": "Tizim", "icon": "monitor", "desc": "Barcha oynalarni yashirib ish stolini ko'rsatadi"},
-    {"id": "c10", "name": "Ovoz 50%", "query": "ovoz 50", "category": "Ovoz", "icon": "volume-2", "desc": "Kompyuter tovush darajasini 50% ga sozlaydi"},
-    {"id": "c11", "name": "Ovozni oshir", "query": "ovozni oshir 20", "category": "Ovoz", "icon": "volume-1", "desc": "Tovush balandligini 20 foizga ko'taradi"},
-    {"id": "c12", "name": "Ovozni pasaytir", "query": "ovozni pasaytir 20", "category": "Ovoz", "icon": "volume-x", "desc": "Tovush balandligini 20 foizga pasaytiradi"},
-    {"id": "c13", "name": "Musiqani to'xtat", "query": "musiqani to'xtat", "category": "Multimedia", "icon": "pause", "desc": "Ijro etilayotgan musiqani to'xtatadi"},
-    {"id": "c14", "name": "Musiqani davom et", "query": "davom et", "category": "Multimedia", "icon": "play", "desc": "To'xtatilgan musiqani qayta ijro etadi"},
-    {"id": "c15", "name": "Soat necha", "query": "soat necha", "category": "Vaqt", "icon": "clock", "desc": "Hozirgi aniq vaqtni aytadi"},
-    {"id": "c16", "name": "Bugungi sana", "query": "bugungi sana", "category": "Vaqt", "icon": "calendar", "desc": "Bugungi kun, oy va yilni aytadi"},
-    {"id": "c17", "name": "Ob-havo ma'lumoti", "query": "ob-havo", "category": "Qidiruv", "icon": "cloud", "desc": "Joriy shahar bo'yicha ob-havoni aytadi"},
-    {"id": "c18", "name": "Tizim sozlamalari", "query": "sozlamalar", "category": "Tizim", "icon": "settings", "desc": "Windows tizim sozlamalari panelini ochadi"}
+def format_tool_result(name: str, res: dict) -> str:
+    """ToolRegistry natijalarini foydalanuvchiga tushunarli formatga o'tkazish"""
+    if not res.get("success"):
+        err_msg = res.get("error", "Noma'lum xatolik")
+        return f"Xatolik: {err_msg}"
+    val = res.get("result")
+    if isinstance(val, dict):
+        if "message" in val and val["message"]:
+            return str(val["message"])
+        if "info" in val:
+            info = val["info"]
+            lines = [f"{k.upper()}: {v}" for k, v in info.items()]
+            return " | ".join(lines)
+        if "rate" in val:
+            return f"1 {val.get('from', 'USD')} = {val.get('rate')} {val.get('to', 'UZS')} ({val.get('name', '')})"
+        if "temp" in val:
+            return f"{val.get('city')}: {val.get('temp')}°C, Namlik: {val.get('humidity')}%, {val.get('desc', '')}"
+        if "found" in val:
+            apps = val.get("found", [])
+            return f"Topilgan ilovalar ({len(apps)} ta): " + ", ".join(apps)
+        if "processes" in val:
+            procs = val.get("processes", [])[:5]
+            names = [f"{p[1]} (CPU: {p[2]}%)" for p in procs]
+            return f"Jarayonlar ({len(val.get('processes', []))} ta): " + ", ".join(names)
+        return str(val)
+    elif isinstance(val, list):
+        if len(val) > 5:
+            return f"{len(val)} ta element: " + ", ".join(str(x) for x in val[:5]) + "..."
+        return ", ".join(str(x) for x in val)
+    return str(val)
+
+
+TOOL_METADATA = {
+    "system_info": {"title": "Tizim Resurslari", "category": "Tizim", "icon": "cpu"},
+    "app_check": {"title": "Ilovalar Tekshiruvi", "category": "Tizim", "icon": "check"},
+    "audio_control": {"title": "Ovoz Boshqaruvi", "category": "Tizim", "icon": "volume"},
+    "process_manager": {"title": "Protseslar Dispetcheri", "category": "Tizim", "icon": "cpu"},
+    "window_manager": {"title": "Oynalar Dispetcheri", "category": "Tizim", "icon": "monitor"},
+    "clipboard": {"title": "Bufer (Clipboard)", "category": "Tizim", "icon": "copy"},
+    "notification": {"title": "Windows Eslatmasi", "category": "Tizim", "icon": "bell"},
+    "screen_analyze": {"title": "Ekran Tahlili (Vision)", "category": "Tizim", "icon": "camera"},
+    "system_control": {"title": "Tizim Harakatlari", "category": "Tizim", "icon": "terminal"},
+    "calculator": {"title": "Kalkulyator", "category": "Utilitlar", "icon": "calculator"},
+    "file_manager": {"title": "Fayl Boshqaruvi", "category": "Utilitlar", "icon": "folder"},
+    "rag_reader": {"title": "Hujjatlar Tahlili (RAG)", "category": "Utilitlar", "icon": "file-text"},
+    "translator": {"title": "Matn Tarjimoni", "category": "Utilitlar", "icon": "globe"},
+    "sandbox_execute_python": {"title": "Python Sandbox", "category": "Utilitlar", "icon": "code"},
+    "secret_vault": {"title": "Xavfsiz Kalitlar", "category": "Utilitlar", "icon": "lock"},
+    "datetime": {"title": "Sana va Vaqt", "category": "Ma'lumot", "icon": "clock"},
+    "currency": {"title": "Valyuta Kurslari", "category": "Ma'lumot", "icon": "dollar-sign"},
+    "weather": {"title": "Ob-havo Ma'lumoti", "category": "Ma'lumot", "icon": "sun"},
+    "music_player": {"title": "Musiqa Pleyeri", "category": "Multimedia", "icon": "play"},
+    "web_search": {"title": "Internet Qidiruv", "category": "Internet", "icon": "search"},
+    "knowledge": {"title": "Bilimlar Bazasi", "category": "Xotira", "icon": "database"},
+    "vector_search": {"title": "Semantik Xotira", "category": "Xotira", "icon": "database"},
+    "reminder": {"title": "Eslatmalar", "category": "Rejalashtirish", "icon": "clock"},
+    "scheduler": {"title": "Vaqtli Vazifalar", "category": "Rejalashtirish", "icon": "calendar"},
+    "file_write": {"title": "Fayl Yozish (Kod)", "category": "Dasturlash", "icon": "code"},
+    "ask_user": {"title": "Foydalanuvchi Savoli", "category": "Interaktiv", "icon": "chat"},
+    "screen_click": {"title": "Sichqoncha Boshqaruvi", "category": "Interaktiv", "icon": "mouse-pointer"},
+    "keyboard_type": {"title": "Matn Kiritish", "category": "Interaktiv", "icon": "terminal"},
+    "keyboard_shortcut": {"title": "Klaviatura Tugmalari", "category": "Interaktiv", "icon": "terminal"},
+}
+
+QUICK_APP_SHORTCUTS = [
+    {"id": "app_telegram", "name": "Telegram (AyuGram)", "query": "telegram", "category": "Ilovalar", "icon": "send", "desc": "Telegram (yoki o'rnatilgan AyuGram) messenjerini ishga tushiradi"},
+    {"id": "app_vscode", "name": "Visual Studio Code", "query": "vs code", "category": "Ilovalar", "icon": "code", "desc": "VS Code dasturlash muhitini ishga tushiradi"},
+    {"id": "app_browser", "name": "Veb Brauzer", "query": "brauzerni och", "category": "Ilovalar", "icon": "globe", "desc": "Tizim standart internet brauzerini ochadi"},
+    {"id": "app_youtube", "name": "YouTube", "query": "youtube", "category": "Multimedia", "icon": "play", "desc": "Brauzerda YouTube portalini ochadi"},
+    {"id": "app_explorer", "name": "Fayllar (Explorer)", "query": "fayllar", "category": "Tizim", "icon": "folder", "desc": "Windows Explorer fayl menejerini ochadi"},
+    {"id": "app_cmd", "name": "Terminal (CMD)", "query": "terminal", "category": "Tizim", "icon": "terminal", "desc": "Windows buyruq satrini ochadi"},
+    {"id": "app_taskmgr", "name": "Vazifalar Dispetcheri", "query": "vazifa menejeri", "category": "Tizim", "icon": "cpu", "desc": "Windows Task Manager oynasini ochadi"},
+    {"id": "app_screenshot", "name": "Skrinshot Olish", "query": "skrinshot", "category": "Tizim", "icon": "camera", "desc": "Butun ekranning lahzali tasvirini olib saqlaydi"},
+    {"id": "app_desktop", "name": "Ish Stoliga O'tish", "query": "ish stoli", "category": "Tizim", "icon": "monitor", "desc": "Barcha oynalarni yig'ishtirib ish stolini ko'rsatadi"},
+    {"id": "app_settings", "name": "Windows Sozlamalari", "query": "sozlamalar", "category": "Tizim", "icon": "settings", "desc": "Windows tizim sozlamalari panelini ochadi"},
 ]
 
+
+# ========== 3. BUYRUQLAR (COMMANDS) HANDLERS ==========
 async def handle_commands_list(request):
-    """GET /api/commands - Barcha mavjud buyruqlar ro'yxati"""
-    categories = ["Barchasi", "Ilovalar", "Tizim", "Multimedia", "Ovoz", "Vaqt", "Qidiruv"]
+    """GET /api/commands - Barcha mavjud buyruqlar va real ToolRegistry vositalari ro'yxati"""
+    categories = [
+        "Barchasi",
+        "Tizim",
+        "Ilovalar",
+        "Utilitlar",
+        "Ma'lumot",
+        "Multimedia",
+        "Internet",
+        "Xotira",
+        "Rejalashtirish",
+        "Dasturlash",
+        "Interaktiv"
+    ]
     
-    # commands.json dan ham qo'shimchalarni yuklash
-    commands_file = os.path.join(BASE_DIR, "data", "commands.json")
-    custom_count = 0
-    if os.path.exists(commands_file):
-        try:
-            with open(commands_file, "r", encoding="utf-8") as f:
-                c_data = json.load(f)
-                custom_count = len(c_data)
-        except Exception:
-            pass
+    commands = []
+    
+    # 1. Tezkor ilovalar va amallar
+    commands.extend(QUICK_APP_SHORTCUTS)
+    
+    # 2. ToolRegistry dagi real vositalar
+    try:
+        from core.agent_tools import get_registry
+        reg = get_registry()
+        for name, tool in reg._tools.items():
+            meta = TOOL_METADATA.get(name, {})
+            cat = meta.get("category", "Tizim")
+            title = meta.get("title", name)
+            icon = meta.get("icon", "commands")
+            
+            commands.append({
+                "id": f"tool_{name}",
+                "name": title,
+                "tool_name": name,
+                "query": name,
+                "category": cat,
+                "icon": icon,
+                "desc": tool.description,
+                "parameters": tool.parameters,
+                "is_tool": True
+            })
+    except Exception as e:
+        logger.error(f"ToolRegistry yuklashda xatolik: {e}")
 
     return web.json_response({
         "ok": True,
         "categories": categories,
-        "commands": DEFAULT_COMMANDS_CATALOG,
-        "total_commands": max(len(DEFAULT_COMMANDS_CATALOG), custom_count)
+        "commands": commands,
+        "total_commands": len(commands)
     })
 
 
 async def handle_commands_execute(request):
-    """POST /api/commands/execute - Buyruqni darhol ishga tushirish"""
+    """POST /api/commands/execute - Buyruq yoki ToolRegistry vositasini darhol ishga tushirish"""
     try:
         body = await request.json()
     except Exception:
         return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
 
     cmd_text = body.get("command", "").strip()
+    cmd_params = body.get("parameters")
     if not cmd_text:
         return web.json_response({"ok": False, "error": "Buyruq kiritilmadi"}, status=400)
 
-    m, _, _, _, _, dispatcher = get_modules()
-    user = get_current_user_name()
-    ovoz = get_current_voice_type()
-
     loop = asyncio.get_running_loop()
 
-    def _run():
-        return execute_command_pipeline(cmd_text, user, ovoz, mode="command")
+    # ToolRegistry tekshirish
+    from core.agent_tools import get_registry
+    reg = get_registry()
+    candidate = cmd_text.split()[0].lower() if " " in cmd_text else cmd_text.lower()
+    tool = reg.get(candidate)
 
-    result_message = await loop.run_in_executor(None, _run)
+    if tool:
+        def _run_tool():
+            kwargs = {}
+            if isinstance(cmd_params, dict) and cmd_params:
+                kwargs = cmd_params
+            else:
+                args_str = cmd_text[len(candidate):].strip()
+                if candidate == "calculator" and args_str:
+                    kwargs["expression"] = args_str
+                elif candidate == "weather" and args_str:
+                    kwargs["city"] = args_str
+                elif candidate == "app_check" and args_str:
+                    kwargs["app_name"] = args_str
+                elif candidate == "system_info" and args_str:
+                    kwargs["category"] = args_str
+                elif candidate == "notification" and args_str:
+                    kwargs["message"] = args_str
+                elif candidate == "currency" and args_str:
+                    parts = args_str.split()
+                    if len(parts) >= 2:
+                        kwargs["from_currency"], kwargs["to_currency"] = parts[0], parts[1]
+                    elif len(parts) == 1:
+                        kwargs["from_currency"] = parts[0]
+            res = tool.call(**kwargs)
+            return format_tool_result(candidate, res)
+
+        result_message = await loop.run_in_executor(None, _run_tool)
+    else:
+        user = get_current_user_name()
+        ovoz = get_current_voice_type()
+        def _run_cmd():
+            return execute_command_pipeline(cmd_text, user, ovoz, mode="command")
+        result_message = await loop.run_in_executor(None, _run_cmd)
+
     await broadcast_ws("command_executed", {"command": cmd_text, "result": result_message})
 
     return web.json_response({
