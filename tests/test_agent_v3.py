@@ -114,6 +114,7 @@ class TestRetryLogic(unittest.TestCase):
             return '{"action": "final_answer", "response": "OK"}'
         
         agent = ReActAgent(reg, mock_ai)
+        agent._manager_agent = None  # To'g'ridan-to'g'ri ReAct loop tool retry tekshiruvi
         result = agent.run("test")
         # Tool 2 marta urinilishi kerak
         self.assertGreater(call_count[0], 1)

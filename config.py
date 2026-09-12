@@ -78,6 +78,13 @@ class Config:
                 # Standart va yuklangan konfiguratsiyani birlashtirish
                 config = self.default_config.copy()
                 self._deep_update(config, loaded_config)
+
+                # Dinamik temp_dir: har doim amaldagi tizim temp katalogini ta'minlash
+                if "paths" in config:
+                    saved_temp = config["paths"].get("temp_dir", "")
+                    if not saved_temp or not os.path.exists(saved_temp):
+                        config["paths"]["temp_dir"] = tempfile.gettempdir()
+
                 return config
             except Exception as e:
                 print(f"Konfiguratsiyani yuklashda xatolik: {e}")

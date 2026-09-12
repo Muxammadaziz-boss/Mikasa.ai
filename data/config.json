@@ -14,7 +14,7 @@
     "vad_enabled": true,
     "vad_threshold": 0.015,
     "silence_duration": 1.2,
-    "tts_speed": 1.6,
+    "tts_speed": 1.0,
     "tts_engine": "edge_tts"
   },
   "gui": {
@@ -32,7 +32,7 @@
     "commands_file": "commands.json",
     "history_file": "buyruqlar_tarixi.txt",
     "reminders_file": "eslatmalar.txt",
-    "temp_dir": "C:\\Users\\MUXAMM~1\\AppData\\Local\\Temp",
+    "temp_dir": "",
     "user_file": "foydalanuvchi_ismi.txt",
     "voice_file": "ovoz_turi.txt"
   },
