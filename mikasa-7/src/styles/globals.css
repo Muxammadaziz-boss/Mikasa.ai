@@ -104,3 +104,46 @@ input {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* ========== Phase 17 — Responsive Desktop Styles ========== */
+/* 1. Prevent excessive stretching on 1440p / 1080p ultra-wide screens */
+.responsive-container {
+  width: 100%;
+  max-width: 1140px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(16px, 3vw, 32px);
+  padding-right: clamp(16px, 3vw, 32px);
+}
+
+.chat-readable-container {
+  width: 100%;
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 2. Responsive scaling & non-clipping for 1024x700 and 1280x800 */
+@media (max-width: 1120px) {
+  .mikasa-sidebar {
+    width: var(--sidebar-width-collapsed) !important;
+    padding: 16px 8px 14px 8px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --font-size-body: 13px;
+  }
+  .composer-input-container {
+    padding: 8px 12px !important;
+  }
+}
+
+/* 3. 1920x1080 Ultra-Readable Viewport */
+@media (min-width: 1920px) {
+  .chat-readable-container {
+    max-width: 980px;
+  }
+}
+

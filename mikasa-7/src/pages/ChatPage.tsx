@@ -370,51 +370,61 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "24px 32px",
+          padding: "20px clamp(16px, 3vw, 32px)",
           display: "flex",
           flexDirection: "column",
-          gap: "20px",
         }}
       >
-        {messages.length === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "auto 0",
-              textAlign: "center",
-              gap: "16px",
-              maxWidth: "520px",
-              alignSelf: "center",
-            }}
-          >
-            <div style={{ marginBottom: "6px" }}>
-              <MikasaOrb size="100px" state={isLoading ? "thinking" : "idle"} />
-            </div>
-
-            <h2
-              className="text-metallic-gradient"
-              style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}
-            >
-              Mikasa AI Suhbatiga xush kelibsiz!
-            </h2>
-
-            <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
-              Salom, <strong>{userDisplayName}</strong>! Istalgan savolingizni bering, dasturlash va apparat holatini so'rang yoki kompyuteringiz boshqaruviga oid buyruqlarni yuboring.
-            </p>
-
-            {/* Quick Prompts */}
+        <div
+          className="chat-readable-container"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            width: "100%",
+            flex: 1,
+          }}
+        >
+          {messages.length === 0 ? (
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "auto 0",
+                textAlign: "center",
+                gap: "16px",
+                maxWidth: "520px",
+                alignSelf: "center",
                 width: "100%",
-                marginTop: "8px",
               }}
             >
+              <div style={{ marginBottom: "6px" }}>
+                <MikasaOrb size="100px" state={isLoading ? "thinking" : "idle"} />
+              </div>
+
+              <h2
+                className="text-metallic-gradient"
+                style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}
+              >
+                Mikasa AI Suhbatiga xush kelibsiz!
+              </h2>
+
+              <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
+                Salom, <strong>{userDisplayName}</strong>! Istalgan savolingizni bering, dasturlash va apparat holatini so'rang yoki kompyuteringiz boshqaruviga oid buyruqlarni yuboring.
+              </p>
+
+              {/* Quick Prompts */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "8px",
+                  width: "100%",
+                  marginTop: "8px",
+                }}
+              >
               {quickPrompts.map((p, idx) => (
                 <button
                   key={idx}
@@ -635,22 +645,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           </div>
         )}
 
+        </div>
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* 3. Composer Section (Multiline, Enter to Send, Shift+Enter for Newline) */}
       <div
         style={{
-          padding: "12px 24px 16px 24px",
+          padding: "12px clamp(16px, 3vw, 24px) 16px clamp(16px, 3vw, 24px)",
           borderTop: "1px solid var(--border)",
           backgroundColor: "var(--surface)",
         }}
       >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage();
-          }}
+        <div className="chat-readable-container" style={{ width: "100%" }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
           style={{
             display: "flex",
             alignItems: "flex-end",
@@ -797,6 +810,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             <ArrowUpIcon size={15} />
           </button>
         </form>
+        </div>
       </div>
     </div>
   );

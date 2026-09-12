@@ -785,6 +785,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: 16,
+                    flexWrap: "wrap",
                     opacity: isInactive ? 0.75 : 1,
                     transition: "all 0.15s ease",
                   }}

@@ -1470,20 +1470,13 @@ async def handle_account_update(request):
 
     # In-memory config.py singletonini ham yangilash
     try:
-        from config import set_config
-        if new_name:
-            set_config("user.name", new_name)
-        if new_voice in ["ayol", "erkak"]:
-            set_config("user.voice_type", new_voice)
-        if "tts_speed" in body and body["tts_speed"] is not None:
-            try:
-                set_config("audio.tts_speed", float(body["tts_speed"]))
-            except Exception:
-                pass
-        if "theme" in body and body["theme"]:
-            set_config("gui.theme", str(body["theme"]))
+        from config import config as cfg_instance
+        if hasattr(cfg_instance, "_deep_update"):
+            cfg_instance._deep_update(cfg_instance.config, cfg)
+        elif hasattr(cfg_instance, "config"):
+            cfg_instance.config.update(cfg)
     except Exception as e:
-        logger.warning(f"config.set_config xatoligi: {e}")
+        logger.warning(f"config singleton yangilash xatoligi: {e}")
 
     saved_user = new_name or get_current_user_name()
     saved_avatar = cfg["user"].get("avatar", "emerald")

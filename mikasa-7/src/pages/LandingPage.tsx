@@ -326,7 +326,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           className="landing-quick-actions"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: "10px",
             width: "100%",
             marginTop: "2px",

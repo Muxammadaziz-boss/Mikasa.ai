@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { WindowControls } from "../components/WindowControls";
 
@@ -19,7 +19,23 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenCommandPalette,
   children,
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 1120;
+    }
+    return false;
+  });
+
+  // Responsive desktop: auto-collapse sidebar when width < 1120px to prevent content clipping
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1120) {
+        setCollapsed(true);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
 
   return (
