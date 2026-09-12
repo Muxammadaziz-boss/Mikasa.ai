@@ -84,7 +84,14 @@ copyFileWithLog(dllSource, dllTarget, "WebView2 Loader DLL");
 // 5. Copy MSI Installer if exists
 const msiDir = path.join(tauriBundleDir, "msi");
 if (fs.existsSync(msiDir)) {
-  const msiFiles = fs.readdirSync(msiDir).filter((f) => f.endsWith(".msi"));
+  const msiFiles = fs.readdirSync(msiDir)
+    .filter((f) => f.endsWith(".msi"))
+    .sort((a, b) => {
+      const aVer = a.includes(version) ? 1 : 0;
+      const bVer = b.includes(version) ? 1 : 0;
+      if (bVer !== aVer) return bVer - aVer;
+      return fs.statSync(path.join(msiDir, b)).mtimeMs - fs.statSync(path.join(msiDir, a)).mtimeMs;
+    });
   if (msiFiles.length > 0) {
     const srcMsi = path.join(msiDir, msiFiles[0]);
     const destMsi = path.join(releaseVersionDir, `Mikasa-AI-${versionName}.msi`);
@@ -95,7 +102,14 @@ if (fs.existsSync(msiDir)) {
 // 6. Copy NSIS Setup if exists
 const nsisDir = path.join(tauriBundleDir, "nsis");
 if (fs.existsSync(nsisDir)) {
-  const nsisFiles = fs.readdirSync(nsisDir).filter((f) => f.endsWith(".exe"));
+  const nsisFiles = fs.readdirSync(nsisDir)
+    .filter((f) => f.endsWith(".exe"))
+    .sort((a, b) => {
+      const aVer = a.includes(version) ? 1 : 0;
+      const bVer = b.includes(version) ? 1 : 0;
+      if (bVer !== aVer) return bVer - aVer;
+      return fs.statSync(path.join(nsisDir, b)).mtimeMs - fs.statSync(path.join(nsisDir, a)).mtimeMs;
+    });
   if (nsisFiles.length > 0) {
     const srcNsis = path.join(nsisDir, nsisFiles[0]);
     const destNsis = path.join(releaseVersionDir, `Mikasa-AI-Setup-${versionName}.exe`);
