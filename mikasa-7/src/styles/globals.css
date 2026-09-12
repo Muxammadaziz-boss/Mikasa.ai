@@ -1,0 +1,194 @@
+@import "./tokens.css";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-darkest);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-darkest);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Artwork Layer */
+.cinematic-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../assets/mikasa-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.82;
+}
+
+/* Atmospheric vignette: softens orange highlights and dims bottom Mikasa text */
+.cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(5, 7, 11, 0.94) 0%, rgba(5, 7, 11, 0.82) 28%, rgba(5, 7, 11, 0.35) 55%, transparent 100%),
+    radial-gradient(ellipse at 50% 30%, rgba(5, 7, 11, 0.08) 0%, rgba(5, 7, 11, 0.58) 75%, rgba(5, 7, 11, 0.92) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Accessible focus outlines */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  user-select: none;
+}
+
+input {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+}
+
+/* Typography Gradient utility */
+.text-metallic-gradient {
+  background: linear-gradient(180deg, #FFFFFF 0%, #D2DEED 70%, #9EB5D0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ========== Phase 17 — Responsive Desktop Styles ========== */
+/* 1. Prevent excessive stretching on 1440p / 1080p ultra-wide screens */
+.responsive-container {
+  width: 100%;
+  max-width: 1140px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(16px, 3vw, 32px);
+  padding-right: clamp(16px, 3vw, 32px);
+}
+
+.chat-readable-container {
+  width: 100%;
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 2. Responsive scaling & non-clipping for 1024x700 and 1280x800 */
+@media (max-width: 1120px) {
+  .mikasa-sidebar {
+    width: var(--sidebar-width-collapsed) !important;
+    padding: 16px 8px 14px 8px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --font-size-body: 13px;
+  }
+  .composer-input-container {
+    padding: 8px 12px !important;
+  }
+}
+
+/* 3. 1920x1080 Ultra-Readable Viewport */
+@media (min-width: 1920px) {
+  .chat-readable-container {
+    max-width: 980px;
+  }
+}
+
+/* ========== Phase 18 — Accessibility (a11y) Styles ========== */
+/* Focus rings: visible high-contrast ring for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--primary-glow, #10B981) !important;
+  outline-offset: 2px !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced Motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast text ratio helpers */
+.text-high-contrast {
+  color: #FFFFFF !important;
+}
+
+.text-subtle-contrast {
+  color: #CBD5E1 !important;
+}
+

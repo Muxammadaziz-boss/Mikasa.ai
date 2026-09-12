@@ -133,20 +133,56 @@ FAQAT JSON QAYTARING. BOSHQA HECH NARSA YOZMANG.
 
 
 def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
-    """AI ga savol yuborish — avval Gemini, keyin OpenRouter"""
+    """AI ga savol yuborish — avval Gemini, keyin OpenRouter (to'liq kontekst va mantiqiy fikrlash bilan)"""
     
-    # AgentMemory dan foydalanuvchi bilimlarini promptga qo'shish
     global SYSTEM_PROMPT
     enriched_prompt = SYSTEM_PROMPT
+    
+    # 1. Foydalanuvchi ismi
+    enriched_prompt += f"\n\nJoriy foydalanuvchi ismi: {foydalanuvchi_ismi}."
+    
+    # 2. Kompyuter va dasturlar konteksti (Real-time Windows Inventory & Specs)
+    try:
+        from core.app_detector import get_app_detector
+        detector = get_app_detector()
+        specs = detector.get_realtime_system_specs()
+        inventory = detector.get_realtime_inventory_summary()
+        enriched_prompt += f"\n\nKOMPYUTER VA ILOVALAR HOLATI (REAL-TIME WINDOWS INVENTORY):\n{specs}\n\nAniqlangan dasturlar holati:\n{inventory}\n"
+    except Exception as e:
+        logging.warning(f"AI kontekstiga dasturlar va tizim ma'lumotlarini yuklashda xatolik: {e}")
+
+    # 3. AgentMemory dan bilimlar va so'nggi suhbat tarixi
     try:
         from core.agent_memory import get_memory
         memory = get_memory()
+        
+        # Bilimlar
         knowledge = memory.get_knowledge()
         if knowledge:
             bilimlar = "\n".join(f"- {k}: {v.get('value', v)}" for k, v in list(knowledge.items())[:10])
-            enriched_prompt += f"\n\nFOYDALANUVCHI HAQIDA BILIMLAR:\n{bilimlar}\nBu ma'lumotlarni suhbatda ishlat!"
+            enriched_prompt += f"\n\nFOYDALANUVCHI HAQIDA BILIMLAR:\n{bilimlar}\n"
+            
+        # So'nggi suhbat tarixi
+        conversations = memory.get_conversations(last_n=6)
+        if conversations:
+            tarix_lines = []
+            for c in conversations:
+                u = c.get("user", "").strip()
+                a = c.get("agent", "").strip()
+                if u and a:
+                    tarix_lines.append(f"Foydalanuvchi: {u}")
+                    tarix_lines.append(f"Mikasa: {a}")
+            if tarix_lines:
+                enriched_prompt += f"\nSO'NGGI SUHBAT TARIXI (Kontekst uchun):\n" + "\n".join(tarix_lines) + "\n"
     except Exception:
         pass
+
+    enriched_prompt += """
+\nMUHIM MANTIQ VA FIKRLASH QOIDALARI:
+- Agar foydalanuvchi 'shunga o'xshash', 'boshqa', 'u', 'yana' kabi so'zlarni ishlatsa, avvalgi suhbat mavzusi va kompyuterdagi mavjud dasturlar holatini bog'lab, chuqur mantiqiy, do'stona va foydali maslahat ber!
+- Masalan: Agar foydalanuvchi Telegram haqida so'ragan bo'lsa va keyin 'shunga o'xshash bormi?' desa, unga Telegramga o'xshash messenjerlar (WhatsApp, Discord, Signal) haqida ma'lumot ber, kompyuteridagi holatini ayt va qulay yechimlarni taklif qil.
+- Doimo foydalanuvchiga chin dildan yordam beradigan, mantiqan o'ylaydigan sun'iy intellekt bo'l!
+"""
     
     # 1-urinish: Google Gemini
     if GOOGLE_API_KEY:
@@ -166,12 +202,14 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
 
 
 def _gemini_yuborish(matn, system_prompt=None):
-    """Google Gemini API orqali so'rov — Google Search Grounding bilan"""
+    """Google Gemini API orqali so'rov — Google Search Grounding va Thinking Mode bilan"""
     prompt = system_prompt or SYSTEM_PROMPT
     GEMINI_MODELS = [
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
+        "gemini-flash-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
     ]
     
     suhbat_tarixi_gemini.append({"role": "user", "parts": [{"text": matn}]})
@@ -182,10 +220,7 @@ def _gemini_yuborish(matn, system_prompt=None):
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             
-            gen_config = {"maxOutputTokens": 1024, "temperature": 0.3}
-            # gemini-2.5 uchun thinking o'chirish
-            if "2.5" in model:
-                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+            gen_config = {"maxOutputTokens": 2048, "temperature": 0.4}
             
             request_body = {
                 "system_instruction": {"parts": [{"text": prompt}]},
@@ -223,10 +258,12 @@ def _gemini_yuborish(matn, system_prompt=None):
                     continue
             
             data = response.json()
-            # Grounded javobda bir nechta parts bo'lishi mumkin
             parts = data["candidates"][0]["content"]["parts"]
             ai_text = ""
             for part in parts:
+                # Agar modelning ichki o'ylash (thought) qismi bo'lsa, uni o'tkazib yuboramiz
+                if part.get("thought", False):
+                    continue
                 if "text" in part:
                     ai_text += part["text"]
             ai_text = ai_text.strip()
@@ -274,7 +311,7 @@ def _openrouter_yuborish(matn, system_prompt=None):
             json={
                 "model": OPENROUTER_MODEL,
                 "messages": messages,
-                "max_tokens": 300,
+                "max_tokens": 1024,
                 "temperature": 0.3,
             },
             timeout=15
@@ -300,14 +337,29 @@ def _openrouter_yuborish(matn, system_prompt=None):
 
 
 def _javob_tahlil(ai_text):
-    """AI javobini tahlil qilish"""
+    """AI javobini tahlil qilish (mustahkam himoya va tiklash bilan)"""
     javob = _json_ajratish(ai_text)
     
     if javob:
         logging.info(f"AI natija: type={javob.get('type')}, intent={javob.get('intent', '-')}")
         return javob
     else:
-        # Agar buzilgan JSON bo'lsa — xom matnni TTS ga bermaslik
+        # 1. Qisman uzilib qolgan JSON dan 'response' matnini chiqarib olish
+        import re
+        resp_match = re.search(r'"response"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)', ai_text)
+        if resp_match:
+            clean_resp = resp_match.group(1).replace('\\"', '"').replace('\\n', '\n').strip()
+            if clean_resp:
+                return {"type": "answer", "response": clean_resp}
+
+        # 2. Agar matnda JSON belgilari bo'lsa ham foydali matn qismini tozalab olish
+        tozalangan = re.sub(r'[{}\[\]"]', ' ', ai_text)
+        tozalangan = re.sub(r'\b(type|response|intent|params|answer)\b\s*:\s*', ' ', tozalangan)
+        tozalangan = re.sub(r'\s+', ' ', tozalangan).strip()
+        if len(tozalangan) > 15:
+            return {"type": "answer", "response": tozalangan}
+
+        # 3. Agar haqiqatdan ham foydali matn topilmasa
         if ai_text.strip().startswith("{"):
             logging.warning(f"Buzilgan JSON: {ai_text[:100]}")
             return {"type": "answer", "response": "Kechirasiz, javobni tayyorlashda xatolik bo'ldi. Qaytadan urinib ko'ring."}

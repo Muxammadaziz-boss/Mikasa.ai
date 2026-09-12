@@ -31,11 +31,32 @@ class ScheduledTask:
         self.data = data  # {"text": "..."} yoki {"tool": "...", "params": {...}}
         self.repeat_seconds = repeat_seconds  # 0 = bir marta, >0 = takrorlanuvchi
         self.completed = False
+        self.enabled = True
+        self.cancelled = False
+        self.last_run = None
+        self.last_error = None
         self.created_at = datetime.datetime.now()
+
+    def get_state(self) -> str:
+        """5 ta holatdan biri: 'active', 'completed', 'repeating', 'failed', 'cancelled'"""
+        if self.cancelled or not self.enabled:
+            return "cancelled"
+        if self.last_error:
+            return "failed"
+        if self.completed:
+            return "completed"
+        if self.repeat_seconds > 0:
+            return "repeating"
+        return "active"
 
     def is_due(self) -> bool:
         """Vaqti keldimi?"""
-        return not self.completed and datetime.datetime.now() >= self.run_at
+        return (
+            self.enabled
+            and not self.cancelled
+            and not self.completed
+            and datetime.datetime.now() >= self.run_at
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +66,11 @@ class ScheduledTask:
             "data": self.data,
             "repeat_seconds": self.repeat_seconds,
             "completed": self.completed,
+            "enabled": self.enabled,
+            "cancelled": self.cancelled,
+            "last_run": self.last_run,
+            "last_error": self.last_error,
+            "status": self.get_state(),
             "created_at": self.created_at.isoformat(),
         }
 
@@ -53,14 +79,20 @@ class ScheduledTask:
         task = cls(
             task_id=d["task_id"],
             run_at=datetime.datetime.fromisoformat(d["run_at"]),
-            task_type=d["task_type"],
-            data=d["data"],
+            task_type=d.get("task_type", "reminder"),
+            data=d.get("data", {}),
             repeat_seconds=d.get("repeat_seconds", 0),
         )
         task.completed = d.get("completed", False)
-        task.created_at = datetime.datetime.fromisoformat(
-            d.get("created_at", datetime.datetime.now().isoformat())
-        )
+        task.enabled = d.get("enabled", True)
+        task.cancelled = d.get("cancelled", False)
+        task.last_run = d.get("last_run", None)
+        task.last_error = d.get("last_error", None)
+        if "created_at" in d:
+            try:
+                task.created_at = datetime.datetime.fromisoformat(d["created_at"])
+            except Exception:
+                task.created_at = datetime.datetime.now()
         return task
 
 
@@ -76,6 +108,7 @@ class AgentScheduler:
         self._tasks = {}  # {task_id: ScheduledTask}
         self._file = os.path.join(BASE_DIR, "data", "scheduled_tasks.json")
         self._running = False
+        self._stop_event = threading.Event()
         self._thread = None
         self._callback = None  # Vazifa bajarilganda chaqiriladigan funksiya
         self._counter = 0
@@ -93,6 +126,7 @@ class AgentScheduler:
         if self._running:
             return
         self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._loop, daemon=True, name="Scheduler"
         )
@@ -102,8 +136,9 @@ class AgentScheduler:
     def stop(self):
         """To'xtatish"""
         self._running = False
-        if self._thread:
-            self._thread.join(timeout=10)
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3)
         self._save()
         logger.info("Scheduler to'xtatildi")
 
@@ -144,6 +179,74 @@ class AgentScheduler:
             logger.info(f"Vazifa qo'shildi: {task_id} ({task_type}) → {vaqt_str}")
             return task_id
 
+    def edit(
+        self,
+        task_id: str,
+        text: Optional[str] = None,
+        data: Optional[dict] = None,
+        run_at: Optional[datetime.datetime] = None,
+        delay_seconds: Optional[int] = None,
+        repeat_seconds: Optional[int] = None,
+    ) -> bool:
+        """Vazifani tahrirlash"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            if text is not None:
+                if not task.data:
+                    task.data = {}
+                task.data["text"] = text
+            if data is not None:
+                task.data = data
+            if run_at is not None:
+                task.run_at = run_at
+            elif delay_seconds is not None:
+                task.run_at = datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)
+            if repeat_seconds is not None:
+                task.repeat_seconds = max(0, repeat_seconds)
+            # Tahrirlanganda holatni yangilash
+            task.completed = False
+            task.cancelled = False
+            task.last_error = None
+            self._save()
+            logger.info(f"Vazifa tahrirlandi: {task_id}")
+            return True
+
+    def enable(self, task_id: str) -> bool:
+        """Vazifani faollashtirish"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            task.enabled = True
+            task.cancelled = False
+            task.last_error = None
+            self._save()
+            logger.info(f"Vazifa faollashtirildi: {task_id}")
+            return True
+
+    def disable(self, task_id: str) -> bool:
+        """Vazifani to'xtatib turish / bekor qilish"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            task.enabled = False
+            task.cancelled = True
+            self._save()
+            logger.info(f"Vazifa to'xtatildi: {task_id}")
+            return True
+
+    def execute(self, task_id: str) -> bool:
+        """Vazifani kutmasdan darhol bajarish"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+        self._execute_task(task)
+        return True
+
     def remove(self, task_id: str) -> bool:
         """Vazifani o'chirish"""
         with self._lock:
@@ -154,7 +257,7 @@ class AgentScheduler:
             return False
 
     def list_tasks(self, include_completed: bool = False) -> list:
-        """Barcha vazifalar ro'yxati"""
+        """Barcha vazifalar ro'yxati (boyitilgan holat ma'lumotlari bilan)"""
         with self._lock:
             tasks = []
             for task in self._tasks.values():
@@ -162,11 +265,21 @@ class AgentScheduler:
                     tasks.append(
                         {
                             "id": task.task_id,
+                            "task_id": task.task_id,
                             "type": task.task_type,
+                            "task_type": task.task_type,
                             "run_at": task.run_at.strftime("%Y-%m-%d %H:%M:%S"),
+                            "run_at_iso": task.run_at.isoformat(),
                             "data": task.data,
                             "completed": task.completed,
+                            "enabled": task.enabled,
+                            "cancelled": task.cancelled,
                             "repeat": task.repeat_seconds > 0,
+                            "repeat_seconds": task.repeat_seconds,
+                            "last_run": task.last_run,
+                            "last_error": task.last_error,
+                            "status": task.get_state(),
+                            "created_at": task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                         }
                     )
             return tasks
@@ -180,7 +293,7 @@ class AgentScheduler:
     @property
     def active_count(self) -> int:
         with self._lock:
-            return sum(1 for t in self._tasks.values() if not t.completed)
+            return sum(1 for t in self._tasks.values() if t.enabled and not t.completed and not t.cancelled)
 
     def _loop(self):
         """Background loop — har 5 soniyada tekshirish"""
@@ -189,7 +302,8 @@ class AgentScheduler:
                 self._check_tasks()
             except Exception as e:
                 logger.error(f"Scheduler loop xatolik: {e}")
-            time.sleep(5)  # 5 soniyada bir tekshirish
+            if self._stop_event.wait(timeout=5.0):
+                break
 
     def _check_tasks(self):
         """Vaqti kelgan vazifalarni bajarish"""
@@ -206,6 +320,9 @@ class AgentScheduler:
             if self._callback:
                 self._callback(task)
 
+            task.last_run = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            task.last_error = None
+
             if task.repeat_seconds > 0:
                 # Takrorlanuvchi — keyingi vaqtni belgilash
                 task.run_at = datetime.datetime.now() + datetime.timedelta(
@@ -218,7 +335,9 @@ class AgentScheduler:
             self._save()
         except Exception as e:
             logger.error(f"Vazifa bajarish xatolik: {task.task_id}: {e}")
+            task.last_error = str(e)
             task.completed = True
+            self._save()
 
     def _load(self):
         """Fayldan yuklash"""
@@ -226,11 +345,15 @@ class AgentScheduler:
             try:
                 with open(self._file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                for d in data.get("tasks", []):
+                tasks_list = data.get("tasks", [])
+                # Tarix uchun oxirgi 200 ta vazifani saqlash
+                for d in tasks_list[-200:]:
                     task = ScheduledTask.from_dict(d)
-                    if not task.completed:
-                        self._tasks[task.task_id] = task
+                    self._tasks[task.task_id] = task
                 self._counter = data.get("counter", 0)
+                logger.debug(f"Scheduler: {len(self._tasks)} ta vazifa yuklandi")
+            except Exception as e:
+                logger.warning(f"Scheduler yuklash xatolik: {e}")
                 logger.debug(f"Scheduler: {len(self._tasks)} ta vazifa yuklandi")
             except Exception as e:
                 logger.warning(f"Scheduler yuklash xatolik: {e}")

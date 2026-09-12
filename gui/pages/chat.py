@@ -739,6 +739,25 @@ class ChatPage(ctk.CTkFrame):
         self._input_var.set(text)
         self._on_send()
 
+    def send_prompt(self, text: str, auto_send: bool = True, attached_file: str = None):
+        """Tashqi sahifalardan (masalan, LandingPage) kelgan promptni qabul qilish"""
+        if attached_file and os.path.exists(attached_file):
+            self._attached_file = attached_file
+            self._show_attachment_preview(attached_file)
+        self._input_var.set(text)
+        if auto_send and (text or self._attached_file):
+            self._on_send()
+        else:
+            self.focus_input()
+
+    def focus_input(self):
+        """Chat input maydoniga fokus berish"""
+        try:
+            if hasattr(self, "input_entry") and self.input_entry.winfo_exists():
+                self.input_entry.focus_set()
+        except Exception:
+            pass
+
     def _clear_chat(self):
         self.hide_typing()
         self._remove_attached_file()
