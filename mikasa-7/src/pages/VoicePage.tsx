@@ -71,14 +71,27 @@ export const VoicePage: React.FC<VoicePageProps> = ({
     }
   };
 
+  const effectiveOrbState: "idle" | "listening" | "thinking" | "speaking" | "loading" | "error" | "offline" =
+    backendStatus.status === "offline"
+      ? "offline"
+      : backendStatus.status === "connecting"
+      ? "loading"
+      : voiceState;
+
   const getStateDescription = () => {
-    switch (voiceState) {
+    switch (effectiveOrbState) {
       case "listening":
         return "Sizni eshitmoqdaman... Gapiring";
       case "thinking":
         return "Mikasa o‘ylamoqda...";
       case "speaking":
         return "Mikasa gapirmoqda...";
+      case "offline":
+        return "Audio xizmati oflayn. Bog'lanish kutilmoqda...";
+      case "loading":
+        return "Audio tizimiga ulanilmoqda...";
+      case "error":
+        return "Ovoz tizimida xatolik yuz berdi.";
       case "idle":
       default:
         return "Muloqotni boshlash uchun tugmani bosing";
@@ -183,7 +196,7 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           }}
           title={voiceState === "listening" ? "Tinglashni to'xtatish" : "Tinglashni boshlash"}
         >
-          <MikasaOrb size={200} state={voiceState} />
+          <MikasaOrb size={200} state={effectiveOrbState} />
         </div>
 
         <div>

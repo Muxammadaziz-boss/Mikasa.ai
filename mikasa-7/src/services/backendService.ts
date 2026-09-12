@@ -101,7 +101,7 @@ export interface AccountSettings {
   voices_available: Array<{ id: string; name: string; lang: string }>;
 }
 
-export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
+export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 const API_BASE = "http://127.0.0.1:18420";
 const WS_BASE = "ws://127.0.0.1:18420/api/ws";
