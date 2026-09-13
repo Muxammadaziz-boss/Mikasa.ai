@@ -353,6 +353,9 @@ def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask")
                 
                 return ai_resp
 
+            elif isinstance(reply, dict) and reply.get("type") in ("confirmation", "clarification"):
+                return reply.get("question") or reply.get("response") or "Iltimos, tasdiqlang yoki aniqlashtiring."
+
             elif isinstance(reply, dict):
                 return reply.get("response") or reply.get("javob") or str(reply)
             elif reply:

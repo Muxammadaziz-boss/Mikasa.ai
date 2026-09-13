@@ -133,7 +133,20 @@ FAQAT JSON QAYTARING. BOSHQA HECH NARSA YOZMANG.
 
 
 def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
-    """AI ga savol yuborish — avval Gemini, keyin OpenRouter (to'liq kontekst va mantiqiy fikrlash bilan)"""
+    """AI ga savol yuborish — Mikasa Intelligence Core orqali
+    (Context -> Intent -> Reasoning -> Decision -> Tool -> Verification -> Response)
+    Har qanday nosozlikda an'anaviy to'g'ridan-to'g'ri fallback saqlanadi.
+    """
+    try:
+        from core.intelligence import get_orchestrator, CompatibilityAdapter
+        orchestrator = get_orchestrator()
+        intel_resp = orchestrator.handle(matn, user_name=foydalanuvchi_ismi)
+        if intel_resp:
+            legacy_dict = CompatibilityAdapter.to_legacy_ai_engine_dict(intel_resp)
+            if legacy_dict:
+                return legacy_dict
+    except Exception as e:
+        logging.warning(f"Intelligence Orchestrator orqali chaqirishda xatolik: {e}, an'anaviy oqimga o'tilmoqda...")
     
     global SYSTEM_PROMPT
     enriched_prompt = SYSTEM_PROMPT
