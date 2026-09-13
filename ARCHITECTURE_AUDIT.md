@@ -289,3 +289,61 @@ Master plandagi barcha bosqichlar qat'iy ketma-ketlikda bajariladi:
 
 *Hujjat Post-Phase-27 yakuniy ishlab chiqarish auditi talablariga muvofiq yangilandi.*
 
+---
+
+## 11. PHASE 28 — INTELLIGENCE CORE ARCHITECTURE
+
+**Holat:** `Phase 28 — Intelligence Core Yakunlandi`  
+**Tarmoq:** `dev-v7.0.0`  
+**Baho:** Production-Grade Modular Intelligence Layer
+
+### 11.1 Arxitektura Transformatsiyasi
+
+Oldingi monolitik va qattiq bog'langan oqim:
+```
+USER ──> LLM ──> RAW JSON COMMAND
+```
+
+Yangi ko'p bosqichli va xavfsiz **Intelligence Core** oqimi:
+```
+USER
+  │
+CONTEXT ENGINE (Selective & Bounded Context Assembly)
+  │
+AI PROVIDER MANAGER (Gemini 2.5 Flash / OpenRouter Fallback)
+  │
+INTENT ENGINE (Normalized Intent Categorization)
+  │
+DECISION ENGINE + PERMISSION ENGINE (Risk Assessment & Action Routing)
+  ├── ANSWER (Direct conversation)
+  ├── CLARIFICATION (Ambiguity resolution)
+  ├── CONFIRMATION (High-risk action safeguard)
+  └── COMMAND / TOOL
+        │
+     TOOL REGISTRY (Safe execution)
+        │
+     RESULT VERIFICATION (No fake success)
+        │
+COMPATIBILITY ADAPTER ──> REST / WebSocket / React Frontend
+```
+
+### 11.2 Yaratilgan Modullar (`core/intelligence/`)
+
+1. **`types.py`**: Barcha ichki qatlamlar uchun normalizatsiya qilingan ma'lumotlar modellari (`AIRequest`, `AIResponse`, `Intent`, `Decision`, `RiskLevel`, `IntelligenceResponse`).
+2. **`provider.py`**: Provayder-mustaqil `AIProvider` abstraksiyasi va deterministik fallback boshqaruvchisi `ProviderManager`.
+3. **`gemini_provider.py`**: Google Gemini REST integratsiyasi (Google Search Grounding, Thinking mode filtri, 429 kvota navbatlari va xatoliklar nazorati).
+4. **`openrouter_provider.py`**: OpenRouter fallback integratsiyasi (universal modellar va xavfsiz sarlavhalar).
+5. **`context.py`**: `ContextEngine` — faqat kerakli ma'lumotlarni (foydalanuvchi bilimlari, cheklangan suhbat tarixi, selektiv kompyuter spetsifikatsiyalari) xavfsiz va ixcham yig'ish.
+6. **`intent.py`**: `IntentEngine` — AI javobi yoki mahalliy qoidalardan niyatni normalizatsiya qilish.
+7. **`permission.py`**: `PermissionEngine` — amallarni `LOW`, `MEDIUM`, `HIGH` risk darajalariga ajratish va yuqori xavfli amallarni (`shutdown`, `restart`, `delete`) majburiy tasdiqlash rejimiga o'tkazish.
+8. **`decision.py`**: `DecisionEngine` — niyat va ruxsatlar asosida yakuniy qaror turini belgilash (`ANSWER`, `COMMAND`, `TOOL`, `CLARIFICATION`, `CONFIRMATION`, `ERROR`).
+9. **`orchestrator.py`**: `IntelligenceOrchestrator` — butun quvurni muvofiqlashtiruvchi, vositalar ijrosini nazorat qiluvchi va natijalarni tekshiruvchi markaziy kognitiv nazoratchi.
+10. **`adapter.py`**: `CompatibilityAdapter` — mavjud React frontend va `core/ai_engine.py` funksiyalariga 100% orqaga qaytuvchanlik (backward compatibility) ta'minlovchi ko'prik.
+
+### 11.3 Sinovlar va Ishonchlilik
+
+- **Yangi Testlar:** `tests/test_intelligence_core.py` (27 ta yangi test: provayder normalizatsiyasi, fallback, selektiv kontekst, niyat, ruxsatlar, orkestratsiya, asbob tekshiruvi va adapter).
+- **Regressiya Holati:** Barcha 66 ta backend testlari (39 ta oldingi + 27 ta yangi) va 10 ta frontend testlari 100% muvaffaqiyatli o'tdi.
+- **Xavfsizlik:** Model chiqishi hech qachon to'g'ridan-to'g'ri `eval`/`exec`/`os.system` ga uzatilmaydi; barcha ijrolar faqat ro'yxatdan o'tgan vositalar va ruxsatlar nazorati orqali amalga oshiriladi.
+
+
