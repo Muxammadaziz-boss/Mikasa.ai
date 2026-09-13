@@ -12,6 +12,22 @@ from core.intelligence.types import (
     Decision,
     IntelligenceResponse,
 )
+from core.intelligence.memory_types import (
+    MemoryType,
+    MemorySource,
+    MemoryConfidence,
+    MemoryItem,
+    ActiveTaskContext,
+)
+from core.intelligence.memory_policy import (
+    MemoryPolicy,
+    PolicyDecision,
+)
+from core.intelligence.memory_retriever import MemoryRetriever
+from core.intelligence.task_context import (
+    TaskContextManager,
+    get_task_context_manager,
+)
 from core.intelligence.provider import (
     AIProvider,
     ProviderManager,
@@ -34,6 +50,16 @@ __all__ = [
     "Intent",
     "Decision",
     "IntelligenceResponse",
+    "MemoryType",
+    "MemorySource",
+    "MemoryConfidence",
+    "MemoryItem",
+    "ActiveTaskContext",
+    "MemoryPolicy",
+    "PolicyDecision",
+    "MemoryRetriever",
+    "TaskContextManager",
+    "get_task_context_manager",
     "AIProvider",
     "ProviderManager",
     "GeminiProvider",
@@ -46,6 +72,7 @@ __all__ = [
     "CompatibilityAdapter",
     "get_orchestrator",
 ]
+
 
 _orchestrator = None
 
