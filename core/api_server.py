@@ -799,7 +799,13 @@ async def handle_memory_knowledge_save(request):
     if not mem:
         return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
 
-    mem.save_knowledge(key, value)
+    saved = mem.save_knowledge(key, value)
+    if not saved:
+        return web.json_response({
+            "ok": False,
+            "error": "Xotiraga saqlash rad etildi (maxfiy ma'lumot yoki siyosat cheklovi)"
+        }, status=400)
+
     await broadcast_ws("memory_updated", {"action": "save", "key": key, "value": value})
 
     return web.json_response({

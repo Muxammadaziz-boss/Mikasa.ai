@@ -8,6 +8,16 @@ import logging
 import datetime
 from collections import deque
 from threading import RLock
+from typing import Optional, List, Dict, Any
+
+from core.intelligence.memory_types import (
+    MemoryItem,
+    MemoryType,
+    MemorySource,
+    MemoryConfidence,
+)
+from core.intelligence.memory_policy import MemoryPolicy
+from core.intelligence.memory_retriever import MemoryRetriever
 
 logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Loyiha ildizi
@@ -158,16 +168,97 @@ class AgentMemory:
 
     # ========== BILIMLAR BAZASI ==========
 
-    def save_knowledge(self, key: str, value: str):
-        """Yangi bilim saqlash"""
+    def save_knowledge(
+        self,
+        key: str,
+        value: str,
+        memory_type: Optional[MemoryType] = None,
+        source: MemorySource = MemorySource.USER,
+        confidence: float = 1.0,
+        importance: float = 0.5,
+    ) -> bool:
+        """Yangi bilim saqlash (MemoryPolicy xavfsizlik va deduplikatsiya bilan)"""
         with self._lock:
-            self._knowledge[key] = {
-                "value": value,
-                "saved_at": datetime.datetime.now().isoformat(),
-                "access_count": 0,
-            }
+            decision = MemoryPolicy.evaluate_write(
+                key=key,
+                content=value,
+                source=source,
+                existing_knowledge=self._knowledge,
+            )
+
+            if not decision.allowed:
+                logger.warning(
+                    f"Bilim saqlash rad etildi: key='{key}', sabab='{decision.reason}'"
+                )
+                return False
+
+            if memory_type is None:
+                memory_type = MemoryPolicy.classify_type(key, decision.sanitized_content)
+
+            # Duplikat bo'lsa: mavjud xotirani yangilaymiz
+            if decision.is_duplicate and decision.existing_key:
+                target_key = decision.existing_key
+                if target_key in self._knowledge:
+                    existing = self._knowledge[target_key]
+                    if isinstance(existing, dict):
+                        existing["access_count"] = existing.get("access_count", 0) + 1
+                        existing["updated_at"] = datetime.datetime.now().isoformat()
+                        self._save_json(self._knowledge_file, self._knowledge)
+                        return True
+
+            # Yangi xotira yaratish
+            item = MemoryItem(
+                key=key,
+                content=decision.sanitized_content,
+                type=memory_type if isinstance(memory_type, MemoryType) else MemoryType(memory_type),
+                source=source if isinstance(source, MemorySource) else MemorySource(source),
+                importance=importance,
+                confidence=confidence,
+            )
+
+            # Ziddiyatli xotiralar tekshiruvi va yangilanishi
+            existing_items = self.get_memory_items()
+            MemoryPolicy.resolve_conflict(item, existing_items)
+            for ex in existing_items:
+                if ex.key in self._knowledge and not ex.is_active():
+                    self._knowledge[ex.key]["superseded_by"] = ex.superseded_by
+
+            self._knowledge[key] = item.to_dict()
             self._save_json(self._knowledge_file, self._knowledge)
-            logger.debug(f"Bilim saqlandi: {key} = {value}")
+            logger.debug(f"Bilim saqlandi ({item.type.value}): {key} = {decision.sanitized_content}")
+            return True
+
+    def get_memory_items(self) -> List[MemoryItem]:
+        """Barcha bilimlarni normalizatsiya qilingan MemoryItem ro'yxati sifatida olish"""
+        with self._lock:
+            items = []
+            for k, v in self._knowledge.items():
+                try:
+                    items.append(MemoryItem.from_dict(k, v))
+                except Exception as e:
+                    logger.warning(f"MemoryItem yaratishda xatolik ({k}): {e}")
+            return items
+
+    def retrieve_relevant(
+        self,
+        query: str,
+        limit: int = 6,
+        task_entities: Optional[List[str]] = None,
+    ) -> List[MemoryItem]:
+        """So'rov bo'yicha eng mos xotiralarni saralab qaytarish"""
+        with self._lock:
+            items = self.get_memory_items()
+            retrieved = MemoryRetriever.retrieve(
+                query=query,
+                items=items,
+                limit=limit,
+                task_entities=task_entities,
+            )
+            for item in retrieved:
+                if item.key in self._knowledge and isinstance(self._knowledge[item.key], dict):
+                    self._knowledge[item.key]["access_count"] = item.access_count
+                    self._knowledge[item.key]["last_used_at"] = item.last_used_at
+            return retrieved
 
     def get_knowledge(self, key: str = None) -> dict:
         """Bilim olish"""
