@@ -22,8 +22,40 @@ for (const dir of toolchainCandidates) {
   }
 }
 
-// 2. Working directory is projectRoot (portable across any folder)
-const workingDir = projectRoot;
+// 2. Working directory resolution (portable & space-safe on Windows MinGW toolchain)
+let workingDir = projectRoot;
+if (process.platform === 'win32' && workingDir.includes(' ')) {
+  // If invoked from an active junction/subst without spaces, prefer it
+  if (process.cwd() && !process.cwd().includes(' ')) {
+    try {
+      if (fs.realpathSync(process.cwd()) === fs.realpathSync(workingDir)) {
+        workingDir = process.cwd();
+      }
+    } catch {}
+  }
+
+  // If still containing spaces, dynamically map space-ancestor to a root junction
+  if (workingDir.includes(' ')) {
+    const rootDrive = path.parse(workingDir).root;
+    let spaceAncestor = workingDir;
+    while (spaceAncestor && path.dirname(spaceAncestor) !== spaceAncestor) {
+      const parent = path.dirname(spaceAncestor);
+      if (!parent.includes(' ')) break;
+      spaceAncestor = parent;
+    }
+    const junctionBase = path.join(rootDrive, 'mikasa_ws');
+    try {
+      if (!fs.existsSync(junctionBase)) {
+        execSync(`cmd /c mklink /J "${junctionBase}" "${spaceAncestor}"`, { stdio: 'ignore' });
+      }
+      const rel = path.relative(spaceAncestor, workingDir);
+      const spaceFreePath = path.join(junctionBase, rel);
+      if (fs.existsSync(spaceFreePath)) {
+        workingDir = spaceFreePath;
+      }
+    } catch {}
+  }
+}
 
 // 3. Forward all CLI arguments to tauri
 const args = process.argv.slice(2);
