@@ -236,4 +236,56 @@ Master plandagi barcha bosqichlar qat'iy ketma-ketlikda bajariladi:
 
 ---
 
-*Hujjat Phase 0 talablariga muvofiq tayyorlandi va loyiha ildiziga muhrlandi.*
+## 10. POST-PHASE-27 AUDIT & PRODUCTION RELEASE CANDIDATE (RC) STATUS
+
+**Holat:** `v7.1.0-RC1` (Branch: `dev-v7.0.0`)  
+**Yakunlangan sana:** 2026-09-13  
+**Baho:** Production-Ready Release Candidate
+
+### 10.1 Hal Qilingan Texnik Qarzlar va Arxitektura Natijalari
+
+1. **Native Desktop Windowing & Supervisor (Phase 1, 2, 26, Hardening Pass):**
+   - Brauzer yoki `Chrome/Edge --app` rejimiga bog'liqlik butunlay yo'q qilindi. Ilova native **Tauri 2.0 (x64)** qobig'ida ishlaydi.
+   - Frontend assetlari (`dist/`) to'liq `.exe` binar fayli ichiga joylandi (`beforeBuildCommand` orqali to'g'ridan-to'g'ri bog'langan).
+   - Rust supervisor (`mikasa-7/src-tauri/src/lib.rs`) o'ziga tegishli backend bolalar jarayonini (`state.backend_child`) kuzatadi, `child.try_wait()` orqali kutilmagan to'xtashlarni darhol aniqlaydi va ilova yopilganda faqat o'zi ochgan jarayon daraxtini xavfsiz tozalaydi (`taskkill /F /T /PID`).
+   - Python kashfiyoti kengaytirildi: o'rnatilgan/portativ (`python/python.exe`, `runtime/python.exe`), virtual muhit (`.venv`) va tizim darajasidagi runtime'larni avtomatik aniqlaydi.
+
+2. **Dasturchi Yo'llaridan Tozalash (Portativlik):**
+   - Dasturchi kompyuteriga bog'langan statik yo'llar (`D:\tools\w64devkit\bin`, `D:\Ishchi stoli\Mikasa`, `C:\Users\...`) butunlay chiqarib tashlandi.
+   - `scripts/tauri.js` dinamik toolchain discovery va bo'sh joyli yo'llarda (spaces in path) xavfsiz ishlash uchun dinamik ishchi katalog boshqaruviga o'tkazildi.
+
+3. **Xavfsizlik va Tarmoq Himoyasi (Phase 20, Hardening Pass):**
+   - **CSP:** `tauri.conf.json` da qat'iy Content Security Policy joriy etildi (`default-src 'self' tauri: http://localhost:18420 ...`).
+   - **CORS:** `core/api_server.py` faqat ruxsat etilgan mahalliy originlarni (`tauri://localhost`, `http://localhost:*`, `http://127.0.0.1:*`) qabul qiladi; begona saytlar (`evil.com`, va h.k.) 403 Forbidden bilan to'xtatiladi.
+   - **Lokal Tarmoq Izolyatsiyasi:** `ALLOWED_REMOTE_IPS` faqat `127.0.0.1` va `::1` ga ruxsat beradi; tashqi LAN so'rovlari bloklanadi.
+   - **Path Traversal Himoyasi:** `core/agent_plugins.py` plagin nomlarini `^[a-zA-Z0-9_\-]+$` regexi va `os.path.realpath` tekshiruvi orqali xavfsiz chegaralaydi.
+
+4. **Kodni Tozalash va Maxfiy Ma'lumotlarni Sanitarizatsiya Qilish (Phase 22):**
+   - `core/logger.py` dagi `SensitiveDataFilter` barcha API kalitlar (`AIza...`, `sk-...`, `Bearer ...`) va parollarni log fayllariga yozilishidan oldin avtomatik yashiradi (`***MASKED_KEY***`).
+
+5. **Avtomatlashtirilgan Test Sinovlari (Phases 23–25, CI):**
+   - **Backend:** 39 ta birlik va integratsiya testlari (`test_e2e_lifecycle.py`, `test_windows_qa.py`, `test_stress.py`, `test_logging.py`, `test_security_api.py`, va h.k.) 100% muvaffaqiyatli o'tdi (3.82s).
+   - **Frontend:** 10 ta Node.js testlari (`frontend.test.mjs`, `stress.test.mjs`) to'liq o'tdi (308ms).
+   - **Stress:** 1000 ta so'rov tezkor rejimda sinovdan o'tkazildi (1731 req/s, o'rtacha kechikish 0.56ms, xotira o'zgarishi +0.08MB).
+   - **CI:** `.github/workflows/ci.yml` GitHub Actions orqali Python 3.11/3.12 va Node 20 uchun avtomatik tekshiruvni ta'minlaydi.
+
+6. **Reliz Paketlari va Portativ Launcher (Phase 26, 27):**
+   - Barcha reliz fayllari `release/v7.1.0/` katalogida tayyorlandi:
+     - `Mikasa-AI-v7.1.0.exe` (4.78 MB, mustaqil native desktop ilova)
+     - `WebView2Loader.dll` (0.15 MB, native bog'liqlik)
+     - `Mikasa-AI-v7.1.0.msi` (2.60 MB, Windows MSI o'rnatuvchi)
+     - `Mikasa-AI-Setup-v7.1.0.exe` (1.85 MB, NSIS o'rnatuvchi)
+     - `run_portable.bat` (bir marta bosish bilan ishga tushiruvchi avtomatik skript)
+     - `version_manifest.json` (SHA-256 xesh kodlari va hajm ko'rsatkichlari)
+
+### 10.2 Ishlab Chiqarish Asoslari va Qolgan Taxminlar (Production Assumptions)
+
+1. **Python Runtime:**
+   - Foydalanuvchi tizimida Python 3.10+ (yoki ilova yoniga qo'yilgan embedded `python/` jildi) va `requirements.txt` dagi paketlar (`aiohttp`, `psutil`, va h.k.) mavjud bo'lishi talab etiladi.
+2. **Windows WebView2 Runtime:**
+   - Windows 11 va Windows 10 ning zamonaviy versiyalarida WebView2 sukut bo'yicha mavjud; eski Windows versiyalarida Microsoft WebView2 Evergreen Bootstrapper talab etiladi.
+3. **Port 18420:**
+   - Ilova `127.0.0.1:18420` portida faoliyat ko'rsatadi. Ushbu port boshqa dasturlar tomonidan band qilinmagan bo'lishi kerak.
+
+*Hujjat Post-Phase-27 yakuniy ishlab chiqarish auditi talablariga muvofiq yangilandi.*
+
