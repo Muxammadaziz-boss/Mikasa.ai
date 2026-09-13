@@ -1,0 +1,62 @@
+name: Mikasa AI CI
+
+on:
+  push:
+    branches: [ "dev-v7.0.0", "main" ]
+  pull_request:
+    branches: [ "dev-v7.0.0", "main" ]
+
+jobs:
+  backend-test:
+    name: Backend Tests (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp psutil requests python-dotenv Pillow numpy packaging
+
+      - name: Run Backend Test Suite
+        run: |
+          python -m unittest tests/test_e2e_lifecycle.py tests/test_windows_qa.py tests/test_stress.py tests/test_logging.py tests/test_security_api.py tests/test_account_api.py tests/test_plugins_api.py tests/test_scheduler_api.py tests/test_memory_api.py tests/test_commands_api.py
+
+  frontend-test-and-build:
+    name: Frontend Test & Build (Node 20)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'mikasa-7/package.json'
+
+      - name: Install Frontend dependencies
+        working-directory: mikasa-7
+        run: npm install
+
+      - name: Run Frontend Tests
+        working-directory: mikasa-7
+        run: npm test
+
+      - name: Compile Frontend (Vite)
+        working-directory: mikasa-7
+        run: npm run build
