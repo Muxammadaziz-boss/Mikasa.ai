@@ -78,8 +78,25 @@ fn resolve_base_dir() -> Option<PathBuf> {
 
 fn find_python_executable(base_dir: &PathBuf) -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1. Bundled or embedded Python distribution
+    candidates.push(base_dir.join("python").join("python.exe"));
+    candidates.push(base_dir.join("runtime").join("python.exe"));
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join("python").join("python.exe"));
+            candidates.push(exe_dir.join("runtime").join("python.exe"));
+        }
+    }
+
+    // 2. Local virtual environment (.venv)
     candidates.push(base_dir.join(".venv").join("Scripts").join("python.exe"));
+    candidates.push(base_dir.join(".venv").join("bin").join("python"));
+
+    // 3. Parent workspace directories
     if let Some(p1) = base_dir.parent() {
+        candidates.push(p1.join("python").join("python.exe"));
         candidates.push(p1.join(".venv").join("Scripts").join("python.exe"));
         if let Some(p2) = p1.parent() {
             candidates.push(p2.join(".venv").join("Scripts").join("python.exe"));
@@ -202,6 +219,18 @@ fn app_is_maximized(window: tauri::Window) -> Result<bool, String> {
 
 #[tauri::command]
 fn backend_get_status(state: tauri::State<SupervisorState>) -> serde_json::Value {
+    // Check if tracked child process has exited unexpectedly
+    if let Ok(mut lock) = state.backend_child.lock() {
+        if let Some(ref mut child) = *lock {
+            if let Ok(Some(_exit_status)) = child.try_wait() {
+                *lock = None;
+                if let Ok(mut pid_lock) = state.backend_pid.lock() {
+                    *pid_lock = None;
+                }
+            }
+        }
+    }
+
     let is_reachable = if let Ok(addr) = "127.0.0.1:18420".parse() {
         TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok()
     } else {
