@@ -346,4 +346,111 @@ COMPATIBILITY ADAPTER ──> REST / WebSocket / React Frontend
 - **Regressiya Holati:** Barcha 66 ta backend testlari (39 ta oldingi + 27 ta yangi) va 10 ta frontend testlari 100% muvaffaqiyatli o'tdi.
 - **Xavfsizlik:** Model chiqishi hech qachon to'g'ridan-to'g'ri `eval`/`exec`/`os.system` ga uzatilmaydi; barcha ijrolar faqat ro'yxatdan o'tgan vositalar va ruxsatlar nazorati orqali amalga oshiriladi.
 
+---
+
+## 12. PHASE 29 — CONTEXT & MEMORY INTELLIGENCE
+
+**Holat:** `Phase 29 — Context & Memory Intelligence Yakunlandi`  
+**Tarmoq:** `dev-v7.0.0`  
+**Baho:** Production-Grade High-Relevance Context & Memory Intelligence
+
+### 12.1 Arxitektura va Dizayn Prinsiplari
+
+Phase 29 doirasida alohida ikkinchi xotira bazasi (competing database) yaratilmadi; mavjud barqaror `AgentMemory` (`core/agent_memory.py`) kengaytirildi va intellektual modullar bilan chuqurlashtirildi:
+- **Evolyutsiya:** "Barcha suhbatlar va bilimlarni o'qish" modelidan "Joriy vazifa uchun faqat eng kerakli, yuqori reytingli kontekstni saralab olish" modeliga o'tildi.
+- **Xotira — Ko'rsatma emas, Ma'lumot (DATA ONLY):** Xotira ma'lumotlari tizim promptiga faqat `RELEVANT FOYDALANUVCHI BILIMLARI (DATA ONLY)` ko'rinishida uzatiladi. Xotiradagi hech qanday matn tizim qoidalarini, xavfsizlik darajalarini yoki ruxsatnomalarni bekor qila olmaydi.
+- **Maxfiylik va Filtrlash:** API kalitlar (`AIza...`, `sk-...`, `ghp_...`), Bearer tokenlar va parollar xotiraga yozilishidan oldin aniqlanadi va rad etiladi.
+
+```
+FOYDALANUVCHI XABARI
+       │
+TASK CONTEXT MANAGER (Faol vazifalar & 'shunga', 'undagi' havolalari)
+       │
+MEMORY POLICY (Maxfiy ma'lumotlar filtri, Injection himoyasi, Deduplikatsiya)
+       │
+AGENT MEMORY (agent_knowledge.json + MemoryItem normalizatsiyasi)
+       │
+MEMORY RETRIEVER (Ko'p omilli deterministik reyting: Leksik 40% + Muhimlik 20% + Ishonchlilik 15% + Recency 15%)
+       │
+CONTEXT ENGINE 2.0 (Chegaralangan tarix + Faol vazifa + Saralangan xotiralar + DATA ONLY)
+       │
+AI PROVAYDER (Gemini / OpenRouter)
+```
+
+### 12.2 Yangi va Kengaytirilgan Modullar
+
+1. **`core/intelligence/memory_types.py`**:
+   - `MemoryType`: `FACT` (faktlar), `PREFERENCE` (afzalliklar), `CONVERSATION` (suhbat xulosasi), `TASK` (davom etayotgan vazifa), `NOTE` (eslatma).
+   - `MemorySource`: `USER`, `CONVERSATION`, `SYSTEM`.
+   - `MemoryConfidence`: `HIGH` (1.0), `MEDIUM` (0.6), `LOW` (0.3).
+   - `MemoryItem`: Normalizatsiya qilingan xotira modeli (id, key, content, value, type, source, importance, confidence, access_count, superseded_by, metadata).
+   - `ActiveTaskContext`: Ko'p qadamli vazifalar uchun faol holat (task_id, goal, entities, last_action, last_result, status).
+
+2. **`core/intelligence/memory_policy.py`**:
+   - `MemoryPolicy.contains_sensitive_data()`: Gemini, OpenAI, GitHub tokenlari, Bearer tokenlar va parollarni avtomatik aniqlash va xotiraga saqlanishini bloklash.
+   - `MemoryPolicy.sanitize_for_prompt_injection()`: Prompt injection xurujlarini zararsizlantirish.
+   - `MemoryPolicy.evaluate_write()`: Duplikatlarni aniqlash va mavjud xotirani yangilash.
+   - `MemoryPolicy.resolve_conflict()`: Ziddiyatli yangi foydalanuvchi ma'lumoti kelganda eskisini `superseded_by` bilan belgilash.
+   - `MemoryPolicy.classify_type()`: Kalit va matndan xotira turini (`FACT`, `PREFERENCE`, `TASK`, `NOTE`) aniqlash.
+
+3. **`core/intelligence/memory_retriever.py`**:
+   - `MemoryRetriever`: Tashqi og'ir vektor ma'lumotlar bazalariga (ChromaDB va h.k.) tayanmasdan, to'liq deterministik va tezkor (<1ms) ko'p omilli kompozit skoring:
+     - Leksik qoplash (Lexical overlap): 40%
+     - Muhimlik (Importance): 20%
+     - Ishonchlilik (Confidence): 15%
+     - Yangilik / Vaqt omili (Recency): 15%
+     - Xotira turi koeffitsiyenti (Type weight: TASK 1.25, PREFERENCE 1.15, FACT 1.0, NOTE 0.95)
+     - Faol vazifa ob'ektlari bonusi (Task entity bonus: +0.25)
+   - Bounded retrieval: Belgilangan limit (sukut bo'yicha 6 ta) doirasida eng mos xotiralarni ajratadi.
+   - Faol bo'lmagan (`is_active() == False`) xotiralarni avtomatik chetlab o'tadi.
+
+4. **`core/intelligence/task_context.py`**:
+   - `TaskContextManager`: Ko'p bosqichli vazifalarning maqsadlari va ob'ektlarini (`entities`) kuzatib boradi.
+   - `resolve_reference_hint()`: Foydalanuvchi "shunga", "undagi", "o'sha" kabi olmoshlar ishlatganda, faol vazifa yoki avvalgi suhbat burilishlaridagi ob'ektni (masalan: "telegram", "github") aniqlaydi va tizim promptiga kontekstual bog'lanish ko'rsatmasini qo'shadi.
+
+5. **`core/intelligence/context.py` (Context Engine 2.0)**:
+   - Chegaralangan suhbat tarixi (6 ta burilish).
+   - Faol vazifa konteksti va havola ko'rsatmasini inyeksiya qilish.
+   - Saralangan va chegaralangan xotiralarni `RELEVANT FOYDALANUVCHI BILIMLARI (DATA ONLY)` bo'limiga kiritish.
+   - Xotira yoki disk xatolari yuz berganda xavfsiz zaxira (resilience) rejimi.
+
+6. **`core/agent_memory.py`**:
+   - `save_knowledge()` metodi `MemoryPolicy` orqali sanitizatsiya, maxfiylik tekshiruvi va duplikat nazoratiga ulandi.
+   - `get_memory_items()` va `retrieve_relevant()` metodlari qo'shildi.
+   - REST API va React frontend bilan 100% orqaga qaytuvchanlik saqlandi.
+
+### 12.3 Sinovlar va Sifat Ko'rsatkichlari
+
+- **Yangi Testlar:** `tests/test_memory_intelligence.py` — 25 ta to'liq test:
+  1. Xotira birligi normalizatsiyasi
+  2. Fakt va afzallik klassifikatsiyasi
+  3. Aniq xotira saqlash oqimi
+  4. Ishonchlilik darajalari
+  5. API kalit maxfiyligini rad etish
+  6. Parol maxfiyligini rad etish
+  7. Duplikat aniqlash (aniq kalit)
+  8. Noaniq duplikat aniqlash (sinonim kalit)
+  9. Yangilanish oqimi
+  10. Leksik moslik reytingi
+  11. Yangilik (recency) reytingi
+  12. Faol vazifa bonusi
+  13. Chegaralangan qidiruv chegarasi
+  14. Kontekst byudjetiga rioya qilish
+  15. Chegaralangan suhbat tarixi
+  16. Faol vazifadan havola ko'rsatmasi
+  17. Suhbat tarixidan havola ko'rsatmasi
+  18. Faol vazifa hayot sikli
+  19. Ziddiyatlarni hal qilish (`superseded_by`)
+  20. Faol bo'lmagan xotiralarni qidiruvdan chiqarish
+  21. ContextEngine barqarorligi (xatoliklarga chidamlilik)
+  22. Xotirani tozalash
+  23. Xotiradan bitta elementni o'chirish
+  24. `AgentMemory` orqaga qaytuvchanligi
+  25. ContextEngine integratsiyasi va anti-injection sarlavhalari
+- **Barcha 25 ta test 100% muvaffaqiyatli o'tdi (0.078s).**
+- **Phase 28 Intelligence Core testlari:** 27 ta test 100% o'tdi (0.573s).
+- **Frontend Testlari:** 10 ta Node.js testi 100% o'tdi (267ms).
+- **Frontend Build:** `npm run build` muvaffaqiyatli (270ms, xatosiz).
+
+
 
