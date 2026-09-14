@@ -15,6 +15,7 @@ class MemoryType(str, Enum):
     CONVERSATION = "conversation"  # Suhbatdagi muhim mavzu yoki xulosa
     TASK = "task"                  # Davom etayotgan yoki faol vazifa ma'lumotlari
     NOTE = "note"                  # Foydalanuvchi eslab qolishni so'ragan eslatma
+    WORK_CONTEXT = "work_context"  # Ish va loyiha muhiti konteksti
 
 
 class MemorySource(str, Enum):
@@ -44,6 +45,7 @@ class MemoryItem:
     last_used_at: Optional[str] = None
     access_count: int = 0
     superseded_by: Optional[str] = None   # Ziddiyatli yangi xotira bilan almashtirilgan bo'lsa
+    pinned: bool = False                  # Foydalanuvchi tomonidan qadalgan/muhim belgilangan
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def is_active(self) -> bool:
@@ -60,18 +62,26 @@ class MemoryItem:
             "source": self.source.value if isinstance(self.source, MemorySource) else str(self.source),
             "importance": self.importance,
             "confidence": self.confidence,
+            "is_active": self.is_active(),
             "created_at": self.created_at,
             "saved_at": self.created_at,  # Legacy field
             "updated_at": self.updated_at,
             "last_used_at": self.last_used_at,
             "access_count": self.access_count,
             "superseded_by": self.superseded_by,
+            "pinned": self.pinned,
             "metadata": self.metadata,
         }
 
     @classmethod
-    def from_dict(cls, key: str, data: Any) -> "MemoryItem":
+    def from_dict(cls, key_or_data: Any, data: Any = None) -> "MemoryItem":
         """Mavjud agent_knowledge.json yoki yangi formatdan MemoryItem yaratish"""
+        if data is None and isinstance(key_or_data, dict):
+            data = key_or_data
+            key = str(data.get("key", ""))
+        else:
+            key = str(key_or_data)
+
         if isinstance(data, str):
             return cls(key=key, content=data)
 
@@ -104,6 +114,7 @@ class MemoryItem:
             last_used_at=data.get("last_used_at"),
             access_count=int(data.get("access_count", 0)),
             superseded_by=data.get("superseded_by"),
+            pinned=bool(data.get("pinned", False)),
             metadata=data.get("metadata", {}),
         )
 

@@ -43,10 +43,67 @@ export interface CommandsResponse {
 }
 
 export interface KnowledgeItem {
+  id?: string;
   key: string;
   value: string;
+  content?: string;
+  type?: "fact" | "preference" | "work_context" | "task" | "note" | string;
+  source?: "user" | "conversation" | "system" | string;
+  importance?: number;
+  confidence?: number;
+  pinned?: boolean;
+  is_active?: boolean;
   saved_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_used_at?: string | null;
   access_count?: number;
+  superseded_by?: string | null;
+}
+
+export interface MemoryPolicyConfig {
+  do_not_remember_all: boolean;
+  do_not_remember?: boolean;
+  blocked_types: string[];
+  blocked_keys: string[];
+}
+
+export interface MemoryMetrics {
+  total_memories: number;
+  active_memories: number;
+  pinned_memories: number;
+  superseded_memories: number;
+  retrieval_requests_total: number;
+  total_retrieval_requests?: number;
+  memories_retrieved_total: number;
+  average_selected_per_request: number;
+  memory_hit_count: number;
+  memory_hit_rate: number;
+  hit_rate?: number;
+  rejected_writes_total: number;
+  rejected_writes_sensitive: number;
+  rejected_writes_policy: number;
+  deleted_items_total: number;
+  user_deletions?: number;
+}
+
+export interface ContextTraceStageItem {
+  stage: string;
+  status: string;
+  duration_ms: number;
+  details: Record<string, any>;
+  data?: Record<string, any>;
+}
+
+export interface ContextTraceItem {
+  trace_id: string;
+  query?: string;
+  timestamp: string;
+  total_duration_ms: number;
+  duration_ms?: number;
+  stage_count: number;
+  stages: ContextTraceStageItem[];
+  success?: boolean;
 }
 
 export interface ContextTurn {
@@ -65,6 +122,8 @@ export interface MemoryResponse {
     kontekst_hajmi?: number;
     suhbatlar_soni?: number;
     bilimlar_soni?: number;
+    faol_bilimlar_soni?: number;
+    pinned_bilimlar_soni?: number;
     profil_toliq?: boolean;
   };
 }
@@ -523,12 +582,18 @@ class BackendService {
     }
   }
 
-  public async saveKnowledge(key: string, value: string): Promise<boolean> {
+  public async saveKnowledge(
+    key: string,
+    value: string,
+    type?: string,
+    importance?: number,
+    pinned?: boolean
+  ): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE}/api/memory/knowledge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify({ key, value, type, importance, pinned }),
       });
       return res.ok;
     } catch {
@@ -544,6 +609,103 @@ class BackendService {
       return res.ok;
     } catch {
       return false;
+    }
+  }
+
+  public async updateKnowledgeItem(
+    id: string,
+    data: { key?: string; value?: string; content?: string; type?: string; importance?: number; pinned?: boolean }
+  ): Promise<{ ok: boolean; message?: string; item?: KnowledgeItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/knowledge/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || "Ulanish xatosi" };
+    }
+  }
+
+  public async deleteKnowledgeItem(idOrKey: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/knowledge/${encodeURIComponent(idOrKey)}`, {
+        method: "DELETE",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async togglePinKnowledge(idOrKey: string, pinned: boolean): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: idOrKey, pinned }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async getMemoryPolicy(): Promise<MemoryPolicyConfig> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/policy`, { method: "GET" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return data.policy || { do_not_remember_all: false, blocked_types: [], blocked_keys: [] };
+    } catch {
+      return { do_not_remember_all: false, blocked_types: [], blocked_keys: [] };
+    }
+  }
+
+  public async saveMemoryPolicy(config: Partial<MemoryPolicyConfig>): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/policy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  public async getMemoryMetrics(): Promise<MemoryMetrics | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/memory/metrics`, { method: "GET" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return data.metrics || null;
+    } catch {
+      return null;
+    }
+  }
+
+  public async getContextTraces(): Promise<ContextTraceItem[]> {
+    try {
+      const res = await fetch(`${API_BASE}/api/context/traces`, { method: "GET" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return data.traces || [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async getLastContextTrace(): Promise<ContextTraceItem | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/context/last-trace`, { method: "GET" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return data.trace || null;
+    } catch {
+      return null;
     }
   }
 

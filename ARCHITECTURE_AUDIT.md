@@ -454,3 +454,87 @@ AI PROVAYDER (Gemini / OpenRouter)
 
 
 
+---
+
+## 13. Phase 30: Memory UX, User Control & Context Observability
+
+### 13.1 Arxitektura Maqsadi va Asosiy Tamoyillar
+Phase 30 tizim xotirasini foydalanuvchi to'liq boshqaradigan, shaffof, tushunarli, tahrirlanadigan, o'chiriladigan va kuzatiladigan holatga keltirishga bag'ishlangan.
+
+**ASOSIY TAMOYIL: FOYDALANUVCHI XOTIRANING YAGON QONUNIY EGASIDIR.**
+- **DATA ONLY**: Xotira qat'iy ma'lumot (DATA) sifatida ishlatiladi, u hech qachon tizim ko'rsatmasi (system instruction) yoki xavfsizlik cheklovlarini buzuvchi vosita bo'la olmaydi.
+- **Explainability**: Har bir tanlangan yoki rad etilgan xotira uchun tushunarli tushuntirish beriladi.
+- **User Control**: Foydalanuvchi xotiralarni ko'rishi, qidirishi, filtrlashi, tahrirlashi, o'chirishi, muhim qilib qadashi (pin) va yozishni taqiqlashi (Do-Not-Remember) mumkin.
+- **Context Observability**: Har bir so'rovning 11 ta kontekst bosqichi (Context Trace) orqali to'liq kuzatilishi va sirlarni avtomatik niqoblash (Sensitive Redaction).
+
+### 13.2 Yangi Imkoniyatlar va Modullar
+
+1. **`core/intelligence/memory_types.py`**:
+   - `pinned: bool = False`: Foydalanuvchi tomonidan doimiy ustuvor deb belgilangan xotiralar uchun bayroq.
+   - `WORK_CONTEXT = "work_context"`: Loyiha, ish muhiti yoki joriy dasturlash konteksti uchun yangi xotira turi.
+   - `is_active()` metodi: Faol yoki yangi versiya bilan almashtirilgan (`superseded_by`) holatni aniqlash.
+
+2. **`core/intelligence/memory_policy.py`**:
+   - **Do-Not-Remember Policy**:
+     - `do_not_remember_all`: Butunlay barcha xotiralarni saqlashni to'xtatish.
+     - `blocked_types`: Belgilangan xotira turlarini (masalan, `work_context`, `preference`) bloklash.
+     - `blocked_keys`: Muayyan kalitlarni (masalan, maxfiy kalitlar) bloklash.
+   - `data/memory_policy.json` fayliga atomik (`os.replace`) xavfsiz saqlash.
+
+3. **`core/intelligence/memory_retriever.py`**:
+   - **Pinned Boost (+0.35)**: Foydalanuvchi qadagan xotiralar qidiruv reytingida ustuvorlik oladi.
+   - `retrieve_with_explanation()`: Xotiralarni saralash bilan birga inson tushunadigan izoh (`reason`) va batafsil ball taqsimotini (`debug_details`) taqdim etadi.
+
+4. **`core/intelligence/observability.py`**:
+   - `redact_sensitive_data()`: API kalitlari, tokenlar, parollar va maxfiy ma'lumotlarni izlardan avtomatik niqoblovchi funksiya (`[REDACTED]`).
+   - `ContextTrace` & `ContextTraceStage`: Har bir so'rov bo'yicha 11 bosqichli telemetriya zanjiri (`REQUEST`, `LOCAL_DISPATCH`, `TASK_CONTEXT`, `MEMORY_RETRIEVAL`, `SELECTED_MEMORY`, `PROVIDER`, `INTENT`, `PERMISSION`, `DECISION`, `TOOL`, `RESPONSE`).
+   - `ObservabilityManager`: So'nggi 25 ta so'rov uchun xotirada cheklangan ring-bufer (Ring Buffer) va xotira metrikalari menejeri (`MemoryMetricsManager`).
+
+5. **`core/agent_memory.py`**:
+   - Atomik xavfsiz fayl yozish (`os.replace` orqali ma'lumot yo'qolishining oldini olish).
+   - `update_knowledge_item()`: Mavjud bilimning kaliti, qiymati, turi, muhimligi va qadanganlik holatini tahrirlash.
+   - `delete_knowledge_item()`: Bitta xotirani kalit yoki ID bo'yicha xavfsiz o'chirish.
+   - `pin_knowledge_item()`: Xotirani qadash yoki qadoqdan chiqarish.
+
+6. **REST API & WebSocket (`core/api_server.py`)**:
+   - `PUT /api/memory/knowledge/{id}`: Xotira elementini tahrirlash.
+   - `DELETE /api/memory/knowledge/{id}`: Xotirani o'chirish.
+   - `POST /api/memory/pin`: Xotirani qadash / yechish.
+   - `GET /api/memory/policy` & `POST /api/memory/policy`: Maxfiylik siyosatini boshqarish.
+   - `GET /api/memory/metrics`: Xotira quyi tizimi metrikalari.
+   - `GET /api/context/traces` & `GET /api/context/last-trace`: Kontekst izlari va telemetriyasi.
+   - `memory_updated`, `memory_policy_updated` WebSocket real-time hodisalari.
+
+7. **Frontend UX (`mikasa-7/src/pages/MemoryPage.tsx`)**:
+   - **Memory Inspector & Filter Bar**: Qidiruv, turlar bo'yicha filtr (`fact`, `preference`, `work_context`, `task`, `note`), qadalganlar filtri va holat filtri (`faol`, `eskirgan`).
+   - **Full Metadata Edit Modal**: Kalit, mazmun, tur, muhimlik slayderi (0-100%) va qadash (pin) tanlovi.
+   - **Safe Delete Modal**: O'chirilayotgan xotira mazmuni va kaliti bilan tasdiqlash oynasi.
+   - **Privacy & Do-Not-Remember Tab**: Global xotirani o'chirish switchi, taqiqlangan turlar va taqiqlangan kalitlar ro'yxatini boshqarish.
+   - **Observability & Traces Tab**: Xotira metrikalari kartalari (jami, faol, qadalgan, murojaatlar, hit rate), so'nggi 25 ta kontekst izlari, 11 ta bosqich bo'yicha vaqt va detallar, xotira tanlash izohlari (reasons & scores).
+
+### 13.3 Testlar va Verifikatsiya
+
+- **`tests/test_memory_ux.py` (18 ta test)**:
+  - Serializatsiya va to'liq metadatalar mavjudligi
+  - ID yoki kalit bo'yicha xavfsiz tahrirlash
+  - ID yoki kalit bo'yicha xavfsiz o'chirish
+  - Doimiy qadash (pin/unpin)
+  - Qadalgan elementlarning qidiruv reytingidagi bonusi (+0.35)
+  - Do-Not-Remember global taqiq
+  - Do-Not-Remember turlar bo'yicha taqiq
+  - Do-Not-Remember kalitlar bo'yicha taqiq
+  - Siyosat faylining atomik saqlanishi
+  - Faol va qadalgan elementlar statistikasi
+  - Atomik fayl saqlash ishonchliligi
+- **`tests/test_memory_observability.py` (16 ta test)**:
+  - Maxfiy ma'lumotlarni (API kalit, token, parol) izlarda avtomatik niqoblash
+  - 11 bosqichli ContextTrace yaratish va vaqt hisobi
+  - 25 ta izdan iborat ring-bufer chegaralanganligi
+  - Xotira metrikalari hisob-kitobi (hit rate, deletions, pinned, active)
+  - Tushunarli o'zbekcha izohlar bilan xotira tanlovi (`retrieve_with_explanation`)
+  - REST API orqali izlar va metrikalarni olish
+- **`tests/test_memory_intelligence.py` (25 ta test)**: 100% o'tdi.
+- **`tests/test_intelligence_core.py` (24 ta test)**: 100% o'tdi.
+- **`tests/test_memory_api.py` (7 ta test)**: 100% o'tdi.
+- **Frontend Testlari**: 10/10 test muvaffaqiyatli o'tdi.
+- **Frontend Build**: `tsc && vite build` 270ms ichida to'liq xatosiz muvaffaqiyatli yakunlandi.

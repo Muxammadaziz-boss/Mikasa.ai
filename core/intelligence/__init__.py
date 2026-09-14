@@ -40,6 +40,14 @@ from core.intelligence.decision import DecisionEngine
 from core.intelligence.permission import PermissionEngine
 from core.intelligence.orchestrator import IntelligenceOrchestrator
 from core.intelligence.adapter import CompatibilityAdapter
+from core.intelligence.observability import (
+    ContextTraceStage,
+    ContextTrace,
+    MemoryMetricsManager,
+    ObservabilityManager,
+    get_observability_manager,
+    redact_sensitive_data,
+)
 
 __all__ = [
     "RiskLevel",
@@ -71,6 +79,12 @@ __all__ = [
     "IntelligenceOrchestrator",
     "CompatibilityAdapter",
     "get_orchestrator",
+    "ContextTraceStage",
+    "ContextTrace",
+    "MemoryMetricsManager",
+    "ObservabilityManager",
+    "get_observability_manager",
+    "redact_sensitive_data",
 ]
 
 

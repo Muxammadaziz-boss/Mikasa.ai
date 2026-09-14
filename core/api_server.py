@@ -731,23 +731,49 @@ async def handle_memory_get(request):
     context_turns = mem.get_context(last_n=30)
     stats = mem.stats
 
-    # Bilimlarni qulay array formatga o'tkazish
+    # Bilimlarni qulay va to'liq array formatga o'tkazish
     knowledge_list = []
     if isinstance(raw_knowledge, dict):
         for k, v in raw_knowledge.items():
             if isinstance(v, dict):
                 knowledge_list.append({
+                    "id": v.get("id") or k,
                     "key": k,
                     "value": v.get("value", ""),
+                    "content": v.get("content") or v.get("value", ""),
+                    "type": v.get("type", "fact"),
+                    "source": v.get("source", "user"),
+                    "importance": float(v.get("importance", 0.5)),
+                    "confidence": float(v.get("confidence", 1.0)),
+                    "created_at": v.get("created_at") or v.get("saved_at", ""),
                     "saved_at": v.get("saved_at", ""),
-                    "access_count": v.get("access_count", 0)
+                    "updated_at": v.get("updated_at") or v.get("saved_at", ""),
+                    "last_used_at": v.get("last_used_at"),
+                    "access_count": int(v.get("access_count", 0)),
+                    "superseded_by": v.get("superseded_by"),
+                    "is_active": v.get("superseded_by") is None,
+                    "pinned": bool(v.get("pinned", False)),
+                    "metadata": v.get("metadata", {}),
                 })
             else:
                 knowledge_list.append({
+                    "id": k,
                     "key": k,
                     "value": str(v),
+                    "content": str(v),
+                    "type": "fact",
+                    "source": "user",
+                    "importance": 0.5,
+                    "confidence": 1.0,
+                    "created_at": datetime.now().isoformat(),
                     "saved_at": datetime.now().isoformat(),
-                    "access_count": 0
+                    "updated_at": datetime.now().isoformat(),
+                    "last_used_at": None,
+                    "access_count": 0,
+                    "superseded_by": None,
+                    "is_active": True,
+                    "pinned": False,
+                    "metadata": {},
                 })
 
     return web.json_response({
@@ -791,6 +817,8 @@ async def handle_memory_knowledge_save(request):
 
     key = body.get("key", "").strip()
     value = body.get("value", "").strip()
+    pinned = bool(body.get("pinned", False))
+    memory_type = body.get("type")
 
     if not key or not value:
         return web.json_response({"ok": False, "error": "Kalit so'z va qiymat talab qilinadi"}, status=400)
@@ -799,7 +827,7 @@ async def handle_memory_knowledge_save(request):
     if not mem:
         return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
 
-    saved = mem.save_knowledge(key, value)
+    saved = mem.save_knowledge(key, value, memory_type=memory_type, pinned=pinned)
     if not saved:
         return web.json_response({
             "ok": False,
@@ -816,29 +844,155 @@ async def handle_memory_knowledge_save(request):
     })
 
 
-async def handle_memory_knowledge_delete(request):
-    """DELETE /api/memory/knowledge - Bilimni o'chirish"""
-    key = request.query.get("key", "").strip()
-    if not key:
-        try:
-            body = await request.json()
-            key = body.get("key", "").strip()
-        except Exception:
-            pass
+async def handle_memory_knowledge_update(request):
+    """PUT /api/memory/knowledge/{id} - Xotira elementini tahrirlash"""
+    match_info = getattr(request, "match_info", {})
+    item_id = match_info.get("id", "").strip() if match_info else ""
+    if not item_id:
+        return web.json_response({"ok": False, "error": "Xotira ID kiritilmadi"}, status=400)
 
-    if not key:
-        return web.json_response({"ok": False, "error": "O'chirish uchun 'key' kiritilmadi"}, status=400)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    key = body.get("key")
+    value = body.get("value") if body.get("value") is not None else body.get("content")
+    memory_type = body.get("type")
+    importance = body.get("importance")
+    pinned = body.get("pinned")
 
     _, _, mem, _, _, _ = get_modules()
     if not mem:
         return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
 
-    success = mem.delete_knowledge(key)
-    if success:
-        await broadcast_ws("memory_updated", {"action": "delete", "key": key})
-        return web.json_response({"ok": True, "message": f"'{key}' o'chirildi"})
+    updated_item = mem.update_knowledge_item(
+        item_id_or_key=item_id,
+        key=key,
+        content=value,
+        memory_type=memory_type,
+        importance=importance,
+        pinned=pinned
+    )
+
+    if updated_item:
+        await broadcast_ws("memory_updated", {"action": "update", "item": updated_item.to_dict()})
+        return web.json_response({
+            "ok": True,
+            "message": f"'{updated_item.key}' muvaffaqiyatli yangilandi",
+            "item": updated_item.to_dict()
+        })
     else:
-        return web.json_response({"ok": False, "error": f"'{key}' topilmadi"}, status=404)
+        existing = mem.get_memory_item_by_id(item_id)
+        if not existing:
+            return web.json_response({"ok": False, "error": f"ID='{item_id}' bo'yicha xotira topilmadi"}, status=404)
+        return web.json_response({"ok": False, "error": "Xotirani yangilash rad etildi (siyosat yoki maxfiy ma'lumot)"}, status=400)
+
+
+async def handle_memory_knowledge_delete(request):
+    """DELETE /api/memory/knowledge va DELETE /api/memory/knowledge/{id} - Bilimni o'chirish"""
+    match_info = getattr(request, "match_info", {})
+    target = match_info.get("id", "").strip() if match_info else ""
+    if not target and hasattr(request, "query") and request.query:
+        target = request.query.get("key", "").strip() or request.query.get("id", "").strip()
+    if not target and hasattr(request, "json"):
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                target = body.get("key", "").strip() or body.get("id", "").strip()
+        except Exception:
+            pass
+
+    if not target:
+        return web.json_response({"ok": False, "error": "O'chirish uchun ID yoki key kiritilmadi"}, status=400)
+
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    success = mem.delete_knowledge_item(target)
+    if success:
+        await broadcast_ws("memory_updated", {"action": "delete", "target": target})
+        return web.json_response({"ok": True, "message": f"'{target}' o'chirildi"})
+    else:
+        return web.json_response({"ok": False, "error": f"'{target}' topilmadi"}, status=404)
+
+
+async def handle_memory_pin(request):
+    """POST /api/memory/pin - Xotirani qadash (pin) yoki qadoqdan chiqarish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    item_id = body.get("id", "").strip() or body.get("key", "").strip()
+    pinned = bool(body.get("pinned", True))
+
+    if not item_id:
+        return web.json_response({"ok": False, "error": "Xotira ID yoki key kiritilmadi"}, status=400)
+
+    _, _, mem, _, _, _ = get_modules()
+    if not mem:
+        return web.json_response({"ok": False, "error": "Xotira moduli mavjud emas"}, status=500)
+
+    success = mem.pin_knowledge_item(item_id, pinned=pinned)
+    if success:
+        await broadcast_ws("memory_updated", {"action": "pin", "id": item_id, "pinned": pinned})
+        return web.json_response({"ok": True, "message": f"'{item_id}' qadash holati yangilandi: {pinned}"})
+    else:
+        return web.json_response({"ok": False, "error": f"'{item_id}' topilmadi"}, status=404)
+
+
+async def handle_memory_policy_get(request):
+    """GET /api/memory/policy - Xotira maxfiyligi va Do-Not-Remember sozlamalari"""
+    from core.intelligence.memory_policy import MemoryPolicy
+    config = MemoryPolicy.get_policy_config()
+    return web.json_response({"ok": True, "policy": config})
+
+
+async def handle_memory_policy_save(request):
+    """POST /api/memory/policy - Xotira maxfiyligi va Do-Not-Remember sozlamalarini yangilash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    from core.intelligence.memory_policy import MemoryPolicy
+    updated = MemoryPolicy.update_policy_config(
+        do_not_remember_all=body.get("do_not_remember_all"),
+        blocked_types=body.get("blocked_types"),
+        blocked_keys=body.get("blocked_keys")
+    )
+    await broadcast_ws("memory_policy_updated", {"policy": updated})
+    return web.json_response({"ok": True, "message": "Xotira siyosati muvaffaqiyatli saqlandi", "policy": updated})
+
+
+async def handle_memory_metrics_get(request):
+    """GET /api/memory/metrics - Xotira quyi tizimi telemetriya metrikalari"""
+    _, _, mem, _, _, _ = get_modules()
+    from core.intelligence.observability import get_observability_manager
+    metrics = get_observability_manager().metrics.get_metrics(agent_memory=mem)
+    return web.json_response({"ok": True, "metrics": metrics})
+
+
+async def handle_context_traces_get(request):
+    """GET /api/context/traces - So'rovlar kontekst ijro izlari ro'yxati"""
+    limit_str = request.query.get("limit", "10")
+    try:
+        limit = max(1, min(25, int(limit_str)))
+    except ValueError:
+        limit = 10
+
+    from core.intelligence.observability import get_observability_manager
+    traces = get_observability_manager().get_recent_traces(limit=limit)
+    return web.json_response({"ok": True, "traces": traces})
+
+
+async def handle_context_last_trace_get(request):
+    """GET /api/context/last-trace - Oxirgi so'rovning to'liq kontekst izi"""
+    from core.intelligence.observability import get_observability_manager
+    trace = get_observability_manager().get_last_trace()
+    return web.json_response({"ok": True, "trace": trace})
 
 
 async def handle_memory_knowledge_clear(request):
@@ -1621,10 +1775,20 @@ def create_app():
     app.router.add_get("/api/memory", handle_memory_get)
     app.router.add_post("/api/memory/profile", handle_memory_profile_save)
     app.router.add_post("/api/memory/knowledge", handle_memory_knowledge_save)
+    app.router.add_put("/api/memory/knowledge/{id}", handle_memory_knowledge_update)
     app.router.add_delete("/api/memory/knowledge", handle_memory_knowledge_delete)
+    app.router.add_delete("/api/memory/knowledge/{id}", handle_memory_knowledge_delete)
+    app.router.add_post("/api/memory/pin", handle_memory_pin)
+    app.router.add_get("/api/memory/policy", handle_memory_policy_get)
+    app.router.add_post("/api/memory/policy", handle_memory_policy_save)
+    app.router.add_get("/api/memory/metrics", handle_memory_metrics_get)
     app.router.add_post("/api/memory/knowledge/clear", handle_memory_knowledge_clear)
     app.router.add_post("/api/memory/context/clear", handle_memory_context_clear)
     app.router.add_post("/api/memory/history/clear", handle_memory_history_clear)
+
+    # Kontekst va Observability (Context & Observability)
+    app.router.add_get("/api/context/traces", handle_context_traces_get)
+    app.router.add_get("/api/context/last-trace", handle_context_last_trace_get)
 
     # Rejalashtiruvchi (Scheduler)
     app.router.add_get("/api/scheduler", handle_scheduler_list)

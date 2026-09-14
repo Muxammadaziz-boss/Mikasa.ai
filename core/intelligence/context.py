@@ -149,8 +149,9 @@ class ContextEngine:
                         raw_items = items_res
 
                 # Relevance-based ranking
+                retrieval_explanations = []
                 if raw_items:
-                    ranked_memory_items = MemoryRetriever.retrieve(
+                    ranked_memory_items, retrieval_explanations = MemoryRetriever.retrieve_with_explanation(
                         query=message,
                         items=raw_items,
                         limit=self.MAX_RELEVANT_MEMORIES,
@@ -267,5 +268,6 @@ MUHIM QOIDALAR:
                 "user_name": user_name,
                 "retrieved_memories_count": len(ranked_memory_items),
                 "has_active_task": bool(active_task_text),
+                "retrieval_explanations": retrieval_explanations if "retrieval_explanations" in locals() else [],
             }
         )
