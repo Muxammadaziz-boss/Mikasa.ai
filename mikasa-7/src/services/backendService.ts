@@ -245,6 +245,54 @@ export interface AccountSettings {
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
+export interface PlanStepData {
+  step_id: string;
+  order: number;
+  intent: string;
+  tool: string;
+  parameters: Record<string, any>;
+  expected_result?: string;
+  risk_level: "low" | "medium" | "high";
+  status: "pending" | "running" | "completed" | "failed" | "skipped" | "waiting_confirmation";
+  retry_count: number;
+  max_retries: number;
+  observed_result?: any;
+  verification?: {
+    verified: boolean;
+    status: "success" | "failure" | "unknown";
+    reason: string;
+    details: Record<string, any>;
+  };
+  error?: string;
+}
+
+export interface AgentPlanData {
+  plan_id: string;
+  goal: string;
+  steps: PlanStepData[];
+  status: "pending" | "running" | "paused" | "completed" | "failed" | "aborted";
+  created_at?: string;
+  current_step_index: number;
+  max_steps: number;
+  metadata?: Record<string, any>;
+}
+
+export interface AgentExecutionStateData {
+  state: string;
+  current_plan?: AgentPlanData | null;
+  completed_steps: PlanStepData[];
+  failed_steps: PlanStepData[];
+  active_step?: PlanStepData | null;
+  total_execution_time: number;
+  trace_id?: string | null;
+}
+
+export interface AgentEventData {
+  type: string;
+  data: Record<string, any>;
+  timestamp?: string;
+}
+
 const API_BASE = "http://127.0.0.1:18420";
 const WS_BASE = "ws://127.0.0.1:18420/api/ws";
 
@@ -261,6 +309,7 @@ class BackendService {
   private alarmListeners: Set<(data: { id: string; text: string; type: string }) => void> = new Set();
   private transcriptListeners: Set<(data: { text: string; sender: "user" | "mikasa" }) => void> = new Set();
   private accountListeners: Set<(data: any) => void> = new Set();
+  private agentListeners: Set<(event: AgentEventData) => void> = new Set();
 
   constructor() {
     this.connectWs();
@@ -300,6 +349,11 @@ class BackendService {
     return () => this.transcriptListeners.delete(cb);
   }
 
+  public onAgentEvent(cb: (event: AgentEventData) => void): () => void {
+    this.agentListeners.add(cb);
+    return () => this.agentListeners.delete(cb);
+  }
+
   private notifyStatus(status: BackendStatus) {
     this.currentStatus = status;
     this.statusListeners.forEach((cb) => {
@@ -329,7 +383,6 @@ class BackendService {
     }
     if (this.isConnectingWs) return;
     this.isConnectingWs = true;
-
     try {
       this.ws = new WebSocket(WS_BASE);
 
@@ -365,6 +418,14 @@ class BackendService {
                 cb(payload.data);
               } catch (e) {
                 console.error(e);
+              }
+            });
+          } else if (payload.type && payload.type.startsWith("agent_")) {
+            this.agentListeners.forEach((cb) => {
+              try {
+                cb({ type: payload.type, data: payload.data || {}, timestamp: payload.timestamp });
+              } catch (e) {
+                console.error("Error in agent listener", e);
               }
             });
           } else if (payload.type === "account_updated" && payload.data) {
@@ -1024,6 +1085,63 @@ class BackendService {
       return result;
     } catch (err: any) {
       return { ok: false, message: String(err) };
+    }
+  }
+
+  // ========== Agentic Multi-Step Intelligence ==========
+  public async executeAgentGoal(
+    goal: string
+  ): Promise<{ ok: boolean; type?: string; content?: string; plan?: AgentPlanData; metadata?: any; error_code?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async confirmAgentStep(
+    planId: string,
+    stepId: string,
+    approve: boolean = true
+  ): Promise<{ ok: boolean; type?: string; content?: string; metadata?: any; error_code?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId, step_id: stepId, approve }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async abortAgentPlan(
+    planId?: string
+  ): Promise<{ ok: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/abort`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, message: String(err) };
+    }
+  }
+
+  public async getAgentState(): Promise<{ ok: boolean; state: string; execution: AgentExecutionStateData; timestamp?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/state`, { method: "GET" });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, state: "error", execution: {} as any };
     }
   }
 

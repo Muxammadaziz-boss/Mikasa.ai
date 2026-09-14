@@ -538,3 +538,92 @@ Phase 30 tizim xotirasini foydalanuvchi to'liq boshqaradigan, shaffof, tushunarl
 - **`tests/test_memory_api.py` (7 ta test)**: 100% o'tdi.
 - **Frontend Testlari**: 10/10 test muvaffaqiyatli o'tdi.
 - **Frontend Build**: `tsc && vite build` 270ms ichida to'liq xatosiz muvaffaqiyatli yakunlandi.
+
+---
+
+## 14. Phase 31: Agentic Multi-Step Intelligence (Mikasa AI v7.1.0-RC2)
+
+Phase 31 da Mikasa AI oddiy bitta buyruqli yordamchidan chegaralangan, xavfsiz va deterministik **ko'p bosqichli agentik tizimga** aylantirildi:
+`PLAN → ACT → OBSERVE → VERIFY → CONTINUE → COMPLETE`.
+
+Ushbu tizim avvalgi barcha fazalar (`PermissionEngine`, `DecisionEngine`, `ToolRegistry`, `MemoryPolicy`, `TaskContextManager`, `ContextTrace`) xavfsizlik va kontekst mexanizmlariga to'liq tayangan holda ishlaydi.
+
+### 14.1. Boshqaruv va Xavfsizlik Tamoyillari
+1. **Qat'iy Ijro Chegaralari (Bounded Execution)**:
+   - `MAX_STEPS = 8`: Reja maksimal 8 qadam bilan cheklangan.
+   - `MAX_RETRIES_PER_STEP = 1`: Vaqtinchalik xatolarda qadam ko'pi bilan 1 marta qayta uriniladi.
+   - `MAX_TOTAL_EXECUTION_TIME = 60.0s`: Rejaning maksimal bajarilish vaqti 60 soniya.
+2. **Reja Tasdiqlanishi != Amal Tasdiqlanishi (Plan Approval != Action Approval)**:
+   - Reja tuzilishi barcha amallarga ruxsat berilganligini anglatmaydi.
+   - Har bir qadam `PermissionEngine` orqali alohida baholanadi.
+   - Yuqori xavfli (HIGH) amallar reja ijrosini darhol to'xtatadi (`WAITING_CONFIRMATION`) va foydalanuvchining ochiq tasdig'ini talab qiladi.
+3. **Destruktiv Amallarda Qayta Urinish Taqiqi (`AGENT_RETRY_BLOCKED`)**:
+   - `NON_IDEMPOTENT_ACTIONS` to'plamidagi amallar (`shutdown`, `restart`, `clear_memory`, `delete_plugin`, `process_kill`) xato bersa, qayta urinish bloklanadi.
+4. **Kod Inyeksiyasi Taqiqi (No Eval/Exec)**:
+   - Hech qanday `eval`, `exec` yoki `os.system` chaqirilmaydi.
+   - Rejadagi parametrlar inyeksiyalardan qat'iy himoyalangan.
+5. **Bir Vaqtda Bitta Faol Reja (Concurrency Safety)**:
+   - `RLock` orqali himoyalangan; boshqa reja ishlayotgan paytda yangi reja kelib tushsa `AGENT_ALREADY_RUNNING` xatosi qaytariladi.
+6. **Xotira Izolyatsiyasi (DATA ONLY)**:
+   - Xotiradagi ma'lumotlar xavfsizlik qoidalarini yoki ruxsatnomalarni o'zgartira olmaydi.
+
+### 14.2. Qadam Verifikatsiyasi Dvigateli (`core/intelligence/verifier.py`)
+`AgentVerifier` har bir qadam natijasini deterministik dalillar asosida tekshiradi:
+- **Kalkulyator**: Matematik hisob-kitob mavjudligi va sonli qiymat tekshiruvi.
+- **Ob-havo**: Harorat, daraja va ob-havo holati kalit so'zlari tekshiruvi.
+- **Tizim Ma'lumotlari**: Natijaning bo'sh emasligi va tuzilmasi tekshiruvi.
+- **Valyuta**: Kurs, qiymat va valyuta belgisi tekshiruvi.
+- **Ilova Tekshiruvi**: O'rnatilganlik yoki topilmaganlik holati tekshiruvi.
+- **Brauzer va YouTube**: Jarayon faolligi va ochilganlik holati tekshiruvi.
+- **Leksik va Semantik Moslashuv**: Kutilgan natija (`expected_result`) bilan solishtirish.
+- **Tri-State Status**: `SUCCESS` (muvaffaqiyatli), `FAILURE` (muvaffaqiyatsiz), `UNKNOWN` (noma'lum/tolerant).
+- **Davom Etish Qarori (`should_continue`)**:
+  - `SUCCESS` -> `STEP_VERIFIED_SUCCESS` (davom etadi)
+  - `UNKNOWN` -> `STEP_VERIFIED_UNKNOWN_PROCEED` (asbob xato bermagan bo'lsa davom etadi)
+  - `FAILURE` -> `STEP_VERIFICATION_FAILED` (reja to'xtatiladi yoki qayta uriniladi)
+
+### 14.3. Agent Ijro Sikli (`core/intelligence/agent_loop.py`)
+- **Mahalliy Deterministik Dekompozitsiya**: Bog'lovchilar ("va", "keyin", "so'ng", "hamda") orqali murakkab buyruqlarni mahalliy qadamlarga darhol ajratish (LLM kutishisiz).
+- **LLM Strukturaviy Rejalashtiruvchi**: Murakkab so'rovlar uchun qat'iy JSON formatdagi reja taklifi.
+- **Reja Validatsiyasi (`validate_plan`)**: Qadamlar soni, asboblar mavjudligi, parametrlar xavfsizligi va tsiklik takrorlanish tekshiruvi.
+- **Ijro Sikli (`execute_plan`)**: Ketma-ket qadamlarni bajarish, kuzatish (`OBSERVE`), tekshirish (`VERIFY`), TaskContext bilan bog'lash va xulosaviy hisobot tuzish.
+- **Tasdiqlash va Davom Ettirish (`confirm_step`)**: Foydalanuvchi tasdiqlasa reja to'xtagan joyidan davom etadi; rad etilsa toza holda bekor qilinadi.
+- **Foydalanuvchi Bekor Qilishi (`abort_plan`)**: Faol reja darhol xavfsiz to'xtatiladi.
+
+### 14.4. Kuzatuvchanlik va WebSocket Voqealari
+`observability.py` da 10 ta yangi trace bosqichlari qo'shildi:
+- `PLAN_CREATED`, `PLAN_VALIDATED`, `STEP_STARTED`, `STEP_COMPLETED`, `STEP_FAILED`, `STEP_VERIFIED`, `PLAN_PAUSED`, `PLAN_RESUMED`, `PLAN_COMPLETED`, `PLAN_ABORTED`.
+- Barcha bosqichlarda va parametrlarda konfidentsial ma'lumotlar avtomatik niqoblanadi (`[REDACTED]`).
+- Real vaqtda WebSocket hodisalari tarqatiladi: `agent_plan_created`, `agent_step_started`, `agent_step_completed`, `agent_step_failed`, `agent_verification`, `agent_confirmation_required`, `agent_completed`, `agent_aborted`.
+
+### 14.5. REST API Server Integratsiyasi (`core/api_server.py`)
+- `POST /api/agent/execute`: Maqsad bo'yicha reja tuzish va uni ijro etish.
+- `POST /api/agent/confirm`: Pauza qilingan xavfli amalni tasdiqlash yoki rad etish.
+- `POST /api/agent/abort`: Faol rejani xavfsiz to'xtatish.
+- `GET /api/agent/state`: Agentning joriy holati va oxirgi reja ijro tafsilotlari.
+
+### 14.6. Frontend Foydalanuvchi Tajribasi (`mikasa-7`)
+- **`backendService.ts`**:
+  - `executeAgentGoal(goal)`
+  - `confirmAgentStep(planId, stepId, approve)`
+  - `abortAgentPlan(planId)`
+  - `getAgentState()`
+  - `onAgentEvent(callback)`
+- **`ChatPage.tsx`**:
+  - Real vaqtda **Agent Progress Card**:
+    - Reja maqsadi va holat nishonlari (Bajarilmoqda, Tasdiqlash kutilmoqda, Muvaffaqiyatli, To'xtatildi).
+    - Har bir qadam holati ikonkalari (✅ muvaffaqiyatli, ⏳ bajarilmoqda, ❌ xato, ⚪ kutilmoqda).
+    - Yuqori xavfli amallarda interaktiv tasdiqlash bloki:
+      - `[ ✅ Tasdiqlash va davom etish ]`
+      - `[ ❌ Bekor qilish ]`
+    - Faol rejani istalgan paytda to'xtatish tugmasi (`[ ⏹️ To'xtatish ]`).
+
+### 14.7. Test Natijalari
+- `tests/test_agent_loop.py` (17 ta test) — 100% o'tdi.
+- `tests/test_agent_verifier.py` (15 ta test) — 100% o'tdi.
+- `tests/test_agent_security.py` (10 ta test) — 100% o'tdi.
+- Phase 31 jami 42 ta yangi test qo'shildi.
+- Avvalgi barcha fazalar (Phase 28, 29, 30) regressiya testlari (91 ta test) 100% muvaffaqiyatli o'tdi.
+- Jami backend testlari: 133+ test 100% muvaffaqiyatli.
+- Frontend testlari (`node --test tests/frontend.test.mjs tests/stress.test.mjs`): 10/10 test 100% o'tdi.
+- Frontend Production Build (`tsc && vite build`): 100% xatosiz muvaffaqiyatli.

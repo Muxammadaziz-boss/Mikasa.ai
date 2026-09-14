@@ -11,6 +11,16 @@ from core.intelligence.types import (
     Intent,
     Decision,
     IntelligenceResponse,
+    AgentState,
+    PlanStatus,
+    StepStatus,
+    VerificationStatus,
+    FailureCategory,
+    VerificationResult,
+    StepResult,
+    PlanStep,
+    AgentPlan,
+    AgentExecutionState,
 )
 from core.intelligence.memory_types import (
     MemoryType,
@@ -38,6 +48,8 @@ from core.intelligence.context import ContextEngine
 from core.intelligence.intent import IntentEngine
 from core.intelligence.decision import DecisionEngine
 from core.intelligence.permission import PermissionEngine
+from core.intelligence.verifier import AgentVerifier
+from core.intelligence.agent_loop import AgentLoop, get_agent_loop
 from core.intelligence.orchestrator import IntelligenceOrchestrator
 from core.intelligence.adapter import CompatibilityAdapter
 from core.intelligence.observability import (
@@ -47,6 +59,9 @@ from core.intelligence.observability import (
     ObservabilityManager,
     get_observability_manager,
     redact_sensitive_data,
+    AGENT_TRACE_STAGES,
+    CORE_TRACE_STAGES,
+    ALL_TRACE_STAGES,
 )
 
 __all__ = [
@@ -76,6 +91,9 @@ __all__ = [
     "IntentEngine",
     "DecisionEngine",
     "PermissionEngine",
+    "AgentVerifier",
+    "AgentLoop",
+    "get_agent_loop",
     "IntelligenceOrchestrator",
     "CompatibilityAdapter",
     "get_orchestrator",
@@ -85,6 +103,19 @@ __all__ = [
     "ObservabilityManager",
     "get_observability_manager",
     "redact_sensitive_data",
+    "AgentState",
+    "PlanStatus",
+    "StepStatus",
+    "VerificationStatus",
+    "FailureCategory",
+    "VerificationResult",
+    "StepResult",
+    "PlanStep",
+    "AgentPlan",
+    "AgentExecutionState",
+    "AGENT_TRACE_STAGES",
+    "CORE_TRACE_STAGES",
+    "ALL_TRACE_STAGES",
 ]
 
 
@@ -97,12 +128,15 @@ def get_orchestrator() -> IntelligenceOrchestrator:
     if _orchestrator is None:
         from core.agent_tools import get_registry
         from core.command_dispatcher import CommandDispatcher
+        from core.intelligence.agent_loop import get_agent_loop
 
         registry = get_registry()
         dispatcher = CommandDispatcher()
+        loop = get_agent_loop()
 
         _orchestrator = IntelligenceOrchestrator(
             tool_registry=registry,
-            command_dispatcher=dispatcher
+            command_dispatcher=dispatcher,
+            agent_loop=loop
         )
     return _orchestrator

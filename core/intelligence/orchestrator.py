@@ -43,6 +43,7 @@ class IntelligenceOrchestrator:
         permission_engine: Optional[PermissionEngine] = None,
         tool_registry=None,
         command_dispatcher=None,
+        agent_loop=None,
     ):
         self.permission_engine = permission_engine or PermissionEngine()
         self.intent_engine = intent_engine or IntentEngine()
@@ -65,6 +66,17 @@ class IntelligenceOrchestrator:
             permission_engine=self.permission_engine,
             tool_registry=self.tool_registry
         )
+
+        # AgentLoop (Phase 31: Multi-Step Agentic Loop)
+        if agent_loop is None and tool_registry is not None:
+            from core.intelligence.agent_loop import AgentLoop
+            self.agent_loop = AgentLoop(
+                tool_registry=self.tool_registry,
+                permission_engine=self.permission_engine,
+                provider_manager=self.provider_manager
+            )
+        else:
+            self.agent_loop = agent_loop
 
     def handle(
         self,
@@ -151,6 +163,18 @@ class IntelligenceOrchestrator:
             }
         )
         obs.metrics.record_retrieval(retrieved_count)
+
+        # 2.5. Ko'p bosqichli Agentlik Rejasi (Phase 31: Multi-Step Agentic Loop)
+        if self.agent_loop and self._is_multi_step_goal(clean_message):
+            logger.info(f"[IntelligenceOrchestrator] Ko'p bosqichli agentlik maqsadi aniqlandi: '{clean_message}'")
+            plan = self.agent_loop.create_plan_from_goal(clean_message, request=request)
+            if plan and len(plan.steps) > 1:
+                return self.agent_loop.execute_plan(
+                    plan=plan,
+                    request=request,
+                    user_name=user_name,
+                    trace=trace
+                )
 
         # 3. AI Provayderidan javob olish (Fallback bilan)
         trace.start_stage("PROVIDER")
@@ -359,3 +383,23 @@ class IntelligenceOrchestrator:
         if isinstance(result, str) and result.strip():
             return result.strip()
         return default_text or f"'{tool_name}' vositasi muvaffaqiyatli bajarildi."
+
+    def _is_multi_step_goal(self, text: str) -> bool:
+        """Xabar ko'p qadamli agentlik rejasini talab qiladimi yoki yo'qligini aniqlash"""
+        if not text:
+            return False
+        import re
+        lowered = text.lower()
+        delimiters = [r"\bva\b", r"\bkeyin\b", r"\bhamda\b", r"\bso'ng\b", r"\band\b"]
+        pattern = "|".join(delimiters)
+        parts = [p.strip() for p in re.split(pattern, lowered) if p.strip()]
+        if len(parts) >= 2:
+            action_keywords = [
+                "och", "yop", "qidir", "izla", "top", "hisobla", "o'chir",
+                "ko'rsat", "qo'y", "play", "pause", "open", "close", "start",
+                "qulfla", "lock", "brauzer", "youtube"
+            ]
+            has_first = any(ak in parts[0] for ak in action_keywords)
+            has_second = any(ak in parts[1] for ak in action_keywords)
+            return has_first and has_second
+        return False

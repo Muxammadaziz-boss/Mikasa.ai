@@ -44,6 +44,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Agentic Multi-Step State
+  const [activeAgent, setActiveAgent] = useState<{
+    planId: string;
+    goal: string;
+    status: "running" | "paused" | "completed" | "failed" | "aborted";
+    steps: Array<{
+      step_id: string;
+      order: number;
+      tool: string;
+      status: "pending" | "running" | "completed" | "failed" | "waiting_confirmation";
+      reason?: string;
+    }>;
+    confirmation?: {
+      stepId: string;
+      tool: string;
+      risk: string;
+      prompt: string;
+    } | null;
+  } | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialSentRef = useRef(false);
@@ -60,6 +80,69 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   // Backend status subscription
   useEffect(() => {
     const unsub = backendService.onStatusChange((s) => setBackendStatus(s));
+    return () => unsub();
+  }, []);
+
+  // Agent Events Subscription
+  useEffect(() => {
+    const unsub = backendService.onAgentEvent((evt) => {
+      if (evt.type === "agent_plan_created") {
+        setActiveAgent({
+          planId: evt.data.plan_id,
+          goal: evt.data.goal || "Vazifa bajarilmoqda",
+          status: "running",
+          steps: [],
+          confirmation: null,
+        });
+      } else if (evt.type === "agent_step_started") {
+        setActiveAgent((prev) => {
+          if (!prev) return prev;
+          const existing = prev.steps.find((s) => s.step_id === evt.data.step_id);
+          const steps = existing
+            ? prev.steps.map((s) => (s.step_id === evt.data.step_id ? { ...s, status: "running" as const } : s))
+            : [...prev.steps, { step_id: evt.data.step_id, order: evt.data.order, tool: evt.data.tool, status: "running" as const }];
+          return { ...prev, steps, status: "running" };
+        });
+      } else if (evt.type === "agent_step_completed") {
+        setActiveAgent((prev) => {
+          if (!prev) return prev;
+          const steps = prev.steps.map((s) =>
+            s.step_id === evt.data.step_id ? { ...s, status: "completed" as const } : s
+          );
+          return { ...prev, steps };
+        });
+      } else if (evt.type === "agent_verification") {
+        setActiveAgent((prev) => {
+          if (!prev) return prev;
+          const steps = prev.steps.map((s) =>
+            s.step_id === evt.data.step_id ? { ...s, reason: evt.data.reason } : s
+          );
+          return { ...prev, steps };
+        });
+      } else if (evt.type === "agent_confirmation_required") {
+        setActiveAgent((prev) => {
+          if (!prev) return prev;
+          const steps = prev.steps.map((s) =>
+            s.step_id === evt.data.step_id ? { ...s, status: "waiting_confirmation" as const } : s
+          );
+          return {
+            ...prev,
+            status: "paused",
+            steps,
+            confirmation: {
+              stepId: evt.data.step_id,
+              tool: evt.data.tool,
+              risk: evt.data.risk,
+              prompt: evt.data.prompt,
+            },
+          };
+        });
+      } else if (evt.type === "agent_completed") {
+        setActiveAgent((prev) => (prev ? { ...prev, status: "completed", confirmation: null } : null));
+      } else if (evt.type === "agent_aborted") {
+        setActiveAgent((prev) => (prev ? { ...prev, status: "aborted", confirmation: null } : null));
+      }
+    });
     return () => unsub();
   }, []);
 
@@ -190,6 +273,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 130)}px`;
+    }
+  };
+
+  const handleConfirmAgent = async (planId: string, stepId: string, approve: boolean) => {
+    setActiveAgent((prev) =>
+      prev ? { ...prev, confirmation: null, status: approve ? "running" : "aborted" } : null
+    );
+    try {
+      await backendService.confirmAgentStep(planId, stepId, approve);
+    } catch (e) {
+      console.error("Confirm agent error", e);
+    }
+  };
+
+  const handleAbortAgent = async (planId: string) => {
+    try {
+      await backendService.abortAgentPlan(planId);
+      setActiveAgent((prev) => (prev ? { ...prev, status: "aborted", confirmation: null } : null));
+    } catch (e) {
+      console.error("Abort agent error", e);
     }
   };
 
@@ -660,6 +763,212 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         }}
       >
         <div className="chat-readable-container" style={{ width: "100%" }}>
+          {/* Agentic Multi-Step Progress & Confirmation Card */}
+          {activeAgent && (
+            <div
+              style={{
+                marginBottom: "12px",
+                padding: "12px 16px",
+                borderRadius: "14px",
+                backgroundColor: "var(--surface-elevated)",
+                border: activeAgent.confirmation
+                  ? "1px solid rgba(245, 158, 11, 0.6)"
+                  : activeAgent.status === "completed"
+                  ? "1px solid rgba(16, 185, 129, 0.5)"
+                  : "1px solid rgba(56, 189, 248, 0.4)",
+                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.35)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "15px" }}>⚡</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                    Agentlik Rejasi: {activeAgent.goal}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      backgroundColor:
+                        activeAgent.status === "completed"
+                          ? "rgba(16, 185, 129, 0.2)"
+                          : activeAgent.status === "paused"
+                          ? "rgba(245, 158, 11, 0.2)"
+                          : activeAgent.status === "aborted"
+                          ? "rgba(239, 68, 68, 0.2)"
+                          : "rgba(56, 189, 248, 0.2)",
+                      color:
+                        activeAgent.status === "completed"
+                          ? "#10B981"
+                          : activeAgent.status === "paused"
+                          ? "#F59E0B"
+                          : activeAgent.status === "aborted"
+                          ? "#EF4444"
+                          : "#38BDF8",
+                    }}
+                  >
+                    {activeAgent.status === "completed"
+                      ? "Muvaffaqiyatli"
+                      : activeAgent.status === "paused"
+                      ? "Tasdiqlash kutilmoqda"
+                      : activeAgent.status === "aborted"
+                      ? "To'xtatildi"
+                      : "Bajarilmoqda..."}
+                  </span>
+                  {activeAgent.status === "running" && (
+                    <button
+                      type="button"
+                      onClick={() => handleAbortAgent(activeAgent.planId)}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "rgba(239, 68, 68, 0.2)",
+                        border: "1px solid rgba(239, 68, 68, 0.4)",
+                        color: "#EF4444",
+                        fontSize: "11px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ⏹️ To'xtatish
+                    </button>
+                  )}
+                  {(activeAgent.status === "completed" ||
+                    activeAgent.status === "aborted" ||
+                    activeAgent.status === "failed") && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveAgent(null)}
+                      style={{
+                        padding: "2px 6px",
+                        borderRadius: "6px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Steps Checklist */}
+              {activeAgent.steps.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", margin: "8px 0" }}>
+                  {activeAgent.steps.map((s, idx) => (
+                    <div
+                      key={s.step_id || idx}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        backgroundColor: "rgba(255, 255, 255, 0.03)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>
+                          {s.status === "completed"
+                            ? "✅"
+                            : s.status === "running"
+                            ? "⏳"
+                            : s.status === "failed"
+                            ? "❌"
+                            : "⚪"}
+                        </span>
+                        <span style={{ color: s.status === "running" ? "#38BDF8" : "var(--text-secondary)" }}>
+                          {idx + 1}. {s.tool}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                        {s.reason || s.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* High-Risk Confirmation Box */}
+              {activeAgent.confirmation && (
+                <div
+                  style={{
+                    marginTop: "10px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    backgroundColor: "rgba(245, 158, 11, 0.12)",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      color: "#F59E0B",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    ⚠️ Xavfli amal tasdiqlashni talab etadi:
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#FFFFFF", marginBottom: "8px" }}>
+                    {activeAgent.confirmation.prompt}
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleConfirmAgent(activeAgent.planId, activeAgent.confirmation!.stepId, true)
+                      }
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(16, 185, 129, 0.25)",
+                        border: "1px solid #10B981",
+                        color: "#10B981",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✅ Tasdiqlash va davom etish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleConfirmAgent(activeAgent.planId, activeAgent.confirmation!.stepId, false)
+                      }
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(239, 68, 68, 0.2)",
+                        border: "1px solid #EF4444",
+                        color: "#EF4444",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ❌ Bekor qilish
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();

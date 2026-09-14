@@ -159,3 +159,254 @@ class IntelligenceResponse:
             "metadata": self.metadata,
             "error_code": self.error_code,
         }
+
+
+# ========================================================
+# AGENTIC MULTI-STEP EXECUTION TYPES (PHASE 31)
+# ========================================================
+
+class AgentState(str, Enum):
+    IDLE = "idle"
+    PLANNING = "planning"
+    VALIDATING = "validating"
+    EXECUTING = "executing"
+    OBSERVING = "observing"
+    VERIFYING = "verifying"
+    WAITING_CONFIRMATION = "waiting_confirmation"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ABORTED = "aborted"
+
+
+class PlanStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ABORTED = "aborted"
+
+
+class StepStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    WAITING_CONFIRMATION = "waiting_confirmation"
+
+
+class VerificationStatus(str, Enum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    UNKNOWN = "unknown"
+
+
+class FailureCategory(str, Enum):
+    TRANSIENT = "transient"
+    PERMANENT = "permanent"
+    PERMISSION_DENIED = "permission_denied"
+    INVALID_PARAMETERS = "invalid_parameters"
+    TOOL_UNAVAILABLE = "tool_unavailable"
+    VERIFICATION_FAILED = "verification_failed"
+    TIMEOUT = "timeout"
+
+
+@dataclass
+class VerificationResult:
+    """Qadam natijasining verifikatsiya xulosasi"""
+    verified: bool = False
+    status: VerificationStatus = VerificationStatus.UNKNOWN
+    reason: str = ""
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "verified": self.verified,
+            "status": self.status.value if isinstance(self.status, VerificationStatus) else str(self.status),
+            "reason": self.reason,
+            "details": self.details,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "VerificationResult":
+        if not data:
+            return cls()
+        st = data.get("status", VerificationStatus.UNKNOWN)
+        if isinstance(st, str):
+            try:
+                st = VerificationStatus(st)
+            except ValueError:
+                st = VerificationStatus.UNKNOWN
+        return cls(
+            verified=bool(data.get("verified", False)),
+            status=st,
+            reason=data.get("reason", ""),
+            details=data.get("details", {}) or {},
+        )
+
+
+@dataclass
+class StepResult:
+    """Bajarilgan qadamning kuzatuv natijasi (OBSERVE)"""
+    step_id: str
+    tool: str
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    success: bool = False
+    raw_result: Any = None
+    error: Optional[str] = None
+    duration_ms: float = 0.0
+    timestamp: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "step_id": self.step_id,
+            "tool": self.tool,
+            "parameters": self.parameters,
+            "success": self.success,
+            "raw_result": self.raw_result,
+            "error": self.error,
+            "duration_ms": round(self.duration_ms, 2),
+            "timestamp": self.timestamp,
+        }
+
+
+@dataclass
+class PlanStep:
+    """Agent rejasining bitta qadami"""
+    step_id: str
+    order: int
+    intent: str
+    tool: str
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    expected_result: str = ""
+    risk_level: RiskLevel = RiskLevel.LOW
+    status: StepStatus = StepStatus.PENDING
+    retry_count: int = 0
+    max_retries: int = 1
+    observed_result: Optional[Any] = None
+    verification: Optional[VerificationResult] = None
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "step_id": self.step_id,
+            "order": self.order,
+            "intent": self.intent,
+            "tool": self.tool,
+            "parameters": self.parameters,
+            "expected_result": self.expected_result,
+            "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else str(self.risk_level),
+            "status": self.status.value if isinstance(self.status, StepStatus) else str(self.status),
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "observed_result": self.observed_result,
+            "verification": self.verification.to_dict() if self.verification else None,
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PlanStep":
+        risk = data.get("risk_level", RiskLevel.LOW)
+        if isinstance(risk, str):
+            try:
+                risk = RiskLevel(risk.lower())
+            except ValueError:
+                risk = RiskLevel.LOW
+        status = data.get("status", StepStatus.PENDING)
+        if isinstance(status, str):
+            try:
+                status = StepStatus(status.lower())
+            except ValueError:
+                status = StepStatus.PENDING
+        ver_data = data.get("verification")
+        verification = VerificationResult.from_dict(ver_data) if ver_data else None
+
+        return cls(
+            step_id=str(data.get("step_id", "")),
+            order=int(data.get("order", 0)),
+            intent=str(data.get("intent", "")),
+            tool=str(data.get("tool", "")),
+            parameters=dict(data.get("parameters", {}) or {}),
+            expected_result=str(data.get("expected_result", "")),
+            risk_level=risk,
+            status=status,
+            retry_count=int(data.get("retry_count", 0)),
+            max_retries=int(data.get("max_retries", 1)),
+            observed_result=data.get("observed_result"),
+            verification=verification,
+            error=data.get("error"),
+        )
+
+
+@dataclass
+class AgentPlan:
+    """Ko'p bosqichli agentlik rejasi"""
+    plan_id: str
+    goal: str
+    steps: List[PlanStep] = field(default_factory=list)
+    status: PlanStatus = PlanStatus.PENDING
+    created_at: str = ""
+    current_step_index: int = 0
+    max_steps: int = 8
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "plan_id": self.plan_id,
+            "goal": self.goal,
+            "steps": [s.to_dict() for s in self.steps],
+            "status": self.status.value if isinstance(self.status, PlanStatus) else str(self.status),
+            "created_at": self.created_at,
+            "current_step_index": self.current_step_index,
+            "max_steps": self.max_steps,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentPlan":
+        st = data.get("status", PlanStatus.PENDING)
+        if isinstance(st, str):
+            try:
+                st = PlanStatus(st.lower())
+            except ValueError:
+                st = PlanStatus.PENDING
+
+        raw_steps = data.get("steps", [])
+        steps = [PlanStep.from_dict(s) if isinstance(s, dict) else s for s in raw_steps]
+
+        return cls(
+            plan_id=str(data.get("plan_id", "")),
+            goal=str(data.get("goal", "")),
+            steps=steps,
+            status=st,
+            created_at=str(data.get("created_at", "")),
+            current_step_index=int(data.get("current_step_index", 0)),
+            max_steps=int(data.get("max_steps", 8)),
+            metadata=dict(data.get("metadata", {}) or {}),
+        )
+
+
+@dataclass
+class AgentExecutionState:
+    """Agentning joriy ijro holati"""
+    state: AgentState = AgentState.IDLE
+    current_plan: Optional[AgentPlan] = None
+    completed_steps: List[PlanStep] = field(default_factory=list)
+    failed_steps: List[PlanStep] = field(default_factory=list)
+    active_step: Optional[PlanStep] = None
+    start_time: float = 0.0
+    total_execution_time: float = 0.0
+    trace_id: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "state": self.state.value if isinstance(self.state, AgentState) else str(self.state),
+            "current_plan": self.current_plan.to_dict() if self.current_plan else None,
+            "completed_steps": [s.to_dict() for s in self.completed_steps],
+            "failed_steps": [s.to_dict() for s in self.failed_steps],
+            "active_step": self.active_step.to_dict() if self.active_step else None,
+            "total_execution_time": round(self.total_execution_time, 2),
+            "trace_id": self.trace_id,
+        }
+

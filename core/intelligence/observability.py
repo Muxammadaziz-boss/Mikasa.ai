@@ -23,6 +23,37 @@ ADDITIONAL_SENSITIVE_PATTERNS = [
     re.compile(r"AIza[0-9A-Za-z-_]{16,}", re.I),
 ]
 
+# Phase 30 Core Stages (11 stages)
+CORE_TRACE_STAGES = [
+    "REQUEST",
+    "LOCAL_DISPATCH",
+    "TASK_CONTEXT",
+    "MEMORY_RETRIEVAL",
+    "SELECTED_MEMORY",
+    "PROVIDER",
+    "INTENT",
+    "PERMISSION",
+    "DECISION",
+    "TOOL",
+    "RESPONSE",
+]
+
+# Phase 31 Agent Multi-Step Stages (10 stages)
+AGENT_TRACE_STAGES = [
+    "PLAN_CREATED",
+    "PLAN_VALIDATED",
+    "STEP_STARTED",
+    "STEP_COMPLETED",
+    "STEP_FAILED",
+    "STEP_VERIFIED",
+    "PLAN_PAUSED",
+    "PLAN_RESUMED",
+    "PLAN_COMPLETED",
+    "PLAN_ABORTED",
+]
+
+ALL_TRACE_STAGES = CORE_TRACE_STAGES + AGENT_TRACE_STAGES
+
 
 def redact_sensitive_data(obj: Any) -> Any:
     """Ma'lumotlar ichidagi har qanday maxfiy token, parol yoki API kalitlarni yashirish"""

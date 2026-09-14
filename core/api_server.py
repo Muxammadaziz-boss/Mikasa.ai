@@ -128,8 +128,19 @@ async def broadcast_ws(event_type: str, data: dict):
 def sync_broadcast(event_type: str, data: dict, loop=None):
     """Thread-safe usulda WebSocket xabar tarqatish"""
     target_loop = loop or _main_loop
+    if not target_loop:
+        try:
+            target_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                target_loop = asyncio.get_event_loop()
+            except RuntimeError:
+                target_loop = None
     if target_loop and target_loop.is_running():
-        asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, data), target_loop)
+        try:
+            asyncio.run_coroutine_threadsafe(broadcast_ws(event_type, data), target_loop)
+        except Exception:
+            pass
 
 
 # ========== Helper functions for User & Voice ==========
@@ -1028,6 +1039,119 @@ async def handle_memory_history_clear(request):
     return web.json_response({"ok": True, "message": "Suhbatlar tarixi arxivi tozalandi"})
 
 
+# ========== 4.5. AGENTIK MULTI-STEP INTELLIGENCE HANDLERS ==========
+def get_agent_loop_instance():
+    from core.intelligence import get_agent_loop
+    loop_inst = get_agent_loop()
+    if loop_inst.event_emitter is None:
+        loop_inst.event_emitter = sync_broadcast
+    return loop_inst
+
+
+async def handle_agent_execute(request):
+    """POST /api/agent/execute - Ko'p bosqichli agentlik rejasini tuzish va ijro etish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    goal = (body.get("goal") or body.get("text") or body.get("query") or "").strip()
+    if not goal:
+        return web.json_response({"ok": False, "error": "Maqsad (goal) bo'sh bo'lishi mumkin emas"}, status=400)
+
+    user = get_current_user_name()
+    agent_loop = get_agent_loop_instance()
+    loop = asyncio.get_running_loop()
+
+    def _run():
+        plan = agent_loop.create_plan_from_goal(goal)
+        res = agent_loop.execute_plan(plan, user_name=user)
+        return plan, res
+
+    try:
+        plan, res = await loop.run_in_executor(None, _run)
+        return web.json_response({
+            "ok": res.verified or res.type in ("answer", "confirmation"),
+            "type": res.type,
+            "content": res.content,
+            "plan": plan.to_dict() if plan else None,
+            "metadata": res.metadata,
+            "error_code": res.error_code,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Agent ijrosida xatolik: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
+async def handle_agent_confirm(request):
+    """POST /api/agent/confirm - Xavfli amalni tasdiqlash yoki rad etish"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    plan_id = body.get("plan_id")
+    step_id = body.get("step_id")
+    approve = bool(body.get("approve", True))
+
+    if not plan_id or not step_id:
+        return web.json_response({"ok": False, "error": "plan_id va step_id talab qilinadi"}, status=400)
+
+    agent_loop = get_agent_loop_instance()
+    loop = asyncio.get_running_loop()
+
+    def _confirm():
+        return agent_loop.confirm_step(plan_id, step_id, approve=approve)
+
+    try:
+        res = await loop.run_in_executor(None, _confirm)
+        return web.json_response({
+            "ok": res.verified or res.type in ("answer", "confirmation"),
+            "type": res.type,
+            "content": res.content,
+            "metadata": res.metadata,
+            "error_code": res.error_code,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Agent tasdiqlashida xatolik: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
+async def handle_agent_abort(request):
+    """POST /api/agent/abort - Faol agentlik rejasini to'xtatish"""
+    plan_id = None
+    try:
+        if request.can_read_body:
+            body = await request.json()
+            plan_id = body.get("plan_id")
+    except Exception:
+        pass
+
+    agent_loop = get_agent_loop_instance()
+    stopped, msg = agent_loop.abort_plan(plan_id)
+
+    return web.json_response({
+        "ok": stopped,
+        "message": msg,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+async def handle_agent_state(request):
+    """GET /api/agent/state - Joriy agent holati va ijro tafsilotlari"""
+    agent_loop = get_agent_loop_instance()
+    exec_state = agent_loop.get_execution_state()
+
+    return web.json_response({
+        "ok": True,
+        "state": agent_loop.state.value,
+        "execution": exec_state.to_dict(),
+        "timestamp": datetime.now().isoformat()
+    })
+
+
 # ========== 5. REJALASHTIRUVCHI (SCHEDULER) HANDLERS ==========
 async def handle_scheduler_list(request):
     """GET /api/scheduler - Vazifalar va eslatmalar ro'yxati"""
@@ -1789,6 +1913,12 @@ def create_app():
     # Kontekst va Observability (Context & Observability)
     app.router.add_get("/api/context/traces", handle_context_traces_get)
     app.router.add_get("/api/context/last-trace", handle_context_last_trace_get)
+
+    # Agentlik Ko'p Bosqichli Tizim (Agent Loop)
+    app.router.add_post("/api/agent/execute", handle_agent_execute)
+    app.router.add_post("/api/agent/confirm", handle_agent_confirm)
+    app.router.add_post("/api/agent/abort", handle_agent_abort)
+    app.router.add_get("/api/agent/state", handle_agent_state)
 
     # Rejalashtiruvchi (Scheduler)
     app.router.add_get("/api/scheduler", handle_scheduler_list)
