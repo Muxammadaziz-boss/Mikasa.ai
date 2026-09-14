@@ -1490,10 +1490,32 @@ async def handle_plugins_execute(request):
         return tools.call(tool_name, **params)
 
     res = await loop.run_in_executor(None, _call)
+    res_dict = res.to_dict() if hasattr(res, "to_dict") else res
     return web.json_response({
         "ok": True,
         "tool": tool_name,
-        "result": res
+        "result": res_dict
+    })
+
+
+async def handle_tools_catalog(request):
+    """GET /api/tools/catalog - Tool System 2.0 to'liq qobiliyatlar va vositalar katalogi"""
+    _, _, _, _, tools, _ = get_modules()
+    if not tools:
+        return web.json_response({"ok": False, "error": "Tools registry yuklanmagan"}, status=500)
+
+    tools_list = tools.list_tools() if hasattr(tools, "list_tools") else []
+    caps = {}
+    if hasattr(tools, "capability_registry"):
+        caps = tools.capability_registry.list_all_capabilities()
+
+    return web.json_response({
+        "ok": True,
+        "version": "2.0.0",
+        "total_tools": len(tools_list),
+        "capabilities_count": len(caps),
+        "tools": tools_list,
+        "capabilities": caps,
     })
 
 
@@ -1937,6 +1959,7 @@ def create_app():
     app.router.add_post("/api/plugins/uninstall", handle_plugins_uninstall)
     app.router.add_post("/api/plugins/update", handle_plugins_update)
     app.router.add_post("/api/plugins/execute", handle_plugins_execute)
+    app.router.add_get("/api/tools/catalog", handle_tools_catalog)
 
     # Hisob va Sozlamalar (Account & Settings)
     app.router.add_get("/api/account", handle_account_get)

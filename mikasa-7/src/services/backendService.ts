@@ -171,6 +171,20 @@ export interface PluginItem {
   error?: string;
   has_update?: boolean;
   file_name?: string;
+  capabilities?: string[];
+  required_parameters?: string[];
+  risk_level?: "low" | "medium" | "high";
+  timeout?: number;
+  idempotent?: boolean;
+  destructive?: boolean;
+  aliases?: string[];
+  health?: "available" | "unavailable" | "degraded" | "disabled";
+  metrics?: {
+    success_count?: number;
+    failure_count?: number;
+    last_duration_ms?: number;
+    last_executed?: string;
+  };
 }
 
 export interface PluginStats {
@@ -937,6 +951,16 @@ class BackendService {
       return await res.json();
     } catch {
       return { ok: false, tools: [], plugins: [], total_count: 0, categories: [] };
+    }
+  }
+
+  public async getToolsCatalog(): Promise<{ ok: boolean; version?: string; total_tools?: number; tools?: PluginItem[]; capabilities?: Record<string, string[]> }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/tools/catalog`, { method: "GET" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } catch {
+      return { ok: false, tools: [], capabilities: {} };
     }
   }
 

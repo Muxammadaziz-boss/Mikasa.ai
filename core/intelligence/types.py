@@ -145,6 +145,10 @@ class IntelligenceResponse:
     metadata: Dict[str, Any] = field(default_factory=dict)
     error_code: Optional[str] = None
 
+    @property
+    def success(self) -> bool:
+        return self.verified and self.type != "error"
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": self.type,

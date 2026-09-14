@@ -43,6 +43,9 @@ class TaskContextManager:
             return self._current_task
         return None
 
+    # Alias for TaskContext affinity
+    get_active_context = get_active_task
+
     def set_active_task(self, goal: str, entities: Optional[List[str]] = None) -> ActiveTaskContext:
         """Yangi faol vazifani o'rnatish"""
         task = ActiveTaskContext(

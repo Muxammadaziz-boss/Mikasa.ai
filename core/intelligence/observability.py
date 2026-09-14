@@ -52,7 +52,20 @@ AGENT_TRACE_STAGES = [
     "PLAN_ABORTED",
 ]
 
-ALL_TRACE_STAGES = CORE_TRACE_STAGES + AGENT_TRACE_STAGES
+# Phase 32 Tool System 2.0 Stages (9 stages)
+TOOL_TRACE_STAGES = [
+    "TOOL_DISCOVERED",
+    "TOOL_SELECTED",
+    "TOOL_VALIDATION_FAILED",
+    "TOOL_PERMISSION_CHECKED",
+    "TOOL_STARTED",
+    "TOOL_COMPLETED",
+    "TOOL_FAILED",
+    "TOOL_TIMEOUT",
+    "TOOL_BLOCKED",
+]
+
+ALL_TRACE_STAGES = CORE_TRACE_STAGES + AGENT_TRACE_STAGES + TOOL_TRACE_STAGES
 
 
 def redact_sensitive_data(obj: Any) -> Any:
@@ -350,6 +363,10 @@ class ObservabilityManager:
                 if t.trace_id == trace_id:
                     return t
             return None
+
+    def get_trace_obj(self, trace_id: str) -> Optional[ContextTrace]:
+        """get_trace uchun qulay alias"""
+        return self.get_trace(trace_id)
 
     def get_recent_traces(self, limit: int = 10) -> List[Dict[str, Any]]:
         with self._lock:

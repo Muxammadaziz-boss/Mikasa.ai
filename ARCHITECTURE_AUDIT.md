@@ -627,3 +627,114 @@ Ushbu tizim avvalgi barcha fazalar (`PermissionEngine`, `DecisionEngine`, `ToolR
 - Jami backend testlari: 133+ test 100% muvaffaqiyatli.
 - Frontend testlari (`node --test tests/frontend.test.mjs tests/stress.test.mjs`): 10/10 test 100% o'tdi.
 - Frontend Production Build (`tsc && vite build`): 100% xatosiz muvaffaqiyatli.
+
+---
+
+## 15. PHASE 32: TOOL SYSTEM 2.0 — QOBILIYATGA ASOSLANGAN INTELLEKT (CAPABILITY-DRIVEN INTELLIGENCE)
+
+### 15.1. Asosiy Maqsad va Paradigma O'zgarishi
+Phase 32 ning asosiy maqsadi shunchaki yangi vositalar qo'shish emas, balki Mikasa AI ning mavjud imkoniyatlaridan to'liq va xatosiz foydalanishini ta'minlashdir:
+```
+MIKASADA NIMALAR MAVJUD?
+        ↓
+JORIY VAZIFA NIMANI TALAB QILADI?
+        ↓
+QAYSI MAVJUD QOBILIYAT UNI YECHA OLADI?
+        ↓
+QAYSI ASBOB ENG YAXSHI NOMZOD?
+        ↓
+PARAMETRLAR TO'G'RI VA XAVFSIZMI?
+        ↓
+IJROGA RUXSAT BERILGANMI?
+        ↓
+VAQT CHEGARASI (TIMEOUT) BILAN IJRO ETISH
+        ↓
+NATIJANI TUSHUNISH VA NORMALLASHTIRISH
+        ↓
+VERIFIKATSIYA VA MOSLASHTIRISH
+        ↓
+KEYINGI QADAMNI BELGILASH
+```
+
+### 15.2. Arxitektura Qismlari va Ishlab Chiqilgan Modullar
+
+#### 1. Tool Contract 2.0 & Normallashtirish (`core/tools/contract.py`)
+- **`ToolHealth`**: Asbob salomatligi monitoringi (`AVAILABLE`, `UNAVAILABLE`, `DEGRADED`, `DISABLED`).
+- **`ToolErrorCode`**: Standartlashtirilgan xatolik kodlari (`VALIDATION_ERROR`, `PERMISSION_DENIED`, `TOOL_NOT_FOUND`, `TOOL_UNAVAILABLE`, `TIMEOUT`, `EXECUTION_ERROR`, `INVALID_RESULT`, `SECURITY_BLOCKED`, `UNKNOWN_ERROR`).
+- **`ToolResult`**: Normallashtirilgan qaytuvchi obyekt (`success`, `code`, `message`, `data`, `error`, `duration_ms`, `tool`, `version`, `trace_id`, `metadata`).
+  - To'liq orqaga moslik: `ToolResult` obyekti eski kodlar uchun dict kabi murojaat (`res["result"]`, `res.get("result")`, `"data" in res`) imkoniyatini ta'minlaydi.
+  - Avtomatik maxfiylashtirish: `to_dict()` chaqirilganda API tokenlar, parollar va maxfiy kalitlar avtomatik `[REDACTED]` ga almashtiriladi.
+- **`ToolContract2`**: Kengaytirilgan asbob shartnomasi (`capabilities`, `aliases`, `required_parameters`, `risk_level`, `timeout`, `idempotent`, `destructive`, `health`, metrikalar).
+  - Ketma-ket 3 ta xatolikda salomatlik avtomatik `DEGRADED` ga o'tadi; muvaffaqiyatli ijroda esa `AVAILABLE` ga tiklanadi.
+
+#### 2. Parametrlarni Qat'iy Tekshirish va Himoya Dvigateli (`core/tools/validator.py`)
+- **`ParameterValidator`**:
+  - Majburiy parametrlarning mavjudligi va bo'sh emasligini tekshirish.
+  - Strict rejim: deklaratsiya qilinmagan, kutilmagan parametrlarni rad etish (`VALIDATION_ERROR`).
+  - Turlarni qat'iy tekshirish va xavfsiz konvertatsiya (`string`, `integer`, `float`, `boolean`, `dict`, `list`).
+  - Kod inyeksiyasidan himoya: oddiy parametrlarga `eval(`, `exec(`, `os.system(`, `__import__(`, `subprocess.` yozilganda zudlik bilan `SECURITY_BLOCKED` qaytariladi (kod yozuvchi maxsus asboblar bundan mustasno).
+  - Nol jimjit xatolar (Zero silent failures): nosoz parametrlar asbobga o'tkazilmaydi.
+
+#### 3. Qobiliyatlarni Indekslash va Qidirish Registri (`core/tools/discovery.py`)
+- **`CapabilityRegistry`**:
+  - Asboblarni semantik qobiliyat teglari (`capabilities`) va taxalluslari (`aliases`) bo'yicha tezkor indekslash.
+  - `find_by_capability()`: aniq va qisman moslik bo'yicha qobiliyat egalarini topish.
+  - `find_by_alias()`: qisqa va qulay taxalluslar orqali vositani aniqlash.
+  - `discover_capabilities_for_text()`: foydalanuvchi so'rovidagi o'zbek va inglizcha tabiiy kalit so'zlar orqali kerakli qobiliyatlarni aniqlash.
+
+#### 4. Aqlli Asbob Tanlash va Tushuntirish Dvigateli (`core/tools/selector.py`)
+- **`SmartToolSelector`**:
+  - Ko'p omilli nomzodlarni baholash tizimi:
+    - Salomatlik omili (Health Factor — 30%): `DISABLED` va `UNAVAILABLE` vositalarga 0 ball; `DEGRADED` vositalarga 50% jarima.
+    - Qobiliyat mosligi (Capability Match — 35%): to'liq yoki qisman moslik.
+    - Parametrlar mosligi (Parameter Compatibility — 15%): berilgan argumentlarning asbob sxemasiga mosligi.
+    - Xavf darajasi afzalligi (Risk Level — 10%): past xavfli asboblarga ustunlik.
+    - Ishonchlilik omili (Reliability — 10%): avvalgi muvaffaqiyatli ijrolar ulushi.
+    - Task Context yaqinligi: joriy vazifada ilgari muvaffaqiyatli ishlatilgan asbobga 15% bonus.
+  - Transparent Observability tushuntirishi: nima uchun aynan shu asbob tanlanganligini ko'rsatuvchi to'liq tahliliy matn (`explanation`) va ballar taqsimoti (`scoring_breakdown`).
+  - Zaxira vosita (Fallback resolution): asosiy vosita nosoz bo'lganda mos zaxira vositani avtomatik tanlash.
+
+#### 5. Xavfsiz Asbob Ijro Etish Zanjiri (`core/tools/runner.py`)
+- **`SafeToolRunner`**:
+  - To'liq zanjirli xavfsiz ijro: `VALIDATE -> PERMISSION -> TIMEOUT RUN -> NORMALIZE -> HEALTH UPDATE`.
+  - Alohida oqimlar puli (`ThreadPoolExecutor`) orqali asboblarni izolyatsiya qilish.
+  - Qat'iy vaqt chegarasi (`timeout`): qotib qolgan yoki javob bermagan asboblarni to'xtatish va `TIMEOUT` xatosini qaytarish.
+  - Destruktiv va no-idempotent amallarda avtomatik qayta urinishni to'xtatish.
+
+#### 6. Mavjud 29 ta O'rnatilgan Vositalarning To'liq Migratsiyasi (`core/agent_tools.py`)
+- Barcha 29 ta vosita (`system`, `music`, `weather`, `reminder`, `file`, `knowledge`, `datetime`, `scheduler`, `rag`, `currency`, `translator`, `screen`, `file_write`, `app_check`, `ask_user`, `screen_click`, `keyboard_type`, `keyboard_shortcut`, `clipboard`, `process_manager`, `audio_control`, `system_info`, `window_manager`, `notification`, `vector_search`, `sandbox`, `secret_vault`) yangi `ToolContract2` metadatalari bilan boyitildi.
+- `ToolRegistry` qobiliyatlar registri, aqlli tanlash va qobiliyat bo'yicha chaqiruvni to'liq qo'llab-quvvatlaydi.
+- Eski kodlar uchun 100% orqaga moslik (`Tool` konstruktori, `func`/`function` mosligi, dict natijalar).
+
+#### 7. AgentLoop va Kuzatuvchanlik (Observability) Integratsiyasi
+- `core/intelligence/agent_loop.py`:
+  - Qadamlar nafaqat asbob nomi, balki qobiliyat nomi orqali ham qabul qilinadi va avtomatik hal etiladi.
+  - Parametrlar ijro oldidan qat'iy tekshiriladi.
+  - Idempotentlik qoidasi: xavfsiz amallar qayta uriniladi, destruktiv amallarda esa qayta urinish bloklanadi (`AGENT_RETRY_BLOCKED`).
+  - Asosiy asbob ishlamay qolganda avtomatik mos zaxira asbobga (Fallback Tool) o'tish mexanizmi.
+  - Qayta urinishda olingan yangi natijalar (`observed_result`, `error`) to'g'ri yangilanishi ta'minlandi.
+- `core/intelligence/observability.py`:
+  - 9 ta yangi Tool trace bosqichlari: `TOOL_DISCOVERED`, `TOOL_SELECTED`, `TOOL_VALIDATION_FAILED`, `TOOL_PERMISSION_CHECKED`, `TOOL_STARTED`, `TOOL_COMPLETED`, `TOOL_FAILED`, `TOOL_TIMEOUT`, `TOOL_BLOCKED`.
+
+#### 8. Frontend Vizual Ko'rinishi va Tool Inspector (`mikasa-7`)
+- `core/api_server.py`: `GET /api/tools/catalog` katalog so'rovi va `handle_plugins_execute` orqali boyitilgan `ToolResult` qaytarilishi.
+- `mikasa-7/src/services/backendService.ts`: `PluginItem` interfeysi yangi kontrakt maydonlari bilan kengaytirildi va `getToolsCatalog()` metodi qo'shildi.
+- `mikasa-7/src/pages/PluginsPage.tsx`: **Tool Inspector 2.0** yaratildi:
+  - Versiya, xavf darajasi (LOW/MED/HIGH) va salomatlik indikatori (AVAILABLE/DEGRADED/DISABLED).
+  - Idempotent va Destruktiv amallar nishonlari.
+  - Timeout vaqti va Semantik qobiliyatlar (capabilities) teglari.
+  - Majburiy va ixtiyoriy parametrlarning aniq ko'rsatilishi.
+  - Test modalida bajarilish davomiyligi (`duration_ms`), holat kodi va tozalangan natija ko'rinishi.
+
+### 15.3. Test Natijalari va Verifikatsiya
+- Yangi yaratilgan 5 ta test to'plami:
+  1. `tests/test_tool_contract.py` (13 ta test) — 100% OK.
+  2. `tests/test_tool_capabilities.py` (9 ta test) — 100% OK.
+  3. `tests/test_tool_validation.py` (11 ta test) — 100% OK.
+  4. `tests/test_tool_execution_safety.py` (9 ta test) — 100% OK.
+  5. `tests/test_tool_agent_integration.py` (9 ta test) — 100% OK.
+- Phase 32 jami yangi testlar soni: **51 ta test** (talab: 40+).
+- Phases 28, 29, 30, 31 va 32 to'liq intellekt regressiya to'plami: **161 ta test — 100% muvaffaqiyatli**.
+- Frontend testlari (`npm test`): **10/10 test muvaffaqiyatli**.
+- Frontend Production Build (`npm run build`): **267ms da 100% xatosiz yig'ildi**.
+

@@ -859,7 +859,20 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <PlayIcon size={16} color="#34d399" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{selectedTool.name} — Sinash</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{selectedTool.name}</h3>
+                <span
+                  style={{
+                    background: "rgba(59, 130, 246, 0.15)",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                    color: "#60a5fa",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  v{selectedTool.version || "2.0.0"}
+                </span>
               </div>
               <button
                 onClick={closeToolModal}
@@ -874,9 +887,136 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
               </button>
             </div>
 
+            {/* Metadata Pills Row (Tool Contract 2.0) */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              {/* Risk Level */}
+              <span
+                style={{
+                  background:
+                    selectedTool.risk_level === "high"
+                      ? "rgba(239, 68, 68, 0.15)"
+                      : selectedTool.risk_level === "medium"
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : "rgba(16, 185, 129, 0.15)",
+                  color:
+                    selectedTool.risk_level === "high"
+                      ? "#f87171"
+                      : selectedTool.risk_level === "medium"
+                      ? "#fbbf24"
+                      : "#34d399",
+                  border: "1px solid currentColor",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  textTransform: "uppercase",
+                }}
+              >
+                Risk: {selectedTool.risk_level || "low"}
+              </span>
+
+              {/* Health */}
+              <span
+                style={{
+                  background:
+                    selectedTool.health === "unavailable"
+                      ? "rgba(239, 68, 68, 0.15)"
+                      : selectedTool.health === "degraded"
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : "rgba(16, 185, 129, 0.15)",
+                  color:
+                    selectedTool.health === "unavailable"
+                      ? "#f87171"
+                      : selectedTool.health === "degraded"
+                      ? "#fbbf24"
+                      : "#34d399",
+                  border: "1px solid currentColor",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  textTransform: "uppercase",
+                }}
+              >
+                Salomatlik: {selectedTool.health || "available"}
+              </span>
+
+              {/* Idempotency */}
+              <span
+                style={{
+                  background: "rgba(99, 102, 241, 0.12)",
+                  color: "#a5b4fc",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                }}
+              >
+                {selectedTool.idempotent !== false ? "Idempotent" : "No-idempotent"}
+              </span>
+
+              {/* Destructive */}
+              {selectedTool.destructive && (
+                <span
+                  style={{
+                    background: "rgba(239, 68, 68, 0.2)",
+                    color: "#f87171",
+                    border: "1px solid #ef4444",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  Destruktiv
+                </span>
+              )}
+
+              {/* Timeout */}
+              <span
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border-subtle)",
+                  fontSize: 10,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                }}
+              >
+                Timeout: {selectedTool.timeout || 10}s
+              </span>
+            </div>
+
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
               {selectedTool.description}
             </p>
+
+            {/* Capabilities */}
+            {selectedTool.capabilities && selectedTool.capabilities.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>
+                  Qobiliyatlar (Capabilities):
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {selectedTool.capabilities.map((cap) => (
+                    <span
+                      key={cap}
+                      style={{
+                        background: "rgba(14, 165, 233, 0.12)",
+                        border: "1px solid rgba(14, 165, 233, 0.3)",
+                        color: "#38bdf8",
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                      }}
+                    >
+                      ⚡ {cap}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Parameters */}
             {selectedTool.parameters && Object.keys(selectedTool.parameters).length > 0 ? (
@@ -884,30 +1024,44 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>
                   Parametrlar:
                 </span>
-                {Object.entries(selectedTool.parameters).map(([key, val]: [string, any]) => (
-                  <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: 12, color: "var(--text-primary)" }}>
-                      {key} ({val.type || "string"}):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={val.description || key}
-                      value={paramValues[key] || ""}
-                      onChange={(e) =>
-                        setParamValues((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      style={{
-                        background: "rgba(0, 0, 0, 0.3)",
-                        border: "1px solid var(--border-subtle)",
-                        borderRadius: 8,
-                        padding: "8px 12px",
-                        color: "var(--text-primary)",
-                        fontSize: 12,
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                ))}
+                {Object.entries(selectedTool.parameters).map(([key, val]: [string, any]) => {
+                  const isRequired =
+                    val.required === true ||
+                    (selectedTool.required_parameters &&
+                      selectedTool.required_parameters.includes(key));
+                  return (
+                    <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={{ fontSize: 12, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>{key}</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: 10 }}>
+                          ({val.type || "string"})
+                        </span>
+                        {isRequired ? (
+                          <span style={{ color: "#f87171", fontSize: 10, fontWeight: 600 }}>* Majburiy</span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)", fontSize: 10 }}>Ixtiyoriy</span>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={val.description || key}
+                        value={paramValues[key] || ""}
+                        onChange={(e) =>
+                          setParamValues((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        style={{
+                          background: "rgba(0, 0, 0, 0.3)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: 8,
+                          padding: "8px 12px",
+                          color: "var(--text-primary)",
+                          fontSize: 12,
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -930,6 +1084,12 @@ export const PluginsPage: React.FC<PluginsPageProps> = ({ onNavigateHome }) => {
                   color: executionResult.ok ? "#34d399" : "#f87171",
                 }}
               >
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                  <span>Natija (ToolResult)</span>
+                  {executionResult.result?.duration_ms !== undefined && (
+                    <span>Davomiyligi: {executionResult.result.duration_ms} ms</span>
+                  )}
+                </div>
                 <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
                   {JSON.stringify(executionResult, null, 2)}
                 </pre>

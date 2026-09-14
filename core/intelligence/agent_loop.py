@@ -411,10 +411,13 @@ QOIDALAR:
             if any(p in param_str for p in dangerous_patterns):
                 return False, f"AGENT_PLAN_INVALID: Qadam #{step.order} parametrlarida xavfli kod aniqlandi"
 
-            # 4. Asbob mavjudligi tekshiruvi
+            # 4. Asbob mavjudligi tekshiruvi (nomi, taxallusi yoki qobiliyati bo'yicha)
             is_valid_tool = False
-            if self.tool_registry and self.tool_registry.get(tool_name):
-                is_valid_tool = True
+            if self.tool_registry:
+                if self.tool_registry.get(tool_name):
+                    is_valid_tool = True
+                elif hasattr(self.tool_registry, "find_by_capability") and self.tool_registry.find_by_capability(tool_name):
+                    is_valid_tool = True
             elif tool_name in AgentVerifier.DETERMINISTIC_TOOLS:
                 is_valid_tool = True
             elif tool_name in ["open_telegram", "open_chrome", "open_youtube", "open_code", "open_discord", "open_brave", "lock", "search"]:
@@ -603,7 +606,7 @@ QOIDALAR:
                 "tool": step.tool,
             })
 
-            step_result = self._act_execute_step(step)
+            step_result = self._act_execute_step(step, trace=active_trace)
 
             # E. OBSERVE: Natijani qayd etish
             self._transition_to(AgentState.OBSERVING)
@@ -655,37 +658,82 @@ QOIDALAR:
                 # Qadam muvaffaqiyatsiz bo'ldi -> Qayta urinish (Retry) yoki To'xtatish
                 logger.warning(f"[AgentLoop] Qadam #{step.order} muvaffaqiyatsiz: {cont_reason}")
 
-                # Qayta urinish xavfsizligini tekshirish (Idempotency check)
-                if step.tool in self.NON_IDEMPOTENT_ACTIONS:
-                    logger.warning(f"[AgentLoop] Destruktiv amal '{step.tool}' uchun qayta urinish bloklandi (AGENT_RETRY_BLOCKED)")
+                # Qayta urinish xavfsizligini tekshirish (Idempotency check via Tool Contract 2.0)
+                from core.tools.contract import ToolContract2
+                tool_obj = self.tool_registry.get(step.tool) if self.tool_registry else None
+                is_non_idempotent = False
+                if isinstance(tool_obj, ToolContract2):
+                    is_non_idempotent = (not tool_obj.idempotent or bool(tool_obj.destructive))
+                else:
+                    is_non_idempotent = (step.tool in self.NON_IDEMPOTENT_ACTIONS)
+
+                if is_non_idempotent:
+                    logger.warning(f"[AgentLoop] Destruktiv yoki no-idempotent amal '{step.tool}' uchun qayta urinish bloklandi (AGENT_RETRY_BLOCKED)")
                     step.status = StepStatus.FAILED
                     self._execution_state.failed_steps.append(step)
                     self._transition_to(AgentState.FAILED)
                     plan.status = PlanStatus.FAILED
-                    active_trace.add_stage("STEP_FAILED", status="blocked_retry", details={"tool": step.tool})
+                    active_trace.add_stage("STEP_FAILED", status="blocked_retry", details={"tool": step.tool, "reason": "non_idempotent_or_destructive"})
                     self._emit_event("agent_step_failed", {"plan_id": plan.plan_id, "step_id": step.step_id, "error": "AGENT_RETRY_BLOCKED"})
                     return self._finalize_agent_response(
                         success=False,
-                        message=f"Xavfli amal '{step.tool}' bajarilmadi va xavfsizlik yuzasidan qayta urinish bloklandi: {cont_reason}",
+                        message=f"Xavfli yoki no-idempotent amal '{step.tool}' bajarilmadi va xavfsizlik yuzasidan qayta urinish bloklandi: {cont_reason}",
                         error_code="AGENT_RETRY_BLOCKED",
                         plan=plan,
                         trace=active_trace,
                         elapsed=time.time() - start_time
                     )
 
+                # Fallback tekshiruvi: agar birlamchi asbob ishlamasa va zaxira mavjud bo'lsa
+                if step.retry_count < step.max_retries and self.tool_registry and hasattr(self.tool_registry, "select_tool"):
+                    try:
+                        t_obj = self.tool_registry.get(step.tool)
+                        lookup_caps = []
+                        if t_obj and hasattr(t_obj, "capabilities"):
+                            lookup_caps = [c for c in t_obj.capabilities if c != t_obj.name.lower()]
+                        if not lookup_caps:
+                            lookup_caps = [step.tool]
+
+                        for cap in lookup_caps:
+                            sel = self.tool_registry.select_tool(cap, candidate_params=step.parameters)
+                            alt_tool = None
+                            if sel and sel.fallback_tool and sel.fallback_tool.name != step.tool:
+                                alt_tool = sel.fallback_tool
+                            elif sel and sel.tool and sel.tool.name != step.tool:
+                                alt_tool = sel.tool
+
+                            if alt_tool:
+                                logger.info(f"[AgentLoop] Qadam #{step.order} uchun zaxira (fallback) asbob tanlandi: '{alt_tool.name}'")
+                                active_trace.add_stage("TOOL_SELECTED", status="fallback", details={
+                                    "original_tool": step.tool,
+                                    "fallback_tool": alt_tool.name,
+                                    "why": "Primary tool failed, switching to compatible fallback"
+                                })
+                                step.tool = alt_tool.name
+                                break
+                    except Exception as ex:
+                        logger.debug(f"[AgentLoop] Fallback qidirishda xatolik: {ex}")
+
                 # Qayta urinish limiti
                 if step.retry_count < step.max_retries:
                     step.retry_count += 1
                     logger.info(f"[AgentLoop] Qadam #{step.order} uchun {step.retry_count}-qayta urinish...")
                     # 1 marta qayta urinib ko'ramiz
-                    retry_res = self._act_execute_step(step)
+                    retry_res = self._act_execute_step(step, trace=active_trace)
                     retry_ver = self.verifier.verify_step(step, retry_res)
                     step.verification = retry_ver
                     retry_continue, _ = self.verifier.should_continue(retry_ver, step)
                     if retry_continue:
                         step.status = StepStatus.COMPLETED
+                        step.observed_result = retry_res.raw_result
+                        step.error = retry_res.error
                         self._execution_state.completed_steps.append(step)
                         active_trace.add_stage("STEP_COMPLETED", status="ok_after_retry", details={"step_id": step.step_id})
+                        if self.task_context_manager:
+                            self.task_context_manager.update_task_progress(
+                                action=step.tool,
+                                result=str(retry_res.raw_result)[:100] if retry_res.raw_result else None
+                            )
                         continue
 
                 # Qayta urinish ham yordam bermasa -> To'xtatish
@@ -729,8 +777,8 @@ QOIDALAR:
     # ACT EXECUTION HELPER
     # ========================================================
 
-    def _act_execute_step(self, step: PlanStep) -> StepResult:
-        """Bitta asbobni chaqirish va StepResult qaytarish"""
+    def _act_execute_step(self, step: PlanStep, trace: Optional[Any] = None) -> StepResult:
+        """Bitta asbobni chaqirish va StepResult qaytarish (Tool System 2.0 bilan)"""
         tool_name = step.tool
         params = step.parameters or {}
         step_start = time.time()
@@ -738,26 +786,55 @@ QOIDALAR:
         # ToolRegistry orqali bajarish
         if self.tool_registry:
             try:
-                call_res = self.tool_registry.call(tool_name, **params)
+                # 1. To'g'ridan-to'g'ri nom yoki qobiliyat orqali topish
+                tool_obj = self.tool_registry.get(tool_name)
+                if not tool_obj and hasattr(self.tool_registry, "select_tool"):
+                    ctx = None
+                    if self.task_context_manager:
+                        if hasattr(self.task_context_manager, "get_active_context"):
+                            ctx = self.task_context_manager.get_active_context()
+                        elif hasattr(self.task_context_manager, "get_active_task"):
+                            ctx = self.task_context_manager.get_active_task()
+                    sel = self.tool_registry.select_tool(
+                        required_capability=tool_name,
+                        context=ctx,
+                        candidate_params=params
+                    )
+                    if sel and sel.tool:
+                        tool_obj = sel.tool
+                        if trace:
+                            trace.add_stage("TOOL_DISCOVERED", status="ok", details={
+                                "capability": tool_name,
+                                "candidates": sel.candidate_tools
+                            })
+                            trace.add_stage("TOOL_SELECTED", status="ok", details={
+                                "selected": tool_obj.name,
+                                "score": sel.score,
+                                "why": sel.explanation
+                            })
+
+                target_name = tool_obj.name if tool_obj else tool_name
+                call_res = self.tool_registry.call(target_name, **params)
+
                 dur = (time.time() - step_start) * 1000.0
                 if bool(call_res.get("success", False)):
                     return StepResult(
                         step_id=step.step_id,
-                        tool=tool_name,
+                        tool=tool_obj.name if tool_obj else tool_name,
                         parameters=redact_sensitive_data(params),
                         success=True,
-                        raw_result=call_res.get("result"),
+                        raw_result=call_res.get("result") if "result" in call_res else call_res.get("data"),
                         duration_ms=dur,
                         timestamp=datetime.datetime.now().isoformat()
                     )
                 else:
                     return StepResult(
                         step_id=step.step_id,
-                        tool=tool_name,
+                        tool=tool_obj.name if tool_obj else tool_name,
                         parameters=redact_sensitive_data(params),
                         success=False,
                         error=call_res.get("error", "Noma'lum xatolik"),
-                        raw_result=call_res,
+                        raw_result=call_res.to_dict() if hasattr(call_res, "to_dict") else call_res,
                         duration_ms=dur,
                         timestamp=datetime.datetime.now().isoformat()
                     )
@@ -815,7 +892,11 @@ QOIDALAR:
                 )
 
             logger.info(f"[AgentLoop] Foydalanuvchi qadam #{step_id} ni tasdiqladi, reja davom ettirilmoqda")
-            active_trace = get_observability_manager().get_last_trace() or get_observability_manager().create_trace()
+            active_trace = None
+            if self._execution_state and self._execution_state.trace_id:
+                active_trace = get_observability_manager().get_trace_obj(self._execution_state.trace_id)
+            if not active_trace:
+                active_trace = get_observability_manager().create_trace()
             active_trace.add_stage("PLAN_RESUMED", status="ok", details={"plan_id": plan_id, "step_id": step_id})
 
             self._paused_step_id = None
