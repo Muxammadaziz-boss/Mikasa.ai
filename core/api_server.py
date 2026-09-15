@@ -208,6 +208,44 @@ async def handle_status(request):
     })
 
 
+async def handle_system_metrics(request):
+    """GET /api/system/metrics - Haqiqiy tizim telemetriyasi (CPU, RAM, Disk, Tarmoq, Batareya)"""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage("C:\\" if os.name == "nt" else "/")
+        net = psutil.net_io_counters()
+
+        battery = None
+        battery_plugged = None
+        try:
+            bat = psutil.sensors_battery()
+            if bat:
+                battery = round(bat.percent, 1)
+                battery_plugged = bat.power_plugged
+        except Exception:
+            pass
+
+        metrics = {
+            "ok": True,
+            "cpu_percent": round(cpu, 1),
+            "ram_percent": round(mem.percent, 1),
+            "ram_used_gb": round(mem.used / (1024 ** 3), 2),
+            "ram_total_gb": round(mem.total / (1024 ** 3), 2),
+            "disk_percent": round(disk.percent, 1),
+            "disk_free_gb": round(disk.free / (1024 ** 3), 1),
+            "network_sent_kb": round(net.bytes_sent / 1024, 1),
+            "network_recv_kb": round(net.bytes_recv / 1024, 1),
+            "battery_percent": battery,
+            "battery_plugged": battery_plugged,
+            "timestamp": datetime.now().isoformat()
+        }
+        return web.json_response(metrics)
+    except Exception as e:
+        logger.error(f"Tizim metrikalarini olishda xatolik: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
 
 # ========== 2. CHAT & VOICE HANDLERS ==========
 def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask") -> str:
@@ -1904,6 +1942,7 @@ def create_app():
     app = web.Application(middlewares=[cors_middleware])
     # Tizim va Bosh sahifa
     app.router.add_get("/api/status", handle_status)
+    app.router.add_get("/api/system/metrics", handle_system_metrics)
     app.router.add_get("/api/ws", handle_ws)
     
     # AI Chat va Ovoz

@@ -257,7 +257,32 @@ export interface AccountSettings {
   ai_models_available?: Array<{ id: string; name: string; provider: string; badge: string; desc: string }>;
 }
 
-export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
+export type VoiceState =
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "planning"
+  | "acting"
+  | "verifying"
+  | "replanning"
+  | "speaking"
+  | "completed"
+  | "error";
+
+export interface SystemMetrics {
+  ok?: boolean;
+  cpu_percent: number;
+  ram_percent: number;
+  ram_used_gb: number;
+  ram_total_gb: number;
+  disk_percent: number;
+  disk_free_gb?: number;
+  network_sent_kb: number;
+  network_recv_kb: number;
+  battery_percent?: number | null;
+  battery_plugged?: boolean | null;
+  timestamp: string;
+}
 
 export interface PlanStepData {
   step_id: string;
@@ -349,6 +374,8 @@ class BackendService {
   private transcriptListeners: Set<(data: { text: string; sender: "user" | "mikasa" }) => void> = new Set();
   private accountListeners: Set<(data: any) => void> = new Set();
   private agentListeners: Set<(event: AgentEventData) => void> = new Set();
+  private metricsListeners: Set<(metrics: SystemMetrics) => void> = new Set();
+  private clientVoiceStopFn: (() => void) | null = null;
 
   constructor() {
     this.connectWs();
@@ -391,6 +418,11 @@ class BackendService {
   public onAgentEvent(cb: (event: AgentEventData) => void): () => void {
     this.agentListeners.add(cb);
     return () => this.agentListeners.delete(cb);
+  }
+
+  public onSystemMetrics(cb: (metrics: SystemMetrics) => void): () => void {
+    this.metricsListeners.add(cb);
+    return () => this.metricsListeners.delete(cb);
   }
 
   private notifyStatus(status: BackendStatus) {
@@ -480,6 +512,14 @@ class BackendService {
               } catch {}
             }
             this.accountListeners.forEach((cb) => {
+              try {
+                cb(payload.data);
+              } catch (e) {
+                console.error(e);
+              }
+            });
+          } else if (payload.type === "system_metrics" && payload.data) {
+            this.metricsListeners.forEach((cb) => {
               try {
                 cb(payload.data);
               } catch (e) {
@@ -620,6 +660,173 @@ class BackendService {
       return false;
     } catch {
       return false;
+    }
+  }
+
+  // ========== Real System Metrics ==========
+  public async getSystemMetrics(): Promise<SystemMetrics | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/system/metrics`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  // ========== Voice AI Client-Side Microphone & Web Speech ==========
+  public async startClientVoice(
+    onTranscript: (text: string, isFinal: boolean) => void,
+    onError: (err: string) => void,
+    onAudioLevelOrState?: ((level: number) => void) | ((state: VoiceState) => void)
+  ): Promise<(() => void) | null> {
+    // 1. Microphone permission check
+    try {
+      if (navigator?.mediaDevices?.getUserMedia) {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    } catch {
+      const errMsg = "Tovushli boshqaruv uchun mikrofon ruxsati kerak.";
+      onError(errMsg);
+      if (typeof onAudioLevelOrState === "function" && onAudioLevelOrState.length === 1) {
+        try { (onAudioLevelOrState as any)("error"); } catch {}
+      }
+      return null;
+    }
+
+    // 2. Web Speech Recognition check
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      // Fallback to backend voice recognition
+      try {
+        const started = await this.startVoice();
+        if (started) {
+          if (typeof onAudioLevelOrState === "function") {
+            try { (onAudioLevelOrState as any)("listening"); } catch {}
+          }
+          const stopper = () => this.stopVoice();
+          this.clientVoiceStopFn = stopper;
+          return stopper;
+        }
+        onError("Ovozli boshqaruvni ishga tushirib bo'lmadi.");
+        return null;
+      } catch {
+        onError("Ovozli boshqaruvni ishga tushirib bo'lmadi.");
+        return null;
+      }
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "uz-UZ";
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        this.notifyVoiceState("listening");
+        if (typeof onAudioLevelOrState === "function") {
+          try { (onAudioLevelOrState as any)("listening"); } catch {}
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = "";
+        let final = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        if (final) {
+          onTranscript(final.trim(), true);
+        } else if (interim) {
+          onTranscript(interim.trim(), false);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          onError("Tovushli boshqaruv uchun mikrofon ruxsati kerak.");
+        } else if (event.error !== "no-speech") {
+          onError(`Ovozni tinglashda xatolik: ${event.error}`);
+        }
+        this.notifyVoiceState("idle");
+      };
+
+      recognition.onend = () => {
+        this.notifyVoiceState("idle");
+      };
+
+      recognition.start();
+
+      const stopper = () => {
+        try {
+          recognition.stop();
+        } catch {}
+      };
+      this.clientVoiceStopFn = stopper;
+      return stopper;
+    } catch {
+      onError("Ovozli boshqaruvni ishga tushirib bo'lmadi.");
+      return null;
+    }
+  }
+
+  public stopClientVoice(): void {
+    if (this.clientVoiceStopFn) {
+      try {
+        this.clientVoiceStopFn();
+      } catch {}
+      this.clientVoiceStopFn = null;
+    }
+    this.stopVoice();
+    this.notifyVoiceState("idle");
+  }
+
+  // ========== AgentLoop 2.0 Integration ==========
+  public async executeAgent(goal: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Agent ijrosi amalga oshmadi" };
+    }
+  }
+
+  public async confirmAgentStep(planId: string, stepId: string, approve: boolean): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId, step_id: stepId, approve }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Tasdiqlashda xatolik" };
+    }
+  }
+
+  public async abortAgent(planId?: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/api/agent/abort`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { ok: false, error: e.message || "To'xtatishda xatolik" };
     }
   }
 
@@ -1153,36 +1360,12 @@ class BackendService {
     }
   }
 
-  public async confirmAgentStep(
-    planId: string,
-    stepId: string,
-    approve: boolean = true
-  ): Promise<{ ok: boolean; type?: string; content?: string; metadata?: any; error_code?: string; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/agent/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: planId, step_id: stepId, approve }),
-      });
-      return await res.json();
-    } catch (err: any) {
-      return { ok: false, error: String(err) };
-    }
+  public async abortAgentPlan(planId?: string): Promise<{ ok: boolean; message: string }> {
+    return this.abortAgent(planId);
   }
 
-  public async abortAgentPlan(
-    planId?: string
-  ): Promise<{ ok: boolean; message: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/agent/abort`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: planId }),
-      });
-      return await res.json();
-    } catch (err: any) {
-      return { ok: false, message: String(err) };
-    }
+  public async getSchedulerTasks(): Promise<SchedulerResponse> {
+    return this.getScheduler();
   }
 
   public async getAgentState(): Promise<{ ok: boolean; state: string; execution: AgentExecutionStateData; timestamp?: string }> {

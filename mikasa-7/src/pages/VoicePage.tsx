@@ -71,7 +71,7 @@ export const VoicePage: React.FC<VoicePageProps> = ({
     }
   };
 
-  const effectiveOrbState: "idle" | "listening" | "thinking" | "speaking" | "loading" | "error" | "offline" =
+  const effectiveOrbState: VoiceState | "offline" | "loading" =
     backendStatus.status === "offline"
       ? "offline"
       : backendStatus.status === "connecting"

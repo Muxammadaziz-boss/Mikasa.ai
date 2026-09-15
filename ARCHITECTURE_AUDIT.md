@@ -846,4 +846,75 @@ Planning 2.0 doirasida 7 ta yangi trace bosqichi joriy etildi:
 - Frontend testlari (`npm test`): **10/10 test muvaffaqiyatli**.
 - Frontend Production Build (`npm run build`): **297ms da 100% xatosiz yig'ildi**.
 
+---
+
+## 17. Phase 34 — Real Mikasa UI & Voice Experience
+
+### 17.1. Arxitektura Konsepsiyasi va Asosiy Maqsad
+Phase 34 doirasida Mikasa AI oddiy chat interfeysidan **jonli, ovozli va vizual mavjudlikka ega (Voice-First AI Presence)** haqiqiy operatsion tizim muhitiga aylantirildi.
+Tizim foydalanuvchi taqdim etgan tog' va ko'l manzarali kinemotografik fon muhitini, 10 xil holatdagi reaktiv Mikasa Orb yadrosini, real vaqtdagi tizim telemetriyasini, to'liq o'zbekcha mahalliylashtirilgan ovoz nazoratini hamda Phase 31–33 intellektual AgentLoop va Planning 2.0 tizimlarini bitta uyg'un bosh sahifada birlashtirdi.
+
+### 17.2. Amalga Oshirilgan Yangi Komponentlar va O'zgarishlar
+
+#### 1. Kinemotografik Fon va Glassmorphism Tizimi (`assets/mikasa-bg.jpg`, `globals.css`)
+- **Haqiqiy Ko'l va Tog' Foni**: Rasm `mikasa-7/src/assets/mikasa-bg.jpg` va `public/` papkalariga joylashtirildi.
+- **Yumshoq Vinetka (`.cinematic-vignette`)**: Ko'lning sokin suvlari va issiq chiroqlarni to'sib qo'ymaslik uchun radial vinetka shaffofligi muvozanatlashtirildi.
+- **Ultra-shaffof Shisha Panellar (`.glass-panel`, `.glass-card-interactive`, `.glass-pill-suggestion`)**: `backdrop-filter: blur(24px)` va `rgba(10, 16, 28, 0.68)` fon orqali yuqori kontrast va o'qilishi oson matnlar yaratildi.
+
+#### 2. 10 Holatli Jonli Mikasa Orb (`components/MikasaOrb.tsx`)
+- Orb markaziy vizual yadro sifatida quyidagi 10 ta real holatni qabul qiladi va har biri uchun maxsus vizual uslub va animatsiyani taqdim etadi:
+  1. `idle`: Sokit shaffof ko'k nafas olish (`#38BDF8`).
+  2. `listening`: Qizil-pushti pulsatsiya va ovoz amplitudasi bo'yicha kengayish (`#F43F5E`).
+  3. `thinking`: Binafsha aylanma zarrachalar (`#A855F7`).
+  4. `planning`: To'q ko'k kinetik orbital halqalar (`#6366F1`).
+  5. `acting`: Moviy aylanuvchi va kinetik maydon (`#06B6D4`).
+  6. `verifying`: Oltinrang nurli tekshiruv skaneri (`#F59E0B`).
+  7. `replanning`: Qayta rejalashtirish fazasi o'zgarishi (`#EC4899`).
+  8. `speaking`: Zumrad yashil tovush to'lqinlari (`#10B981`).
+  9. `completed`: Muvaffaqiyatli yakunlash charaqlashi (`#10B981`).
+  10. `error`: Qizil xatolik ogohlantirish tebranishi (`#EF4444`).
+- Har bir holat tagida mikro-teg va yorug'lik nuri bilan holat nomi aks ettiriladi.
+
+#### 3. Orb Atrofidagi Aylanma Tavsiyalar (Orbiting Suggestions)
+- Orb atrofida sekin suzuvchi (floating animation: `orb-float-1` .. `orb-float-6`) 6 ta aqlli tavsiya tugmasi joylashtirildi:
+  - `"Ob-havoni tekshir"` (SunIcon)
+  - `"Kompyuterimni tekshir"` (CpuIcon)
+  - `"Bugungi rejani tuz"` (ClockIcon)
+  - `"Pythonni tushuntir"` (CodeIcon)
+  - `"Faylni tahlil qil"` (FileTextIcon)
+  - `"Internetdan izla"` (GlobeIcon)
+- Bosilganda to'g'ridan-to'g'ri AgentLoop / Chat tizimiga so'rov yuboradi.
+
+#### 4. Real Tizim Telemetriyasi — Chap Panel (`core/api_server.py`, `GET /api/system/metrics`)
+- Backendda `psutil` orqali tizimning real ko'rsatkichlari olindi:
+  - `cpu_percent`: Protsessor yuklamasi (rangli progress bar).
+  - `ram_percent`, `ram_used_gb`, `ram_total_gb`: Operativ xotira hajmi va foizi.
+  - `disk_percent`, `disk_free_gb`: Qattiq disk bo'sh joyi.
+  - `network_sent_kb`, `network_recv_kb`: Tarmoq orqali yuklash va qabul tezligi.
+  - `battery_percent`, `battery_plugged`: Batareya darajasi va quvvatlanish holati.
+- Frontend har 3.5 soniyada ma'lumotlarni avtomatik yangilab boradi.
+
+#### 5. Mening Vazifalarim — O'ng Panel (`pages/SchedulerPage.tsx` integratsiyasi)
+- Rejalashtiruvchi vazifalar ro'yxati real vaqtda aks ettiriladi (`Faol`, `Kutilmoqda`, `Bajarildi`, `Takroriy`).
+- Yangi vazifa qo'shish va "Bugungi kun rejasi"ni tuzish tugmalari mavjud.
+
+#### 6. AgentLoop & Planning 2.0 Jonli Vizualizatsiyasi
+- Reja tuzilganda markaziy maydonda Agent Rejasi kartasi ochiladi:
+  - Reja maqsadi va versiya nishoni (`v1`, `v2`).
+  - Qayta rejalashtirish yuz berganda sabab ko'rsatuvchi ogohlantirish banneri.
+  - Har bir qadamning holati, ishlatilgan asbob (`tool`), semantik qobiliyati (`capability`) va verifikatsiya natijasi.
+  - Tasdiqlash talab etiladigan amallarda "Tasdiqlash" / "Rad etish" interaktiv tugmalari.
+
+#### 7. Ovozli Boshqaruv va O'zbekcha Mahalliylashtirish
+- Web Speech API bilan integratsiya va xato yuz berganda aniq o'zbekcha xabar:
+  `"Tovushli boshqaruv uchun mikrofon ruxsati kerak."`
+- Real vaqtdagi o'zbekcha sana va soat formati:
+  `"Seshanba, 15-sentabr • 22:45"`
+
+### 17.3. Test Natijalari va Verifikatsiya
+- Backend telemetriya testi: `tests/test_system_metrics_api.py` — 100% OK.
+- Jami Python backend testlari (Phases 31–34): **129 ta test — 100% muvaffaqiyatli (0.374s)**.
+- Frontend unit va stress testlari (`npm test`): **15/15 test — 100% muvaffaqiyatli**.
+- Frontend Production Build (`npm run build`): **494ms da 100% xatosiz yig'ildi**.
+
 

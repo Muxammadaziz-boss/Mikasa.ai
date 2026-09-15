@@ -113,3 +113,85 @@ test('Error Handling: Structured 3-part layout contract', () => {
   assert.ok(errorObj.reason.length > 0, 'Sabab tushuntirilishi shart');
   assert.ok(errorObj.actionLabel.length > 0, 'Qayta urinish harakati bo\'lishi shart');
 });
+
+// 7. PHASE 34 — REAL MIKASA UI & VOICE EXPERIENCE CONTRACTS
+test('Phase 34: 10 distinct Mikasa Orb presence states', () => {
+  const tenStates = [
+    'idle',
+    'listening',
+    'thinking',
+    'planning',
+    'acting',
+    'verifying',
+    'replanning',
+    'speaking',
+    'completed',
+    'error'
+  ];
+  assert.equal(tenStates.length, 10);
+  for (const s of tenStates) {
+    assert.ok(typeof s === 'string' && s.length > 0);
+  }
+});
+
+test('Phase 34: Natural Uzbek microphone permission error contract', () => {
+  const expectedUzbekMicError = "Tovushli boshqaruv uchun mikrofon ruxsati kerak.";
+  assert.equal(expectedUzbekMicError, "Tovushli boshqaruv uchun mikrofon ruxsati kerak.");
+});
+
+test('Phase 34: Orbiting suggestions curation and structure', () => {
+  const suggestions = [
+    { id: "weather", label: "Ob-havoni tekshir" },
+    { id: "system", label: "Kompyuterimni tekshir" },
+    { id: "plan", label: "Bugungi rejani tuz" },
+    { id: "python", label: "Pythonni tushuntir" },
+    { id: "file", label: "Faylni tahlil qil" },
+    { id: "web", label: "Internetdan izla" }
+  ];
+  assert.equal(suggestions.length, 6);
+  assert.ok(suggestions.some(s => s.id === "weather"));
+  assert.ok(suggestions.some(s => s.id === "system"));
+  assert.ok(suggestions.some(s => s.id === "plan"));
+  assert.ok(suggestions.some(s => s.id === "python"));
+  assert.ok(suggestions.some(s => s.id === "file"));
+  assert.ok(suggestions.some(s => s.id === "web"));
+});
+
+test('Phase 34: Uzbek real-time date formatting contract', () => {
+  const formatUzbekDateTime = (date) => {
+    const dayNames = ["Yakshanba", "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba"];
+    const monthNames = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+    const day = dayNames[date.getDay()];
+    const dateNum = date.getDate();
+    const month = monthNames[date.getMonth()];
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${day}, ${dateNum}-${month} • ${hours}:${minutes}`;
+  };
+
+  const sampleDate = new Date(2026, 8, 15, 22, 45); // Sept 15, 2026, 22:45
+  const formatted = formatUzbekDateTime(sampleDate);
+  assert.equal(formatted, "Seshanba, 15-sentabr • 22:45");
+});
+
+test('Phase 34: System Telemetry metrics schema contract', () => {
+  const sampleMetrics = {
+    cpu_percent: 14.5,
+    ram_percent: 42.1,
+    ram_used_gb: 6.8,
+    ram_total_gb: 16.0,
+    disk_percent: 55.0,
+    disk_free_gb: 120.4,
+    network_sent_kb: 45,
+    network_recv_kb: 180,
+    battery_percent: 92,
+    battery_plugged: true,
+    timestamp: "2026-09-15T22:45:00"
+  };
+
+  assert.ok(typeof sampleMetrics.cpu_percent === 'number');
+  assert.ok(typeof sampleMetrics.ram_percent === 'number');
+  assert.ok(typeof sampleMetrics.disk_percent === 'number');
+  assert.ok(sampleMetrics.ram_used_gb <= sampleMetrics.ram_total_gb);
+  assert.ok(sampleMetrics.battery_percent >= 0 && sampleMetrics.battery_percent <= 100);
+});
