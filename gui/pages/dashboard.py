@@ -330,7 +330,7 @@ class DashboardPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             inner,
-            text="Mikasa AI v6.0.0 muvaffaqiyatli ishga tushdi",
+            text="Mikasa AI v7.0.0 muvaffaqiyatli ishga tushdi",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",

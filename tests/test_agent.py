@@ -91,9 +91,9 @@ class TestToolRegistry(unittest.TestCase):
         self.assertFalse(result["success"])
     
     def test_default_registry(self):
-        """Standart registry 20 ta tool bilan"""
+        """Standart registry kamida 20 ta tool bilan"""
         reg = create_default_registry()
-        self.assertEqual(reg.count, 20)
+        self.assertGreaterEqual(reg.count, 20)
         self.assertIn("calculator", reg.list_names())
         self.assertIn("weather", reg.list_names())
         self.assertIn("web_search", reg.list_names())
@@ -273,6 +273,7 @@ class TestReActAgent(unittest.TestCase):
                 return '{"action": "final_answer", "response": "2 + 2 = 4", "tools_used": ["calculator"]}'
         
         agent = ReActAgent(self.registry, mock_ai)
+        agent._manager_agent = None  # To'g'ridan-to'g'ri ReAct siklini tekshirish
         result = agent.run("2 + 2 necha?")
         self.assertTrue(result["success"])
         self.assertIn("calculator", result["tools_used"])

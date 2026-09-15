@@ -8,6 +8,16 @@ import logging
 import datetime
 from collections import deque
 from threading import RLock
+from typing import Optional, List, Dict, Any
+
+from core.intelligence.memory_types import (
+    MemoryItem,
+    MemoryType,
+    MemorySource,
+    MemoryConfidence,
+)
+from core.intelligence.memory_policy import MemoryPolicy
+from core.intelligence.memory_retriever import MemoryRetriever
 
 logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Loyiha ildizi
@@ -134,6 +144,12 @@ class AgentMemory:
             history.append({"role": "assistant", "content": conv["agent"]})
         return history
 
+    def clear_conversations(self):
+        """Barcha suhbatlar tarixini tozalash"""
+        with self._lock:
+            self._conversations.clear()
+            self._save_conversations()
+
     # ========== FOYDALANUVCHI PROFILI ==========
 
     def set_profile(self, key: str, value):
@@ -152,16 +168,266 @@ class AgentMemory:
 
     # ========== BILIMLAR BAZASI ==========
 
-    def save_knowledge(self, key: str, value: str):
-        """Yangi bilim saqlash"""
+    def save_knowledge(
+        self,
+        key: str,
+        value: str = "",
+        memory_type: Optional[MemoryType] = None,
+        source: MemorySource = MemorySource.USER,
+        confidence: float = 1.0,
+        importance: float = 0.5,
+        pinned: bool = False,
+        category: Optional[str] = None,
+        content: Optional[str] = None,
+    ) -> bool:
+        """Yangi bilim saqlash (MemoryPolicy xavfsizlik, maxfiylik va deduplikatsiya bilan)"""
+        if content is not None and not value:
+            value = content
+        if category and memory_type is None:
+            cat_lower = str(category).lower()
+            if "work" in cat_lower:
+                memory_type = MemoryType.WORK_CONTEXT
+            elif "pref" in cat_lower:
+                memory_type = MemoryType.PREFERENCE
+            elif "task" in cat_lower:
+                memory_type = MemoryType.TASK
+            elif "note" in cat_lower:
+                memory_type = MemoryType.NOTE
+            else:
+                memory_type = MemoryType.FACT
+
         with self._lock:
-            self._knowledge[key] = {
-                "value": value,
-                "saved_at": datetime.datetime.now().isoformat(),
-                "access_count": 0,
-            }
+            decision = MemoryPolicy.evaluate_write(
+                key=key,
+                content=value,
+                source=source,
+                memory_type=memory_type,
+                existing_knowledge=self._knowledge,
+            )
+
+            if not decision.allowed:
+                logger.warning(
+                    f"Bilim saqlash rad etildi: key='{key}', sabab='{decision.reason}'"
+                )
+                try:
+                    from core.intelligence.observability import get_observability_manager
+                    get_observability_manager().metrics.record_write_rejection(decision.reason)
+                except Exception:
+                    pass
+                return False
+
+            if memory_type is None:
+                memory_type = MemoryPolicy.classify_type(key, decision.sanitized_content)
+
+            # Duplikat bo'lsa: mavjud xotirani yangilaymiz
+            if decision.is_duplicate and decision.existing_key:
+                target_key = decision.existing_key
+                if target_key in self._knowledge:
+                    existing = self._knowledge[target_key]
+                    if isinstance(existing, dict):
+                        existing["access_count"] = existing.get("access_count", 0) + 1
+                        existing["updated_at"] = datetime.datetime.now().isoformat()
+                        if pinned:
+                            existing["pinned"] = True
+                        self._save_json(self._knowledge_file, self._knowledge)
+                        return True
+
+            # Yangi xotira yaratish
+            item = MemoryItem(
+                key=key,
+                content=decision.sanitized_content,
+                type=memory_type if isinstance(memory_type, MemoryType) else MemoryType(memory_type),
+                source=source if isinstance(source, MemorySource) else MemorySource(source),
+                importance=importance,
+                confidence=confidence,
+                pinned=pinned,
+            )
+
+            # Ziddiyatli xotiralar tekshiruvi va yangilanishi
+            existing_items = self.get_memory_items()
+            MemoryPolicy.resolve_conflict(item, existing_items)
+            for ex in existing_items:
+                if ex.key in self._knowledge and not ex.is_active():
+                    self._knowledge[ex.key]["superseded_by"] = ex.superseded_by
+
+            self._knowledge[key] = item.to_dict()
             self._save_json(self._knowledge_file, self._knowledge)
-            logger.debug(f"Bilim saqlandi: {key} = {value}")
+            logger.debug(f"Bilim saqlandi ({item.type.value}): {key} = {decision.sanitized_content}")
+            return True
+
+    def update_knowledge_item(
+        self,
+        item_id_or_key: str,
+        key: Optional[str] = None,
+        content: Optional[str] = None,
+        memory_type: Optional[MemoryType] = None,
+        importance: Optional[float] = None,
+        pinned: Optional[bool] = None,
+    ) -> Optional[MemoryItem]:
+        """Mavjud xotira elementini xavfsiz tahrirlash (ID yoki kalit bo'yicha)"""
+        with self._lock:
+            target_key = None
+            existing_dict = None
+
+            if item_id_or_key in self._knowledge:
+                target_key = item_id_or_key
+                existing_dict = self._knowledge[target_key]
+            else:
+                for k, v in self._knowledge.items():
+                    if isinstance(v, dict) and v.get("id") == item_id_or_key:
+                        target_key = k
+                        existing_dict = v
+                        break
+
+            if not target_key or not existing_dict:
+                logger.warning(f"Tahrirlash uchun xotira topilmadi: {item_id_or_key}")
+                return None
+
+            current_item = MemoryItem.from_dict(target_key, existing_dict)
+
+            new_key = key.strip() if key is not None and key.strip() else current_item.key
+            new_content = content.strip() if content is not None else current_item.content
+            new_type = memory_type if memory_type is not None else current_item.type
+            if isinstance(new_type, str):
+                try:
+                    new_type = MemoryType(new_type)
+                except ValueError:
+                    new_type = current_item.type
+            new_importance = float(importance) if importance is not None else current_item.importance
+            new_pinned = bool(pinned) if pinned is not None else current_item.pinned
+
+            # Xavfsizlik va MemoryPolicy tekshiruvi
+            decision = MemoryPolicy.evaluate_write(
+                key=new_key,
+                content=new_content,
+                source=current_item.source,
+                memory_type=new_type,
+            )
+
+            if not decision.allowed:
+                logger.warning(f"Xotirani tahrirlash rad etildi: {decision.reason} ({new_key})")
+                try:
+                    from core.intelligence.observability import get_observability_manager
+                    get_observability_manager().metrics.record_write_rejection(decision.reason)
+                except Exception:
+                    pass
+                return None
+
+            if new_key != target_key:
+                del self._knowledge[target_key]
+
+            updated_item = MemoryItem(
+                id=current_item.id,
+                key=new_key,
+                content=decision.sanitized_content,
+                type=new_type,
+                source=current_item.source,
+                importance=new_importance,
+                confidence=current_item.confidence,
+                created_at=current_item.created_at,
+                updated_at=datetime.datetime.now().isoformat(),
+                last_used_at=current_item.last_used_at,
+                access_count=current_item.access_count,
+                superseded_by=current_item.superseded_by,
+                pinned=new_pinned,
+                metadata=current_item.metadata,
+            )
+
+            self._knowledge[new_key] = updated_item.to_dict()
+            self._save_json(self._knowledge_file, self._knowledge)
+            logger.info(f"Xotira tahrirlandi: id='{updated_item.id}', key='{new_key}'")
+            return updated_item
+
+    def delete_knowledge_item(self, item_id_or_key: str) -> bool:
+        """Xotirani ID yoki kalit bo'yicha xavfsiz o'chirish"""
+        with self._lock:
+            target_key = None
+            if item_id_or_key in self._knowledge:
+                target_key = item_id_or_key
+            else:
+                for k, v in self._knowledge.items():
+                    if isinstance(v, dict) and v.get("id") == item_id_or_key:
+                        target_key = k
+                        break
+
+            if target_key and target_key in self._knowledge:
+                del self._knowledge[target_key]
+                self._save_json(self._knowledge_file, self._knowledge)
+                try:
+                    from core.intelligence.observability import get_observability_manager
+                    get_observability_manager().metrics.record_deletion()
+                except Exception:
+                    pass
+                logger.info(f"Xotira o'chirildi: key='{target_key}'")
+                return True
+
+            logger.warning(f"O'chirish uchun xotira topilmadi: {item_id_or_key}")
+            return False
+
+    def pin_knowledge_item(self, item_id_or_key: str, pinned: bool = True) -> bool:
+        """Xotirani qadash (pin) yoki qadoqdan chiqarish"""
+        with self._lock:
+            target_key = None
+            if item_id_or_key in self._knowledge:
+                target_key = item_id_or_key
+            else:
+                for k, v in self._knowledge.items():
+                    if isinstance(v, dict) and v.get("id") == item_id_or_key:
+                        target_key = k
+                        break
+
+            if target_key and target_key in self._knowledge:
+                val = self._knowledge[target_key]
+                if isinstance(val, dict):
+                    val["pinned"] = pinned
+                    val["updated_at"] = datetime.datetime.now().isoformat()
+                    self._save_json(self._knowledge_file, self._knowledge)
+                    logger.info(f"Xotira qadalishi o'zgardi: key='{target_key}', pinned={pinned}")
+                    return True
+
+            return False
+
+    def get_memory_item_by_id(self, item_id_or_key: str) -> Optional[MemoryItem]:
+        """ID yoki kalit bo'yicha MemoryItem obyektini olish"""
+        with self._lock:
+            if item_id_or_key in self._knowledge:
+                return MemoryItem.from_dict(item_id_or_key, self._knowledge[item_id_or_key])
+            for k, v in self._knowledge.items():
+                if isinstance(v, dict) and v.get("id") == item_id_or_key:
+                    return MemoryItem.from_dict(k, v)
+            return None
+
+    def get_memory_items(self) -> List[MemoryItem]:
+        """Barcha bilimlarni normalizatsiya qilingan MemoryItem ro'yxati sifatida olish"""
+        with self._lock:
+            items = []
+            for k, v in self._knowledge.items():
+                try:
+                    items.append(MemoryItem.from_dict(k, v))
+                except Exception as e:
+                    logger.warning(f"MemoryItem yaratishda xatolik ({k}): {e}")
+            return items
+
+    def retrieve_relevant(
+        self,
+        query: str,
+        limit: int = 6,
+        task_entities: Optional[List[str]] = None,
+    ) -> List[MemoryItem]:
+        """So'rov bo'yicha eng mos xotiralarni saralab qaytarish"""
+        with self._lock:
+            items = self.get_memory_items()
+            retrieved = MemoryRetriever.retrieve(
+                query=query,
+                items=items,
+                limit=limit,
+                task_entities=task_entities,
+            )
+            for item in retrieved:
+                if item.key in self._knowledge and isinstance(self._knowledge[item.key], dict):
+                    self._knowledge[item.key]["access_count"] = item.access_count
+                    self._knowledge[item.key]["last_used_at"] = item.last_used_at
+            return retrieved
 
     def get_knowledge(self, key: str = None) -> dict:
         """Bilim olish"""
@@ -185,13 +451,41 @@ class AgentMemory:
             return "\n".join(lines)
 
     def delete_knowledge(self, key: str) -> bool:
-        """Bilimni o'chirish"""
+        """Bilimni o'chirish (orqaga qaytuvchanlik)"""
+        return self.delete_knowledge_item(key)
+
+    def clear_knowledge(self):
+        """Barcha saqlangan bilimlarni tozalash"""
         with self._lock:
-            if key in self._knowledge:
-                del self._knowledge[key]
-                self._save_json(self._knowledge_file, self._knowledge)
-                return True
-            return False
+            self._knowledge.clear()
+            self._save_json(self._knowledge_file, self._knowledge)
+
+    @property
+    def knowledge(self) -> List[MemoryItem]:
+        """Barcha bilimlarni MemoryItem ro'yxati sifatida olish"""
+        return self.get_memory_items()
+
+    @property
+    def knowledge_file(self) -> str:
+        """agent_knowledge.json fayl yo'li"""
+        return self._knowledge_file
+
+    def add_knowledge(
+        self,
+        key: str,
+        content: str,
+        category: str = "general",
+        confidence: float = 1.0,
+        pinned: bool = False,
+    ) -> bool:
+        """save_knowledge uchun qulay alias"""
+        return self.save_knowledge(
+            key=key,
+            content=content,
+            category=category,
+            confidence=confidence,
+            pinned=pinned,
+        )
 
     # ========== STATISTIKA ==========
 
@@ -199,10 +493,13 @@ class AgentMemory:
     def stats(self) -> dict:
         """Xotira statistikasi"""
         with self._lock:
+            items = self.get_memory_items()
             return {
                 "kontekst_hajmi": len(self._short_term),
                 "suhbatlar_soni": len(self._conversations),
                 "bilimlar_soni": len(self._knowledge),
+                "faol_bilimlar_soni": sum(1 for m in items if m.is_active()),
+                "pinned_bilimlar_soni": sum(1 for m in items if getattr(m, "pinned", False)),
                 "profil_toliq": bool(self._profile.get("ism")),
             }
 
@@ -219,10 +516,12 @@ class AgentMemory:
         return default
 
     def _save_json(self, path: str, data):
-        """JSON faylga saqlash"""
+        """JSON faylga xavfsiz va atomik saqlash (tempfile orqali)"""
         try:
-            with open(path, "w", encoding="utf-8") as f:
+            temp_path = f"{path}.tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, path)
         except Exception as e:
             logger.error(f"JSON saqlash xatolik ({path}): {e}")
 

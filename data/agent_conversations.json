@@ -143,5 +143,60 @@
     "user": "Dollar kursi necha?",
     "agent": "Hozirgi kunda 1 AQSH dollari 12,179.87 O'zbekiston so'miga teng.",
     "time": "2026-03-29T22:46:37.039835"
+  },
+  {
+    "user": "videoni davom ettir",
+    "agent": "{'type': 'command', 'intent': 'play_video', 'params': {}, 'response': 'Video davom ettirildi'}",
+    "time": "2026-09-10T15:44:57.459179"
+  },
+  {
+    "user": "yutubni och",
+    "agent": "YouTube ochilmoqda.",
+    "time": "2026-09-10T15:51:04.392363"
+  },
+  {
+    "user": "musiqani davom ettir",
+    "agent": "▶️ Musiqa davom etmoqda",
+    "time": "2026-09-10T15:51:07.983734"
+  },
+  {
+    "user": "soat necha",
+    "agent": "Hozirgi vaqt: 15:51",
+    "time": "2026-09-10T15:51:11.448966"
+  },
+  {
+    "user": "ovoz 40",
+    "agent": "Ovoz balandligi 40% ga sozlandi.",
+    "time": "2026-09-10T15:51:15.141630"
+  },
+  {
+    "user": "Assalomu alaykum",
+    "agent": "👋 Salom, Muxammadaziz! Xush kelibsiz!",
+    "time": "2026-09-10T15:51:18.265744"
+  },
+  {
+    "user": "musiqani to'xtat",
+    "agent": "⏸️ Musiqa to'xtatildi",
+    "time": "2026-09-10T16:21:48.131569"
+  },
+  {
+    "user": "davom ettir",
+    "agent": "▶️ Musiqa davom etmoqda",
+    "time": "2026-09-10T16:21:54.535333"
+  },
+  {
+    "user": "kiyingisiga o'tqaz",
+    "agent": "⏭️ Keyingi video",
+    "time": "2026-09-10T16:22:09.225183"
+  },
+  {
+    "user": "kiyingi videoga o'tqaz",
+    "agent": "⏭️ Keyingi video",
+    "time": "2026-09-10T16:22:28.369566"
+  },
+  {
+    "user": "kompyuter",
+    "agent": "Kompyuter haqida nima bilmoqchisiz? Yoki biror narsa qilishimni xohlaysizmi?",
+    "time": "2026-09-10T16:23:12.045614"
   }
 ]

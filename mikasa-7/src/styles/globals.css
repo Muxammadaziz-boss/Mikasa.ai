@@ -1,0 +1,368 @@
+@import "./tokens.css";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-darkest);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-darkest);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Artwork Layer — Phase 34 Mountain-Lake Cinematic Environment */
+.cinematic-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../assets/mikasa-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.95;
+  transition: opacity 0.5s ease;
+}
+
+/* Atmospheric vignette: soft cinematic frame keeping cabin light and lake reflections vivid */
+.cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(4, 6, 12, 0.75) 0%, rgba(4, 6, 12, 0.25) 25%, transparent 55%, rgba(4, 6, 12, 0.4) 100%),
+    radial-gradient(ellipse at 50% 40%, rgba(4, 6, 12, 0.05) 0%, rgba(4, 6, 12, 0.35) 70%, rgba(4, 6, 12, 0.75) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Accessible focus outlines */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  user-select: none;
+}
+
+input {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+}
+
+/* Typography Gradient utility */
+.text-metallic-gradient {
+  background: linear-gradient(180deg, #FFFFFF 0%, #D2DEED 70%, #9EB5D0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ========== Phase 17 — Responsive Desktop Styles ========== */
+/* 1. Prevent excessive stretching on 1440p / 1080p ultra-wide screens */
+.responsive-container {
+  width: 100%;
+  max-width: 1140px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(16px, 3vw, 32px);
+  padding-right: clamp(16px, 3vw, 32px);
+}
+
+.chat-readable-container {
+  width: 100%;
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 2. Responsive scaling & non-clipping for 1024x700 and 1280x800 */
+@media (max-width: 1120px) {
+  .mikasa-sidebar {
+    width: var(--sidebar-width-collapsed) !important;
+    padding: 16px 8px 14px 8px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --font-size-body: 13px;
+  }
+  .composer-input-container {
+    padding: 8px 12px !important;
+  }
+}
+
+/* 3. 1920x1080 Ultra-Readable Viewport */
+@media (min-width: 1920px) {
+  .chat-readable-container {
+    max-width: 980px;
+  }
+}
+
+/* ========== Phase 18 — Accessibility (a11y) Styles ========== */
+/* Focus rings: visible high-contrast ring for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--primary-glow, #10B981) !important;
+  outline-offset: 2px !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced Motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast text ratio helpers */
+.text-high-contrast {
+  color: #FFFFFF !important;
+}
+
+.text-subtle-contrast {
+  color: #CBD5E1 !important;
+}
+
+/* ========== Phase 34 — Glassmorphism & Orb Animations ========== */
+.glass-panel {
+  background: rgba(8, 12, 22, 0.58);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.glass-card-interactive {
+  background: rgba(12, 18, 32, 0.52);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.glass-card-interactive:hover {
+  transform: translateY(-2px);
+  background: rgba(18, 26, 44, 0.65);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.glass-pill-suggestion {
+  background: rgba(10, 16, 28, 0.62);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #E2E8F0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.glass-pill-suggestion:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: rgba(24, 38, 64, 0.85);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.25);
+  color: #FFFFFF;
+}
+
+/* Orb State Animations */
+@keyframes orb-breathing {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+}
+
+@keyframes orb-pulse-fast {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+    filter: brightness(1.25);
+  }
+}
+
+@keyframes orb-particle-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orb-orbital-ring {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes orb-kinetic-acting {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.6));
+  }
+  50% {
+    transform: scale(1.07);
+    filter: drop-shadow(0 0 32px rgba(99, 102, 241, 0.8));
+  }
+}
+
+@keyframes orb-scan-sweep {
+  0% {
+    top: 5%;
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    top: 95%;
+    opacity: 0.1;
+  }
+}
+
+@keyframes orb-replan-shift {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.6));
+  }
+  50% {
+    transform: scale(1.06) rotate(180deg);
+    filter: drop-shadow(0 0 32px rgba(168, 85, 247, 0.8));
+  }
+}
+
+@keyframes wave-bounce {
+  0%, 100% {
+    height: 6px;
+  }
+  50% {
+    height: 24px;
+  }
+}
+
+/* Floating animation keyframes for orbiting suggestions */
+@keyframes orb-float-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-4px, -7px); }
+}
+@keyframes orb-float-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(6px, -5px); }
+}
+@keyframes orb-float-3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-5px, 6px); }
+}
+@keyframes orb-float-4 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5px, 7px); }
+}
+@keyframes orb-float-5 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-6px, -4px); }
+}
+@keyframes orb-float-6 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(4px, -8px); }
+}
+

@@ -2,6 +2,7 @@
 # Barcha sahifalar shu yerda
 
 from gui.pages.dashboard import DashboardPage
+from gui.pages.landing import LandingPage
 from gui.pages.voice import VoicePage
 from gui.pages.chat import ChatPage
 from gui.pages.commands import CommandsPage

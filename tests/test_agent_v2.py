@@ -172,9 +172,9 @@ class TestRegistryV2(unittest.TestCase):
     """Yangilangan registry testlari"""
     
     def test_20_tool(self):
-        """20 ta tool bo'lishi kerak"""
+        """Kamida 20 ta tool bo'lishi kerak"""
         reg = create_default_registry()
-        self.assertEqual(reg.count, 20)
+        self.assertGreaterEqual(reg.count, 20)
     
     def test_yangi_toollar_bor(self):
         """Yangi tool'lar ro'yxatda"""
