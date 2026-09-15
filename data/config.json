@@ -15,10 +15,11 @@
     "vad_threshold": 0.015,
     "silence_duration": 1.2,
     "tts_speed": 1.0,
-    "tts_engine": "edge_tts"
+    "tts_engine": "edge_tts",
+    "auto_speak": true
   },
   "gui": {
-    "theme": "dark",
+    "theme": "oled",
     "color_scheme": "green",
     "compact_mode": false,
     "window_size": "1100x800",
@@ -26,7 +27,8 @@
     "font_family": "Segoe UI",
     "font_size": 12,
     "color": "green",
-    "animations": true
+    "animations": true,
+    "glassmorphism": true
   },
   "paths": {
     "commands_file": "commands.json",
@@ -49,17 +51,34 @@
     "backup_count": 5
   },
   "user": {
-    "name": "Ustoz",
-    "voice_type": "ayol"
+    "name": "E2E Sinov Foydalanuvchisi",
+    "voice_type": "erkak",
+    "avatar": "emerald",
+    "role": "Dasturchi / Muhandis",
+    "bio": "Mikasa AI shaxsiy sun'iy intellekt yordamchisi",
+    "language": "uz"
   },
   "voice": {
     "tts_engine": "edge_tts",
     "silero_model": "uz-UZ-MadinaNeural",
-    "speed": 2.0,
+    "speed": 1.0,
     "sample_rate": 44100
   },
   "ai": {
     "model": "gemini",
-    "timeout": 15
+    "timeout": 15,
+    "mode": "balanced",
+    "thinking_enabled": true
+  },
+  "notifications": {
+    "scheduler": true,
+    "voice": true,
+    "sound_effects": true,
+    "system_status": true
+  },
+  "privacy": {
+    "local_storage_only": true,
+    "telemetry_disabled": true,
+    "save_conversations": true
   }
 }
