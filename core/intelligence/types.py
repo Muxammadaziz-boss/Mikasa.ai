@@ -214,6 +214,7 @@ class FailureCategory(str, Enum):
     TOOL_UNAVAILABLE = "tool_unavailable"
     VERIFICATION_FAILED = "verification_failed"
     TIMEOUT = "timeout"
+    SECURITY_BLOCKED = "security_blocked"
 
 
 @dataclass
@@ -277,7 +278,7 @@ class StepResult:
 
 @dataclass
 class PlanStep:
-    """Agent rejasining bitta qadami"""
+    """Agent rejasining bitta qadami (Planning Model 2.0)"""
     step_id: str
     order: int
     intent: str
@@ -291,6 +292,31 @@ class PlanStep:
     observed_result: Optional[Any] = None
     verification: Optional[VerificationResult] = None
     error: Optional[str] = None
+    
+    # Phase 33 — Planning Model 2.0 Field additions
+    description: str = ""
+    purpose: str = ""
+    dependencies: List[str] = field(default_factory=list)
+    required_capability: str = ""
+    verification_policy: str = "oracle_or_heuristic"
+    failure_reason: Optional[str] = None
+    retry_policy: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if not self.description:
+            self.description = self.intent
+        if not self.required_capability and self.tool:
+            self.required_capability = self.tool
+        if not self.failure_reason and self.error:
+            self.failure_reason = self.error
+
+    @property
+    def selected_tool(self) -> str:
+        return self.tool
+
+    @selected_tool.setter
+    def selected_tool(self, val: str):
+        self.tool = val
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -298,15 +324,23 @@ class PlanStep:
             "order": self.order,
             "intent": self.intent,
             "tool": self.tool,
+            "selected_tool": self.selected_tool,
+            "description": self.description or self.intent,
+            "purpose": self.purpose,
+            "dependencies": list(self.dependencies),
+            "required_capability": self.required_capability,
             "parameters": self.parameters,
             "expected_result": self.expected_result,
             "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else str(self.risk_level),
             "status": self.status.value if isinstance(self.status, StepStatus) else str(self.status),
             "retry_count": self.retry_count,
             "max_retries": self.max_retries,
+            "retry_policy": self.retry_policy,
+            "verification_policy": self.verification_policy,
             "observed_result": self.observed_result,
             "verification": self.verification.to_dict() if self.verification else None,
             "error": self.error,
+            "failure_reason": self.failure_reason or self.error,
         }
 
     @classmethod
@@ -326,11 +360,12 @@ class PlanStep:
         ver_data = data.get("verification")
         verification = VerificationResult.from_dict(ver_data) if ver_data else None
 
+        tool_val = str(data.get("selected_tool") or data.get("tool", ""))
         return cls(
             step_id=str(data.get("step_id", "")),
             order=int(data.get("order", 0)),
             intent=str(data.get("intent", "")),
-            tool=str(data.get("tool", "")),
+            tool=tool_val,
             parameters=dict(data.get("parameters", {}) or {}),
             expected_result=str(data.get("expected_result", "")),
             risk_level=risk,
@@ -340,12 +375,19 @@ class PlanStep:
             observed_result=data.get("observed_result"),
             verification=verification,
             error=data.get("error"),
+            description=str(data.get("description", "")),
+            purpose=str(data.get("purpose", "")),
+            dependencies=list(data.get("dependencies", []) or []),
+            required_capability=str(data.get("required_capability", "")),
+            verification_policy=str(data.get("verification_policy", "oracle_or_heuristic")),
+            failure_reason=data.get("failure_reason"),
+            retry_policy=dict(data.get("retry_policy", {}) or {}),
         )
 
 
 @dataclass
 class AgentPlan:
-    """Ko'p bosqichli agentlik rejasi"""
+    """Ko'p bosqichli agentlik rejasi (Planning Model 2.0)"""
     plan_id: str
     goal: str
     steps: List[PlanStep] = field(default_factory=list)
@@ -355,13 +397,117 @@ class AgentPlan:
     max_steps: int = 8
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # Phase 33 — Planning Model 2.0 Field additions
+    intent: str = ""
+    desired_outcome: str = ""
+    assumptions: List[str] = field(default_factory=list)
+    constraints: List[str] = field(default_factory=list)
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)
+    execution_order: List[str] = field(default_factory=list)
+    required_capabilities: List[str] = field(default_factory=list)
+    risk_level: RiskLevel = RiskLevel.LOW
+    updated_at: str = ""
+    plan_version: int = 1
+    replan_count: int = 0
+    max_replans: int = 2
+    replan_history: List[Dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.intent:
+            self.intent = self.goal
+        if not self.desired_outcome:
+            self.desired_outcome = f"'{self.goal}' maqsadini to'liq muvaffaqiyatli bajarish"
+        if not self.execution_order and self.steps:
+            self.execution_order = [s.step_id for s in self.steps]
+        if not self.required_capabilities and self.steps:
+            caps = []
+            for s in self.steps:
+                c = s.required_capability or s.tool
+                if c and c not in caps:
+                    caps.append(c)
+            self.required_capabilities = caps
+        if not self.dependencies and self.steps:
+            self.dependencies = {s.step_id: list(s.dependencies) for s in self.steps if s.dependencies}
+        self.calculate_plan_risk()
+
+    def get_step(self, step_id: str) -> Optional[PlanStep]:
+        """step_id orqali qadamni topish"""
+        for s in self.steps:
+            if s.step_id == step_id:
+                return s
+        return None
+
+    def get_dependencies(self, step_id: str) -> List[str]:
+        """Qadamning bog'liqliklarini olish"""
+        if step_id in self.dependencies:
+            return list(self.dependencies[step_id])
+        s = self.get_step(step_id)
+        return list(s.dependencies) if s else []
+
+    def get_ready_steps(self) -> List[PlanStep]:
+        """Barcha bog'liqliklari yakunlangan (COMPLETED) va bajarilishga tayyor qadamlar"""
+        ready: List[PlanStep] = []
+        completed_ids = {s.step_id for s in self.steps if s.status == StepStatus.COMPLETED}
+        for s in self.steps:
+            if s.status == StepStatus.PENDING:
+                deps = self.get_dependencies(s.step_id)
+                if all(dep in completed_ids for dep in deps):
+                    ready.append(s)
+        return ready
+
+    def calculate_plan_risk(self) -> RiskLevel:
+        """Reja xavf darajasini qadamlar xavfi asosida aniqlash"""
+        if not self.steps:
+            self.risk_level = RiskLevel.LOW
+            return self.risk_level
+
+        # Agar birorta qadam HIGH bo'lsa -> HIGH
+        if any(s.risk_level == RiskLevel.HIGH for s in self.steps):
+            self.risk_level = RiskLevel.HIGH
+        elif any(s.risk_level == RiskLevel.MEDIUM for s in self.steps):
+            self.risk_level = RiskLevel.MEDIUM
+        else:
+            self.risk_level = RiskLevel.LOW
+        return self.risk_level
+
+    def create_next_version(self, reason: str, changed_steps: Optional[List[str]] = None) -> int:
+        """Rejaning yangi versiyasini yaratish va replan tarixiga yozish"""
+        old_version = self.plan_version
+        self.plan_version += 1
+        self.replan_count += 1
+        import datetime
+        self.updated_at = datetime.datetime.now().isoformat()
+
+        self.replan_history.append({
+            "version": self.plan_version,
+            "from_version": old_version,
+            "to_version": self.plan_version,
+            "reason": reason,
+            "changed_steps": changed_steps or [],
+            "timestamp": self.updated_at,
+        })
+        return self.plan_version
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "goal": self.goal,
+            "intent": self.intent,
+            "desired_outcome": self.desired_outcome,
+            "assumptions": list(self.assumptions),
+            "constraints": list(self.constraints),
             "steps": [s.to_dict() for s in self.steps],
+            "dependencies": {k: list(v) for k, v in self.dependencies.items()},
+            "execution_order": list(self.execution_order),
+            "required_capabilities": list(self.required_capabilities),
+            "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else str(self.risk_level),
             "status": self.status.value if isinstance(self.status, PlanStatus) else str(self.status),
             "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "plan_version": self.plan_version,
+            "replan_count": self.replan_count,
+            "max_replans": self.max_replans,
+            "replan_history": self.replan_history,
             "current_step_index": self.current_step_index,
             "max_steps": self.max_steps,
             "metadata": self.metadata,
@@ -376,6 +522,13 @@ class AgentPlan:
             except ValueError:
                 st = PlanStatus.PENDING
 
+        risk = data.get("risk_level", RiskLevel.LOW)
+        if isinstance(risk, str):
+            try:
+                risk = RiskLevel(risk.lower())
+            except ValueError:
+                risk = RiskLevel.LOW
+
         raw_steps = data.get("steps", [])
         steps = [PlanStep.from_dict(s) if isinstance(s, dict) else s for s in raw_steps]
 
@@ -388,6 +541,19 @@ class AgentPlan:
             current_step_index=int(data.get("current_step_index", 0)),
             max_steps=int(data.get("max_steps", 8)),
             metadata=dict(data.get("metadata", {}) or {}),
+            intent=str(data.get("intent", "")),
+            desired_outcome=str(data.get("desired_outcome", "")),
+            assumptions=list(data.get("assumptions", []) or []),
+            constraints=list(data.get("constraints", []) or []),
+            dependencies=dict(data.get("dependencies", {}) or {}),
+            execution_order=list(data.get("execution_order", []) or []),
+            required_capabilities=list(data.get("required_capabilities", []) or []),
+            risk_level=risk,
+            updated_at=str(data.get("updated_at", "")),
+            plan_version=int(data.get("plan_version", 1)),
+            replan_count=int(data.get("replan_count", 0)),
+            max_replans=int(data.get("max_replans", 2)),
+            replan_history=list(data.get("replan_history", []) or []),
         )
 
 

@@ -52,6 +52,13 @@ from core.intelligence.verifier import AgentVerifier
 from core.intelligence.agent_loop import AgentLoop, get_agent_loop
 from core.intelligence.orchestrator import IntelligenceOrchestrator
 from core.intelligence.adapter import CompatibilityAdapter
+from core.intelligence.planner import (
+    GoalDecomposer,
+    DependencyGraph,
+    PlanOptimizer,
+    PlanValidator,
+    ReplanningEngine,
+)
 from core.intelligence.observability import (
     ContextTraceStage,
     ContextTrace,
@@ -61,6 +68,8 @@ from core.intelligence.observability import (
     redact_sensitive_data,
     AGENT_TRACE_STAGES,
     CORE_TRACE_STAGES,
+    TOOL_TRACE_STAGES,
+    PLANNING_TRACE_STAGES,
     ALL_TRACE_STAGES,
 )
 
@@ -115,6 +124,13 @@ __all__ = [
     "AgentExecutionState",
     "AGENT_TRACE_STAGES",
     "CORE_TRACE_STAGES",
+    "GoalDecomposer",
+    "DependencyGraph",
+    "PlanOptimizer",
+    "PlanValidator",
+    "ReplanningEngine",
+    "TOOL_TRACE_STAGES",
+    "PLANNING_TRACE_STAGES",
     "ALL_TRACE_STAGES",
 ]
 

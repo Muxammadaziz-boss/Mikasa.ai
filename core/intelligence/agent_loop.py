@@ -36,6 +36,13 @@ from core.intelligence.observability import (
     redact_sensitive_data,
 )
 from core.intelligence.task_context import TaskContextManager, get_task_context_manager
+from core.intelligence.planner import (
+    GoalDecomposer,
+    DependencyGraph,
+    PlanOptimizer,
+    PlanValidator,
+    ReplanningEngine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +88,26 @@ class AgentLoop:
         self.provider_manager = provider_manager
         self.task_context_manager = task_context_manager or get_task_context_manager()
         self.event_emitter = event_emitter
+
+        # Planning & Reasoning 2.0 Subsystems
+        self.goal_decomposer = GoalDecomposer(
+            tool_registry=tool_registry,
+            provider_manager=provider_manager,
+            permission_engine=self.permission_engine,
+        )
+        self.dependency_graph = DependencyGraph()
+        self.plan_optimizer = PlanOptimizer(
+            task_context_manager=self.task_context_manager
+        )
+        self.plan_validator = PlanValidator(
+            tool_registry=tool_registry,
+            max_steps=self.MAX_STEPS
+        )
+        self.replanning_engine = ReplanningEngine(
+            tool_registry=tool_registry,
+            provider_manager=provider_manager,
+            max_replans=2
+        )
 
         self._lock = RLock()
         self._state: AgentState = AgentState.IDLE
@@ -163,74 +190,100 @@ class AgentLoop:
         request: Optional[AIRequest] = None
     ) -> AgentPlan:
         """
-        Foydalanuvchi maqsadidan AgentPlan yaratish.
-        Oddiy birikmali buyruqlar uchun mahalliy deterministik dekompozitsiya,
-        murakkab maqsadlar uchun AI modeli rejasi.
+        Foydalanuvchi maqsadidan AgentPlan 2.0 yaratish.
+        GoalDecomposer orqali tahlil qilinadi, PlanOptimizer orqali optimallashtiriladi,
+        va DependencyGraph orqali ijro tartibi (execution_order) hisoblanadi.
         """
         clean_goal = (goal or "").strip()
         plan_id = f"plan_{str(uuid.uuid4())[:8]}"
 
-        # 1. Tezkor Mahalliy Rejalashtiruvchi (Local Deterministic Planner)
-        local_steps = self._decompose_locally(clean_goal)
-        if local_steps:
-            logger.info(f"[AgentLoop] Maqsad mahalliy deterministik rejaga aylantirildi: {len(local_steps)} qadam")
-            return AgentPlan(
-                plan_id=plan_id,
-                goal=clean_goal,
-                steps=local_steps,
-                status=PlanStatus.PENDING,
-                created_at=datetime.datetime.now().isoformat(),
-                max_steps=self.MAX_STEPS,
-                metadata={"planner": "local_deterministic"}
-            )
-
-        # 2. AI Modeli orqali rejalashtirish
-        if self.provider_manager and request:
-            ai_steps = self._generate_plan_via_llm(clean_goal, request)
-            if ai_steps:
-                return AgentPlan(
+        # 1. GoalDecomposer orqali rejalashtirish
+        if hasattr(self, "goal_decomposer") and self.goal_decomposer:
+            plan = self.goal_decomposer.decompose(clean_goal, request=request)
+        else:
+            # Zaxira dekompozitsiya
+            local_steps = self._decompose_locally(clean_goal)
+            if local_steps:
+                plan = AgentPlan(
                     plan_id=plan_id,
                     goal=clean_goal,
-                    steps=ai_steps,
+                    steps=local_steps,
                     status=PlanStatus.PENDING,
                     created_at=datetime.datetime.now().isoformat(),
                     max_steps=self.MAX_STEPS,
-                    metadata={"planner": "ai_provider"}
+                    metadata={"planner": "local_deterministic"}
+                )
+            elif self.provider_manager and request:
+                ai_steps = self._generate_plan_via_llm(clean_goal, request)
+                if ai_steps:
+                    plan = AgentPlan(
+                        plan_id=plan_id,
+                        goal=clean_goal,
+                        steps=ai_steps,
+                        status=PlanStatus.PENDING,
+                        created_at=datetime.datetime.now().isoformat(),
+                        max_steps=self.MAX_STEPS,
+                        metadata={"planner": "ai_provider"}
+                    )
+                else:
+                    single_tool = self._infer_single_tool(clean_goal)
+                    single_params = {"query": clean_goal} if single_tool == "search" else {}
+                    plan = AgentPlan(
+                        plan_id=plan_id,
+                        goal=clean_goal,
+                        steps=[
+                            PlanStep(
+                                step_id="step_1",
+                                order=1,
+                                intent=single_tool,
+                                tool=single_tool,
+                                parameters=single_params,
+                                expected_result=f"{clean_goal} bajarilishi",
+                                risk_level=self.permission_engine.evaluate(single_tool, single_params)[0]
+                            )
+                        ],
+                        status=PlanStatus.PENDING,
+                        created_at=datetime.datetime.now().isoformat(),
+                        max_steps=self.MAX_STEPS,
+                        metadata={"planner": "single_step_fallback"}
+                    )
+            else:
+                single_tool = self._infer_single_tool(clean_goal)
+                single_params = {"query": clean_goal} if single_tool == "search" else {}
+                plan = AgentPlan(
+                    plan_id=plan_id,
+                    goal=clean_goal,
+                    steps=[
+                        PlanStep(
+                            step_id="step_1",
+                            order=1,
+                            intent=single_tool,
+                            tool=single_tool,
+                            parameters=single_params,
+                            expected_result=f"{clean_goal} bajarilishi",
+                            risk_level=self.permission_engine.evaluate(single_tool, single_params)[0]
+                        )
+                    ],
+                    status=PlanStatus.PENDING,
+                    created_at=datetime.datetime.now().isoformat(),
+                    max_steps=self.MAX_STEPS,
+                    metadata={"planner": "single_step_fallback"}
                 )
 
-        # 3. Yagona qadamli zaxira reja
-        single_tool = self._infer_single_tool(clean_goal)
-        single_params: Dict[str, Any] = {}
-        if single_tool == "search":
-            single_params["query"] = clean_goal
-        elif single_tool == "calculator":
-            expr = re.sub(r"[^\d\+\-\*\/\(\)\.\s]", "", clean_goal).strip()
-            single_params["expression"] = expr or "0"
-        elif single_tool == "weather":
-            single_params["city"] = "Toshkent"
-        elif single_tool == "currency":
-            single_params["from_currency"] = "USD"
-            single_params["to_currency"] = "UZS"
+        # 2. PlanOptimizer orqali ortiqcha takrorlanishlarni tozalash
+        if hasattr(self, "plan_optimizer") and self.plan_optimizer:
+            plan = self.plan_optimizer.optimize(plan)
 
-        return AgentPlan(
-            plan_id=plan_id,
-            goal=clean_goal,
-            steps=[
-                PlanStep(
-                    step_id="step_1",
-                    order=1,
-                    intent=single_tool,
-                    tool=single_tool,
-                    parameters=single_params,
-                    expected_result=f"{clean_goal} bajarilishi",
-                    risk_level=self.permission_engine.evaluate(single_tool, single_params)[0]
-                )
-            ],
-            status=PlanStatus.PENDING,
-            created_at=datetime.datetime.now().isoformat(),
-            max_steps=self.MAX_STEPS,
-            metadata={"planner": "single_step_fallback"}
-        )
+        # 3. DependencyGraph orqali ijro tartibini ta'minlash
+        if hasattr(self, "dependency_graph") and self.dependency_graph:
+            if not plan.execution_order or len(plan.execution_order) != len(plan.steps):
+                dep_map = {s.step_id: list(s.dependencies) for s in plan.steps}
+                plan.dependencies = dep_map
+                order = self.dependency_graph.compute_execution_order(plan.steps, dep_map)
+                plan.execution_order = order
+
+        plan.risk_level = plan.calculate_plan_risk()
+        return plan
 
     def _decompose_locally(self, text: str) -> Optional[List[PlanStep]]:
         """
@@ -381,8 +434,12 @@ QOIDALAR:
     def validate_plan(self, plan: AgentPlan) -> Tuple[bool, Optional[str]]:
         """
         Rejaning xavfsizlik va tuzilmaviy qoidalariga mosligini qat'iy tekshirish.
-        Hech qachon noma'lum yoki inyeksiya xavfi bor rejalarni ijroga o'tkazmaydi.
+        PlanValidator orqali DAG (tsikllar, yetishmayotgan bog'liqliklar), limitlar,
+        inyeksiya va asboblar mavjudligini tekshiradi.
         """
+        if hasattr(self, "plan_validator") and self.plan_validator:
+            return self.plan_validator.validate(plan)
+
         if not plan or not plan.steps:
             return False, "AGENT_PLAN_INVALID: Rejada birorta ham qadam mavjud emas"
 
@@ -509,17 +566,32 @@ QOIDALAR:
         if self.task_context_manager:
             self.task_context_manager.set_active_task(plan.goal)
 
-        # 3. Qadamlarni birma-bir bajarish
-        start_index = plan.current_step_index
-        if resume_from_step:
-            for idx, st in enumerate(plan.steps):
-                if st.step_id == resume_from_step:
-                    start_index = idx
-                    break
+        # Planning 2.0: Emit PLAN_OPTIMIZED trace if metadata indicates optimization
+        if plan.metadata.get("optimized"):
+            active_trace.add_stage(
+                "PLAN_OPTIMIZED",
+                status="ok",
+                details={"plan_id": plan.plan_id, "steps_count": len(plan.steps)}
+            )
 
-        for idx in range(start_index, len(plan.steps)):
-            step = plan.steps[idx]
-            plan.current_step_index = idx
+        # 3. Qadamlarni ijro tartibi (execution_order) bo'yicha bajarish
+        if not plan.execution_order:
+            plan.execution_order = [s.step_id for s in plan.steps]
+
+        steps_by_id = {s.step_id: s for s in plan.steps}
+
+        start_order_idx = 0
+        if resume_from_step and resume_from_step in plan.execution_order:
+            start_order_idx = plan.execution_order.index(resume_from_step)
+
+        for exec_idx in range(start_order_idx, len(plan.execution_order)):
+            step_id = plan.execution_order[exec_idx]
+            step = steps_by_id.get(step_id)
+            if not step:
+                continue
+
+            if step in plan.steps:
+                plan.current_step_index = plan.steps.index(step)
             self._execution_state.active_step = step
 
             # A. Vaqt chegarasi (Timeout) tekshiruvi
@@ -554,7 +626,43 @@ QOIDALAR:
                     elapsed=elapsed
                 )
 
-            # C. Ruxsat va Tasdiqlash (PERMISSION)
+            # C. Bog'liqliklar yechilishi (Dependency Resolution)
+            step_deps = plan.get_dependencies(step.step_id)
+            unresolved_dep = None
+            for dep_id in step_deps:
+                dep_step = steps_by_id.get(dep_id)
+                if not dep_step or dep_step.status != StepStatus.COMPLETED:
+                    unresolved_dep = dep_id
+                    break
+                else:
+                    active_trace.add_stage(
+                        "STEP_DEPENDENCY_RESOLVED",
+                        status="ok",
+                        details={"step_id": step.step_id, "resolved_dependency": dep_id}
+                    )
+
+            if unresolved_dep:
+                logger.warning(f"[AgentLoop] Qadam #{step.order} ({step.step_id}) bog'liqlik sababli bloklandi: {unresolved_dep}")
+                step.status = StepStatus.BLOCKED
+                active_trace.add_stage(
+                    "STEP_BLOCKED",
+                    status="blocked",
+                    details={"step_id": step.step_id, "blocked_by": unresolved_dep}
+                )
+                self._transition_to(AgentState.FAILED)
+                plan.status = PlanStatus.FAILED
+                return self._finalize_agent_response(
+                    success=False,
+                    message=f"Qadam #{step.order} ({step.tool}) bog'liq bo'lgan '{unresolved_dep}' muvaffaqiyatli yakunlanmagan.",
+                    error_code="PLAN_DEPENDENCY_UNRESOLVED",
+                    plan=plan,
+                    trace=active_trace,
+                    elapsed=time.time() - start_time
+                )
+
+            active_trace.add_stage("STEP_READY", status="ok", details={"step_id": step.step_id})
+
+            # D. Ruxsat va Tasdiqlash (PERMISSION)
             risk_level, requires_confirmation, prompt_text = self.permission_engine.evaluate(step.tool, step.parameters)
             step.risk_level = risk_level
 
@@ -590,7 +698,7 @@ QOIDALAR:
                         "plan_id": plan.plan_id,
                         "step_id": step.step_id,
                         "risk": risk_level.value,
-                        "current_step": idx + 1,
+                        "current_step": step.order,
                         "total_steps": len(plan.steps)
                     }
                 )
@@ -684,37 +792,7 @@ QOIDALAR:
                         elapsed=time.time() - start_time
                     )
 
-                # Fallback tekshiruvi: agar birlamchi asbob ishlamasa va zaxira mavjud bo'lsa
-                if step.retry_count < step.max_retries and self.tool_registry and hasattr(self.tool_registry, "select_tool"):
-                    try:
-                        t_obj = self.tool_registry.get(step.tool)
-                        lookup_caps = []
-                        if t_obj and hasattr(t_obj, "capabilities"):
-                            lookup_caps = [c for c in t_obj.capabilities if c != t_obj.name.lower()]
-                        if not lookup_caps:
-                            lookup_caps = [step.tool]
-
-                        for cap in lookup_caps:
-                            sel = self.tool_registry.select_tool(cap, candidate_params=step.parameters)
-                            alt_tool = None
-                            if sel and sel.fallback_tool and sel.fallback_tool.name != step.tool:
-                                alt_tool = sel.fallback_tool
-                            elif sel and sel.tool and sel.tool.name != step.tool:
-                                alt_tool = sel.tool
-
-                            if alt_tool:
-                                logger.info(f"[AgentLoop] Qadam #{step.order} uchun zaxira (fallback) asbob tanlandi: '{alt_tool.name}'")
-                                active_trace.add_stage("TOOL_SELECTED", status="fallback", details={
-                                    "original_tool": step.tool,
-                                    "fallback_tool": alt_tool.name,
-                                    "why": "Primary tool failed, switching to compatible fallback"
-                                })
-                                step.tool = alt_tool.name
-                                break
-                    except Exception as ex:
-                        logger.debug(f"[AgentLoop] Fallback qidirishda xatolik: {ex}")
-
-                # Qayta urinish limiti
+                # Qayta urinish limiti (Retry policy bo'yicha bir xil asbob bilan qayta urinish)
                 if step.retry_count < step.max_retries:
                     step.retry_count += 1
                     logger.info(f"[AgentLoop] Qadam #{step.order} uchun {step.retry_count}-qayta urinish...")
@@ -735,6 +813,58 @@ QOIDALAR:
                                 result=str(retry_res.raw_result)[:100] if retry_res.raw_result else None
                             )
                         continue
+
+                # Planning 2.0: Replanning Engine
+                if getattr(step, "failure_category", None) != FailureCategory.SECURITY_BLOCKED and hasattr(self, "replanning_engine") and self.replanning_engine:
+                    active_trace.add_stage(
+                        "PLAN_REPLAN_REQUIRED",
+                        status="warning",
+                        details={"failed_step": step.step_id, "reason": cont_reason}
+                    )
+                    replanned, replan_msg = self.replanning_engine.evaluate_and_replan(
+                        plan=plan,
+                        failed_step=step,
+                        failure_reason=cont_reason,
+                        request=request
+                    )
+                    if replanned:
+                        active_trace.add_stage(
+                            "PLAN_REPLANNED",
+                            status="ok",
+                            details={"version": plan.plan_version, "reason": replan_msg}
+                        )
+                        active_trace.add_stage(
+                            "PLAN_VERSION_CREATED",
+                            status="ok",
+                            details={"plan_id": plan.plan_id, "version": plan.plan_version}
+                        )
+                        self._emit_event("agent_plan_replanned", {
+                            "plan_id": plan.plan_id,
+                            "version": plan.plan_version,
+                            "replan_count": plan.replan_count,
+                            "reason": replan_msg,
+                            "step_id": step.step_id,
+                            "tool": step.tool,
+                        })
+
+                        # Qayta rejalashtirilgan qadamni bajarish
+                        logger.info(f"[AgentLoop] Rejalashtirilgan yangi v{plan.plan_version} bo'yicha qadam qayta bajarilmoqda: {step.tool}")
+                        replan_res = self._act_execute_step(step, trace=active_trace)
+                        replan_ver = self.verifier.verify_step(step, replan_res)
+                        step.verification = replan_ver
+                        replan_continue, _ = self.verifier.should_continue(replan_ver, step)
+                        if replan_continue:
+                            step.status = StepStatus.COMPLETED
+                            step.observed_result = replan_res.raw_result
+                            step.error = replan_res.error
+                            self._execution_state.completed_steps.append(step)
+                            active_trace.add_stage("STEP_COMPLETED", status="ok_after_replan", details={"step_id": step.step_id})
+                            if self.task_context_manager:
+                                self.task_context_manager.update_task_progress(
+                                    action=step.tool,
+                                    result=str(replan_res.raw_result)[:100] if replan_res.raw_result else None
+                                )
+                            continue
 
                 # Qayta urinish ham yordam bermasa -> To'xtatish
                 step.status = StepStatus.FAILED
@@ -974,7 +1104,12 @@ QOIDALAR:
                 "completed_steps": len([s for s in plan.steps if s.status == StepStatus.COMPLETED]),
                 "status": plan.status.value,
                 "latency_ms": round(elapsed * 1000.0, 2),
-                "trace_id": trace.trace_id if trace else None
+                "trace_id": trace.trace_id if trace else None,
+                "plan_version": getattr(plan, "plan_version", 1),
+                "replan_count": getattr(plan, "replan_count", 0),
+                "execution_order": getattr(plan, "execution_order", []),
+                "dependencies": getattr(plan, "dependencies", {}),
+                "replan_history": getattr(plan, "replan_history", []),
             }
         )
 

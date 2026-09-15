@@ -124,8 +124,8 @@ class ToolContract2:
     """
     name: str
     description: str
-    parameters: Dict[str, Dict[str, Any]]
-    function: Callable
+    parameters: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    function: Optional[Callable] = None
     category: str = "general"
     version: str = "2.0.0"
     capabilities: List[str] = field(default_factory=list)

@@ -264,6 +264,11 @@ export interface PlanStepData {
   order: number;
   intent: string;
   tool: string;
+  selected_tool?: string;
+  description?: string;
+  purpose?: string;
+  dependencies?: string[];
+  required_capability?: string;
   parameters: Record<string, any>;
   expected_result?: string;
   risk_level: "low" | "medium" | "high";
@@ -271,6 +276,8 @@ export interface PlanStepData {
   retry_count: number;
   max_retries: number;
   observed_result?: any;
+  verification_policy?: string;
+  failure_reason?: string;
   verification?: {
     verified: boolean;
     status: "success" | "failure" | "unknown";
@@ -283,11 +290,29 @@ export interface PlanStepData {
 export interface AgentPlanData {
   plan_id: string;
   goal: string;
+  intent?: string;
+  desired_outcome?: string;
+  assumptions?: string[];
+  constraints?: string[];
   steps: PlanStepData[];
+  dependencies?: Record<string, string[]>;
+  execution_order?: string[];
+  required_capabilities?: string[];
+  risk_level?: "low" | "medium" | "high";
   status: "pending" | "running" | "paused" | "completed" | "failed" | "aborted";
   created_at?: string;
+  updated_at?: string;
   current_step_index: number;
   max_steps: number;
+  plan_version?: number;
+  replan_count?: number;
+  max_replans?: number;
+  replan_history?: Array<{
+    version: number;
+    reason: string;
+    timestamp: string;
+    changed_steps: string[];
+  }>;
   metadata?: Record<string, any>;
 }
 

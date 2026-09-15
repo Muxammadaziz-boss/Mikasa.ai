@@ -44,16 +44,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Agentic Multi-Step State
+  // Agentic Multi-Step State (Planning & Reasoning 2.0)
   const [activeAgent, setActiveAgent] = useState<{
     planId: string;
     goal: string;
     status: "running" | "paused" | "completed" | "failed" | "aborted";
+    planVersion?: number;
+    replanCount?: number;
+    replanReason?: string;
     steps: Array<{
       step_id: string;
       order: number;
       tool: string;
-      status: "pending" | "running" | "completed" | "failed" | "waiting_confirmation";
+      capability?: string;
+      dependencies?: string[];
+      status: "pending" | "running" | "completed" | "failed" | "waiting_confirmation" | "blocked";
       reason?: string;
     }>;
     confirmation?: {
@@ -91,8 +96,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           planId: evt.data.plan_id,
           goal: evt.data.goal || "Vazifa bajarilmoqda",
           status: "running",
+          planVersion: evt.data.plan_version || 1,
+          replanCount: 0,
           steps: [],
           confirmation: null,
+        });
+      } else if (evt.type === "agent_plan_replanned") {
+        setActiveAgent((prev) => {
+          if (!prev) return prev;
+          const steps = prev.steps.map((s) =>
+            s.step_id === evt.data.step_id
+              ? { ...s, tool: evt.data.tool || s.tool, status: "running" as const }
+              : s
+          );
+          return {
+            ...prev,
+            steps,
+            planVersion: evt.data.version || (prev.planVersion ? prev.planVersion + 1 : 2),
+            replanCount: evt.data.replan_count || (prev.replanCount ? prev.replanCount + 1 : 1),
+            replanReason: evt.data.reason,
+          };
         });
       } else if (evt.type === "agent_step_started") {
         setActiveAgent((prev) => {
@@ -100,7 +123,17 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           const existing = prev.steps.find((s) => s.step_id === evt.data.step_id);
           const steps = existing
             ? prev.steps.map((s) => (s.step_id === evt.data.step_id ? { ...s, status: "running" as const } : s))
-            : [...prev.steps, { step_id: evt.data.step_id, order: evt.data.order, tool: evt.data.tool, status: "running" as const }];
+            : [
+                ...prev.steps,
+                {
+                  step_id: evt.data.step_id,
+                  order: evt.data.order,
+                  tool: evt.data.tool,
+                  capability: evt.data.capability,
+                  dependencies: evt.data.dependencies,
+                  status: "running" as const,
+                },
+              ];
           return { ...prev, steps, status: "running" };
         });
       } else if (evt.type === "agent_step_completed") {
@@ -792,6 +825,28 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   <span style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
                     Agentlik Rejasi: {activeAgent.goal}
                   </span>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      padding: "1px 6px",
+                      borderRadius: "4px",
+                      backgroundColor:
+                        activeAgent.planVersion && activeAgent.planVersion > 1
+                          ? "rgba(168, 85, 247, 0.2)"
+                          : "rgba(255, 255, 255, 0.1)",
+                      color:
+                        activeAgent.planVersion && activeAgent.planVersion > 1
+                          ? "#C084FC"
+                          : "var(--text-secondary)",
+                      border:
+                        activeAgent.planVersion && activeAgent.planVersion > 1
+                          ? "1px solid rgba(168, 85, 247, 0.4)"
+                          : "1px solid rgba(255, 255, 255, 0.15)",
+                    }}
+                  >
+                    v{activeAgent.planVersion || 1}
+                  </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span
@@ -864,6 +919,29 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                 </div>
               </div>
 
+              {/* Replanning Banner */}
+              {activeAgent.replanReason && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 10px",
+                    marginBottom: "8px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(168, 85, 247, 0.12)",
+                    border: "1px solid rgba(168, 85, 247, 0.3)",
+                    fontSize: "11.5px",
+                    color: "#E9D5FF",
+                  }}
+                >
+                  <span>🔄</span>
+                  <span>
+                    <strong>Qayta rejalashtirildi (v{activeAgent.planVersion}):</strong> {activeAgent.replanReason}
+                  </span>
+                </div>
+              )}
+
               {/* Steps Checklist */}
               {activeAgent.steps.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", margin: "8px 0" }}>
@@ -888,11 +966,39 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                             ? "⏳"
                             : s.status === "failed"
                             ? "❌"
+                            : s.status === "blocked"
+                            ? "🚫"
                             : "⚪"}
                         </span>
                         <span style={{ color: s.status === "running" ? "#38BDF8" : "var(--text-secondary)" }}>
                           {idx + 1}. {s.tool}
                         </span>
+                        {s.capability && (
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              padding: "1px 5px",
+                              borderRadius: "4px",
+                              backgroundColor: "rgba(56, 189, 248, 0.1)",
+                              color: "#38BDF8",
+                            }}
+                          >
+                            {s.capability}
+                          </span>
+                        )}
+                        {s.dependencies && s.dependencies.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              padding: "1px 5px",
+                              borderRadius: "4px",
+                              backgroundColor: "rgba(255, 255, 255, 0.05)",
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            dep: {s.dependencies.join(", ")}
+                          </span>
+                        )}
                       </div>
                       <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                         {s.reason || s.status}

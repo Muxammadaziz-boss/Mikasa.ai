@@ -738,3 +738,112 @@ KEYINGI QADAMNI BELGILASH
 - Frontend testlari (`npm test`): **10/10 test muvaffaqiyatli**.
 - Frontend Production Build (`npm run build`): **267ms da 100% xatosiz yig'ildi**.
 
+---
+
+## 16. Phase 33 — Planning & Reasoning 2.0
+
+### 16.1. Arxitektura Konsepsiyasi va Asosiy Maqsad
+Phase 33 doirasida Mikasa AI tizimining rejalashtirish va mantiqiy fikrlash (Planning & Reasoning) arxitekturasi tubdan yangilandi va 2.0 darajasiga ko'tarildi.
+Oldingi bosqichlarda rejalashtirish faqat ketma-ket oddiy ro'yxatdan iborat bo'lgan bo'lsa, Planning 2.0 quyidagi to'liq siklni joriy etdi:
+```
+USER GOAL 
+    ↓
+UNDERSTAND GOAL 
+    ↓
+IDENTIFY REQUIRED OUTCOME 
+    ↓
+DECOMPOSE GOAL (Heuristics / LLM) 
+    ↓
+IDENTIFY DEPENDENCIES (DAG) 
+    ↓
+CHOOSE EXECUTION ORDER (Kahn's Topological Sort) 
+    ↓
+SELECT REQUIRED CAPABILITIES (Tool System 2.0) 
+    ↓
+EXECUTE STEP (Act) 
+    ↓
+OBSERVE RESULT 
+    ↓
+ANALYZE & VERIFY RESULT (Oracle / Heuristic) 
+    ↓
+REPLAN IF NECESSARY (ReplanningEngine, v1 -> v2) 
+    ↓
+COMPLETE
+```
+
+### 16.2. Amalga Oshirilgan Yangi Komponentlar va O'zgarishlar
+
+#### 1. Planning Model 2.0 (`core/intelligence/types.py`)
+- **`PlanStep` yangilanishi**:
+  - `description`: Har bir qadamning inson tushunadigan maqsadi.
+  - `purpose`: Ushbu qadam umumiy rejaga nima hissa qo'shishi.
+  - `dependencies`: Ushbu qadam bajarilishidan oldin yakunlanishi shart bo'lgan qadamlar ID lari ro'yxati.
+  - `required_capability`: Kerakli semantik qobiliyat (masalan, `weather`, `browser_navigation`).
+  - `selected_tool`: Qobiliyatni bajarish uchun Tool System 2.0 tomonidan tanlangan aniq asbob.
+  - `verification_policy`: Qadam natijasini baholash siyosati (`strict`, `lenient`, `oracle_or_heuristic`).
+  - `failure_reason`: Xatolik kelib chiqqanda uning sababi.
+  - `retry_policy`: Qayta urinish konfiguratsiyasi.
+- **`AgentPlan` yangilanishi**:
+  - `intent` va `desired_outcome`: Rejadan kutilayotgan aniq yakuniy natija.
+  - `assumptions` va `constraints`: Reja tuzishdagi taxminlar va vaqt/resurs cheklovlari.
+  - `dependencies`: Reja darajasidagi to'liq bog'liqliklar grafigi (`{step_id: [dep_ids]}`).
+  - `execution_order`: Topologik saralangan qadamlar tartibi.
+  - `required_capabilities`: Reja talab qiladigan barcha qobiliyatlar ro'yxati.
+  - `plan_version`: Rejaning hozirgi versiyasi (boshlang'ich: `1`).
+  - `replan_count` va `max_replans`: Qayta rejalashtirish hisoblagichi va chegarasi (`MAX_REPLANS = 2`).
+  - `replan_history`: Har bir qayta rejalashtirishning to'liq tarixi (`version`, `reason`, `timestamp`, `changed_steps`).
+  - `get_ready_steps()`: Faqat barcha bog'liqliklari muvaffaqiyatli yakunlangan (`COMPLETED`) qadamlarni qaytaruvchi aqlli metod.
+
+#### 2. Goal Decomposer (`core/intelligence/planner.py` - `GoalDecomposer`)
+- **Zero Over-Planning**: Oddiy bir harakatli so'rovlar ("vaqt necha", "12 + 88", "youtube ni och") aniqlanadi va ularga keraksiz ko'p bosqichli rejalar tuzilmaydi (1 qadamda tezkor bajariladi).
+- **Deterministik Ko'p Qadamli Tahlil**: O'zbek va ingliz tillaridagi bog'lovchilar (`va`, `keyin`, `hamda`, `so'ng`, `and`, `then`) va qoliplar orqali maqsadlar qadamlarga ajratiladi.
+- **LLM Structured Decomposition**: Noma'lum va murakkab maqsadlar uchun sun'iy intellekt modeli orqali qat'iy JSON formatdagi reja shakllantiriladi.
+
+#### 3. Dependency Graph & Topological Execution (`DependencyGraph`)
+- **Bog'liqliklar grafigini qurish**: Har bir qadamning kirish/chiqish ma'lumotlari asosida qaramliklarni aniqlash.
+- **Tsiklik bog'liqliklarni aniqlash (`PLAN_CIRCULAR_DEPENDENCY`)**: Qadamlar orasida cheksiz halqa (`A -> B -> A`) hosil bo'lsa, xavfsizlik yuzasidan reja rad etiladi.
+- **Topologik Saralash (Kahn algoritmi)**: Barcha bog'liqliklarga rioya qilgan holda qadamlarning to'g'ri bajarilish tartibini (`execution_order`) hisoblash.
+
+#### 4. Plan Optimizer (`PlanOptimizer`)
+- **Dublikatlarni yo'qotish**: Bir xil asbob va parametrlarga ega bo'lgan takroriy qadamlar aniqlanadi, qisqartiriladi va bog'liqliklar oldingi qadamga avtomatik yo'naltiriladi.
+- **Kontekst xotirasidan qayta foydalanish (`TaskContext`)**: Agar zarur ma'lumot faol vazifa xotirasida allaqachon mavjud bo'lsa, qadam qayta ishlatilgan deb belgilanadi va ortiqcha operatsiyalar oldi olinadi.
+
+#### 5. Replanning Engine 2.0 (`ReplanningEngine`)
+- **Failure-Aware Replanning**: Qadam ijrosi yoki tekshiruvi muvaffaqiyatsiz bo'lganda, Tool System 2.0 orqali mos zaxira asbob (Fallback Tool) qidiriladi.
+- **Versiyalash (`v1 -> v2`)**: Qayta rejalashtirishda reja versiyasi oshiriladi, o'zgarish sababi qayd etiladi va frontend uchun `agent_plan_replanned` hodisasi yuboriladi.
+- **Qat'iy xavfsizlik va chegaralar**:
+  - `SECURITY_BLOCKED` holatida qayta rejalashtirish taqiqlanadi (xavfsizlikni chetlab o'tishning oldi olingan).
+  - Tasdiqlash talab etiladigan amallarda avtomatik replan qilinmaydi.
+  - `MAX_REPLANS = 2`: cheksiz replan sikllariga yo'l qo'yilmaydi.
+
+#### 6. Observability (Kuzatuvchanlik) Kengaytirilishi (`observability.py`)
+Planning 2.0 doirasida 7 ta yangi trace bosqichi joriy etildi:
+- `PLAN_OPTIMIZED`: Reja optimallashtirilganda.
+- `STEP_DEPENDENCY_RESOLVED`: Qadamning bog'liqligi yechilganda.
+- `STEP_READY`: Qadam barcha talablar bajarilib ijroga tayyor bo'lganda.
+- `STEP_BLOCKED`: Qadam qaramlik sababli to'xtatilganda.
+- `PLAN_REPLAN_REQUIRED`: Xatolik sababli replan talab etilganda.
+- `PLAN_REPLANNED`: Reja muvaffaqiyatli qayta tuzilganda.
+- `PLAN_VERSION_CREATED`: Yangi reja versiyasi shakllantirilganda.
+
+#### 7. Frontend Vizualizatsiyasi (`mikasa-7`)
+- `mikasa-7/src/services/backendService.ts`: `PlanStepData` va `AgentPlanData` yangi Planning 2.0 maydonlari bilan kengaytirildi.
+- `mikasa-7/src/pages/ChatPage.tsx`:
+  - Agent Progress Card ga **Versiya Nishoni** (`v1`, `v2`) qo'shildi.
+  - Qayta rejalashtirilganda **Replan Sababi Banneri** (`Rejalashtirildi vX: sabab`) ko'rsatiladi.
+  - Har bir qadam yonida uning kerakli qobiliyati (`capability`) va bog'liqliklari (`deps: s1, s2`) ko'rsatiladi.
+
+### 16.3. Test Natijalari va Verifikatsiya
+- Yangi yaratilgan 6 ta test to'plami:
+  1. `tests/test_plan_model.py` (6 ta test) — 100% OK.
+  2. `tests/test_goal_decomposition.py` (9 ta test) — 100% OK.
+  3. `tests/test_dependency_graph.py` (7 ta test) — 100% OK.
+  4. `tests/test_plan_optimizer.py` (3 ta test) — 100% OK.
+  5. `tests/test_replanning.py` (5 ta test) — 100% OK.
+  6. `tests/test_planning_agent_integration.py` (5 ta test) — 100% OK.
+- Jami yangi testlar: **35 ta test** (talab: 30+).
+- Phases 31, 32 va 33 to'liq intellekt test to'plami: **128 ta test — 100% muvaffaqiyatli**.
+- Frontend testlari (`npm test`): **10/10 test muvaffaqiyatli**.
+- Frontend Production Build (`npm run build`): **297ms da 100% xatosiz yig'ildi**.
+
+
