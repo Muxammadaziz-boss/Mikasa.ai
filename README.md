@@ -1,88 +1,69 @@
-# 🔷 MIKASA AI v6.0.0 — Level 6 Autonomous Desktop Assistant
+# 🔷 MIKASA AI v7.3.0 — Level 7 Autonomous Desktop Assistant & Intelligence Hub
 
-> **O'zbek tilidagi birinchi professional avtonom AI desktop yordamchisi**  
-> Yuqori unumdorlikka ega VAD ovoz tizimi, ko'p agentli arxitektura (Multi-Agent), Raycast uslubidagi Command Center va Apple Dark Minimal zamonaviy interfeysi.
+> **O'zbek tilidagi birinchi professional avtonom AI desktop yordamchisi va aqlli orkestratori**  
+> React 19 + Tauri 2.0 zamonaviy interfeysi, interaktiv Mikasa Orb, ko'p bosqichli intellektual boshqaruv (Agent Loop), Tool System 2.0, Secret Vault va to'liq avtonom desktop tizimi.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
-[![GUI](https://img.shields.io/badge/GUI-CustomTkinter-blue)](https://github.com/TomSchimansky/CustomTkinter)
+[![UI](https://img.shields.io/badge/UI-Tauri%202.0%20%7C%20React%2019-61DAFB?style=flat&logo=react&logoColor=black)](mikasa-7/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?logo=windows)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v6.0.0--final-success)](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v6.0.0-final)
-[![Tests](https://img.shields.io/badge/Tests-48%2F48%20Passed-brightgreen)](tests/)
+[![Release](https://img.shields.io/badge/Release-v7.3.0--final-success)](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v7.3.0)
+[![Tests](https://img.shields.io/badge/Tests-86%2F86%20Backend%20%7C%2015%2F15%20Frontend-brightgreen)](tests/)
 
 ---
 
-## 🌟 6-Versiyadagi Asosiy Yangiliklar
+## 🌟 7-Versiyadagi Asosiy Yangiliklar
 
-### 1. ⚡ Dinamik VAD (Voice Activity Detection) Ovoz Xizmati
-* Avvalgi qat'iy kechikishlar o'rniga dinamik ovoz faolligini aniqlash (`core/audio_service.py`).
-* Foydalanuvchi gapirib bo'lgach (1.2 soniya sukunatdan so'ng) yozish darhol to'xtatiladi va tezkor ishlanadi.
-* Javob qaytarish tezligi 2 barobardan ziyod oshirildi.
+### 1. 🪐 Mikasa Orb & Zamonaviy Desktop UI (Tauri 2.0 + React 19)
+* **Mikasa Orb**: Haqiqiy vaqt rejimida yordamchi holatini aks ettiruvchi interaktiv vizual yadro (`IDLE`, `LISTENING`, `THINKING`, `SPEAKING`, `ERROR`).
+* **Apple Dark Minimal & Glassmorphism**: Premium qora dizayn, silliq blur effektlar, dinamik fon rasmlari va qulay navigatsiya.
+* **Raycast Uslubidagi Command Center**: 29+ dan ortiq tizim asboblarini klaviatura orqali bir lahzada chaqirish (`Ctrl+K`).
+* **Interaktiv Vazifalar (Scheduler)**: Fon rejimida ishlovchi eslatmalar, davriy buyruqlar va vazifalar monitoringi.
 
-### 2. 🔀 Tezkor Mahalliy Buyruqlar Taqsimlagichi (`CommandDispatcher`)
-* Tizim buyruqlari (ovozni boshqarish, vaqt/sana, YouTube/Google qidiruvlari, dasturlarni ochish) AI modeliga so'rov yubormasdan lahzada bajariladi.
-* AI tokenlarini tejaydi va mahalliy buyruqlarni 0 kechikish bilan bajaradi.
+### 2. 🧠 Agent Loop 2.0 & Rejalashtirish Dvigateli (Planner)
+* **Deterministik Sikl**: Har bir murakkab so'rov `PLAN → ACT → OBSERVE → VERIFY → COMPLETE` zanjiri bo'yicha tartibli bajariladi.
+* **Bog'liqliklar Grafigi (DAG)**: Ko'p bosqichli topshiriqlar uchun Directed Acyclic Graph va Kahn algoritmi asosidagi topologik saralash (`DependencyGraph`).
+* **Avtomatik Verifikatsiya**: Har bir qadam natijasi tekshiriladi va xatolik yuz berganda xavfsiz replanning amalga oshiriladi.
 
-### 3. 🛠️ Ko'p Agentli Arxitektura (Multi-Agent System)
-* **ManagerAgent**: Barcha kiruvchi vazifalarni tahlil qilib, kerakli agentlarga yo'naltiruvchi orkestrator.
-* **SystemAgent (DevOps)**: Kompyuterning texnik holatini (CPU, RAM, Disk), eng ko'p resurs sarflayotgan ilovalarni tahlil qilish va xavfsiz kesh tozalash.
-* **ResearchAgent & CoderAgent**: Dasturlash va axborot qidirish vazifalarini alohida ixtisoslashgan holda yechish.
+### 3. 🛠️ Capability-Driven Tool System 2.0
+* **29+ Rasmiy Asboblar**: Hisob-kitob, ob-havo, valyuta kurslari, xotira, fayllar boshqaruvi, tarjimon, tizim diagnostikasi, audio boshqaruvi va boshqalar.
+* **Qat'iy Validatsiya**: `ParameterValidator` orqali noto'g'ri yoki xavfli parametrlar filtrlanadi.
+* **Vaqt Chegarasi (Timeout Enforcement)** va **Salomatlik Holati (ToolHealth)**: Asboblar tizimni to'xtatib qo'ymasligi kafolatlanadi.
 
-### 4. 🎛️ Raycast Uslubidagi Tezkor "Command Center"
-* 128+ dan ortiq tizim va aqlli buyruqlar katalogi.
-* Raycast darajasidagi filtrlash, klaviatura boshqaruvi va bir bosishda bajarish.
-* Tezkor qidiruv, qulay toifalar va status ko'rsatkichlari.
+### 4. 🛡️ Xavfsizlik & Ruxsatlar Modeli (Permission & Risk Engine)
+* **PermissionEngine**: Amallarni xavf darajasiga ko'ra baholash (`LOW`, `MEDIUM`, `HIGH`).
+* **Foydalanuvchi Tasdig'i (Confirmation Flow)**: Kompyuterni o'chirish (`shutdown`), qayta yuklash (`restart`) yoki fayllarni o'chirish kabi muhim amallar foydalanuvchi roziligisiz bajarilmaydi.
+* **SecretVault & Log Redaction**: API kalitlar shifrlanadi va jurnallarda (`sk-***MASKED_KEY***`) ko'rinishida avtomatik niqoblanadi.
 
-### 5. 🖥️ Apple Dark Minimal Custom Window Chrome
-* Maxsus silliq oyna sarlavhasi (Clean Titlebar) va oynani xavfsiz surish mexanizmi (GIL va thread-safe).
-* Windows DWM resizing bilan mukammal uyg'unlashgan va yuqori hoshiyadagi keraksiz chiziqlardan tozalangan.
-* Toza, ortiqcha elementlarsiz sarlavha paneli.
-
-### 6. 👤 Foydalanuvchi Hisob Maydoni (Account Area)
-* Sidebar pastki qismida ixcham va qulay hisob bloki: `[MA] Muxammadaziz / Hisob ›`.
-* Sozlamalar va hisob boshqaruvi uchun sichqonchaning o'ng tugmasi kontekst menyusi.
-* Chat muloqotida foydalanuvchi hamda Mikasa AI ning professional vektor avatarlari.
-
-### 7. 🔔 Proaktiv Bildirishnomalar (Smooth Toast UI)
-* Foydalanuvchi boshqa dasturlarda ishlayotgan paytda ham muhim taklif va hodisalar haqida ekranning pastki o'ng burchagida paydo bo'luvchi silliq xabarnomalar.
+### 5. 📦 Windows uchun Yig'ilgan Desktop Relizlar
+* [Mikasa-AI-Setup-v7.3.0.exe](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v7.3.0) — NSIS qulay o'rnatuvchisi.
+* [Mikasa-AI-v7.3.0.exe](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v7.3.0) — O'rnatish talab qilmaydigan Portable versiya.
+* [Mikasa-AI-v7.3.0.msi](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v7.3.0) — Standart Windows MSI paketi.
 
 ---
 
 ## 🚀 O'rnatish va Ishga Tushirish
 
-### 1. Talablar
-* **Python**: 3.11 (tavsiya etiladi)
-* **OS**: Windows 10 / 11
-* **Internet**: Ovozni aniqlash va AI modellar uchun
+### 1. Tayyor Desktop Ilovani Ishlatish (Tavsiya etiladi)
+[Releases Sahifasidan](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v7.3.0) `Mikasa-AI-Setup-v7.3.0.exe` yoki `Mikasa-AI-v7.3.0.exe` ni yuklab oling va to'g'ridan-to'g'ri ishga tushiring.
 
-### 2. O'rnatish qadamlari
+### 2. Dasturchilar uchun (Source Code orqali)
 ```bash
 # Repozitoriyani klonlash
 git clone https://github.com/Muxammadaziz-boss/Mikasa.ai.git
 cd Mikasa.ai
 
-# Virtual muhit yaratish va faollashtirish
+# Python virtual muhiti
 python -m venv .venv
 .venv\Scripts\activate
-
-# Kutubxonalarni o'rnatish
 pip install -r requirements.txt
-```
 
-### 3. Konfiguratsiya
-Loyiha ildizidagi `.env` faylida o'zingizning API kalitingizni ko'rsating:
-```env
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-OPENROUTER_MODEL=openai/gpt-3.5-turbo
-DEFAULT_MUSIC_PLATFORM=youtube
-DEBUG=false
-```
+# Frontend (mikasa-7)
+cd mikasa-7
+npm install
+npm run build
+cd ..
 
-### 4. Ishga tushirish
-```bash
-# Asosiy GUI interfeysini ishga tushirish
-python run_gui.py
-
-# Yoki konsol orqali ishga tushirish
+# Ishga tushirish
 python main.py
 ```
 
@@ -92,38 +73,41 @@ python main.py
 
 ```
 Mikasa.ai/
-├── core/                       # Asosiy xizmatlar va aqlli tizimlar
-│   ├── audio_service.py        # Modulli Audio va VAD xizmati
-│   ├── command_dispatcher.py   # Tezkor buyruqlar taqsimlagichi
-│   ├── agent_planner.py        # ReAct agent orkestratsiyasi
-│   ├── agent_tools.py          # 29+ ta agent asboblari
-│   ├── proactive_watcher.py    # Proaktiv monitoring va tavsiyalar
-│   ├── smart_algorithms.py     # Markov zanjiri, Levenshtein tahlili
-│   └── agents/                 # Sub-agentlar (SystemAgent, Coder, Research)
-├── gui/                        # Zamonaviy CustomTkinter interfeysi
-│   ├── app.py                  # Asosiy oyna va Custom Chrome
-│   ├── theme.py                # Ranglar, shriftlar va vektor ikonkalar
-│   ├── components.py           # NavItem, AccountRow, UserAvatar, Toast UI
-│   ├── backend.py              # Asinxron BackendBridge
-│   └── pages/                  # Sahifalar (Chat, Commands, Dashboard, ...)
-├── tests/                      # Keng qamrovli test to'plamlari
-├── data/                       # Ma'lumotlar bazasi va konfiguratsiyalar
-├── run_gui.py                  # Tezkor GUI start skripti
+├── core/                       # Intellektual yadro va backend xizmatlari
+│   ├── intelligence/           # Agent Loop, Planner DAG, Verifier, PermissionEngine
+│   ├── tools/                  # Tool System 2.0 (Contract, Runner, Discovery, Validator)
+│   ├── agent_tools.py          # 29+ tizim asboblari
+│   ├── api_server.py           # Mahalliy REST API server
+│   ├── audio_service.py        # VAD ovoz xizmati
+│   └── smart_algorithms.py     # Mahalliy tezkor qidiruv va algoritmlar
+├── mikasa-7/                   # Tauri 2.0 + React 19 Desktop UI
+│   ├── src/                    # React frontend komponentlari (Orb, Dashboard, Chat)
+│   ├── src-tauri/              # Rust Tauri qobig'i va tizim integratsiyasi
+│   └── dist/                   # Ishlab chiqarish uchun yig'ilgan statik fayllar
+├── release/                    # Yig'ilgan desktop ilovalar arxivi (v7.0.0 ... v7.3.0)
+│   └── v7.3.0/                 # v7.3.0 Setup, Portable va MSI ilovalari
+├── tests/                      # 86 ta avtomatlashtirilgan backend testlari
+├── docs/                       # Loyiha arxitekturasi va qo'llanmalar
 ├── main.py                     # Asosiy tizim boshqaruvchisi
-├── requirements.txt            # Bog'liqliklar ro'yxati
-└── README.md                   # Loyiha hujjati
+├── requirements.txt            # Python bog'liqliklari
+└── README.md                   # Loyiha bosh sahifasi
 ```
 
 ---
 
-## 🧪 Avtomatlashtirilgan Testlar
+## 🧪 Sifat Kafolati va Testlar
 
-Loyiha to'liq avtomatlashtirilgan testlar bilan ta'minlangan:
+Loyiha to'liq integratsion va birlik testlari bilan qamrab olingan:
 ```bash
-# Barcha asosiy testlarni yurgizish
-python -m unittest tests/test_v6_user_account.py tests/test_v6_window_chrome.py tests/test_v6_chat.py tests/test_v6_chat_ux.py tests/test_v6_surfaces.py tests/test_v6_final_qa.py
+# Backend testlarini ishga tushirish (86 ta test)
+python -m unittest discover tests/ "test_*.py"
+
+# Frontend testlarini ishga tushirish (15 ta test)
+cd mikasa-7 && npm test
 ```
-Natija: `48/48 OK` (100% barqaror).
+- **Backend**: `86 / 86 PASS` (100% barqaror)
+- **Frontend**: `15 / 15 PASS` (100% barqaror)
+- **Flake8**: `0 syntax/lint errors`
 
 ---
 
