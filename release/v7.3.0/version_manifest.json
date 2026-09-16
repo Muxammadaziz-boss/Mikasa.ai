@@ -2,7 +2,7 @@
   "app": "Mikasa AI",
   "version": "7.3.0",
   "version_name": "v7.3.0",
-  "release_date": "2026-09-16T20:42:32.715Z",
+  "release_date": "2026-09-16T23:56:03.878Z",
   "files": [
     {
       "name": "Mikasa-AI-v7.3.0.exe",
@@ -20,13 +20,13 @@
       "name": "Mikasa-AI-v7.3.0.msi",
       "size_bytes": 2740224,
       "size_mb": 2.61,
-      "sha256": "1ba0973b519b99c27126ccaa8f7798b6e291e2211439b502423f129a1ebf5dd0"
+      "sha256": "6685d75d41d3f12d2684bc205f2421bbf6ccc90581c5d722d57c18ee6d73636d"
     },
     {
       "name": "Mikasa-AI-Setup-v7.3.0.exe",
-      "size_bytes": 1952252,
-      "size_mb": 1.86,
-      "sha256": "ca8b245131603b81562da45a1c1fc0164bb094ad759d19c7e031514d198d9a81"
+      "size_bytes": 2019187,
+      "size_mb": 1.93,
+      "sha256": "74bdf9f83aee5e6549f03ad6a12b1d2db8a4be401b9d73dff131df6ca92592ed"
     }
   ],
   "backend": {
