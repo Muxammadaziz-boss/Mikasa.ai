@@ -1,30 +1,10 @@
-# 🚀 Mikasa AI Versiyalar Arxiv (Releases Archive)
+# 🚀 Mikasa AI 8-Versiya Relizlar Kanali (Release Channel v8.x)
 
-### [v7.3.0] — 17/09/2026
-- **Desktop Ilova**: `v7.3.0/Mikasa-AI-v7.3.0.exe`
-- **Windows MSI**: `v7.3.0/Mikasa-AI-v7.3.0.msi`
-- **NSIS Setup**: `v7.3.0/Mikasa-AI-Setup-v7.3.0.exe`
-- **Manifest**: `v7.3.0/version_manifest.json`
-- **Backend**: Python API Server (`http://127.0.0.1:18420`)
+Ushbu papka faqat Mikasa AI v8.x versiyasiga tegishli yig'ilgan desktop ilovalar (`.exe`, `.msi`) va distributivlar uchun mo'ljallangan.
 
-### [v7.2.0] — 16/09/2026
-- **Desktop Ilova**: `v7.2.0/Mikasa-AI-v7.2.0.exe`
-- **Windows MSI**: `v7.2.0/Mikasa-AI-v7.2.0.msi`
-- **NSIS Setup**: `v7.2.0/Mikasa-AI-Setup-v7.2.0.exe`
-- **Manifest**: `v7.2.0/version_manifest.json`
-- **Backend**: Python API Server (`http://127.0.0.1:18420`)
+Oldingi versiyalar (v7.x va avvalgilar) arxivlari o'zlarining tegishli versiya papkalarida (`yordamchi_7.0.0`) hamda GitHub Releases bo'limida saqlanadi.
 
-### [v7.1.0] — 10/09/2026
-- **Desktop Ilova**: `v7.1.0/Mikasa-AI-v7.1.0.exe`
-- **Windows MSI**: `v7.1.0/Mikasa-AI-v7.1.0.msi`
-- **NSIS Setup**: `v7.1.0/Mikasa-AI-Setup-v7.1.0.exe`
-- **Manifest**: `v7.1.0/version_manifest.json`
-- **Backend**: Python API Server (`http://127.0.0.1:18420`)
+---
 
-### [v7.0.0] — 10/09/2026
-- **Desktop Ilova**: `v7.0.0/Mikasa-AI-v7.0.0.exe`
-- **Windows MSI**: `v7.0.0/Mikasa-AI-v7.0.0.msi`
-- **NSIS Setup**: `v7.0.0/Mikasa-AI-Setup-v7.0.0.exe`
-- **Manifest**: `v7.0.0/version_manifest.json`
-- **Backend**: Python API Server (`http://127.0.0.1:18420`)
-
+### Rejalashtirilgan Relizlar:
+- **v8.0.0-alpha** — Remote PC Control, Telegram Gateway & Wake-on-LAN
