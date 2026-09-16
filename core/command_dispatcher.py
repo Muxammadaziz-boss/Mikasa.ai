@@ -379,16 +379,84 @@ class CommandDispatcher:
             return True, f"Bugun {now.day}-{oylar[now.month-1]}, {now.year}-yil."
 
         # -------------------------------------------------------------
-        # 2. Kompyuter va Tizim Parametrlari (PC Specs)
+        # 2. Protsessor, Videokarta va Tizim Parametrlari (Hardware Specs)
         # -------------------------------------------------------------
+        # Protsessor (CPU) so'ralganda ("protsessor", "prosseser", "cpu", "processor")
+        is_cpu_query = any(w in clean_text for w in [
+            "protsessor", "protsessr", "prossesor", "prosseser", "processor", "cpu"
+        ]) and (
+            any(p in clean_text for p in [
+                "model", "qanaqa", "qanday", "nechi", "qancha", "haqida", "haqidagi",
+                "ma'lumot", "malumot", "parametr", "kerak", "ayt", "ko'rsat", "korsat",
+                "nomi", "qaysi", "bormi"
+            ]) or clean_text in ["protsessor", "prosseser", "cpu", "protsessorim"]
+        )
+        if is_cpu_query:
+            cpu_name = platform.processor() or "Standart protsessor"
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                    reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                    if reg_name:
+                        cpu_name = str(reg_name).strip()
+            except Exception:
+                pass
+            cores_p = psutil.cpu_count(logical=False) or 1
+            cores_l = psutil.cpu_count(logical=True) or 1
+            cpu_usage = psutil.cpu_percent(interval=0.1)
+            return True, (
+                f"🧠 **Protsessoringiz modeli va ma'lumotlari:**\n\n"
+                f"• **Model:** {cpu_name}\n"
+                f"• **Yadrolar:** {cores_p} ta fizik / {cores_l} ta mantiqiy yadro\n"
+                f"• **Hozirgi yuklama:** {cpu_usage}% band"
+            )
+
+        # Videokarta (GPU) so'ralganda
+        is_gpu_query = any(w in clean_text for w in ["videokarta", "videokartam", "gpu", "grafika"]) and any(
+            p in clean_text for p in ["model", "qanaqa", "qanday", "haqida", "ma'lumot", "kerak", "ayt", "nomi", "bormi"]
+        )
+        if is_gpu_query:
+            gpus = []
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+                    count_gpu = winreg.QueryInfoKey(root_gpu)[0]
+                    for i in range(count_gpu):
+                        sub = winreg.EnumKey(root_gpu, i)
+                        if sub.isdigit():
+                            try:
+                                with winreg.OpenKey(root_gpu, sub) as k:
+                                    desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                                    if desc and desc not in gpus:
+                                        gpus.append(str(desc))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+            gpus_str = ", ".join(gpus) if gpus else "Standart video adapter"
+            return True, f"🎮 **Videokartangiz (GPU):**\n• {gpus_str}"
+
+        # RAM so'ralganda
+        is_ram_query = any(w in clean_text for w in ["ram", "operativka", "tezkor xotira"]) and any(
+            p in clean_text for p in ["qancha", "qanaqa", "nechi", "haqida", "ma'lumot", "kerak", "ayt", "band"]
+        )
+        if is_ram_query:
+            mem = psutil.virtual_memory()
+            total_gb = round(mem.total / (1024**3), 1)
+            used_gb = round(mem.used / (1024**3), 1)
+            free_gb = round(mem.available / (1024**3), 1)
+            return True, (
+                f"💾 **Tezkor xotira (RAM):**\n\n"
+                f"• Jami: {total_gb} GB\n"
+                f"• Ishlatilmoqda: {used_gb} GB ({mem.percent}%)\n"
+                f"• Bo'sh joy: {free_gb} GB"
+            )
+
         is_pc_query = (
             any(w in clean_text for w in ["kompyuter", "pc", "tizim", "sistema"]) and
             any(p in clean_text for p in ["parametr", "xususiyat", "ma'lumot", "malumot", "xarakteristika", "info", "spesifikatsiya", "haqida"])
         ) or any(clean_text == kw for kw in [
             "kompyuterim parametrlarini aytib ber", "pc parametrlarini aytib ber",
             "kompyuterim parametrlari", "pc parametrlari", "tizim parametrlari",
-            "tizim ma'lumotlari", "ram qancha", "operativka qancha", "protsessor qanday",
-            "diskda qancha joy bor"
+            "tizim ma'lumotlari", "diskda qancha joy bor"
         ])
 
         if is_pc_query:

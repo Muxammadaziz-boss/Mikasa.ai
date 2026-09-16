@@ -2347,18 +2347,33 @@ def _system_info(category: str = "all") -> dict:
     """Sistema ma'lumotlarini olish"""
     try:
         import psutil
+        import platform
+        import os
 
         info = {}
         if category in ("all", "cpu"):
-            info["cpu"] = f"{psutil.cpu_percent()}%"
+            cpu_name = platform.processor() or "CPU"
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                        reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                        if reg_name:
+                            cpu_name = str(reg_name).strip()
+                except Exception:
+                    pass
+            info["cpu_model"] = cpu_name
+            info["cpu_usage"] = f"{psutil.cpu_percent()}%"
+            info["cpu_cores"] = f"{psutil.cpu_count(logical=False) or 1} fiz / {psutil.cpu_count(logical=True) or 1} mantiqiy"
         if category in ("all", "ram"):
             mem = psutil.virtual_memory()
             info["ram"] = (
-                f"{mem.percent}% ({mem.used // (1024**3)}GB / {mem.total // (1024**3)}GB)"
+                f"{mem.percent}% ({round(mem.used / (1024**3), 1)}GB / {round(mem.total / (1024**3), 1)}GB)"
             )
         if category in ("all", "disk"):
-            disk = psutil.disk_usage("/")
-            info["disk"] = f"{disk.percent}% ({disk.free // (1024**3)}GB bo'sh)"
+            root_drive = "C:\\" if os.name == "nt" else "/"
+            disk = psutil.disk_usage(root_drive)
+            info["disk"] = f"{disk.percent}% ({round(disk.free / (1024**3), 1)}GB bo'sh / {round(disk.total / (1024**3), 1)}GB)"
         if category in ("all", "battery"):
             bat = psutil.sensors_battery()
             if bat:

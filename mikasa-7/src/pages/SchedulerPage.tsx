@@ -332,7 +332,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
         flexDirection: "column",
         height: "100%",
         width: "100%",
-        background: "var(--bg-gradient)",
+        background: "transparent",
         color: "var(--text-primary)",
         overflowY: "auto",
         position: "relative",
@@ -345,9 +345,10 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
           alignItems: "center",
           justifyContent: "space-between",
           padding: "16px 28px",
-          borderBottom: "1px solid var(--border-subtle)",
-          background: "rgba(10, 15, 29, 0.75)",
-          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          background: "rgba(8, 14, 28, 0.72)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
           position: "sticky",
           top: 0,
           zIndex: 20,
@@ -492,23 +493,26 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
 
         {/* Quick Presets */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#94A3B8" }}>
             Tezkor Eslatmalar:
           </span>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => handleAddTask("Suv ichish vaqti keldi!", 30, true)}
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid var(--border-subtle)",
+                background: "rgba(10, 18, 36, 0.68)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: 10,
                 padding: "8px 14px",
-                color: "var(--text-primary)",
+                color: "#E2E8F0",
                 fontSize: 12,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               }}
             >
               <SchedulerIcon size={14} color="#38BDF8" />
@@ -517,16 +521,19 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
             <button
               onClick={() => handleAddTask("Ko'zlarni 2 daqiqa dam oldiring!", 20, true)}
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid var(--border-subtle)",
+                background: "rgba(10, 18, 36, 0.68)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: 10,
                 padding: "8px 14px",
-                color: "var(--text-primary)",
+                color: "#E2E8F0",
                 fontSize: 12,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               }}
             >
               <SchedulerIcon size={14} color="#10B981" />
@@ -535,16 +542,19 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
             <button
               onClick={() => handleAddTask("Muhim vazifani tekshirish", 15, false)}
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid var(--border-subtle)",
+                background: "rgba(10, 18, 36, 0.68)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: 10,
                 padding: "8px 14px",
-                color: "var(--text-primary)",
+                color: "#E2E8F0",
                 fontSize: 12,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               }}
             >
               <ClockIcon size={14} color="#F59E0B" />
@@ -553,16 +563,19 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
             <button
               onClick={() => handleAddTask("1 soatlik diqqat sessiyasi yakuni", 60, false)}
               style={{
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid var(--border-subtle)",
+                background: "rgba(10, 18, 36, 0.68)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: 10,
                 padding: "8px 14px",
-                color: "var(--text-primary)",
+                color: "#E2E8F0",
                 fontSize: 12,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               }}
             >
               <ClockIcon size={14} color="#818CF8" />
@@ -574,13 +587,16 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
         {/* Custom Task Form */}
         <div
           style={{
-            background: "rgba(255, 255, 255, 0.03)",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: 14,
-            padding: "18px 22px",
+            background: "rgba(10, 18, 36, 0.72)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: 16,
+            padding: "20px 24px",
             display: "flex",
             flexDirection: "column",
-            gap: 12,
+            gap: 14,
+            boxShadow: "0 12px 36px rgba(0, 0, 0, 0.45)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500 }}>
@@ -702,8 +718,10 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                   key={tab.id}
                   onClick={() => setFilterStatus(tab.id)}
                   style={{
-                    background: active ? "rgba(245, 158, 11, 0.2)" : "rgba(255, 255, 255, 0.04)",
-                    border: active ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid var(--border-subtle)",
+                    background: active ? "rgba(245, 158, 11, 0.25)" : "rgba(10, 18, 36, 0.65)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    border: active ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid rgba(255, 255, 255, 0.1)",
                     color: active ? "#fbbf24" : "var(--text-secondary)",
                     borderRadius: 8,
                     padding: "6px 12px",
@@ -726,8 +744,10 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
-                background: "rgba(0, 0, 0, 0.25)",
-                border: "1px solid var(--border-subtle)",
+                background: "rgba(10, 18, 36, 0.65)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
                 borderRadius: 8,
                 padding: "6px 10px",
                 width: 220,
@@ -754,8 +774,9 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
               <button
                 onClick={handleClearCompleted}
                 style={{
-                  background: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
                   color: "#f87171",
                   borderRadius: 8,
                   padding: "6px 12px",
@@ -800,8 +821,10 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 textAlign: "center",
                 padding: "48px 20px",
                 color: "var(--text-muted)",
-                border: "1px dashed var(--border-subtle)",
-                borderRadius: 12,
+                background: "rgba(10, 18, 36, 0.65)",
+                backdropFilter: "blur(20px)",
+                border: "1px dashed rgba(255, 255, 255, 0.1)",
+                borderRadius: 14,
                 fontSize: 13,
               }}
             >
@@ -817,9 +840,11 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                 <div
                   key={taskId}
                   style={{
-                    background: isInactive ? "rgba(255, 255, 255, 0.015)" : "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid var(--border-subtle)",
-                    borderRadius: 12,
+                    background: isInactive ? "rgba(10, 18, 36, 0.58)" : "rgba(10, 18, 36, 0.75)",
+                    backdropFilter: "blur(24px)",
+                    WebkitBackdropFilter: "blur(24px)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    borderRadius: 14,
                     padding: "16px 20px",
                     display: "flex",
                     alignItems: "center",
@@ -827,6 +852,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = ({ onNavigateHome }) 
                     gap: 16,
                     flexWrap: "wrap",
                     opacity: isInactive ? 0.75 : 1,
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                     transition: "all 0.15s ease",
                   }}
                 >

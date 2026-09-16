@@ -373,13 +373,15 @@ class IntelligenceOrchestrator:
     def _format_tool_output(self, tool_name: str, result: Any, default_text: str) -> str:
         """Asbob natijasini foydalanuvchiga tushunarli matnga aylantirish"""
         if isinstance(result, dict):
-            if "message" in result:
+            if "message" in result and result["message"]:
                 return str(result["message"])
-            if "response" in result:
+            if "response" in result and result["response"]:
                 return str(result["response"])
-            if "info" in result and isinstance(result["info"], dict):
+            if "info" in result and isinstance(result["info"], dict) and result["info"]:
                 lines = [f"• {k}: {v}" for k, v in result["info"].items()]
                 return "Ma'lumotlar:\n" + "\n".join(lines)
+            if "error" in result and result["error"]:
+                return f"Xatolik: {result['error']}"
         if isinstance(result, str) and result.strip():
             return result.strip()
         return default_text or f"'{tool_name}' vositasi muvaffaqiyatli bajarildi."

@@ -7,7 +7,6 @@ import { MikasaOrb } from "../components/MikasaOrb";
 import { MarkdownView } from "../components/MarkdownView";
 import {
   SparklesIcon,
-  MicIcon,
   ArrowUpIcon,
   TrashIcon,
   HomeIcon,
@@ -29,14 +28,13 @@ interface ChatPageProps {
   initialPrompt?: string;
   userName?: string;
   onNavigateHome: () => void;
-  onNavigateVoice: () => void;
+  onNavigateVoice?: () => void;
 }
 
 export const ChatPage: React.FC<ChatPageProps> = ({
   initialPrompt,
   userName = "Ustoz",
   onNavigateHome,
-  onNavigateVoice,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -347,7 +345,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         position: "relative",
         zIndex: 2,
         overflow: "hidden",
-        backgroundColor: "var(--bg-darkest)",
+        backgroundColor: "transparent",
       }}
     >
       {/* 1. Header Toolbar */}
@@ -357,8 +355,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "12px 24px",
-          borderBottom: "1px solid var(--border)",
-          backgroundColor: "var(--surface)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          backgroundColor: "rgba(8, 14, 28, 0.65)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           zIndex: 10,
         }}
       >
@@ -670,17 +670,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                         ? "18px 4px 18px 18px"
                         : "4px 18px 18px 18px",
                       backgroundColor: isUser
-                        ? "rgba(2, 132, 199, 0.28)"
-                        : "var(--surface)",
+                        ? "rgba(2, 132, 199, 0.72)"
+                        : "rgba(10, 18, 36, 0.72)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
                       border: isUser
-                        ? "1px solid rgba(56, 189, 248, 0.35)"
-                        : "1px solid var(--border)",
+                        ? "1px solid rgba(56, 189, 248, 0.4)"
+                        : "1px solid rgba(255, 255, 255, 0.1)",
                       color: "#FFFFFF",
                       fontSize: "14px",
                       lineHeight: 1.6,
                       boxShadow: isUser
-                        ? "0 4px 20px rgba(2, 132, 199, 0.15)"
-                        : "0 4px 20px rgba(0, 0, 0, 0.3)",
+                        ? "0 4px 20px rgba(2, 132, 199, 0.25)"
+                        : "0 8px 24px rgba(0, 0, 0, 0.4)",
                     }}
                   >
                     {isUser ? (
@@ -1086,20 +1088,22 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             width: "100%",
             minHeight: "48px",
             borderRadius: "16px",
-            backgroundColor: "var(--bg-darkest)",
-            border: "1px solid rgba(56, 189, 248, 0.22)",
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05)",
+            backgroundColor: "rgba(10, 18, 36, 0.75)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.08)",
             padding: "6px 8px 6px 14px",
             gap: "8px",
             transition: "all 0.15s ease",
           }}
           onFocusCapture={(e) => {
             e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.55)";
-            e.currentTarget.style.boxShadow = "0 6px 28px rgba(0, 0, 0, 0.5), 0 0 18px rgba(2, 132, 199, 0.25)";
+            e.currentTarget.style.boxShadow = "0 8px 36px rgba(0, 0, 0, 0.55), 0 0 18px rgba(2, 132, 199, 0.25)";
           }}
           onBlurCapture={(e) => {
-            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.22)";
-            e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.4)";
+            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.25)";
+            e.currentTarget.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.45)";
           }}
         >
           {/* Attachment Button */}
@@ -1156,38 +1160,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               overflowY: "auto",
             }}
           />
-
-          {/* Voice Page Jump Button */}
-          <button
-            type="button"
-            onClick={onNavigateVoice}
-            title="Ovozli muloqot rejimiga o‘tish"
-            aria-label="Ovozli muloqot rejimiga o‘tish"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "34px",
-              height: "34px",
-              borderRadius: "8px",
-              color: "rgba(255, 255, 255, 0.65)",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.color = "var(--primary-glow)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "rgba(255, 255, 255, 0.65)";
-            }}
-          >
-            <MicIcon size={17} />
-          </button>
 
           {/* Glowing Circular Send Button */}
           <button
