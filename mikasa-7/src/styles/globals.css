@@ -126,9 +126,11 @@ input {
 
 /* 2. Responsive scaling & non-clipping for 1024x700 and 1280x800 */
 @media (max-width: 1120px) {
-  .mikasa-sidebar {
-    width: var(--sidebar-width-collapsed) !important;
-    padding: 16px 8px 14px 8px !important;
+  .mikasa-topnav-center {
+    gap: 4px !important;
+  }
+  .mikasa-topnav-center span {
+    display: none;
   }
 }
 
@@ -366,3 +368,42 @@ input {
   50% { transform: translate(4px, -8px); }
 }
 
+/* Enhanced Orb — Orbital Ring Animations */
+@keyframes orb-ring-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes orb-ring-fast {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes orb-ring-structured {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(1.02); }
+  50% { transform: rotate(180deg) scale(1); }
+  75% { transform: rotate(270deg) scale(1.02); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes orb-ring-flow {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.04); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes orb-ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+/* Enhanced Orb — Particle Float */
+@keyframes orb-particle-float {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  25% { transform: translate(3px, -4px); opacity: 0.9; }
+  50% { transform: translate(-2px, -6px); opacity: 0.6; }
+  75% { transform: translate(4px, 2px); opacity: 0.8; }
+}
+
+/* Enhanced Orb — Mic Pulse */
+@keyframes orb-mic-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
