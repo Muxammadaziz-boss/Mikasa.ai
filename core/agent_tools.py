@@ -1829,8 +1829,6 @@ def set_ask_user_callback(callback):
 
 def _ask_user(question: str) -> dict:
     """Foydalanuvchidan savol so'rash va javobni kutish"""
-    global _ask_user_callback
-
     if not question:
         return {"error": "Savol matni kerak"}
 

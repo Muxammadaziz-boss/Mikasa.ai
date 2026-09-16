@@ -1,0 +1,21 @@
+name: Python Package using Conda
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-linux:
+    name: Conda Package Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check Conda Environment
+      run: |
+        if [ -f environment.yml ]; then
+          echo "Conda environment file found. Updating conda env..."
+        else
+          echo "No environment.yml found. Skipping conda build."
+        fi

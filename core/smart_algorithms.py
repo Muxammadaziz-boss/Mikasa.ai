@@ -577,8 +577,6 @@ def aqlli_buyruq_aniqla(matn, buyruqlar_dict, regex_fallback_func=None):
     Returns:
         intent string yoki tuple (buyruq, qiymat)
     """
-    global _oxirgi_intent
-    
     matn_toza = matn.lower().strip()
     
     # 1. CACHE — tez tekshirish

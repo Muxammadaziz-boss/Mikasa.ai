@@ -172,13 +172,14 @@ class BackendBridge:
 
                 self._queue_ui(_ready_cb)
 
-            except Exception as e:
-                logger.error(f"Backend init xatolik: {e}")
-                self._queue_ui(lambda: self.app.set_status("offline", f"Xatolik: {e}"))
+            except Exception as exc:
+                err_msg = str(exc)
+                logger.error(f"Backend init xatolik: {err_msg}")
+                self._queue_ui(lambda: self.app.set_status("offline", f"Xatolik: {err_msg}"))
 
                 def _err_cb():
                     if hasattr(self.app, "on_backend_error"):
-                        self.app.on_backend_error(str(e))
+                        self.app.on_backend_error(err_msg)
 
                 self._queue_ui(_err_cb)
 

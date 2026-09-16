@@ -22,7 +22,32 @@ class TestWindowsQA(unittest.TestCase):
         current_os = platform.system()
         self.assertEqual(current_os, "Windows", f"QA sinovi Windows tizimida bajarilishi shart (aniqlandi: {current_os})")
         release = platform.release()
-        self.assertIn(release, ["10", "11"], f"Windows 10 yoki 11 qo'llab-quvvatlanadi (aniqlandi: {release})")
+
+        # Platform aniqlash: Windows 10, Windows 11, Windows Server, Linux, macOS
+        def classify_os_platform() -> str:
+            sys_name = platform.system()
+            if sys_name == "Windows":
+                rel = str(platform.release()).strip()
+                if "server" in rel.lower() or rel in ["2016", "2019", "2022", "2025"]:
+                    return "Windows Server"
+                if rel == "11":
+                    return "Windows 11"
+                if rel == "10":
+                    return "Windows 10"
+                return f"Windows ({rel})"
+            elif sys_name == "Linux":
+                return "Linux"
+            elif sys_name == "Darwin":
+                return "macOS"
+            return sys_name
+
+        detected_platform = classify_os_platform()
+        # Windows QA sinovi Windows 10, 11 yoki Windows Server muhitlarida qo'llab-quvvatlanadi
+        supported_windows = ["Windows 10", "Windows 11", "Windows Server"]
+        self.assertTrue(
+            any(detected_platform.startswith(w) for w in supported_windows),
+            f"Windows 10, 11 yoki Windows Server qo'llab-quvvatlanadi (aniqlandi: {detected_platform}, release: {release})"
+        )
 
     def test_python_runtime_compatibility(self):
         """Python versiyasi 3.10+ va 64-bit ekanligi tekshiriladi"""

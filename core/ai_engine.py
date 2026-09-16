@@ -148,7 +148,6 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
     except Exception as e:
         logging.warning(f"Intelligence Orchestrator orqali chaqirishda xatolik: {e}, an'anaviy oqimga o'tilmoqda...")
     
-    global SYSTEM_PROMPT
     enriched_prompt = SYSTEM_PROMPT
     
     # 1. Foydalanuvchi ismi

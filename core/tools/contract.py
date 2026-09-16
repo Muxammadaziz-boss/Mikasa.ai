@@ -48,6 +48,10 @@ class ToolResult:
     trace_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def result(self) -> Any:
+        return self.data
+
     def to_dict(self) -> Dict[str, Any]:
         """Observability va API uchun maxfiy ma'lumotlari tozalangan dict"""
         from core.intelligence.observability import redact_sensitive_data
@@ -100,7 +104,16 @@ class ToolResult:
 
         message = data.get("message", "")
         # Extract payload
-        result_data = data.get("result") if "result" in data else {k: v for k, v in data.items() if k not in ("success", "error", "message")}
+        if "result" in data:
+            if isinstance(data["result"], dict):
+                result_data = data["result"]
+            else:
+                result_data = {
+                    "result": data["result"],
+                    **{k: v for k, v in data.items() if k not in ("success", "error", "message", "result")}
+                }
+        else:
+            result_data = {k: v for k, v in data.items() if k not in ("success", "error", "message")}
         if not result_data and "message" in data:
             result_data = {"message": message}
 
