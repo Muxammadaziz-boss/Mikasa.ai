@@ -28,6 +28,46 @@ except ImportError:
 # 1. APPARAT VA TIZIM MA'LUMOTLARI (QISQA VA TO'LIQ DETALLI)
 # =========================================================================
 
+def get_system_gpus() -> list:
+    """Tizimdagi barcha faol videokartalarni VRAM va drayver versiyalari bilan aniq olish"""
+    gpus = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+            count_gpu = winreg.QueryInfoKey(root_gpu)[0]
+            for i in range(count_gpu):
+                sub = winreg.EnumKey(root_gpu, i)
+                if sub.isdigit():
+                    try:
+                        with winreg.OpenKey(root_gpu, sub) as k:
+                            desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                            if not desc:
+                                continue
+                            drv_ver = ""
+                            try:
+                                drv_ver, _ = winreg.QueryValueEx(k, 'DriverVersion')
+                            except Exception:
+                                pass
+                            vram_gb = 0.0
+                            for mem_key in ['HardwareInformation.qwMemorySize', 'HardwareInformation.MemorySize']:
+                                try:
+                                    raw_bytes, _ = winreg.QueryValueEx(k, mem_key)
+                                    if raw_bytes and raw_bytes > 0:
+                                        vram_gb = round(raw_bytes / (1024**3), 1)
+                                        break
+                                except Exception:
+                                    pass
+                            gpus.append({
+                                "name": str(desc).strip(),
+                                "driver": str(drv_ver).strip(),
+                                "vram_gb": vram_gb
+                            })
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return gpus
+
+
 def get_system_specs_summary() -> str:
     """Kompyuterning asosiy apparat parametrlarini qisqa olish"""
     try:
@@ -42,22 +82,8 @@ def get_system_specs_summary() -> str:
         except Exception:
             pass
 
-        gpus = []
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
-                count_gpu = winreg.QueryInfoKey(root_gpu)[0]
-                for i in range(count_gpu):
-                    sub = winreg.EnumKey(root_gpu, i)
-                    if sub.isdigit():
-                        try:
-                            with winreg.OpenKey(root_gpu, sub) as k:
-                                desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
-                                if desc and desc not in gpus:
-                                    gpus.append(str(desc))
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+        gpu_items = get_system_gpus()
+        gpus = [g["name"] + (f" ({g['vram_gb']} GB)" if g.get("vram_gb") else "") for g in gpu_items]
 
         cores_p = psutil.cpu_count(logical=False) or 1
         cores_l = psutil.cpu_count(logical=True) or 1
@@ -383,13 +409,18 @@ class CommandDispatcher:
         # -------------------------------------------------------------
         # Protsessor (CPU) so'ralganda ("protsessor", "prosseser", "cpu", "processor")
         is_cpu_query = any(w in clean_text for w in [
-            "protsessor", "protsessr", "prossesor", "prosseser", "processor", "cpu"
+            "protsessor", "protsessr", "prossesor", "prosseser", "processor", "cpu",
+            "protsessorchi", "protsessrchi", "prossesorchi", "prosseserchi", "cpuchi"
         ]) and (
             any(p in clean_text for p in [
                 "model", "qanaqa", "qanday", "nechi", "qancha", "haqida", "haqidagi",
                 "ma'lumot", "malumot", "parametr", "kerak", "ayt", "ko'rsat", "korsat",
-                "nomi", "qaysi", "bormi"
-            ]) or clean_text in ["protsessor", "prosseser", "cpu", "protsessorim"]
+                "nomi", "qaysi", "bormi", "chi", "?"
+            ]) or clean_text in [
+                "protsessor", "protsessor?", "prosseser", "prosseser?", "cpu", "cpu?",
+                "protsessorim", "protsessorim?", "protsessorchi", "protsessorchi?",
+                "prosseserchi", "prosseserchi?", "cpuchi", "cpuchi?"
+            ] or clean_text.endswith("chi") or clean_text.endswith("chi?")
         )
         if is_cpu_query:
             cpu_name = platform.processor() or "Standart protsessor"
@@ -410,45 +441,88 @@ class CommandDispatcher:
                 f"• **Hozirgi yuklama:** {cpu_usage}% band"
             )
 
-        # Videokarta (GPU) so'ralganda
-        is_gpu_query = any(w in clean_text for w in ["videokarta", "videokartam", "gpu", "grafika"]) and any(
-            p in clean_text for p in ["model", "qanaqa", "qanday", "haqida", "ma'lumot", "kerak", "ayt", "nomi", "bormi"]
+        # Videokarta (GPU) so'ralganda ("videokarta", "gpu", "grafika", "videokartam", "videokartachi?")
+        is_gpu_query = any(w in clean_text for w in [
+            "videokarta", "videokartam", "videokartachi", "videokartamchi",
+            "gpu", "gpuchi", "grafika", "grafikachi"
+        ]) and (
+            any(p in clean_text for p in [
+                "model", "qanaqa", "qanday", "nechi", "qancha", "haqida", "ma'lumot",
+                "kerak", "ayt", "nomi", "bormi", "ko'rsat", "korsat", "parametr", "chi", "?"
+            ]) or clean_text in [
+                "videokarta", "videokarta?", "videokartam", "videokartam?",
+                "videokartachi", "videokartachi?", "gpu", "gpu?", "gpuchi", "gpuchi?",
+                "grafika", "grafika?", "grafikachi", "grafikachi?"
+            ] or clean_text.endswith("chi") or clean_text.endswith("chi?")
         )
         if is_gpu_query:
-            gpus = []
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
-                    count_gpu = winreg.QueryInfoKey(root_gpu)[0]
-                    for i in range(count_gpu):
-                        sub = winreg.EnumKey(root_gpu, i)
-                        if sub.isdigit():
-                            try:
-                                with winreg.OpenKey(root_gpu, sub) as k:
-                                    desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
-                                    if desc and desc not in gpus:
-                                        gpus.append(str(desc))
-                            except Exception:
-                                pass
-            except Exception:
-                pass
-            gpus_str = ", ".join(gpus) if gpus else "Standart video adapter"
-            return True, f"🎮 **Videokartangiz (GPU):**\n• {gpus_str}"
+            gpu_items = get_system_gpus()
+            if gpu_items:
+                gpu_lines = []
+                for g in gpu_items:
+                    details = [f"• **Model:** {g['name']}"]
+                    if g.get("vram_gb"):
+                        details.append(f"• **Video xotira (VRAM):** {g['vram_gb']} GB")
+                    if g.get("driver"):
+                        details.append(f"• **Drayver versiyasi:** {g['driver']}")
+                    details.append("• **Holati:** Faol (DirectX 12)")
+                    gpu_lines.append("\n".join(details))
+                gpu_body = "\n\n".join(gpu_lines)
+                return True, f"🎮 **Videokartangiz (GPU) ma'lumotlari:**\n\n{gpu_body}"
+            else:
+                return True, "🎮 **Videokartangiz (GPU):**\n• Standart video adapter"
 
-        # RAM so'ralganda
-        is_ram_query = any(w in clean_text for w in ["ram", "operativka", "tezkor xotira"]) and any(
-            p in clean_text for p in ["qancha", "qanaqa", "nechi", "haqida", "ma'lumot", "kerak", "ayt", "band"]
+        # RAM (Tezkor xotira) so'ralganda ("ram", "ramchi?", "operativka", "operativkachi?")
+        is_ram_query = any(w in clean_text for w in [
+            "ram", "ramchi", "operativka", "operativkachi", "tezkor xotira", "xotirachi"
+        ]) and (
+            any(p in clean_text for p in [
+                "qancha", "qanaqa", "nechi", "haqida", "ma'lumot", "kerak", "ayt",
+                "band", "bo'sh", "hajm", "chi", "?"
+            ]) or clean_text in [
+                "ram", "ram?", "ramchi", "ramchi?", "operativka", "operativka?",
+                "operativkachi", "operativkachi?", "tezkor xotira", "tezkor xotira?",
+                "xotirachi", "xotirachi?"
+            ] or clean_text.endswith("chi") or clean_text.endswith("chi?")
         )
         if is_ram_query:
             mem = psutil.virtual_memory()
             total_gb = round(mem.total / (1024**3), 1)
             used_gb = round(mem.used / (1024**3), 1)
             free_gb = round(mem.available / (1024**3), 1)
+            approx_total = round(total_gb)
             return True, (
-                f"💾 **Tezkor xotira (RAM):**\n\n"
-                f"• Jami: {total_gb} GB\n"
-                f"• Ishlatilmoqda: {used_gb} GB ({mem.percent}%)\n"
-                f"• Bo'sh joy: {free_gb} GB"
+                f"💾 **Tezkor xotira (RAM) ma'lumotlari:**\n\n"
+                f"• **Jami hajm:** {total_gb} GB (~{approx_total} GB)\n"
+                f"• **Ishlatilmoqda:** {used_gb} GB ({mem.percent}%)\n"
+                f"• **Bo'sh joy:** {free_gb} GB"
             )
+
+        # Disk (Qattiq disk / SSD) so'ralganda ("disk", "diskchi?", "joy qancha?")
+        is_disk_query = any(w in clean_text for w in [
+            "disk", "diskchi", "qattiq disk", "ssd", "hdd", "xotira joyi", "qancha joy bor", "joy qancha"
+        ]) and (
+            any(p in clean_text for p in [
+                "qancha", "qanaqa", "nechi", "bo'sh", "haqida", "ma'lumot", "kerak", "ayt", "bor", "joy", "chi", "?"
+            ]) or clean_text in [
+                "disk", "disk?", "diskchi", "diskchi?", "joy qancha?", "qancha joy bor?", "disklar"
+            ] or clean_text.endswith("chi") or clean_text.endswith("chi?")
+        )
+        if is_disk_query:
+            disks = []
+            for part in psutil.disk_partitions(all=False):
+                if "cdrom" in part.opts or part.fstype == "":
+                    continue
+                try:
+                    usage = psutil.disk_usage(part.mountpoint)
+                    free_gb = round(usage.free / (1024**3), 1)
+                    total_gb = round(usage.total / (1024**3), 1)
+                    drive = part.mountpoint.rstrip("\\")
+                    disks.append(f"• **{drive}\\**: {free_gb} GB bo'sh / {total_gb} GB ({usage.percent}% band)")
+                except Exception:
+                    pass
+            disks_str = "\n".join(disks) if disks else "Disklar aniqlanmadi"
+            return True, f"💽 **Disk xotirasi (Storage) holati:**\n\n{disks_str}"
 
         is_pc_query = (
             any(w in clean_text for w in ["kompyuter", "pc", "tizim", "sistema"]) and

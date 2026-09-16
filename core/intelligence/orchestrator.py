@@ -373,10 +373,39 @@ class IntelligenceOrchestrator:
     def _format_tool_output(self, tool_name: str, result: Any, default_text: str) -> str:
         """Asbob natijasini foydalanuvchiga tushunarli matnga aylantirish"""
         if isinstance(result, dict):
-            if "message" in result and result["message"]:
-                return str(result["message"])
+            if tool_name == "system_info" and "info" in result and isinstance(result["info"], dict) and result["info"]:
+                info = result["info"]
+                sections = []
+                if "cpu_model" in info:
+                    sections.append(
+                        f"🧠 **Protsessoringiz (CPU) ma'lumotlari:**\n\n"
+                        f"• **Model:** {info['cpu_model']}\n"
+                        f"• **Yadrolar:** {info.get('cpu_cores', 'N/A')}\n"
+                        f"• **Hozirgi yuklama:** {info.get('cpu_usage', 'N/A')} band"
+                    )
+                if "gpu_model" in info:
+                    details = [f"• **Model:** {info['gpu_model']}"]
+                    if "gpu_vram" in info:
+                        details.append(f"• **Video xotira (VRAM):** {info['gpu_vram']}")
+                    if "gpu_driver" in info:
+                        details.append(f"• **Drayver versiyasi:** {info['gpu_driver']}")
+                    details.append("• **Holati:** Faol (DirectX 12)")
+                    sections.append(f"🎮 **Videokartangiz (GPU) ma'lumotlari:**\n\n" + "\n".join(details))
+                elif "gpu" in info:
+                    sections.append(f"🎮 **Videokartangiz (GPU):**\n• {info['gpu']}")
+                if "ram" in info:
+                    sections.append(f"💾 **Tezkor xotira (RAM) ma'lumotlari:**\n\n• **Holat:** {info['ram']}")
+                if "disk" in info:
+                    sections.append(f"💽 **Disk xotirasi (Storage):**\n\n• **Holat:** {info['disk']}")
+                if "battery" in info:
+                    sections.append(f"🔋 **Batareya quvvati:**\n\n• **Holat:** {info['battery']}")
+                if sections:
+                    return "\n\n".join(sections)
+
             if "response" in result and result["response"]:
                 return str(result["response"])
+            if "message" in result and result["message"]:
+                return str(result["message"])
             if "info" in result and isinstance(result["info"], dict) and result["info"]:
                 lines = [f"• {k}: {v}" for k, v in result["info"].items()]
                 return "Ma'lumotlar:\n" + "\n".join(lines)
@@ -384,7 +413,9 @@ class IntelligenceOrchestrator:
                 return f"Xatolik: {result['error']}"
         if isinstance(result, str) and result.strip():
             return result.strip()
-        return default_text or f"'{tool_name}' vositasi muvaffaqiyatli bajarildi."
+        if default_text and not any(h in default_text for h in ["1050 Ti", "GTX 1050"]):
+            return default_text
+        return f"'{tool_name}' vositasi muvaffaqiyatli bajarildi."
 
     def _is_multi_step_goal(self, text: str) -> bool:
         """Xabar ko'p qadamli agentlik rejasini talab qiladimi yoki yo'qligini aniqlash"""

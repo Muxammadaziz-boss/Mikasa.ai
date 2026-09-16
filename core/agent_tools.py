@@ -2365,6 +2365,53 @@ def _system_info(category: str = "all") -> dict:
             info["cpu_model"] = cpu_name
             info["cpu_usage"] = f"{psutil.cpu_percent()}%"
             info["cpu_cores"] = f"{psutil.cpu_count(logical=False) or 1} fiz / {psutil.cpu_count(logical=True) or 1} mantiqiy"
+        if category in ("all", "gpu", "videokarta"):
+            gpus = []
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+                        count_gpu = winreg.QueryInfoKey(root_gpu)[0]
+                        for i in range(count_gpu):
+                            sub = winreg.EnumKey(root_gpu, i)
+                            if sub.isdigit():
+                                try:
+                                    with winreg.OpenKey(root_gpu, sub) as k:
+                                        desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                                        if not desc:
+                                            continue
+                                        drv_ver = ""
+                                        try:
+                                            drv_ver, _ = winreg.QueryValueEx(k, 'DriverVersion')
+                                        except Exception:
+                                            pass
+                                        vram_gb = 0.0
+                                        for mem_key in ['HardwareInformation.qwMemorySize', 'HardwareInformation.MemorySize']:
+                                            try:
+                                                raw_bytes, _ = winreg.QueryValueEx(k, mem_key)
+                                                if raw_bytes and raw_bytes > 0:
+                                                    vram_gb = round(raw_bytes / (1024**3), 1)
+                                                    break
+                                            except Exception:
+                                                pass
+                                        gpus.append({
+                                            "name": str(desc).strip(),
+                                            "driver": str(drv_ver).strip(),
+                                            "vram_gb": vram_gb
+                                        })
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
+            if gpus:
+                g = gpus[0]
+                info["gpu_model"] = g["name"]
+                if g.get("vram_gb"):
+                    info["gpu_vram"] = f"{g['vram_gb']} GB"
+                if g.get("driver"):
+                    info["gpu_driver"] = g["driver"]
+            else:
+                info["gpu_model"] = "Standart video adapter"
         if category in ("all", "ram"):
             mem = psutil.virtual_memory()
             info["ram"] = (
@@ -2392,11 +2439,11 @@ def _system_info(category: str = "all") -> dict:
 
 TOOL_SYSTEM_INFO = Tool(
     name="system_info",
-    description="CPU, RAM, Disk, Battery haqida ma'lumot olish",
+    description="CPU, RAM, GPU (videokarta), Disk, Battery haqida ma'lumot olish",
     parameters={
         "category": {
             "type": "string",
-            "description": "'all', 'cpu', 'ram', 'disk', 'battery'. Default: all",
+            "description": "'all', 'cpu', 'gpu', 'ram', 'disk', 'battery'. Default: all",
             "required": False,
         },
     },
