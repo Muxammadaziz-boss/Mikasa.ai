@@ -1,0 +1,37 @@
+{
+  "app": "Mikasa AI",
+  "version": "7.3.0",
+  "version_name": "v7.3.0",
+  "release_date": "2026-09-16T19:02:26.105Z",
+  "files": [
+    {
+      "name": "Mikasa-AI-v7.3.0.exe",
+      "size_bytes": 5018112,
+      "size_mb": 4.79,
+      "sha256": "867b6173d845885f673fc73bab3f4cf0a3191c0cda6ff6e4d5c541a25ea72190"
+    },
+    {
+      "name": "WebView2Loader.dll",
+      "size_bytes": 160320,
+      "size_mb": 0.15,
+      "sha256": "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+    },
+    {
+      "name": "Mikasa-AI-v7.3.0.msi",
+      "size_bytes": 2740224,
+      "size_mb": 2.61,
+      "sha256": "bcc768ab4ee6bf635c51cb81321375b61bcb85ef2d564fd870aebdbf8aeb9d18"
+    },
+    {
+      "name": "Mikasa-AI-Setup-v7.3.0.exe",
+      "size_bytes": 1950448,
+      "size_mb": 1.86,
+      "sha256": "9deddcdfae5c4b5b61a015033675ba6ef9a1abd032bd3db7b04e5f3f6944f851"
+    }
+  ],
+  "backend": {
+    "service": "core/api_server.py",
+    "port": 18420,
+    "protocol": "HTTP/REST + WebSocket"
+  }
+}

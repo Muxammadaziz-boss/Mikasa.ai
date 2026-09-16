@@ -139,7 +139,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 border: "1px solid rgba(56, 189, 248, 0.25)",
               }}
             >
-              v7.2
+              v7.3
             </span>
           </div>
 
