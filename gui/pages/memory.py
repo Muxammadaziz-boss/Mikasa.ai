@@ -15,6 +15,7 @@ from gui.components import (
     SecondaryButton,
     StatWidget,
 )
+from gui.icons import get_vector_icon
 
 
 class MemoryPage(ctk.CTkFrame):

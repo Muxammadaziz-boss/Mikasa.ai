@@ -11,51 +11,35 @@ import datetime
 import webbrowser
 from urllib.parse import quote_plus
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Set
+
+from core.intelligence.types import RiskLevel
+from core.tools.contract import (
+    ToolContract2,
+    ToolErrorCode,
+    ToolHealth,
+    ToolResult,
+)
+from core.tools.discovery import CapabilityRegistry
+from core.tools.selector import SmartToolSelector, ToolSelectionResult
+from core.tools.runner import get_tool_runner
 
 logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Loyiha ildizi
 
 
 # ========================================================
-# TOOL DATACLASS
+# TOOL DATACLASS (Tool Contract 2.0)
 # ========================================================
 
 
 @dataclass
-class Tool:
-    """Bitta tool/plugin tavsifi"""
-
-    name: str
-    description: str  # AI uchun — tool nima qilishini tushuntirish
-    parameters: dict  # {"param_name": {"type": "string", "description": "...", "required": True}}
-    function: Callable  # Haqiqiy funksiya
-    category: str = "general"
-
-    def to_dict(self):
-        """AI prompt uchun dict formatda"""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": {
-                k: {
-                    "type": v.get("type", "string"),
-                    "description": v.get("description", ""),
-                }
-                for k, v in self.parameters.items()
-            },
-        }
-
-    def call(self, **kwargs):
-        """Toolni chaqirish"""
-        try:
-            logger.info(f"Tool '{self.name}' chaqirildi: {kwargs}")
-            result = self.function(**kwargs)
-            logger.info(f"Tool '{self.name}' natija: {str(result)[:200]}")
-            return {"success": True, "result": result}
-        except Exception as e:
-            logger.error(f"Tool '{self.name}' xatolik: {e}")
-            return {"success": False, "error": str(e)}
+class Tool(ToolContract2):
+    """Bitta tool/plugin tavsifi (Tool Contract 2.0 bilan kengaytirilgan)"""
+    def __init__(self, *args, **kwargs):
+        if "func" in kwargs and "function" not in kwargs:
+            kwargs["function"] = kwargs.pop("func")
+        super().__init__(*args, **kwargs)
 
 
 # ========================================================
@@ -64,29 +48,96 @@ class Tool:
 
 
 class ToolRegistry:
-    """Tool'larni ro'yxatdan o'tkazish va boshqarish"""
+    """Tool'larni ro'yxatdan o'tkazish va boshqarish (Tool System 2.0)"""
 
     def __init__(self):
-        self._tools = {}
+        self._tools: Dict[str, Tool] = {}
+        self.capability_registry = CapabilityRegistry()
 
     def register(self, tool: Tool):
         """Yangi tool qo'shish"""
         self._tools[tool.name] = tool
-        logger.debug(f"Tool ro'yxatdan o'tdi: {tool.name}")
+        self.capability_registry.register_tool(
+            tool_name=tool.name,
+            capabilities=tool.capabilities,
+            aliases=tool.aliases
+        )
+        logger.debug(f"Tool ro'yxatdan o'tdi: {tool.name} (capabilities={tool.capabilities})")
+
+    def unregister(self, name: str) -> bool:
+        """Toolni ro'yxatdan o'chirish"""
+        if name in self._tools:
+            del self._tools[name]
+            self.capability_registry.unregister_tool(name)
+            logger.debug(f"Tool ro'yxatdan o'chirildi: {name}")
+            return True
+        return False
 
     def get(self, name: str) -> Optional[Tool]:
-        """Tool ni nomi bo'yicha olish"""
-        return self._tools.get(name)
+        """Tool ni nomi yoki taxallusi bo'yicha olish"""
+        if not name:
+            return None
+        clean_name = str(name).strip()
+        if clean_name in self._tools:
+            return self._tools[clean_name]
+        # Check alias
+        resolved = self.capability_registry.find_by_alias(clean_name)
+        if resolved and resolved in self._tools:
+            return self._tools[resolved]
+        return None
 
-    def call(self, name: str, **kwargs) -> dict:
-        """Tool ni nomi bo'yicha chaqirish"""
+    def find_by_capability(self, capability: str) -> List[Tool]:
+        """Berilgan qobiliyatga ega barcha faol asboblar"""
+        names = self.capability_registry.find_by_capability(capability)
+        return [self._tools[n] for n in names if n in self._tools]
+
+    def select_tool(
+        self,
+        required_capability: str,
+        context: Optional[Any] = None,
+        candidate_params: Optional[Dict[str, Any]] = None,
+        prefer_low_risk: bool = True
+    ) -> ToolSelectionResult:
+        """SmartToolSelector yordamida qobiliyat uchun eng mos asbobni tanlash"""
+        candidates = self.find_by_capability(required_capability)
+        if not candidates:
+            single = self.get(required_capability)
+            if single:
+                candidates = [single]
+
+        return SmartToolSelector.select_best_tool(
+            required_capability=required_capability,
+            candidate_tools=candidates,
+            context=context,
+            candidate_params=candidate_params,
+            prefer_low_risk=prefer_low_risk
+        )
+
+    def discover_capabilities_for_text(self, text: str) -> List[Tuple[str, float]]:
+        """Matndan talab qilinayotgan qobiliyatlarni aniqlash"""
+        return self.capability_registry.discover_capabilities_for_text(text)
+
+    def call(self, name: str, **kwargs) -> Any:
+        """Tool ni nomi, taxallusi yoki qobiliyati bo'yicha chaqirish (SafeToolRunner orqali)"""
         tool = self.get(name)
         if not tool:
-            return {"success": False, "error": f"Tool '{name}' topilmadi"}
+            candidates = self.find_by_capability(name)
+            if candidates:
+                sel = self.select_tool(name, candidate_params=kwargs)
+                if sel and sel.tool:
+                    tool = sel.tool
+
+        if not tool:
+            return ToolResult(
+                success=False,
+                code=ToolErrorCode.TOOL_NOT_FOUND,
+                error=f"Tool '{name}' topilmadi",
+                tool=name
+            )
         return tool.call(**kwargs)
 
     def list_tools(self) -> list:
-        """Barcha tool'larni ro'yxati"""
+        """Barcha tool'larni ro'yxati (dict formatda)"""
         return [t.to_dict() for t in self._tools.values()]
 
     def list_names(self) -> list:
@@ -98,9 +149,10 @@ class ToolRegistry:
         lines = []
         for tool in self._tools.values():
             params_str = ", ".join(
-                f"{k}: {v.get('type', 'string')}" for k, v in tool.parameters.items()
+                f"{k}: {v.get('type', 'string') if isinstance(v, dict) else 'string'}" for k, v in tool.parameters.items()
             )
-            lines.append(f"- {tool.name}({params_str}) — {tool.description}")
+            caps_str = f" [capabilities: {', '.join(tool.capabilities)}]" if tool.capabilities else ""
+            lines.append(f"- {tool.name}({params_str}) — {tool.description}{caps_str}")
         return "\n".join(lines)
 
     @property
@@ -192,6 +244,12 @@ TOOL_WEB_SEARCH = Tool(
     },
     function=_web_search,
     category="internet",
+    capabilities=['web_search', 'internet_search', 'search', 'google', 'duckduckgo'],
+    aliases=['search', 'google', 'qidiruv', 'internet'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -283,6 +341,12 @@ TOOL_CALCULATOR = Tool(
     },
     function=_calculator,
     category="utility",
+    capabilities=['calculation', 'math', 'arithmetic', 'compute'],
+    aliases=['calc', 'hisobla', 'hisoblagich', 'math'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -440,6 +504,12 @@ TOOL_SYSTEM = Tool(
     },
     function=_system_control,
     category="system",
+    capabilities=['system_power', 'system_control', 'power_management', 'app_launcher'],
+    aliases=['system', 'power', 'tizim'],
+    risk_level=RiskLevel.HIGH,
+    timeout=10.0,
+    idempotent=False,
+    destructive=True,
 )
 
 
@@ -510,6 +580,12 @@ TOOL_MUSIC = Tool(
     },
     function=_music_player,
     category="media",
+    capabilities=['music', 'audio_playback', 'media'],
+    aliases=['music', 'musiqa', 'pleer'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -577,6 +653,12 @@ TOOL_WEATHER = Tool(
     },
     function=_weather,
     category="info",
+    capabilities=['weather', 'forecast', 'temperature', 'climate'],
+    aliases=['ob_havo', 'obhavo', 'weather_info'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -640,6 +722,12 @@ TOOL_REMINDER = Tool(
     },
     function=_reminder,
     category="productivity",
+    capabilities=['reminder', 'alarm', 'notification_schedule'],
+    aliases=['eslatma', 'eslat'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -713,6 +801,12 @@ TOOL_FILE = Tool(
     },
     function=_file_manager,
     category="utility",
+    capabilities=['file_read', 'file_list', 'file_management', 'file_search'],
+    aliases=['files', 'fayllar', 'file', 'fayl'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -786,6 +880,12 @@ TOOL_KNOWLEDGE = Tool(
     },
     function=_knowledge,
     category="memory",
+    capabilities=['knowledge_base', 'memory_store', 'fact_retrieval'],
+    aliases=['bilim', 'xotira', 'facts'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -827,6 +927,12 @@ TOOL_DATETIME = Tool(
     },
     function=_datetime_tool,
     category="info",
+    capabilities=['datetime', 'clock', 'current_time', 'calendar'],
+    aliases=['vaqt', 'soat', 'sana', 'time', 'date'],
+    risk_level=RiskLevel.LOW,
+    timeout=3.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -911,6 +1017,12 @@ TOOL_SCHEDULER = Tool(
     },
     function=_scheduler_tool,
     category="productivity",
+    capabilities=['scheduler', 'task_schedule', 'cron'],
+    aliases=['reja', 'jadval', 'schedule'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -1065,6 +1177,12 @@ TOOL_RAG = Tool(
     },
     function=_rag_reader,
     category="utility",
+    capabilities=['document_reading', 'rag', 'pdf_reader', 'text_extraction'],
+    aliases=['hujjat', 'rag', 'read_doc'],
+    risk_level=RiskLevel.LOW,
+    timeout=15.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -1129,6 +1247,12 @@ TOOL_CURRENCY = Tool(
     },
     function=_currency,
     category="info",
+    capabilities=['currency_exchange', 'currency_converter', 'valyuta'],
+    aliases=['valyuta', 'kurs', 'dollar', 'exchange'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -1202,6 +1326,12 @@ TOOL_TRANSLATOR = Tool(
     },
     function=_translator,
     category="utility",
+    capabilities=['translation', 'translate', 'language_translation'],
+    aliases=['tarjima', 'translate', 'tarjimon'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -1234,6 +1364,12 @@ TOOL_SCREEN = Tool(
     },
     function=_screen_analyze,
     category="system",
+    capabilities=['screen_vision', 'screen_ocr', 'desktop_vision'],
+    aliases=['ekran', 'screen', 'vision'],
+    risk_level=RiskLevel.LOW,
+    timeout=15.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -1360,6 +1496,12 @@ TOOL_FILE_WRITE = Tool(
     },
     function=_file_write,
     category="coding",
+    capabilities=['file_write', 'file_create', 'code_generation'],
+    aliases=['fayl_yozish', 'write_file', 'save_file'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=10.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -1572,6 +1714,23 @@ def _app_check(category: str = "code_editor", app_name: str = "") -> dict:
 
     # Aniq ilova nomi berilgan bo'lsa
     if app_name:
+        try:
+            from core.app_detector import get_app_detector
+            info = get_app_detector().detect_app(app_name)
+            if info.found:
+                return {
+                    "name": info.name,
+                    "found": True,
+                    "running": info.running,
+                    "pid": info.pid,
+                    "path": info.exe_path,
+                    "family": info.family,
+                    "canonical_name": info.canonical_name,
+                    "message": info.format_uzbek_response(app_name),
+                }
+        except Exception as e:
+            logger.warning(f"AppDetector xatosi _app_check da: {e}")
+
         app_name_lower = app_name.lower().strip()
         for cat_name, apps in APP_DATABASE.items():
             if app_name_lower in apps:
@@ -1649,6 +1808,12 @@ TOOL_APP_CHECK = Tool(
     },
     function=_app_check,
     category="system",
+    capabilities=['app_detection', 'software_check', 'installed_apps'],
+    aliases=['dasturlar', 'apps', 'check_app'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -1664,8 +1829,6 @@ def set_ask_user_callback(callback):
 
 def _ask_user(question: str) -> dict:
     """Foydalanuvchidan savol so'rash va javobni kutish"""
-    global _ask_user_callback
-
     if not question:
         return {"error": "Savol matni kerak"}
 
@@ -1712,6 +1875,12 @@ TOOL_ASK_USER = Tool(
     },
     function=_ask_user,
     category="interaction",
+    capabilities=['user_interaction', 'ask_question', 'clarify_with_user'],
+    aliases=['savol', "so'rash", 'ask'],
+    risk_level=RiskLevel.LOW,
+    timeout=30.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -1852,6 +2021,12 @@ TOOL_SCREEN_CLICK = Tool(
     },
     function=_screen_click,
     category="interaction",
+    capabilities=['mouse_click', 'gui_interaction', 'desktop_automation'],
+    aliases=['bosish', 'click', 'mouse'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -1893,6 +2068,12 @@ TOOL_KEYBOARD_TYPE = Tool(
     },
     function=_keyboard_type,
     category="interaction",
+    capabilities=['keyboard_input', 'type_text', 'desktop_automation'],
+    aliases=['yozish', 'type', 'keyboard'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=10.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -1954,6 +2135,12 @@ TOOL_KEYBOARD_SHORTCUT = Tool(
     },
     function=_keyboard_shortcut,
     category="interaction",
+    capabilities=['hotkey', 'keyboard_shortcut', 'key_combination'],
+    aliases=['klaviatura', 'shortcut', 'hotkey'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2006,6 +2193,12 @@ TOOL_CLIPBOARD = Tool(
     },
     function=_clipboard,
     category="system",
+    capabilities=['clipboard', 'copy_paste', 'clipboard_history'],
+    aliases=['bufer', 'clipboard', 'copy'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2068,6 +2261,12 @@ TOOL_PROCESS_MANAGER = Tool(
     },
     function=_process_manager,
     category="system",
+    capabilities=['process_management', 'task_manager', 'kill_process'],
+    aliases=['jarayon', 'process', 'tasklist'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=10.0,
+    idempotent=False,
+    destructive=True,
 )
 
 
@@ -2132,6 +2331,12 @@ TOOL_AUDIO_CONTROL = Tool(
     },
     function=_audio_control,
     category="system",
+    capabilities=['volume_control', 'mute_audio', 'sound_system'],
+    aliases=['ovoz', 'tovush', 'volume'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2140,18 +2345,80 @@ def _system_info(category: str = "all") -> dict:
     """Sistema ma'lumotlarini olish"""
     try:
         import psutil
+        import platform
+        import os
 
         info = {}
         if category in ("all", "cpu"):
-            info["cpu"] = f"{psutil.cpu_percent()}%"
+            cpu_name = platform.processor() or "CPU"
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                        reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                        if reg_name:
+                            cpu_name = str(reg_name).strip()
+                except Exception:
+                    pass
+            info["cpu_model"] = cpu_name
+            info["cpu_usage"] = f"{psutil.cpu_percent()}%"
+            info["cpu_cores"] = f"{psutil.cpu_count(logical=False) or 1} fiz / {psutil.cpu_count(logical=True) or 1} mantiqiy"
+        if category in ("all", "gpu", "videokarta"):
+            gpus = []
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+                        count_gpu = winreg.QueryInfoKey(root_gpu)[0]
+                        for i in range(count_gpu):
+                            sub = winreg.EnumKey(root_gpu, i)
+                            if sub.isdigit():
+                                try:
+                                    with winreg.OpenKey(root_gpu, sub) as k:
+                                        desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                                        if not desc:
+                                            continue
+                                        drv_ver = ""
+                                        try:
+                                            drv_ver, _ = winreg.QueryValueEx(k, 'DriverVersion')
+                                        except Exception:
+                                            pass
+                                        vram_gb = 0.0
+                                        for mem_key in ['HardwareInformation.qwMemorySize', 'HardwareInformation.MemorySize']:
+                                            try:
+                                                raw_bytes, _ = winreg.QueryValueEx(k, mem_key)
+                                                if raw_bytes and raw_bytes > 0:
+                                                    vram_gb = round(raw_bytes / (1024**3), 1)
+                                                    break
+                                            except Exception:
+                                                pass
+                                        gpus.append({
+                                            "name": str(desc).strip(),
+                                            "driver": str(drv_ver).strip(),
+                                            "vram_gb": vram_gb
+                                        })
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
+            if gpus:
+                g = gpus[0]
+                info["gpu_model"] = g["name"]
+                if g.get("vram_gb"):
+                    info["gpu_vram"] = f"{g['vram_gb']} GB"
+                if g.get("driver"):
+                    info["gpu_driver"] = g["driver"]
+            else:
+                info["gpu_model"] = "Standart video adapter"
         if category in ("all", "ram"):
             mem = psutil.virtual_memory()
             info["ram"] = (
-                f"{mem.percent}% ({mem.used // (1024**3)}GB / {mem.total // (1024**3)}GB)"
+                f"{mem.percent}% ({round(mem.used / (1024**3), 1)}GB / {round(mem.total / (1024**3), 1)}GB)"
             )
         if category in ("all", "disk"):
-            disk = psutil.disk_usage("/")
-            info["disk"] = f"{disk.percent}% ({disk.free // (1024**3)}GB bo'sh)"
+            root_drive = "C:\\" if os.name == "nt" else "/"
+            disk = psutil.disk_usage(root_drive)
+            info["disk"] = f"{disk.percent}% ({round(disk.free / (1024**3), 1)}GB bo'sh / {round(disk.total / (1024**3), 1)}GB)"
         if category in ("all", "battery"):
             bat = psutil.sensors_battery()
             if bat:
@@ -2170,16 +2437,22 @@ def _system_info(category: str = "all") -> dict:
 
 TOOL_SYSTEM_INFO = Tool(
     name="system_info",
-    description="CPU, RAM, Disk, Battery haqida ma'lumot olish",
+    description="CPU, RAM, GPU (videokarta), Disk, Battery haqida ma'lumot olish",
     parameters={
         "category": {
             "type": "string",
-            "description": "'all', 'cpu', 'ram', 'disk', 'battery'. Default: all",
+            "description": "'all', 'cpu', 'gpu', 'ram', 'disk', 'battery'. Default: all",
             "required": False,
         },
     },
     function=_system_info,
     category="system",
+    capabilities=['system_information', 'hardware_specs', 'os_metrics'],
+    aliases=['tizim_info', 'kompyuter', 'specs', 'sysinfo'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -2276,6 +2549,12 @@ TOOL_WINDOW_MANAGER = Tool(
     },
     function=_window_manager,
     category="system",
+    capabilities=['window_management', 'window_focus', 'window_resize'],
+    aliases=['oyna', 'window', 'deraza'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2320,6 +2599,12 @@ TOOL_NOTIFICATION = Tool(
     },
     function=_notification,
     category="system",
+    capabilities=['desktop_notification', 'toast_message', 'alert_user'],
+    aliases=['bildirishnoma', 'toast', 'notify'],
+    risk_level=RiskLevel.LOW,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2454,6 +2739,12 @@ TOOL_SANDBOX = Tool(
     },
     function=_sandbox_execute,
     category="utility",
+    capabilities=['python_execution', 'code_sandbox', 'isolated_run'],
+    aliases=['python', 'sandbox', 'kod'],
+    risk_level=RiskLevel.MEDIUM,
+    timeout=15.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -2510,6 +2801,12 @@ TOOL_SECRET_VAULT = Tool(
     },
     function=_secret_vault,
     category="utility",
+    capabilities=['credential_vault', 'secret_storage', 'api_key_storage'],
+    aliases=['vault', 'maxfiy', 'kalit'],
+    risk_level=RiskLevel.HIGH,
+    timeout=5.0,
+    idempotent=False,
+    destructive=False,
 )
 
 
@@ -2540,6 +2837,12 @@ TOOL_VECTOR_SEARCH = Tool(
     },
     function=_vector_search,
     category="knowledge",
+    capabilities=['vector_search', 'semantic_memory', 'embedding_search'],
+    aliases=['vektor', 'semantic', 'vector_memory'],
+    risk_level=RiskLevel.LOW,
+    timeout=10.0,
+    idempotent=True,
+    destructive=False,
 )
 
 
@@ -2601,3 +2904,7 @@ def get_registry() -> ToolRegistry:
     if _registry is None:
         _registry = create_default_registry()
     return _registry
+
+
+# Alias
+get_tool_registry = get_registry

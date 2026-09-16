@@ -69,7 +69,8 @@ class TTSManager:
                     repo_or_dir='snakers4/silero-models',
                     model='silero_tts',
                     language='uz',
-                    speaker='v4_uz'
+                    speaker='v4_uz',
+                    trust_repo=True
                 )
                 
                 self._silero_model = model
