@@ -138,14 +138,14 @@ export const MikasaOrb: React.FC<MikasaOrbProps> = ({
       case "idle":
       default:
         return {
-          glow: "rgba(56, 189, 248, 0.3)",
-          innerGlow: "rgba(139, 92, 246, 0.3)",
-          ring: "rgba(125, 211, 252, 0.2)",
-          ring2: "rgba(168, 85, 247, 0.15)",
-          ring3: "rgba(236, 72, 153, 0.1)",
-          core: "radial-gradient(circle at 38% 32%, #F0F9FF 0%, #38BDF8 35%, #0284C7 68%, #4C1D95 100%)",
-          shadow: "0 0 30px rgba(56, 189, 248, 0.4)",
-          particleColor: "#7DD3FC",
+          glow: "rgba(168, 85, 247, 0.35)",
+          innerGlow: "rgba(56, 189, 248, 0.35)",
+          ring: "rgba(129, 140, 248, 0.3)",
+          ring2: "rgba(192, 132, 252, 0.25)",
+          ring3: "rgba(56, 189, 248, 0.2)",
+          core: "radial-gradient(circle at 45% 38%, #312E81 0%, #4C1D95 35%, #1E40AF 70%, #0F172A 100%)",
+          shadow: "0 0 45px rgba(168, 85, 247, 0.5), inset 0 0 24px rgba(56, 189, 248, 0.45)",
+          particleColor: "#C084FC",
         };
     }
   };

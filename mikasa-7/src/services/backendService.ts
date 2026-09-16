@@ -279,6 +279,10 @@ export interface SystemMetrics {
   disk_free_gb?: number;
   network_sent_kb: number;
   network_recv_kb: number;
+  upload_mb_s?: number;
+  download_mb_s?: number;
+  gpu_percent?: number;
+  cpu_temp?: number;
   battery_percent?: number | null;
   battery_plugged?: boolean | null;
   timestamp: string;
