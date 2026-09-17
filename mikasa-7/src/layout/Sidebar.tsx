@@ -7,6 +7,7 @@ import {
   MemoryIcon,
   SchedulerIcon,
   PluginsIcon,
+  RemoteControlIcon,
   CollapseSidebarIcon,
   ExpandSidebarIcon,
   SearchIcon,
@@ -48,6 +49,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
     items: [
       { id: "scheduler", path: "/scheduler", label: "Rejalashtiruvchi", icon: SchedulerIcon },
       { id: "plugins", path: "/plugins", label: "Plaginlar", icon: PluginsIcon },
+      { id: "remote", path: "/remote", label: "Masofaviy Boshqaruv", icon: RemoteControlIcon },
     ],
   },
 ];

@@ -361,6 +361,56 @@ export interface AgentEventData {
   timestamp?: string;
 }
 
+// ========== Phase 38 Remote Control & Permissions Interfaces ==========
+export interface RemoteDevice {
+  device_id: string;
+  hostname: string;
+  os: string;
+  mac_address: string;
+  local_ip: string;
+  state: "online" | "offline" | "waking" | "unknown";
+  agent_version: string;
+  is_paired: boolean;
+  telegram_user_id?: string | null;
+  permissions?: Record<string, boolean>;
+}
+
+export interface PermissionDefinitionItem {
+  id: string;
+  category: "system" | "apps" | "files" | "network" | "power" | "advanced";
+  name: string;
+  description: string;
+  danger_level: "low" | "medium" | "high" | "critical";
+  requires_confirmation: boolean;
+}
+
+export interface PermissionProfileData {
+  user_id: string;
+  device_id: string;
+  permissions: Record<string, boolean>;
+  capabilities: string[];
+  version: number;
+  updated_at: number;
+}
+
+export interface PairingCodeResponse {
+  ok: boolean;
+  code?: string;
+  expires_in?: number;
+  instruction?: string;
+  error?: string;
+}
+
+export interface RemoteAuditItem {
+  event_id: string;
+  timestamp: string;
+  event_type: string;
+  telegram_user_id?: string;
+  device_id?: string;
+  status: string;
+  details?: Record<string, any>;
+}
+
 const API_BASE = "http://127.0.0.1:18420";
 const WS_BASE = "ws://127.0.0.1:18420/api/ws";
 
@@ -379,6 +429,7 @@ class BackendService {
   private accountListeners: Set<(data: any) => void> = new Set();
   private agentListeners: Set<(event: AgentEventData) => void> = new Set();
   private metricsListeners: Set<(metrics: SystemMetrics) => void> = new Set();
+  private remoteListeners: Set<(event: { type: string; data: any }) => void> = new Set();
   private clientVoiceStopFn: (() => void) | null = null;
 
   constructor() {
@@ -427,6 +478,11 @@ class BackendService {
   public onSystemMetrics(cb: (metrics: SystemMetrics) => void): () => void {
     this.metricsListeners.add(cb);
     return () => this.metricsListeners.delete(cb);
+  }
+
+  public onRemoteEvent(cb: (event: { type: string; data: any }) => void): () => void {
+    this.remoteListeners.add(cb);
+    return () => this.remoteListeners.delete(cb);
   }
 
   private notifyStatus(status: BackendStatus) {
@@ -526,6 +582,16 @@ class BackendService {
             this.metricsListeners.forEach((cb) => {
               try {
                 cb(payload.data);
+              } catch (e) {
+                console.error(e);
+              }
+            });
+          } else if (
+            ["permission_changed", "pairing_code_generated", "device_paired", "device_unpaired", "session_locked", "session_logout"].includes(payload.type)
+          ) {
+            this.remoteListeners.forEach((cb) => {
+              try {
+                cb({ type: payload.type, data: payload.data || {} });
               } catch (e) {
                 console.error(e);
               }
@@ -1389,8 +1455,107 @@ class BackendService {
     return this.currentStatus.user || localStorage.getItem("mikasa_user_name") || "Ustoz";
   }
 
-  public getVoiceState(): VoiceState {
-    return this.currentVoiceState;
+  // ========== Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi ==========
+  public async getRemoteDevices(): Promise<{ ok: boolean; devices: RemoteDevice[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/devices`);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, devices: [], error: String(err) };
+    }
+  }
+
+  public async getDevicePermissions(deviceId: string): Promise<{
+    ok: boolean;
+    device_id: string;
+    profile: PermissionProfileData;
+    catalog: Record<string, PermissionDefinitionItem[]>;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, device_id: deviceId, profile: {} as any, catalog: {}, error: String(err) };
+    }
+  }
+
+  public async updateDevicePermissions(
+    deviceId: string,
+    permissions: Record<string, boolean>,
+    capabilities?: string[]
+  ): Promise<{ ok: boolean; message?: string; profile?: PermissionProfileData; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions, capabilities }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async generatePairingCode(deviceId: string = "local_pc"): Promise<PairingCodeResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate", device_id: deviceId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async unpairTelegram(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/unpair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async lockRemoteSession(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/session/lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async logoutRemoteSession(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/session/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getRemoteAudit(): Promise<{ ok: boolean; total: number; events: RemoteAuditItem[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/remote/audit`);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, total: 0, events: [], error: String(err) };
+    }
   }
 }
 

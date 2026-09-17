@@ -314,6 +314,8 @@ class TelegramRemoteGateway:
         elif (
             lower.startswith("/system_info")
             or lower.startswith("/sys")
+            or lower.startswith("/info")
+            or lower == "info"
             or lower == "system_info"
             or lower == "system info"
             or lower == "📊 system status"
@@ -336,11 +338,40 @@ class TelegramRemoteGateway:
         ):
             return {"action": "shutdown", "params": {}, "high_risk": True}
 
-        # Buyruqlar: Pairing
-        elif lower.startswith("/pair"):
+        # Buyruqlar: Pairing & Linking (/pair MK-XXXXXX, /link MK-XXXXXX)
+        elif lower.startswith("/pair") or lower.startswith("/link"):
             parts = raw.split(maxsplit=1)
             token = parts[1].strip() if len(parts) > 1 else ""
             return {"action": "pair", "params": {"pairing_token": token}}
+
+        elif lower.startswith("/unpair") or "bog'lanishni uz" in lower:
+            return {"action": "unpair", "params": {}}
+
+        elif lower.startswith("/devices") or "qurilmalar" in lower:
+            return {"action": "devices", "params": {}}
+
+        elif lower.startswith("/account") or "hisobim" in lower:
+            return {"action": "account", "params": {}}
+
+        # Buyruqlar: Screenshot
+        elif lower.startswith("/screenshot") or "ekranni rasmga ol" in lower or "skrinshot" in lower:
+            return {"action": "system.screenshot", "params": {}}
+
+        # Buyruqlar: Apps
+        elif lower.startswith("/apps") or "dasturlar ro'yxati" in lower or "dasturlar" in lower:
+            return {"action": "app.list", "params": {}}
+
+        # Buyruqlar: Files
+        elif lower.startswith("/files") or "fayllar ro'yxati" in lower or "fayllar" in lower:
+            return {"action": "file.list", "params": {}}
+
+        # Buyruqlar: Network
+        elif lower.startswith("/network") or "tarmoq holati" in lower or "tarmoq" in lower:
+            return {"action": "network.info", "params": {}}
+
+        # Buyruqlar: Sleep
+        elif lower.startswith("/sleep") or "uxlat" in lower or "uyqu rejimiga" in lower:
+            return {"action": "power.sleep", "params": {}, "high_risk": True}
 
         # Buyruqlar: Session / Logout / Lock
         elif lower.startswith("/logout") or lower.startswith("/lock") or "sessiyani yop" in lower:

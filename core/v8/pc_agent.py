@@ -206,7 +206,7 @@ class MikasaPCAgent:
                 }
 
         else:
-            # 4. Mikasa Tool System 2.0 orqali chaqirish
+            # 4. Mikasa Tool System 2.0 yoki RemoteToolRegistry orqali chaqirish
             reg = get_registry()
             tool = reg.get(action)
             if tool:
@@ -221,19 +221,27 @@ class MikasaPCAgent:
                     success = False
                     result_payload = {"error": str(ex)}
             else:
-                success = False
-                final_res = {
-                    "success": False,
-                    "request_id": req_id,
-                    "error": f"UNKNOWN_ACTION: Noma'lum buyruq '{action}'"
-                }
-                self._audit.log(
-                    RemoteEventType.COMMAND_FAILED,
-                    request_id=req_id,
-                    device_id=self.identity.device_id,
-                    reason=f"Unknown action {action}"
-                )
-                return final_res
+                from core.v8.remote_tools import RemoteToolRegistry
+                remote_reg = RemoteToolRegistry.get_default_instance()
+                remote_tool = remote_reg.get(action)
+                if remote_tool:
+                    tool_res = remote_reg.execute(action, params)
+                    success = tool_res.success
+                    result_payload = tool_res.data if tool_res.data is not None else ({"error": tool_res.error} if tool_res.error else {})
+                else:
+                    success = False
+                    final_res = {
+                        "success": False,
+                        "request_id": req_id,
+                        "error": f"UNKNOWN_ACTION: Noma'lum buyruq '{action}'"
+                    }
+                    self._audit.log(
+                        RemoteEventType.COMMAND_FAILED,
+                        request_id=req_id,
+                        device_id=self.identity.device_id,
+                        reason=f"Unknown action {action}"
+                    )
+                    return final_res
 
         final_res = {
             "success": success,

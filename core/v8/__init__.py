@@ -1,5 +1,5 @@
 # ========== core/v8/__init__.py ==========
-# Mikasa AI v8.0.0 — Phase 37: Secure Remote Session Authentication
+# Mikasa AI v8.0.0 — Phase 38: Mikasa Online Remote Control + User Permission Center
 # Package initialization, versioning & exports
 
 from core.v8.device import (
@@ -32,6 +32,23 @@ from core.v8.auth_session import (
     SessionManager,
     RemoteAuthEngine
 )
+from core.v8.user_linking import (
+    TelegramIdentity,
+    PairingToken,
+    UserDeviceLink,
+    UserLinkingStore
+)
+from core.v8.permission_center import (
+    PermissionCategory,
+    PermissionDefinition,
+    UserPermissionProfile,
+    PermissionStore,
+    STANDARD_PERMISSIONS
+)
+from core.v8.remote_tools import (
+    RemoteToolDefinition,
+    RemoteToolRegistry
+)
 from core.v8.remote_orchestrator import RemoteOrchestrator
 from core.v8.planning_remote import create_remote_wake_and_verify_dag
 from core.v8.events import (
@@ -43,7 +60,7 @@ from core.v8.events import (
 )
 
 __version__ = "8.0.0"
-PHASE = 37
+PHASE = 38
 
 __all__ = [
     "__version__",
@@ -76,6 +93,19 @@ __all__ = [
     "RemoteAuthSession",
     "SessionManager",
     "RemoteAuthEngine",
+    # User Linking & Permission Center (Phase 38)
+    "TelegramIdentity",
+    "PairingToken",
+    "UserDeviceLink",
+    "UserLinkingStore",
+    "PermissionCategory",
+    "PermissionDefinition",
+    "UserPermissionProfile",
+    "PermissionStore",
+    "STANDARD_PERMISSIONS",
+    # Remote Tools (Phase 38)
+    "RemoteToolDefinition",
+    "RemoteToolRegistry",
     # Orchestrator & DAG
     "RemoteOrchestrator",
     "create_remote_wake_and_verify_dag",

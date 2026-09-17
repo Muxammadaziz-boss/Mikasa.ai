@@ -37,6 +37,18 @@ class RemoteEventType(str, Enum):
     SESSION_OPENED = "SESSION_OPENED"
     SESSION_EXPIRED = "SESSION_EXPIRED"
     SESSION_CLOSED = "SESSION_CLOSED"
+    # Phase 38 — User Linking & Permission Center Events
+    ACCOUNT_LINKED = "ACCOUNT_LINKED"
+    ACCOUNT_UNLINKED = "ACCOUNT_UNLINKED"
+    DEVICE_PAIRED = "DEVICE_PAIRED"
+    DEVICE_UNPAIRED = "DEVICE_UNPAIRED"
+    PERMISSION_GRANTED = "PERMISSION_GRANTED"
+    PERMISSION_REVOKED = "PERMISSION_REVOKED"
+    PERMISSION_CHANGED = "PERMISSION_CHANGED"
+    COMMAND_RECEIVED = "COMMAND_RECEIVED"
+    COMMAND_AUTHORIZED = "COMMAND_AUTHORIZED"
+    COMMAND_DENIED = "COMMAND_DENIED"
+    COMMAND_EXECUTED = "COMMAND_EXECUTED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -58,7 +70,9 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
     cleaned = {}
     sensitive_keys = {
         "token", "bot_token", "password", "secret", "pairing_token",
-        "auth_header", "pin", "auth_code", "session_token"
+        "auth_header", "pin", "auth_code", "session_token",
+        "pairing_code", "pairing_secret", "raw_file_content", "private_key",
+        "secret_hash"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:

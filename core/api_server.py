@@ -1900,7 +1900,238 @@ async def handle_account_update(request):
     })
 
 
-# ========== 8. WEBSOCKET HANDLER ==========
+# ========== 8. PHASE 38: REMOTE CONTROL & USER PERMISSION CENTER API ==========
+
+async def handle_remote_devices(request):
+    """GET /api/remote/devices - Ro'yxatdan o'tgan va bog'langan qurilmalar"""
+    from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, DeviceIdentityManager
+    reg = DeviceRegistry.get_default_instance()
+    hb = HeartbeatManager()
+    linking = UserLinkingStore.get_default_instance()
+
+    devices = []
+    for d in reg.list_devices():
+        link = linking.get_link_by_device(d.device_id)
+        state = hb.get_device_state(d.device_id)
+        devices.append({
+            "device_id": d.device_id,
+            "hostname": d.hostname,
+            "os": f"{d.os_name} {d.os_release}".strip(),
+            "mac_address": d.mac_address,
+            "local_ip": d.local_ip,
+            "state": state.value,
+            "agent_version": d.agent_version,
+            "is_paired": link is not None and link.is_active,
+            "telegram_user_id": link.telegram_user_id if link else None
+        })
+
+    # Agar ro'yxat bo'sh bo'lsa, lokal qurilmani qo'shish
+    if not devices:
+        local_ident = DeviceIdentityManager.create_local_identity()
+        reg.register_or_update(local_ident)
+        devices.append({
+            "device_id": local_ident.device_id,
+            "hostname": local_ident.hostname,
+            "os": f"{local_ident.os_name} {local_ident.os_release}".strip(),
+            "mac_address": local_ident.mac_address,
+            "local_ip": local_ident.local_ip,
+            "state": "online",
+            "agent_version": local_ident.agent_version,
+            "is_paired": False,
+            "telegram_user_id": None
+        })
+
+    return web.json_response({"ok": True, "devices": devices})
+
+
+async def handle_remote_device_detail(request):
+    """GET /api/remote/devices/{id} - Muayyan qurilma tafsilotlari"""
+    dev_id = request.match_info.get("id", "")
+    from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, PermissionStore
+    reg = DeviceRegistry.get_default_instance()
+    dev = reg.get_device(dev_id)
+    if not dev:
+        return web.json_response({"ok": False, "error": f"Qurilma topilmadi: {dev_id}"}, status=404)
+
+    linking = UserLinkingStore.get_default_instance()
+    link = linking.get_link_by_device(dev_id)
+    hb = HeartbeatManager()
+    perm_store = PermissionStore.get_default_instance()
+    profile = perm_store.get_profile("admin", dev_id)
+
+    return web.json_response({
+        "ok": True,
+        "device": {
+            **dev.to_dict(),
+            "state": hb.get_device_state(dev_id).value,
+            "is_paired": link is not None and link.is_active,
+            "telegram_user_id": link.telegram_user_id if link else None,
+            "permissions": profile.permissions
+        }
+    })
+
+
+async def handle_remote_permissions_get(request):
+    """GET /api/remote/permissions/{device_id} - Ruxsatlar profili va katalogi"""
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8 import PermissionStore
+    store = PermissionStore.get_default_instance()
+    profile = store.get_profile("admin", dev_id)
+
+    return web.json_response({
+        "ok": True,
+        "device_id": dev_id,
+        "profile": profile.to_dict(),
+        "catalog": store.get_catalog()
+    })
+
+
+async def handle_remote_permissions_put(request):
+    """PUT /api/remote/permissions/{device_id} - Ruxsatlarni zudlik bilan yangilash"""
+    dev_id = request.match_info.get("device_id", "")
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    new_perms = body.get("permissions", {})
+    new_caps = body.get("capabilities")
+
+    from core.v8 import PermissionStore
+    store = PermissionStore.get_default_instance()
+    updated = store.update_permissions("admin", dev_id, new_perms, new_caps)
+
+    await broadcast_ws("permission_changed", {
+        "device_id": dev_id,
+        "profile": updated.to_dict()
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": "Ruxsatlar muvaffaqiyatli yangilandi va barcha kanallarda qo'llanildi",
+        "profile": updated.to_dict()
+    })
+
+
+async def handle_remote_pair(request):
+    """POST /api/remote/pair - Kod generatsiya qilish (MK-XXXXXX) yoki bog'lash"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    action = body.get("action", "generate")
+    dev_id = body.get("device_id", "local_pc")
+
+    from core.v8 import UserLinkingStore
+    linking = UserLinkingStore.get_default_instance()
+
+    if action == "generate":
+        code = linking.generate_pairing_code("admin", dev_id, ttl=300.0)
+        await broadcast_ws("pairing_code_generated", {
+            "device_id": dev_id,
+            "code": code,
+            "expires_in": 300
+        })
+        return web.json_response({
+            "ok": True,
+            "code": code,
+            "expires_in": 300,
+            "instruction": f"Telegram botingizda quyidagicha yuboring: /pair {code}"
+        })
+    elif action == "redeem":
+        code = body.get("code", "")
+        tg_id = body.get("telegram_user_id", "")
+        ok, msg, link = linking.redeem_pairing_code(code, tg_id)
+        if ok and link:
+            await broadcast_ws("device_paired", {
+                "device_id": link.device_id,
+                "telegram_user_id": link.telegram_user_id
+            })
+            return web.json_response({"ok": True, "message": msg, "link": link.to_dict()})
+        return web.json_response({"ok": False, "error": msg}, status=400)
+
+    return web.json_response({"ok": False, "error": f"Noma'lum amal: {action}"}, status=400)
+
+
+async def handle_remote_unpair(request):
+    """POST /api/remote/unpair - Telegram bog'lanishini uzish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    dev_id = body.get("device_id", "")
+    from core.v8 import UserLinkingStore, DeviceRegistry
+    linking = UserLinkingStore.get_default_instance()
+    reg = DeviceRegistry.get_default_instance()
+
+    unpaired = linking.unlink_telegram(dev_id)
+    reg.unpair_device(dev_id)
+
+    await broadcast_ws("device_unpaired", {"device_id": dev_id})
+    return web.json_response({
+        "ok": True,
+        "message": "Bog'lanish bekor qilindi",
+        "device_id": dev_id,
+        "unpaired": unpaired
+    })
+
+
+async def handle_remote_session_lock(request):
+    """POST /api/remote/session/lock - Masofaviy sessiyani bloklash / qulflash"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    dev_id = body.get("device_id", "")
+    from core.v8 import SessionManager
+    sm = SessionManager()
+    closed = sm.close_session("admin", dev_id)
+
+    await broadcast_ws("session_locked", {"device_id": dev_id})
+    return web.json_response({
+        "ok": True,
+        "message": "Masofaviy sessiya qulflandi",
+        "closed": closed
+    })
+
+
+async def handle_remote_session_logout(request):
+    """POST /api/remote/session/logout - Masofaviy sessiyani yopish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    dev_id = body.get("device_id", "")
+    from core.v8 import SessionManager
+    sm = SessionManager()
+    closed = sm.close_session("admin", dev_id)
+
+    await broadcast_ws("session_logout", {"device_id": dev_id})
+    return web.json_response({
+        "ok": True,
+        "message": "Masofaviy sessiya yakunlandi",
+        "closed": closed
+    })
+
+
+async def handle_remote_audit(request):
+    """GET /api/remote/audit - Masofaviy hodisalar auditi (Sanitizatsiyalangan)"""
+    from core.v8 import RemoteAuditLogger
+    logger_inst = RemoteAuditLogger.get_instance()
+    history = logger_inst.get_history(limit=50)
+
+    return web.json_response({
+        "ok": True,
+        "total": len(history),
+        "events": [e.to_dict() for e in reversed(history)]
+    })
+
+
+# ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
     ws = web.WebSocketResponse()
@@ -2047,6 +2278,17 @@ def create_app():
     # Hisob va Sozlamalar (Account & Settings)
     app.router.add_get("/api/account", handle_account_get)
     app.router.add_post("/api/account", handle_account_update)
+
+    # Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi (Remote Control & Permissions)
+    app.router.add_get("/api/remote/devices", handle_remote_devices)
+    app.router.add_get("/api/remote/devices/{id}", handle_remote_device_detail)
+    app.router.add_get("/api/remote/permissions/{device_id}", handle_remote_permissions_get)
+    app.router.add_put("/api/remote/permissions/{device_id}", handle_remote_permissions_put)
+    app.router.add_post("/api/remote/pair", handle_remote_pair)
+    app.router.add_post("/api/remote/unpair", handle_remote_unpair)
+    app.router.add_post("/api/remote/session/lock", handle_remote_session_lock)
+    app.router.add_post("/api/remote/session/logout", handle_remote_session_logout)
+    app.router.add_get("/api/remote/audit", handle_remote_audit)
 
     return app
 

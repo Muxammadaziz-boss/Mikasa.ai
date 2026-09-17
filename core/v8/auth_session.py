@@ -102,6 +102,8 @@ class SessionManager:
         logger.info(f"[SessionManager] Yangi sessiya ochildi: user={user_id}, dev={device_id}, ttl={session_ttl}s")
         return session
 
+    open_session = create_session
+
     def get_active_session(
         self,
         user_id: str,
@@ -184,10 +186,15 @@ class RemoteAuthEngine:
         self._cooldown_until: Dict[str, float] = {}
         self._pending_challenges: Dict[str, Dict[str, Any]] = {}  # user_id -> challenge info
 
-        # Boshlang'ich parollarni o'rnatish
-        env_pw = os.environ.get("REMOTE_AUTH_PASSWORD") or os.environ.get("ADMIN_PAROL") or default_password or "mikasa2026"
+        # Boshlang'ich parollarni o'rnatish (Production Secret Hash qo'llab-quvvatlanadi)
+        env_secret_hash = os.environ.get("REMOTE_AUTH_SECRET_HASH")
+        if env_secret_hash and env_secret_hash.startswith("pbkdf2:"):
+            self._password_hash = env_secret_hash
+        else:
+            env_pw = os.environ.get("REMOTE_AUTH_PASSWORD") or os.environ.get("ADMIN_PAROL") or default_password or "mikasa2026"
+            self.set_password(env_pw)
+
         env_pin = os.environ.get("REMOTE_AUTH_PIN") or default_pin or "1234"
-        self.set_password(env_pw)
         self.set_pin(env_pin)
 
     @classmethod

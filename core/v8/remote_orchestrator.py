@@ -1,6 +1,6 @@
 # ========== core/v8/remote_orchestrator.py ==========
-# Phase 36/37 — Remote PC Control Master Orchestrator
-# Coordinates Telegram Gateway ↔ Auth Engine ↔ DeviceRegistry ↔ WoL ↔ Heartbeat ↔ AgentLoop ↔ PCAgent
+# Phase 36/37/38 — Remote PC Control Master Orchestrator
+# Coordinates Telegram Gateway ↔ User Linking ↔ Permission Center ↔ Auth Engine ↔ DeviceRegistry ↔ WoL ↔ Heartbeat ↔ Tool System 2.0 ↔ PCAgent
 
 import time
 import logging
@@ -16,6 +16,9 @@ from core.v8.pc_agent import MikasaPCAgent
 from core.v8.planning_remote import create_remote_wake_and_verify_dag
 from core.v8.events import RemoteEventType, RemoteAuditLogger
 from core.v8.auth_session import RemoteAuthEngine, SessionManager
+from core.v8.user_linking import UserLinkingStore
+from core.v8.permission_center import PermissionStore
+from core.v8.remote_tools import RemoteToolRegistry
 
 logger = logging.getLogger("core.v8.orchestrator")
 
@@ -24,7 +27,7 @@ class RemoteOrchestrator:
     """
     Mikasa AI v8.0.0 Masofaviy Boshqaruv Markaziy Koordinatori.
     Barcha qatlamlarni birlashtiradi va xavfsiz boshqaradi:
-    Telegram -> Auth -> RateLimit -> Intent/DAG -> WoL -> Heartbeat -> Session Auth -> AgentLoop -> PC.
+    Telegram -> User Linking -> Permission Center -> Session Auth -> Envelope/RateLimit -> Intent/DAG -> WoL -> Tool System 2.0 -> PC Agent.
     """
 
     def __init__(
@@ -37,14 +40,19 @@ class RemoteOrchestrator:
         pc_agent: Optional[MikasaPCAgent] = None,
         session_manager: Optional[SessionManager] = None,
         auth_engine: Optional[RemoteAuthEngine] = None,
+        user_linking: Optional[UserLinkingStore] = None,
+        permission_store: Optional[PermissionStore] = None,
+        tool_registry: Optional[RemoteToolRegistry] = None,
         agent_loop=None,
-        require_session_auth: bool = True
+        require_session_auth: bool = True,
+        telegram_gateway: Optional[TelegramRemoteGateway] = None,
+        user_linking_store: Optional[UserLinkingStore] = None
     ):
         self.device_registry = device_registry or DeviceRegistry.get_default_instance()
         self.heartbeat_manager = heartbeat_manager or HeartbeatManager()
         self.wol_manager = wol_manager or WakeOnLanManager()
         self.envelope_manager = envelope_manager or EnvelopeManager()
-        self.gateway = gateway or TelegramRemoteGateway(
+        self.gateway = gateway or telegram_gateway or TelegramRemoteGateway(
             admin_id="admin",
             envelope_manager=self.envelope_manager,
             wol_manager=self.wol_manager
@@ -56,22 +64,56 @@ class RemoteOrchestrator:
         )
         self.session_manager = session_manager or SessionManager()
         self.auth_engine = auth_engine or RemoteAuthEngine(session_manager=self.session_manager)
+        self.user_linking = user_linking or user_linking_store or UserLinkingStore.get_default_instance()
+        self.permission_store = permission_store
+        self.tool_registry = tool_registry or RemoteToolRegistry.get_default_instance()
         self.agent_loop = agent_loop
         self.require_session_auth = require_session_auth
         self._audit = RemoteAuditLogger.get_instance()
 
+    @property
+    def pending_confirmations(self):
+        """Gateway ichidagi kutilayotgan tasdiqlar xaritasi"""
+        return getattr(self.gateway, "_pending_confirmations", {})
+
+    def pop_pending_confirmation(self, request_id: str):
+        return self.gateway.pop_pending_confirmation(request_id)
+
+    def cancel_confirmation(self, request_id: str):
+        return self.gateway.cancel_confirmation(request_id)
+
     def resolve_target_device(self, user_id: Union[str, int]) -> Optional[DeviceIdentity]:
         """Foydalanuvchiga bog'langan qurilmani aniqlash"""
-        paired = self.device_registry.get_paired_device_for_user(str(user_id))
+        user_str = str(user_id)
+
+        # 1. UserLinkingStore orqali tekshirish
+        link = self.user_linking.get_link_by_telegram(user_str)
+        if link:
+            dev = self.device_registry.get_device(link.device_id)
+            if dev:
+                return dev
+
+        # 2. DeviceRegistry pairing
+        paired = self.device_registry.get_paired_device_for_user(user_str)
         if paired:
             return paired
 
-        # Agar pairing topilmasa, mavjud birinchi qurilmani yoki pc_agent identity'sini olish
+        # 3. Agar pairing topilmasa, mavjud birinchi qurilmani yoki pc_agent identity'sini olish
         all_devs = self.device_registry.list_devices()
         if all_devs:
             return all_devs[0]
 
         return self.pc_agent.identity if self.pc_agent else None
+
+    async def process_telegram_message(
+        self,
+        user_id: Union[str, int],
+        text: str,
+        chat_id: Optional[Union[str, int]] = None
+    ) -> Dict[str, Any]:
+        """Telegram xabarini qayta ishlash uchun qulay usul"""
+        cid = chat_id if chat_id is not None else user_id
+        return await self.handle_message(cid, user_id, text)
 
     async def handle_message(
         self,
@@ -91,23 +133,116 @@ class RemoteOrchestrator:
 
         self._audit.log(RemoteEventType.REMOTE_REQUEST_RECEIVED, user_id=user_str, text=log_text)
 
-        # 1. Avtorizatsiya tekshiruvi (Telegram ID allowlist)
-        if not self.gateway.is_authorized(user_str):
+        # 1. Buyruqni tahlil qilish (Uzbek NLP + slash commands)
+        parsed = self.gateway.parse_command(clean_text)
+        action = parsed["action"]
+        params = parsed.get("params", {})
+
+        # 2. Avtorizatsiya tekshiruvi (Telegram ID allowlist yoki UserLinkingStore)
+        is_user_authorized = self.gateway.is_authorized(user_str) or self.user_linking.is_telegram_linked(user_str)
+        is_pairing_command = action in ("pair", "link") or clean_text.lower().startswith(("/pair", "/link"))
+
+        if not is_user_authorized and not is_pairing_command:
             self._audit.log(RemoteEventType.REMOTE_REQUEST_DENIED, user_id=user_str, reason="Unauthorized")
             await self.gateway.transport.send_message(
                 chat_id,
-                "⛔ **Ruxsat berilmadi!**\nSizda ushbu kompyuterni masofadan boshqarish huquqi yo'q."
+                "⛔ **Ruxsat berilmadi!**\nSizning Telegram hisobingiz Mikasa tizimiga bog'lanmagan. "
+                "Ilovada 'Telegram ulash' tugmasini bosing va `/pair MK-XXXXXX` kodini yuboring."
             )
             return {"success": False, "error": "UNAUTHORIZED", "user_id": user_str}
 
         self._audit.log(RemoteEventType.REMOTE_REQUEST_AUTHORIZED, user_id=user_str)
 
-        # 2. Qurilmani aniqlash
+        # 3. Qurilmani va Mikasa hisobini aniqlash
+        link = self.user_linking.get_link_by_telegram(user_str)
+        effective_user_id = link.mikasa_user_id if link else (
+            "admin" if self.gateway.is_authorized(user_str) else user_str
+        )
         device = self.resolve_target_device(user_str)
         dev_id = device.device_id if device else (self.pc_agent.identity.device_id if self.pc_agent else "pc")
         mac_addr = getattr(device, "mac_address", "") or "AA:BB:CC:DD:EE:FF"
 
-        # 3. Kutilayotgan Autentifikatsiya (Authentication Challenge) ni qayta ishlash
+        # 4. Foydalanuvchi bog'lanish amallari (/pair, /unpair, /devices, /account)
+        if action == "pair":
+            token_code = params.get("pairing_token") or ""
+            if not token_code and len(clean_text.split()) > 1:
+                token_code = clean_text.split()[1]
+
+            if not token_code:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "ℹ️ **Telegram ulash:**\nIlovadagi 6 xonali kodni yuboring:\nMasalan: `/pair MK-A7F92B`"
+                )
+                return {"success": False, "action": "pair", "error": "MISSING_CODE"}
+
+            ok, msg, link = self.user_linking.redeem_pairing_code(token_code, user_str)
+            if ok and link:
+                self.gateway.add_allowed_user(user_str)
+                dev = self.device_registry.get_device(link.device_id)
+                dev_host = dev.hostname if dev else link.device_id
+                self.device_registry.pair_device(
+                    device_id=link.device_id,
+                    user_id=user_str,
+                    fingerprint=getattr(dev, "fingerprint", "fp") or "fp",
+                    mac_address=getattr(dev, "mac_address", "") or ""
+                )
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    f"✅ **Qurilma muvaffaqiyatli bog'landi!**\n\n"
+                    f"🖥️ Qurilma: `{dev_host}`\n"
+                    f"🆔 Device ID: `{link.device_id}`\n"
+                    f"👤 Telegram ID: `{user_str}`\n\n"
+                    f"Endi kompyuterni boshqarishingiz mumkin."
+                )
+                return {"success": True, "action": "pair", "device_id": link.device_id}
+            else:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    f"❌ **Bog'lanishda xatolik:**\n{msg}"
+                )
+                return {"success": False, "action": "pair", "error": msg}
+
+        elif action == "unpair":
+            ok = self.user_linking.unlink_telegram(dev_id, user_str)
+            self.device_registry.unpair_device(dev_id)
+            await self.gateway.transport.send_message(
+                chat_id,
+                f"🔒 **Qurilma bilan bog'lanish bekor qilindi.** (`{dev_id}`)"
+            )
+            return {"success": True, "action": "unpair", "unpaired": ok}
+
+        elif action == "devices":
+            links = self.user_linking.list_linked_devices(user_str)
+            if not links:
+                p_dev = self.device_registry.get_paired_device_for_user(user_str)
+                if p_dev:
+                    msg = f"📱 **Bog'langan qurilmalar:**\n• `{p_dev.hostname}` (`{p_dev.device_id}`) — `{p_dev.status.value}`"
+                else:
+                    msg = "ℹ️ Bog'langan qurilmalar topilmadi. Bog'lash uchun: `/pair MK-XXXXXX`"
+            else:
+                lines = ["📱 **Bog'langan qurilmalar:**"]
+                for link_item in links:
+                    dev = self.device_registry.get_device(link_item.device_id)
+                    hname = dev.hostname if dev else link_item.device_id
+                    st = self.heartbeat_manager.get_device_state(link_item.device_id).value
+                    lines.append(f"• `{hname}` (`{link_item.device_id}`) — `{st}`")
+                msg = "\n".join(lines)
+            await self.gateway.transport.send_message(chat_id, msg)
+            return {"success": True, "action": "devices"}
+
+        elif action == "account":
+            linked = self.user_linking.get_link_by_telegram(user_str)
+            dev_str = f"`{linked.device_id}`" if linked else "Bog'lanmagan"
+            msg = (
+                f"👤 **Mikasa Foydalanuvchi Hisobi:**\n"
+                f"• Telegram Numeric ID: `{user_str}`\n"
+                f"• Bog'langan qurilma: {dev_str}\n"
+                f"• Telegram Gateway: Faol"
+            )
+            await self.gateway.transport.send_message(chat_id, msg)
+            return {"success": True, "action": "account"}
+
+        # 5. Kutilayotgan Autentifikatsiya (Authentication Challenge) ni qayta ishlash
         if self.auth_engine.is_auth_pending(user_str):
             if clean_text.lower() in ("/cancel", "cancel", "bekor qilish"):
                 self.auth_engine.clear_auth_pending(user_str)
@@ -148,12 +283,7 @@ class RemoteOrchestrator:
                     )
                 return {"success": False, "action": "auth_failed", "error": msg}
 
-        # 4. Buyruqni tahlil qilish (Uzbek NLP + slash commands)
-        parsed = self.gateway.parse_command(clean_text)
-        action = parsed["action"]
-        params = parsed.get("params", {})
-
-        # 5. Sessiyani boshqarish buyruqlari (/logout, /lock, /session)
+        # 6. Sessiyani boshqarish buyruqlari (/logout, /lock, /session)
         if action == "logout":
             closed = self.session_manager.close_session(user_str, dev_id)
             if closed:
@@ -187,7 +317,109 @@ class RemoteOrchestrator:
                 )
                 return {"success": True, "action": "session_status", "active": False}
 
-        # 6. Standart buyruqlar
+        # 7. Tasdiqlash (/confirm) va Bekor qilish (/cancel)
+        if action in ("confirm", "yes") or clean_text.lower() in ("/confirm", "confirm", "ha", "yes"):
+            found_req_id = None
+            for req_id, entry in list(self.pending_confirmations.items()):
+                env = entry.get("envelope")
+                if (env and (env.user_id == effective_user_id or getattr(env, "telegram_user_id", None) == user_str)) or entry.get("chat_id") == chat_id:
+                    found_req_id = req_id
+                    break
+            if not found_req_id and self.pending_confirmations:
+                found_req_id = list(self.pending_confirmations.keys())[-1]
+
+            if found_req_id:
+                envelope = self.pop_pending_confirmation(found_req_id)
+                if envelope:
+                    if self.require_session_auth:
+                        active_sess = (
+                            self.session_manager.get_active_session(effective_user_id, dev_id)
+                            or self.session_manager.get_active_session(user_str, dev_id)
+                        )
+                        if not active_sess:
+                            self.auth_engine.set_auth_pending(user_str, dev_id, True, chat_id=chat_id)
+                            # Re-store pending confirmation so it's not lost
+                            self.gateway.store_pending_confirmation(found_req_id, envelope, ttl=60.0, chat_id=chat_id)
+                            await self.gateway.transport.send_message(
+                                chat_id,
+                                "🔐 **Parolni tasdiqlang!**\n"
+                                "Masofaviy buyruqni bajarish uchun parol yoki PIN kodni kiriting:"
+                            )
+                            return {
+                                "success": False,
+                                "error": "SESSION_REQUIRED",
+                                "auth_required": True
+                            }
+                        envelope.session_id = active_sess.session_id
+
+                    envelope.confirmation_required = False
+                    exec_res = await self.execute_command(envelope)
+                    action_name = envelope.action.split(".")[-1]
+                    await self.gateway.transport.send_message(
+                        chat_id,
+                        f"✅ **Amal muvaffaqiyatli bajarildi!** (`{envelope.action}`)\nKompyuterda {action_name} holati qo'llanildi."
+                    )
+                    return {"success": True, "action": "confirm", "result": exec_res}
+
+            await self.gateway.transport.send_message(chat_id, "ℹ️ Tasdiqlash uchun kutilayotgan buyruq topilmadi.")
+            return {"success": False, "error": "NO_PENDING_CONFIRMATION"}
+
+        elif action in ("cancel", "no") or clean_text.lower() in ("/cancel", "cancel", "yo'q", "no", "bekor qilish"):
+            cleared = False
+            for req_id in list(self.pending_confirmations.keys()):
+                self.cancel_confirmation(req_id)
+                cleared = True
+            await self.gateway.transport.send_message(chat_id, "❌ **Amal bekor qilindi.**")
+            return {"success": True, "action": "cancel", "cancelled": cleared}
+
+        # 8. Ruxsatlarni xaritalash va tekshirish (User Permission Center)
+        ACTION_TO_PERMISSION = {
+            "status": "system.status",
+            "wake": "power.wake",
+            "info": "system.info",
+            "sys": "system.info",
+            "system_info": "system.info",
+            "system.info": "system.info",
+            "system.screenshot": "system.screenshot",
+            "screenshot": "system.screenshot",
+            "app.list": "app.list",
+            "apps": "app.list",
+            "app.launch": "app.launch",
+            "app.close": "app.close",
+            "file.list": "file.list",
+            "files": "file.list",
+            "file.read": "file.read",
+            "network.info": "network.info",
+            "network": "network.info",
+            "restart": "power.restart",
+            "power.restart": "power.restart",
+            "shutdown": "power.shutdown",
+            "power.shutdown": "power.shutdown",
+            "sleep": "power.sleep",
+            "power.sleep": "power.sleep",
+        }
+        required_perm = ACTION_TO_PERMISSION.get(action, action)
+
+        if self.permission_store is not None and not self.permission_store.is_granted(effective_user_id, dev_id, required_perm):
+            self._audit.log(
+                RemoteEventType.COMMAND_DENIED,
+                user_id=user_str,
+                device_id=dev_id,
+                action=action,
+                permission=required_perm,
+                reason="Permission not granted"
+            )
+            if action in ("wake", "power.wake"):
+                err_msg = "❌ **Kompyuterni uyg'otish (WoL) uchun ruxsat berilmagan.**"
+            else:
+                err_msg = "❌ **Bu amal uchun ruxsat berilmagan.**"
+            await self.gateway.transport.send_message(
+                chat_id,
+                err_msg
+            )
+            return {"success": False, "error": "PERMISSION_DENIED", "permission": required_perm}
+
+        # 9. Standart buyruqlar
         if action == "status":
             current_state = self.heartbeat_manager.get_device_state(dev_id)
             info = device.to_dict() if device and hasattr(device, "to_dict") else {}
@@ -212,14 +444,18 @@ class RemoteOrchestrator:
                 user_id=user_str
             )
 
-        elif action in ("restart", "shutdown"):
-            # Yuqori xavfli buyruq: Confirmation talab etiladi
+        # 10. Yuqori xavfli amallar: Confirmation talab etiladi
+        if action in ("restart", "shutdown", "sleep", "power.restart", "power.shutdown", "power.sleep", "app.close"):
             envelope = self.envelope_manager.create_envelope(
                 device_id=dev_id,
                 action=action,
                 params=params,
-                user_id=user_str,
-                confirmation_required=True
+                user_id=effective_user_id,
+                confirmation_required=True,
+                telegram_user_id=user_str,
+                session_id=None,
+                tool_id=required_perm,
+                permission_version=self.permission_store.get_profile(effective_user_id, dev_id).version if self.permission_store else 1
             )
             self.gateway.store_pending_confirmation(
                 request_id=envelope.request_id,
@@ -228,11 +464,20 @@ class RemoteOrchestrator:
                 chat_id=chat_id,
                 prompt=f"Kompyuterni {action} qilish"
             )
-            action_desc = "qayta ishga tushiradi" if action == "restart" else "o'chiradi"
+            action_desc_map = {
+                "restart": "qayta ishga tushiradi",
+                "power.restart": "qayta ishga tushiradi",
+                "shutdown": "o'chiradi",
+                "power.shutdown": "o'chiradi",
+                "sleep": "kutish rejimiga o'tkazadi",
+                "power.sleep": "kutish rejimiga o'tkazadi",
+                "app.close": "dasturni yopadi"
+            }
+            action_desc = action_desc_map.get(action, action)
             prompt_text = (
-                f"⚠️ **DIQQAT! Yuqori xavfli amal:**\n\n"
+                f"⚠️ **TASDIQLASH TALAB ETILADI!**\n\n"
                 f"Ushbu amal kompyuterni `{action_desc}`.\n"
-                f"Davom ettirishni tasdiqlaysizmi?"
+                f"Tasdiqlash uchun `/confirm` deb yuboring yoki inline tugmani bosing."
             )
             await self.gateway.transport.send_message(
                 chat_id,
@@ -246,47 +491,48 @@ class RemoteOrchestrator:
                 "request_id": envelope.request_id
             }
 
-        elif action == "cancel":
-            await self.gateway.transport.send_message(chat_id, "❌ **Amal bekor qilindi.**")
-            return {"success": True, "action": "cancel"}
+        # 11. Sessiya ruxsati tekshiruvi (Amallar faol sessiya talab qiladi)
+        active_sess = None
+        if self.require_session_auth:
+            active_sess = self.session_manager.get_active_session(effective_user_id, dev_id) or self.session_manager.get_active_session(user_str, dev_id)
+            if not active_sess:
+                self.auth_engine.set_auth_pending(user_str, dev_id, True, chat_id=chat_id)
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "🔐 **Parolni tasdiqlang!**\n"
+                    "Masofaviy buyruqni bajarish uchun parol yoki PIN kodni kiriting:"
+                )
+                return {
+                    "success": False,
+                    "error": "SESSION_REQUIRED",
+                    "auth_required": True
+                }
 
-        else:
-            # Sessiya ruxsati tekshiruvi (ixtiyoriy asboblar faol sessiya talab qiladi)
-            if self.require_session_auth:
-                active_sess = self.session_manager.get_active_session(user_str, dev_id)
-                if not active_sess:
-                    self.auth_engine.set_auth_pending(user_str, dev_id, True, chat_id=chat_id)
-                    await self.gateway.transport.send_message(
-                        chat_id,
-                        "🔐 **Parolni tasdiqlang!**\n"
-                        "Masofaviy buyruqni bajarish uchun parol yoki PIN kodni kiriting:"
-                    )
-                    return {
-                        "success": False,
-                        "error": "SESSION_REQUIRED",
-                        "auth_required": True
-                    }
-
-            # Standart asboblar (system_info, chat, va boshqalar)
-            envelope = self.envelope_manager.create_envelope(
-                device_id=dev_id,
-                action=action,
-                params=params,
-                user_id=user_str
+        # 11. Standart asboblarni bajarish (system.screenshot, app.list, file.list, network.info, va boshqalar)
+        envelope = self.envelope_manager.create_envelope(
+            device_id=dev_id,
+            action=required_perm,
+            params=params,
+            user_id=effective_user_id,
+            telegram_user_id=user_str,
+            session_id=active_sess.session_id if active_sess else None,
+            tool_id=required_perm,
+            permission_version=self.permission_store.get_profile(effective_user_id, dev_id).version if self.permission_store else 1
+        )
+        exec_res = await self.execute_command(envelope)
+        if exec_res.get("success"):
+            res_val = exec_res.get("result")
+            await self.gateway.transport.send_message(
+                chat_id,
+                f"✅ **Buyruq bajarildi:** `{action}`\n\nNatija: `{res_val}`"
             )
-            exec_res = await self.execute_command(envelope)
-            if exec_res.get("success"):
-                await self.gateway.transport.send_message(
-                    chat_id,
-                    f"✅ **Buyruq bajarildi:** `{action}`\n\nNatija: `{exec_res.get('result')}`"
-                )
-            else:
-                err_msg = exec_res.get("error", "Noma'lum xatolik")
-                await self.gateway.transport.send_message(
-                    chat_id,
-                    f"❌ **Xatolik:** {err_msg}"
-                )
-            return exec_res
+        else:
+            err_msg = exec_res.get("error", "Noma'lum xatolik")
+            await self.gateway.transport.send_message(
+                chat_id,
+                f"❌ **Xatolik:** {err_msg}"
+            )
+        return exec_res
 
     async def handle_callback_query(
         self,
@@ -301,7 +547,7 @@ class RemoteOrchestrator:
         user_str = str(user_id)
         await self.gateway.transport.answer_callback_query(callback_query_id)
 
-        if not self.gateway.is_authorized(user_str):
+        if not self.gateway.is_authorized(user_str) and not self.user_linking.is_telegram_linked(user_str):
             await self.gateway.transport.send_message(
                 chat_id,
                 "⛔ **Ruxsat yo'q!** Ushbu amalni faqat vakolatli administrator bajara oladi."
@@ -357,10 +603,15 @@ class RemoteOrchestrator:
             )
 
         elif data == "btn_sys":
+            if self.permission_store is not None and not self.permission_store.is_granted(user_str, dev_id, "system.info"):
+                await self.gateway.transport.send_message(chat_id, "❌ **Bu amal uchun ruxsat berilmagan.**")
+                return {"success": False, "error": "PERMISSION_DENIED"}
+
             envelope = self.envelope_manager.create_envelope(
                 device_id=dev_id,
                 action="system_info",
-                user_id=user_str
+                user_id=user_str,
+                tool_id="system.info"
             )
             return await self.execute_command(envelope)
 
@@ -381,10 +632,31 @@ class RemoteOrchestrator:
     ) -> Dict[str, Any]:
         """
         Masofadan kompyuterni uyg'otish va tekshirish E2E pipeline (Planning 2.0 DAG asosida):
-        CHECK_DEVICE -> WAKE_DEVICE -> WAIT_HEARTBEAT -> VERIFY_ONLINE -> AUTH_CHALLENGE -> GET_STATUS
+        CHECK_PERMISSION -> CHECK_DEVICE -> WAKE_DEVICE -> WAIT_HEARTBEAT -> VERIFY_ONLINE -> AUTH_CHALLENGE -> GET_STATUS
         """
         user_str = str(user_id) if user_id is not None else ""
+        link = self.user_linking.get_link_by_telegram(user_str)
+        effective_user_id = link.mikasa_user_id if link else (
+            "admin" if self.gateway.is_authorized(user_str) else user_str
+        )
         self._audit.log(RemoteEventType.WOL_REQUESTED, device_id=device_id, user_id=user_str)
+
+        # [0/5] Ruxsat tekshiruvi (power.wake)
+        if self.permission_store is not None and effective_user_id and not self.permission_store.is_granted(effective_user_id, device_id, "power.wake"):
+            self._audit.log(
+                RemoteEventType.COMMAND_DENIED,
+                user_id=user_str,
+                device_id=device_id,
+                action="wake",
+                permission="power.wake",
+                reason="Permission not granted"
+            )
+            if chat_id:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "❌ **Kompyuterni uyg'otish (WoL) uchun ruxsat berilmagan.**"
+                )
+            return {"success": False, "error": "PERMISSION_DENIED", "permission": "power.wake"}
 
         # [1/5] Qurilma holatini tekshirish
         current_state = self.heartbeat_manager.get_device_state(device_id)
@@ -434,7 +706,6 @@ class RemoteOrchestrator:
             await asyncio.sleep(poll_interval)
 
         if not is_awake:
-            # Timeout sodir bo'ldi
             self.heartbeat_manager.set_device_state(device_id, DeviceState.OFFLINE)
             self._audit.log(RemoteEventType.WOL_FAILED, device_id=device_id, reason="Heartbeat timeout")
             self._audit.log(RemoteEventType.DEVICE_OFFLINE, device_id=device_id)

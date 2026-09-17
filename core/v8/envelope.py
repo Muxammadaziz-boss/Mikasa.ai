@@ -15,6 +15,7 @@ from core.v8.events import RemoteEventType, RemoteAuditLogger
 class RemoteCommandEnvelope:
     """
     Masofaviy buyruq xavfsiz konverti (Envelope).
+    Idempotentlik, replay attack himoyasi va ruxsatlar versiyasi bilan ta'minlangan.
     """
     request_id: str
     device_id: str
@@ -27,17 +28,37 @@ class RemoteCommandEnvelope:
     nonce: str = field(default_factory=lambda: secrets.token_hex(8))
     confirmation_required: bool = False
     signature: Optional[str] = None
+    # Phase 38 Qo'shimcha maydonlar
+    command_id: Optional[str] = None
+    telegram_user_id: Optional[str] = None
+    session_id: Optional[str] = None
+    tool_id: Optional[str] = None
+    permission_version: int = 1
 
     def __post_init__(self):
         if self.expires_at == 0.0:
             self.expires_at = self.created_at + 300.0  # 5 daqiqa amal qiladi
+        if self.command_id is None:
+            self.command_id = self.request_id
+        if self.tool_id is None:
+            self.tool_id = self.action
+
+    @property
+    def timestamp(self) -> float:
+        return self.created_at
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RemoteCommandEnvelope":
-        return cls(**data)
+        valid_keys = {
+            "request_id", "device_id", "action", "params", "origin", "user_id",
+            "created_at", "expires_at", "nonce", "confirmation_required", "signature",
+            "command_id", "telegram_user_id", "session_id", "tool_id", "permission_version"
+        }
+        filtered = {k: v for k, v in data.items() if k in valid_keys}
+        return cls(**filtered)
 
 
 class RateLimiter:
@@ -106,11 +127,16 @@ class EnvelopeManager:
         params: Optional[Dict[str, Any]] = None,
         user_id: str = "",
         origin: str = "telegram",
-        confirmation_required: bool = False
+        confirmation_required: bool = False,
+        telegram_user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        tool_id: Optional[str] = None,
+        permission_version: int = 1
     ) -> RemoteCommandEnvelope:
         now = time.time()
+        req_id = str(uuid.uuid4())
         return RemoteCommandEnvelope(
-            request_id=str(uuid.uuid4()),
+            request_id=req_id,
             device_id=device_id,
             action=action,
             params=params or {},
@@ -119,7 +145,12 @@ class EnvelopeManager:
             created_at=now,
             expires_at=now + self.default_ttl,
             nonce=secrets.token_hex(8),
-            confirmation_required=confirmation_required
+            confirmation_required=confirmation_required,
+            command_id=req_id,
+            telegram_user_id=telegram_user_id,
+            session_id=session_id,
+            tool_id=tool_id or action,
+            permission_version=permission_version
         )
 
     def validate_envelope(self, envelope: RemoteCommandEnvelope, current_time: Optional[float] = None) -> Tuple[bool, str]:
@@ -137,7 +168,10 @@ class EnvelopeManager:
 
         # 2. Ruxsat tekshiruvi (Authorization)
         if self.authorized_user_ids:
-            if str(envelope.user_id) not in self.authorized_user_ids:
+            uid_ok = (str(envelope.user_id) in self.authorized_user_ids) or (
+                bool(envelope.telegram_user_id) and str(envelope.telegram_user_id) in self.authorized_user_ids
+            )
+            if not uid_ok:
                 self._audit.log(
                     RemoteEventType.REMOTE_REQUEST_DENIED,
                     request_id=envelope.request_id,
@@ -146,7 +180,10 @@ class EnvelopeManager:
                 )
                 return False, f"UNAUTHORIZED: Foydalanuvchi {envelope.user_id} ruxsatga ega emas"
         elif self.authorized_user_id is not None:
-            if str(envelope.user_id) != self.authorized_user_id:
+            uid_ok = (str(envelope.user_id) == self.authorized_user_id) or (
+                bool(envelope.telegram_user_id) and str(envelope.telegram_user_id) == self.authorized_user_id
+            )
+            if not uid_ok:
                 self._audit.log(
                     RemoteEventType.REMOTE_REQUEST_DENIED,
                     request_id=envelope.request_id,

@@ -11,6 +11,7 @@ const CommandsPage = lazy(() => import("./pages/CommandsPage").then(m => ({ defa
 const MemoryPage = lazy(() => import("./pages/MemoryPage").then(m => ({ default: m.MemoryPage })));
 const SchedulerPage = lazy(() => import("./pages/SchedulerPage").then(m => ({ default: m.SchedulerPage })));
 const PluginsPage = lazy(() => import("./pages/PluginsPage").then(m => ({ default: m.PluginsPage })));
+const RemoteControlPage = lazy(() => import("./pages/RemoteControlPage").then(m => ({ default: m.RemoteControlPage })));
 const AccountPage = lazy(() => import("./pages/AccountPage").then(m => ({ default: m.AccountPage })));
 
 const PageLoadingFallback = () => (
@@ -137,6 +138,8 @@ export function App() {
         return <SchedulerPage onNavigateHome={() => handleNavigate("/")} />;
       case "/plugins":
         return <PluginsPage onNavigateHome={() => handleNavigate("/")} />;
+      case "/remote":
+        return <RemoteControlPage onNavigateHome={() => handleNavigate("/")} />;
       case "/account":
         return (
           <AccountPage
