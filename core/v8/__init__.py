@@ -52,13 +52,11 @@ from core.v8.account_device import (
     AccountDeviceManager
 )
 from core.v8.account_auth import (
+    SupabaseAuthManager,
     AccountAuthManager,
+    SupabaseSessionClaims,
     AccountSession,
-    PasswordManager,
-    VerificationToken,
-    AuthRateLimiter,
-    EmailVerificationProvider,
-    MockEmailVerificationProvider
+    AuthRateLimiter
 )
 from core.v8.permission_center import (
     PermissionCategory,
@@ -87,14 +85,12 @@ PHASE = 41
 __all__ = [
     "__version__",
     "PHASE",
-    # Account & Auth (Phase 41)
+    # Account & Auth (Phase 41 - Supabase Auth)
+    "SupabaseAuthManager",
     "AccountAuthManager",
+    "SupabaseSessionClaims",
     "AccountSession",
-    "PasswordManager",
-    "VerificationToken",
     "AuthRateLimiter",
-    "EmailVerificationProvider",
-    "MockEmailVerificationProvider",
     # Device & Accounts (Phase 40)
     "MikasaUser",
     "Device",

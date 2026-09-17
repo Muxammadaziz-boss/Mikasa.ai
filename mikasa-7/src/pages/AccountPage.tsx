@@ -336,8 +336,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
   const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword) {
-      setPwdChangeError("Eski va yangi parolni kiriting");
+    if (!newPassword) {
+      setPwdChangeError("Yangi parolni kiriting");
       return;
     }
     if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
@@ -2062,12 +2062,11 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
               <form onSubmit={handlePasswordChangeSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Joriy parol</label>
+                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Joriy parol (ixtiyoriy)</label>
                   <input
                     type="password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    required
                     style={{
                       padding: "9px 12px",
                       background: "rgba(0, 0, 0, 0.3)",

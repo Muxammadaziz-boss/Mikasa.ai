@@ -1,6 +1,11 @@
 # ========== tests/test_v8_phase41.py ==========
-# Phase 41 — Account Registration & Authentication System
-# Comprehensive Test Suite covering all 30 specification scenarios
+# Phase 41 — Supabase Auth Migration Test Suite
+# Comprehensive 30 Unit & Integration Tests covering:
+# - Supabase JWT verification & claims decoding
+# - Profile synchronization & zero backend password storage
+# - Input validation & rate limiting
+# - PostgreSQL RLS migration & multi-tenant isolation
+# - Bearer token HTTP endpoints & session decoupling
 
 import os
 import shutil
@@ -10,22 +15,31 @@ import asyncio
 import json
 import time
 
-from core.v8.account_device import AccountDeviceManager
+from core.v8.account_device import (
+    MikasaUser,
+    MikasaProfile,
+    AccountDeviceManager,
+)
 from core.v8.account_auth import (
-    PasswordManager,
+    SupabaseAuthManager,
+    AccountAuthManager,
+    SupabaseSessionClaims,
+    AuthRateLimiter,
     validate_username,
     validate_email,
-    VerificationToken,
-    MockEmailVerificationProvider,
-    AccountAuthManager
 )
+from core.v8.telegram_identity import TelegramIdentityManager
+from core.v8.auth_session import RemoteAuthSession
 from core.api_server import (
     handle_auth_register,
     handle_auth_login,
     handle_auth_me,
+    handle_auth_verify_email,
     handle_auth_forgot_password,
     handle_auth_reset_password,
-    _get_request_user_id
+    handle_auth_change_password,
+    handle_devices_list,
+    _get_request_user_id,
 )
 
 
@@ -43,479 +57,444 @@ class MockRequest:
         return self._body
 
 
-class TestPasswordManagerAndValidation(unittest.TestCase):
-    """Scenarios 1-5: Password Manager & Input Validation Rules"""
-
-    def test_01_password_hashing_pbkdf2(self):
-        """Scenario 1: PBKDF2-HMAC-SHA256 hashing format and verification."""
-        pwd = "SecurePassword123!"
-        hashed = PasswordManager.hash_password(pwd)
-        self.assertTrue(hashed.startswith("pbkdf2_sha256$600000$"))
-        parts = hashed.split("$")
-        self.assertEqual(len(parts), 4)
-        self.assertEqual(parts[0], "pbkdf2_sha256")
-        self.assertEqual(parts[1], "600000")
-
-        # Verify correct password
-        self.assertTrue(PasswordManager.verify_password(pwd, hashed))
-        # Verify incorrect password
-        self.assertFalse(PasswordManager.verify_password("WrongPassword999", hashed))
-
-    def test_02_password_constant_time_comparison(self):
-        """Scenario 2: Constant-time comparison rejects malformed or altered hashes safely."""
-        hashed = PasswordManager.hash_password("Valid12345")
-        # Tampered hash
-        tampered = hashed[:-4] + "abcd"
-        self.assertFalse(PasswordManager.verify_password("Valid12345", tampered))
-        # Invalid format
-        self.assertFalse(PasswordManager.verify_password("Valid12345", "plaintext_password"))
-        self.assertFalse(PasswordManager.verify_password("Valid12345", ""))
-
-    def test_03_password_validation_rules(self):
-        """Scenario 3: Password strength validation (min 8 chars, letter + number)."""
-        # Strong password
-        valid, msg = PasswordManager.validate_strength("Secret99")
-        self.assertTrue(valid)
-
-        # Too short (< 8)
-        valid, msg = PasswordManager.validate_strength("Sec1")
-        self.assertFalse(valid)
-        self.assertIn("kamida 8", msg)
-
-        # Only letters
-        valid, msg = PasswordManager.validate_strength("SecretOnlyLetters")
-        self.assertFalse(valid)
-        self.assertIn("raqam", msg)
-
-        # Only numbers
-        valid, msg = PasswordManager.validate_strength("1234567890")
-        self.assertFalse(valid)
-        self.assertIn("harf", msg)
-
-        # With confirmation mismatch
-        valid, msg = PasswordManager.validate_strength("Secret99", confirm_password="SecretDifferent99")
-        self.assertFalse(valid)
-        self.assertIn("mos kelmadi", msg)
-
-    def test_04_validate_username_rules(self):
-        """Scenario 4: Username validation rules (3-32 chars, alphanumeric, _ and -)."""
-        self.assertTrue(validate_username("alisher")[0])
-        self.assertTrue(validate_username("user_123")[0])
-        self.assertTrue(validate_username("john-doe")[0])
-
-        # Too short (< 3)
-        self.assertFalse(validate_username("ab")[0])
-        # Too long (> 32)
-        self.assertFalse(validate_username("a" * 33)[0])
-        # Invalid characters
-        self.assertFalse(validate_username("user@name")[0])
-        self.assertFalse(validate_username("user name")[0])
-        self.assertFalse(validate_username("user!name")[0])
-
-    def test_05_validate_email_rules(self):
-        """Scenario 5: Email validation rules and canonical lowercase conversion."""
-        valid, email = validate_email("User.Name@Example.Com")
-        self.assertTrue(valid)
-        self.assertEqual(email, "user.name@example.com")
-
-        # Optional empty email
-        self.assertTrue(validate_email(None)[0])
-        self.assertTrue(validate_email("")[0])
-
-        # Invalid emails
-        self.assertFalse(validate_email("invalid_email")[0])
-        self.assertFalse(validate_email("@missinguser.com")[0])
-        self.assertFalse(validate_email("user@.com")[0])
-
-
-class TestAccountRegistration(unittest.TestCase):
-    """Scenarios 6-9: User Registration Workflows"""
+class TestSupabaseJWTVerification(unittest.TestCase):
+    """Scenarios 1-6: Supabase JWT Verification & Claims Decoding"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_auth_reg_")
-        self.auth_file = os.path.join(self.test_dir, "auth.json")
-        self.device_file = os.path.join(self.test_dir, "device.json")
-        self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
-        self.auth_mgr = AccountAuthManager(
-            account_device_mgr=self.account_mgr,
-            storage_path=self.auth_file,
-            email_provider=MockEmailVerificationProvider()
-        )
+        self.secret = "test-super-secret-jwt-signing-key-32ch!"
+        self.auth_mgr = SupabaseAuthManager(supabase_jwt_secret=self.secret)
 
-    def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-
-    def test_06_register_new_user_success(self):
-        """Scenario 6: Registering a new valid user creates MikasaUser and AccountSession."""
-        ok, msg, user, session = self.auth_mgr.register(
-            username="sardor_dev",
-            password="StrongPassword123!",
-            email="sardor@example.com",
-            client_ip="192.168.1.10",
-            user_agent="MikasaApp/8.0.0"
+    def test_01_supabase_jwt_valid_signature_and_claims(self):
+        """Scenario 1: Valid HS256 JWT signature verification and claims extraction."""
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="user-uuid-001",
+            email="developer@mikasa.ai",
+            username="mikasadev",
+            display_name="Mikasa Developer",
+            role="authenticated",
+            exp_seconds=1800,
+            secret=self.secret
         )
+        ok, msg, claims = self.auth_mgr.verify_supabase_jwt(token)
         self.assertTrue(ok)
-        self.assertIsNotNone(user)
-        self.assertIsNotNone(session)
-        self.assertEqual(user.username, "sardor_dev")
-        self.assertEqual(user.email, "sardor@example.com")
-        self.assertFalse(user.is_verified)
-        self.assertTrue(session.is_active)
-        self.assertTrue(len(session.token) >= 32)
+        self.assertEqual(msg, "OK")
+        self.assertIsNotNone(claims)
+        self.assertEqual(claims.user_id, "user-uuid-001")
+        self.assertEqual(claims.email, "developer@mikasa.ai")
+        self.assertEqual(claims.username, "mikasadev")
+        self.assertEqual(claims.display_name, "Mikasa Developer")
+        self.assertEqual(claims.role, "authenticated")
+        self.assertTrue(claims.is_valid)
 
-        # Verify user persisted in AccountDeviceManager
-        found = self.account_mgr.get_user(user.id)
-        self.assertIsNotNone(found)
-        self.assertEqual(found.username, "sardor_dev")
-
-    def test_07_register_duplicate_username_fails(self):
-        """Scenario 7: Duplicate username registration is rejected."""
-        self.auth_mgr.register(username="duplicate_user", password="Password123!")
-        ok, msg, user, session = self.auth_mgr.register(
-            username="duplicate_user",
-            password="Password456!"
+    def test_02_supabase_jwt_expired_token_rejected(self):
+        """Scenario 2: Token with expired timestamp is rejected."""
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="user-uuid-expired",
+            email="expired@mikasa.ai",
+            exp_seconds=-60,
+            secret=self.secret
         )
+        ok, msg, claims = self.auth_mgr.verify_supabase_jwt(token)
         self.assertFalse(ok)
-        self.assertIsNone(user)
-        self.assertIn("mavjud", msg.lower())
+        self.assertIn("expired", msg.lower())
+        self.assertIsNone(claims)
 
-    def test_08_register_duplicate_email_fails(self):
-        """Scenario 8: Duplicate email address is rejected."""
-        self.auth_mgr.register(username="user1", email="shared@example.com", password="Password123!")
-        ok, msg, user, session = self.auth_mgr.register(
-            username="user2",
-            email="shared@example.com",
-            password="Password123!"
+    def test_03_supabase_jwt_invalid_signature_rejected(self):
+        """Scenario 3: Token signed with a different key is rejected for invalid signature."""
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="user-uuid-tampered",
+            email="tampered@mikasa.ai",
+            secret="different-unauthorized-secret-key!"
         )
+        ok, msg, claims = self.auth_mgr.verify_supabase_jwt(token)
         self.assertFalse(ok)
-        self.assertIsNone(user)
-        self.assertIn("email", msg.lower())
+        self.assertIn("imzo", msg.lower())
+        self.assertIsNone(claims)
 
-    def test_09_register_weak_password_fails(self):
-        """Scenario 9: Registering with a weak password is rejected."""
-        ok, msg, user, session = self.auth_mgr.register(
-            username="weak_pwd_user",
-            password="123"
-        )
-        self.assertFalse(ok)
-        self.assertIsNone(user)
-        self.assertIn("kamida 8", msg.lower())
-
-
-class TestAccountLoginAndRateLimiting(unittest.TestCase):
-    """Scenarios 10-14: Login, Verification & Rate Limiting"""
-
-    def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_auth_login_")
-        self.auth_file = os.path.join(self.test_dir, "auth.json")
-        self.device_file = os.path.join(self.test_dir, "device.json")
-        self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
-        self.auth_mgr = AccountAuthManager(
-            account_device_mgr=self.account_mgr,
-            storage_path=self.auth_file
-        )
-        # Seed test user
-        self.auth_mgr.register(
-            username="alisher_test",
-            email="alisher@example.com",
-            password="CorrectPassword123!"
-        )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-
-    def test_10_login_with_username_success(self):
-        """Scenario 10: Successful login using username returns user and active session."""
-        ok, msg, user, session = self.auth_mgr.login(
-            username_or_email="alisher_test",
-            password="CorrectPassword123!",
-            client_ip="10.0.0.1"
-        )
-        self.assertTrue(ok)
-        self.assertIsNotNone(user)
-        self.assertIsNotNone(session)
-        self.assertEqual(user.username, "alisher_test")
-        self.assertIsNotNone(user.last_login_at)
-
-    def test_11_login_with_email_success(self):
-        """Scenario 11: Successful login using email address returns user and session."""
-        ok, msg, user, session = self.auth_mgr.login(
-            username_or_email="alisher@example.com",
-            password="CorrectPassword123!",
-            client_ip="10.0.0.1"
-        )
-        self.assertTrue(ok)
-        self.assertIsNotNone(user)
-        self.assertEqual(user.username, "alisher_test")
-
-    def test_12_login_invalid_credentials_fails(self):
-        """Scenario 12: Invalid username or password returns generic error message."""
-        ok, msg, user, session = self.auth_mgr.login(
-            username_or_email="alisher_test",
-            password="WrongPassword123!"
-        )
-        self.assertFalse(ok)
-        self.assertIsNone(user)
-        self.assertIn("noto'g'ri", msg.lower())
-
-        # Unknown user returns the same generic message (user enumeration defense)
-        ok2, msg2, user2, session2 = self.auth_mgr.login(
-            username_or_email="non_existent_user",
-            password="SomePassword123!"
-        )
-        self.assertFalse(ok2)
-        self.assertEqual(msg, msg2)
-
-    def test_13_login_rate_limiting_cooldown(self):
-        """Scenario 13: 5 consecutive failed attempts trigger a 5-minute cooldown."""
-        ip = "192.168.100.5"
-        for i in range(5):
-            ok, msg, user, session = self.auth_mgr.login(
-                username_or_email="alisher_test",
-                password="WrongPassword!",
-                client_ip=ip
-            )
+    def test_04_supabase_jwt_malformed_tokens_rejected(self):
+        """Scenario 4: Malformed, empty, or unparseable tokens are safely rejected without crash."""
+        cases = [
+            "",
+            None,
+            "just-a-plain-string",
+            "part1.part2",
+            "part1.part2.part3.part4",
+            "notbase64.notbase64.notbase64",
+        ]
+        for bad_tok in cases:
+            ok, msg, claims = self.auth_mgr.verify_supabase_jwt(bad_tok)
             self.assertFalse(ok)
+            self.assertIsNone(claims)
 
-        # 6th attempt should be blocked by rate limiter
-        ok, msg, user, session = self.auth_mgr.login(
-            username_or_email="alisher_test",
-            password="CorrectPassword123!",
-            client_ip=ip
+    def test_05_supabase_jwt_claims_dataclass(self):
+        """Scenario 5: SupabaseSessionClaims properties, valid checks, and dict export."""
+        now = time.time()
+        claims = SupabaseSessionClaims(
+            user_id="sub-uuid-123",
+            email="alice@example.com",
+            role="authenticated",
+            exp=now + 3600,
+            iat=now,
+            username="alice",
+            display_name="Alice Smith"
         )
-        self.assertFalse(ok)
-        self.assertIn("urinish", msg.lower())
+        self.assertEqual(claims.id, "sub-uuid-123")
+        self.assertTrue(claims.is_valid)
 
-    def test_14_login_successful_resets_rate_limit(self):
-        """Scenario 14: A successful login resets the failed attempts counter."""
-        ip = "192.168.100.10"
-        # 3 failed attempts
-        for _ in range(3):
-            self.auth_mgr.login(username_or_email="alisher_test", password="WrongPassword!", client_ip=ip)
+        d = claims.to_dict()
+        self.assertEqual(d["user_id"], "sub-uuid-123")
+        self.assertEqual(d["email"], "alice@example.com")
+        self.assertEqual(d["username"], "alice")
+        self.assertTrue(d["is_valid"])
 
-        # Successful login
-        ok, msg, user, session = self.auth_mgr.login(
-            username_or_email="alisher_test",
-            password="CorrectPassword123!",
-            client_ip=ip
+        expired_claims = SupabaseSessionClaims(user_id="sub-123", exp=now - 10)
+        self.assertFalse(expired_claims.is_valid)
+
+    def test_06_supabase_jwt_unverified_dev_fallback(self):
+        """Scenario 6: When SUPABASE_JWT_SECRET is empty in development, decodes claims safely."""
+        dev_mgr = SupabaseAuthManager(supabase_jwt_secret="")
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="dev-user-01",
+            email="dev@example.com",
+            username="devuser",
+            secret=self.secret
         )
+        ok, msg, claims = dev_mgr.verify_supabase_jwt(token)
         self.assertTrue(ok)
-
-        # Can fail again without immediate block
-        ok2, _, _, _ = self.auth_mgr.login(
-            username_or_email="alisher_test",
-            password="WrongPassword!",
-            client_ip=ip
-        )
-        self.assertFalse(ok2)
+        self.assertIsNotNone(claims)
+        self.assertEqual(claims.user_id, "dev-user-01")
+        self.assertEqual(claims.username, "devuser")
 
 
-class TestAccountSessionsAndTokens(unittest.TestCase):
-    """Scenarios 15-19: Session Lifecycle, Hashing & Revocation"""
+class TestProfileAndZeroPasswordStorage(unittest.TestCase):
+    """Scenarios 7-12: Public Profile Sync & Zero Backend Password Storage"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_auth_sess_")
-        self.auth_file = os.path.join(self.test_dir, "auth.json")
-        self.device_file = os.path.join(self.test_dir, "device.json")
-        self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
-        self.auth_mgr = AccountAuthManager(
-            account_device_mgr=self.account_mgr,
-            storage_path=self.auth_file
-        )
-        _, _, self.user, self.session = self.auth_mgr.register(
-            username="sess_user",
-            password="SessionPassword123!"
+        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_profile_")
+        self.storage_file = os.path.join(self.test_dir, "accounts.json")
+        self.device_mgr = AccountDeviceManager(storage_path=self.storage_file)
+        self.auth_mgr = SupabaseAuthManager(
+            account_device_mgr=self.device_mgr,
+            supabase_jwt_secret="test-secret"
         )
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_15_session_token_hashing_and_ttl(self):
-        """Scenario 15: Session tokens are stored hashed; 7-day default TTL."""
-        self.assertTrue(self.session.token)
-        self.assertGreater(self.session.expires_at, time.time() + 6 * 86400)
+    def test_07_zero_password_storage_in_mikasa_user(self):
+        """Scenario 7: Assert MikasaUser and MikasaProfile have ZERO password storage attributes."""
+        user = MikasaUser(id="uuid-test-01", username="testuser", email="test@example.com")
+        self.assertFalse(hasattr(user, "password_hash"))
+        self.assertFalse(hasattr(user, "password_salt"))
+        self.assertFalse(hasattr(user, "password"))
 
-        # Authenticate via plaintext token
-        sess, user = self.auth_mgr.authenticate_token(self.session.token)
-        self.assertIsNotNone(sess)
-        self.assertIsNotNone(user)
-        self.assertEqual(user.id, self.user.id)
+        data = user.to_dict()
+        self.assertNotIn("password_hash", data)
+        self.assertNotIn("password_salt", data)
+        self.assertNotIn("password", data)
+        self.assertIs(MikasaProfile, MikasaUser)
 
-    def test_16_session_activity_tracking(self):
-        """Scenario 16: Authenticating with a token updates last_activity_at."""
-        old_act = self.session.last_activity_at
-        # Advance time slightly
-        time.sleep(0.02)
-        sess, _ = self.auth_mgr.authenticate_token(self.session.token)
-        self.assertGreater(sess.last_activity_at, old_act)
+    def test_08_upsert_profile_from_supabase_new_user(self):
+        """Scenario 8: upsert_profile_from_supabase creates new MikasaUser with Supabase UUID."""
+        profile = self.device_mgr.upsert_profile_from_supabase(
+            user_id="auth-users-uuid-101",
+            email="newuser@example.com",
+            username="newuser",
+            display_name="New User",
+            avatar_url="https://example.com/avatar.png",
+            is_verified=True
+        )
+        self.assertEqual(profile.id, "auth-users-uuid-101")
+        self.assertEqual(profile.email, "newuser@example.com")
+        self.assertEqual(profile.username, "newuser")
+        self.assertEqual(profile.display_name, "New User")
+        self.assertTrue(profile.is_verified)
 
-    def test_17_session_expiration(self):
-        """Scenario 17: Expired sessions are rejected upon authentication."""
-        # Artificially expire session
-        self.session.expires_at = time.time() - 100
-        sess, user = self.auth_mgr.authenticate_token(self.session.token)
-        self.assertIsNone(sess)
-        self.assertIsNone(user)
+        fetched = self.device_mgr.get_user("auth-users-uuid-101")
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.id, "auth-users-uuid-101")
 
-    def test_18_logout_single_session(self):
-        """Scenario 18: Logging out a single session invalidates only that session."""
-        # Create second session for same user
-        _, _, _, session2 = self.auth_mgr.login(username_or_email="sess_user", password="SessionPassword123!")
+    def test_09_upsert_profile_from_supabase_existing_user(self):
+        """Scenario 9: upsert_profile_from_supabase updates existing profile in-place without duplicate."""
+        self.device_mgr.upsert_profile_from_supabase(
+            user_id="auth-users-uuid-102",
+            email="user102@example.com",
+            username="user102",
+            display_name="Original Name"
+        )
+        updated = self.device_mgr.upsert_profile_from_supabase(
+            user_id="auth-users-uuid-102",
+            email="user102_updated@example.com",
+            display_name="Updated Name",
+            avatar_url="https://example.com/new_avatar.png"
+        )
+        self.assertEqual(updated.id, "auth-users-uuid-102")
+        self.assertEqual(updated.email, "user102_updated@example.com")
+        self.assertEqual(updated.display_name, "Updated Name")
+        self.assertEqual(updated.avatar_url, "https://example.com/new_avatar.png")
 
-        # Logout first session
-        logged_out = self.auth_mgr.logout(self.session.token)
-        self.assertTrue(logged_out)
+        all_users = self.device_mgr.list_users()
+        matching = [u for u in all_users if u.id == "auth-users-uuid-102"]
+        self.assertEqual(len(matching), 1)
 
-        # First session invalid
-        sess1, _ = self.auth_mgr.authenticate_token(self.session.token)
-        self.assertIsNone(sess1)
+    def test_10_authenticate_token_flow(self):
+        """Scenario 10: authenticate_token verifies JWT and automatically synchronizes profile."""
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="supabase-auth-uuid-201",
+            email="tokenuser@example.com",
+            username="tokenuser",
+            display_name="Token User"
+        )
+        claims, profile = self.auth_mgr.authenticate_token(token)
+        self.assertIsNotNone(claims)
+        self.assertIsNotNone(profile)
+        self.assertEqual(claims.user_id, "supabase-auth-uuid-201")
+        self.assertEqual(profile.id, "supabase-auth-uuid-201")
+        self.assertEqual(profile.email, "tokenuser@example.com")
+        self.assertEqual(profile.username, "tokenuser")
 
-        # Second session still valid
-        sess2, _ = self.auth_mgr.authenticate_token(session2.token)
-        self.assertIsNotNone(sess2)
+    def test_11_profile_username_fallback_generation(self):
+        """Scenario 11: Falls back to email prefix or user_id when username metadata is missing."""
+        token = self.auth_mgr.create_mock_jwt(
+            user_id="uuid-no-username",
+            email="johndoe@example.com",
+            username="",
+            display_name=""
+        )
+        claims, profile = self.auth_mgr.authenticate_token(token)
+        self.assertEqual(profile.username, "johndoe")
 
-    def test_19_logout_all_sessions(self):
-        """Scenario 19: logout_all revokes all sessions for that user."""
-        self.auth_mgr.login(username_or_email="sess_user", password="SessionPassword123!")
-        self.auth_mgr.login(username_or_email="sess_user", password="SessionPassword123!")
+        # Without email
+        token_no_email = self.auth_mgr.create_mock_jwt(
+            user_id="uuid-plain-only",
+            email="",
+            username=""
+        )
+        claims2, profile2 = self.auth_mgr.authenticate_token(token_no_email)
+        self.assertEqual(profile2.username, "uuid-plain-only")
 
-        active_before = self.auth_mgr.get_active_sessions_for_user(self.user.id)
-        self.assertEqual(len(active_before), 3)
+    def test_12_mikasa_user_json_serialization(self):
+        """Scenario 12: MikasaUser serialization roundtrip maintains structure without password leaks."""
+        user = MikasaUser(
+            id="uuid-ser-1",
+            username="serial_user",
+            email="ser@example.com",
+            display_name="Serial User",
+            status="ACTIVE",
+            is_verified=True
+        )
+        d = user.to_dict()
+        self.assertNotIn("password", d)
+        self.assertNotIn("password_hash", d)
 
-        count = self.auth_mgr.logout_all(self.user.id)
-        self.assertEqual(count, 3)
+        roundtrip = MikasaUser.from_dict(d)
+        self.assertEqual(roundtrip.id, user.id)
+        self.assertEqual(roundtrip.username, user.username)
+        self.assertEqual(roundtrip.email, user.email)
+        self.assertEqual(roundtrip.status, user.status)
 
-        active_after = self.auth_mgr.get_active_sessions_for_user(self.user.id)
-        self.assertEqual(len(active_after), 0)
+
+class TestInputValidationAndRateLimiter(unittest.TestCase):
+    """Scenarios 13-18: Input Validation & Rate Limiter Security"""
+
+    def test_13_validate_username_valid(self):
+        """Scenario 13: Valid usernames conform to length and character set."""
+        valid_cases = ["john_doe", "alice-99", "admin_user", "MikasaAI", "dev-v8"]
+        for u in valid_cases:
+            valid, clean = validate_username(u)
+            self.assertTrue(valid, f"Should be valid: {u}")
+            self.assertEqual(clean, u)
+
+    def test_14_validate_username_invalid_chars(self):
+        """Scenario 14: Invalid characters in username are rejected."""
+        invalid_cases = ["user name", "user@email", "bad!char", "slash/name", "hash#tag", "dollar$name"]
+        for u in invalid_cases:
+            valid, msg = validate_username(u)
+            self.assertFalse(valid, f"Should be invalid: {u}")
+            self.assertIn("Username 3-32 belgidan", msg)
+
+    def test_15_validate_username_length_boundaries(self):
+        """Scenario 15: Usernames shorter than 3 or longer than 32 characters are rejected."""
+        self.assertFalse(validate_username("ab")[0])
+        self.assertTrue(validate_username("abc")[0])
+        self.assertTrue(validate_username("a" * 32)[0])
+        self.assertFalse(validate_username("a" * 33)[0])
+        self.assertFalse(validate_username("")[0])
+        self.assertFalse(validate_username(None)[0])
+
+    def test_16_validate_email_formats(self):
+        """Scenario 16: Canonical email formatting, case normalization, and invalid pattern rejection."""
+        valid, clean = validate_email("  Test.User@Example.COM  ")
+        self.assertTrue(valid)
+        self.assertEqual(clean, "test.user@example.com")
+
+        valid_empty, clean_empty = validate_email("", allow_empty=True)
+        self.assertTrue(valid_empty)
+        self.assertEqual(clean_empty, "")
+
+        invalid_empty, _ = validate_email("", allow_empty=False)
+        self.assertFalse(invalid_empty)
+
+        invalid_emails = ["notanemail", "@missinguser.com", "user@.com", "user name@example.com"]
+        for em in invalid_emails:
+            valid, _ = validate_email(em)
+            self.assertFalse(valid, f"Should be invalid: {em}")
+
+    def test_17_auth_rate_limiter_allows_under_limit(self):
+        """Scenario 17: Rate limiter permits requests under the max attempt threshold."""
+        limiter = AuthRateLimiter()
+        ip = "192.168.1.100"
+        for _ in range(4):
+            limiter.record_failure(ip)
+            limited, wait = limiter.is_rate_limited(ip)
+            self.assertFalse(limited)
+            self.assertEqual(wait, 0.0)
+
+    def test_18_auth_rate_limiter_blocks_and_resets(self):
+        """Scenario 18: Exceeding max attempts triggers rate limit cooldown, and success resets it."""
+        limiter = AuthRateLimiter()
+        ip = "192.168.1.101"
+        for _ in range(5):
+            limiter.record_failure(ip)
+
+        limited, wait = limiter.is_rate_limited(ip)
+        self.assertTrue(limited)
+        self.assertGreater(wait, 0.0)
+
+        # Successful attempt resets counter
+        limiter.record_success(ip)
+        limited_after, wait_after = limiter.is_rate_limited(ip)
+        self.assertFalse(limited_after)
+        self.assertEqual(wait_after, 0.0)
 
 
-class TestEmailVerificationAndPasswordReset(unittest.TestCase):
-    """Scenarios 20-26: Email Verification & Password Reset Workflows"""
+class TestRLSMigrationAndTenantIsolation(unittest.TestCase):
+    """Scenarios 19-24: PostgreSQL RLS Migration & Multi-Tenant Isolation"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_auth_reset_")
-        self.auth_file = os.path.join(self.test_dir, "auth.json")
-        self.device_file = os.path.join(self.test_dir, "device.json")
-        self.mock_email = MockEmailVerificationProvider()
+        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_rls_")
+        self.device_file = os.path.join(self.test_dir, "devices.json")
         self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
-        self.auth_mgr = AccountAuthManager(
-            account_device_mgr=self.account_mgr,
-            storage_path=self.auth_file,
-            email_provider=self.mock_email
-        )
-        _, _, self.user, self.session = self.auth_mgr.register(
-            username="reset_user",
-            email="reset@example.com",
-            password="OriginalPassword123!"
-        )
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_20_email_verification_token_generation_and_consumption(self):
-        """Scenario 20: Email verification token sets is_verified=True and cannot be reused."""
-        self.assertEqual(len(self.mock_email.sent_emails), 1)
-        sent = self.mock_email.sent_emails[0]
-        token = sent["token"]
-
-        self.assertFalse(self.user.is_verified)
-        ok, msg = self.auth_mgr.verify_email(token)
-        self.assertTrue(ok)
-        self.assertTrue(self.user.is_verified)
-
-        # Re-using the same token should fail (single-use)
-        ok2, msg2 = self.auth_mgr.verify_email(token)
-        self.assertFalse(ok2)
-        self.assertIn("ishlatilgan", msg2.lower())
-
-    def test_21_email_verification_expired_token_fails(self):
-        """Scenario 21: Expired verification tokens are rejected."""
-        token_obj = VerificationToken(
-            token="exp_token",
-            user_id=self.user.id,
-            token_type="email_verification",
-            expires_at=time.time() - 10
+    def test_19_sql_migration_file_exists(self):
+        """Scenario 19: PostgreSQL migration file exists and defines all 4 required schema tables."""
+        migration_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "supabase", "migrations", "20260918_phase41_supabase_auth.sql"
         )
-        self.auth_mgr._tokens["exp_token"] = token_obj
-        ok, msg = self.auth_mgr.verify_email("exp_token")
-        self.assertFalse(ok)
-        self.assertIn("muddati", msg.lower())
+        self.assertTrue(os.path.exists(migration_path), f"Migration not found at {migration_path}")
+        with open(migration_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
-    def test_22_request_password_reset_user_enumeration_defense(self):
-        """Scenario 22: Password reset request returns identical success message for valid/invalid users."""
-        ok1, msg1, token1 = self.auth_mgr.request_password_reset("reset@example.com")
-        self.assertTrue(ok1)
-        self.assertIsNotNone(token1)
+        self.assertIn("CREATE TABLE IF NOT EXISTS public.profiles", content)
+        self.assertIn("CREATE TABLE IF NOT EXISTS public.devices", content)
+        self.assertIn("CREATE TABLE IF NOT EXISTS public.telegram_links", content)
+        self.assertIn("CREATE TABLE IF NOT EXISTS public.permissions", content)
 
-        ok2, msg2, token2 = self.auth_mgr.request_password_reset("unknown_user@example.com")
-        self.assertTrue(ok2)
-        self.assertIsNone(token2)
-        self.assertEqual(msg1, msg2)
-
-    def test_23_reset_password_with_valid_token(self):
-        """Scenario 23: Valid password reset token changes password and terminates all existing sessions."""
-        _, _, token = self.auth_mgr.request_password_reset("reset@example.com")
-        self.assertIsNotNone(token)
-
-        # Reset password
-        ok, msg = self.auth_mgr.reset_password(token, "BrandNewPassword123!")
-        self.assertTrue(ok)
-
-        # Old session should now be invalidated
-        sess, _ = self.auth_mgr.authenticate_token(self.session.token)
-        self.assertIsNone(sess)
-
-        # Login with old password fails
-        ok_old, _, _, _ = self.auth_mgr.login(username_or_email="reset_user", password="OriginalPassword123!")
-        self.assertFalse(ok_old)
-
-        # Login with new password succeeds
-        ok_new, _, user_new, sess_new = self.auth_mgr.login(username_or_email="reset_user", password="BrandNewPassword123!")
-        self.assertTrue(ok_new)
-        self.assertIsNotNone(sess_new)
-
-    def test_24_reset_password_with_expired_or_invalid_token_fails(self):
-        """Scenario 24: Expired or invalid reset tokens fail."""
-        ok, msg = self.auth_mgr.reset_password("invalid_token_xyz", "NewPassword123!")
-        self.assertFalse(ok)
-        self.assertIn("topilmadi", msg.lower())
-
-    def test_25_change_password_authenticated(self):
-        """Scenario 25: Authenticated user can change their password with valid old password."""
-        ok, msg = self.auth_mgr.change_password(
-            user_id=self.user.id,
-            old_password="OriginalPassword123!",
-            new_password="UpdatedPassword123!"
+    def test_20_sql_migration_rls_enabled(self):
+        """Scenario 20: Row Level Security is explicitly enabled on all 4 tables."""
+        migration_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "supabase", "migrations", "20260918_phase41_supabase_auth.sql"
         )
-        self.assertTrue(ok)
+        with open(migration_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
-        # Login with updated password succeeds
-        ok_login, _, _, _ = self.auth_mgr.login(username_or_email="reset_user", password="UpdatedPassword123!")
-        self.assertTrue(ok_login)
+        self.assertIn("ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY", content)
+        self.assertIn("ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY", content)
+        self.assertIn("ALTER TABLE public.telegram_links ENABLE ROW LEVEL SECURITY", content)
+        self.assertIn("ALTER TABLE public.permissions ENABLE ROW LEVEL SECURITY", content)
 
-    def test_26_change_password_wrong_old_password_fails(self):
-        """Scenario 26: Changing password with wrong old password is rejected."""
-        ok, msg = self.auth_mgr.change_password(
-            user_id=self.user.id,
-            old_password="IncorrectOldPassword!",
-            new_password="UpdatedPassword123!"
+    def test_21_sql_migration_auth_uid_policies(self):
+        """Scenario 21: Policies use auth.uid() check to enforce strict tenant data boundaries."""
+        migration_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "supabase", "migrations", "20260918_phase41_supabase_auth.sql"
         )
+        with open(migration_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("id = auth.uid()", content)
+        self.assertIn("user_id = auth.uid()", content)
+        self.assertIn("CREATE POLICY", content)
+
+    def test_22_sql_migration_new_user_trigger(self):
+        """Scenario 22: Automatic profile creation trigger on auth.users insert."""
+        migration_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "supabase", "migrations", "20260918_phase41_supabase_auth.sql"
+        )
+        with open(migration_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("CREATE OR REPLACE FUNCTION public.handle_new_user()", content)
+        self.assertIn("CREATE TRIGGER on_auth_user_created", content)
+        self.assertIn("AFTER INSERT", content)
+        self.assertIn("ON auth.users", content)
+
+    def test_23_multi_tenant_device_isolation(self):
+        """Scenario 23: Devices of User A cannot be accessed, listed, or renamed by User B."""
+        user_a = self.account_mgr.upsert_profile_from_supabase(user_id="user-uuid-A", username="alice")
+        user_b = self.account_mgr.upsert_profile_from_supabase(user_id="user-uuid-B", username="bob")
+
+        dev_a = self.account_mgr.register_device(user_id=user_a.id, device_id="laptop-a", name="Alice Laptop")
+        dev_b = self.account_mgr.register_device(user_id=user_b.id, device_id="pc-b", name="Bob Desktop")
+
+        # User A list
+        devices_a = self.account_mgr.get_devices_for_user(user_a.id)
+        self.assertEqual(len(devices_a), 1)
+        self.assertEqual(devices_a[0].device_id, "laptop-a")
+
+        # User B list
+        devices_b = self.account_mgr.get_devices_for_user(user_b.id)
+        self.assertEqual(len(devices_b), 1)
+        self.assertEqual(devices_b[0].device_id, "pc-b")
+
+        # User A attempts to rename User B's device -> fails
+        self.assertEqual(dev_a.name, "Alice Laptop")
+        ok, msg, _ = self.account_mgr.rename_device("pc-b", user_id=user_a.id, new_name="Hacked Device")
         self.assertFalse(ok)
-        self.assertIn("noto'g'ri", msg.lower())
+        self.assertEqual(dev_b.name, "Bob Desktop")
+
+    def test_24_multi_tenant_telegram_link_isolation(self):
+        """Scenario 24: Telegram identities linked to User A cannot be unlinked or accessed by User B."""
+        tg_mgr = TelegramIdentityManager(storage_path=os.path.join(self.test_dir, "tg.json"))
+        user_a = self.account_mgr.upsert_profile_from_supabase(user_id="user-uuid-A2", username="alice2")
+        user_b = self.account_mgr.upsert_profile_from_supabase(user_id="user-uuid-B2", username="bob2")
+
+        # Link telegram for User A
+        req, otp, deep_link, err = tg_mgr.create_link_request(mikasa_user_id=user_a.id)
+        tg_mgr.verify_otp(otp=otp, telegram_user_id=987654321, username="alice_tg")
+
+        # Verify link belongs to User A
+        link_a = tg_mgr.get_link_by_mikasa_user(user_a.id)
+        self.assertIsNotNone(link_a)
+        self.assertEqual(link_a.telegram_user_id, 987654321)
+
+        # User B has no link
+        link_b = tg_mgr.get_link_by_mikasa_user(user_b.id)
+        self.assertIsNone(link_b)
+
+        # User B cannot unlink User A's telegram link
+        self.assertEqual(tg_mgr.count_active_links(), 1)
+        ok = tg_mgr.unlink(telegram_user_id=111222333)
+        self.assertFalse(ok)
+        self.assertIsNotNone(tg_mgr.get_link_by_mikasa_user(user_a.id))
 
 
-class TestTenantIsolationAndAPIEndpoints(unittest.TestCase):
-    """Scenarios 27-30: Multi-Tenant Isolation & HTTP Endpoints"""
+class TestAPISupabaseAuthAndSessionDecoupling(unittest.TestCase):
+    """Scenarios 25-30: Bearer Token API Endpoints & Session Separation"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_auth_api_")
-        self.auth_file = os.path.join(self.test_dir, "auth.json")
-        self.device_file = os.path.join(self.test_dir, "device.json")
-        self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
-        self.auth_mgr = AccountAuthManager(
+        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_api_")
+        self.storage_file = os.path.join(self.test_dir, "accounts.json")
+        self.account_mgr = AccountDeviceManager(storage_path=self.storage_file)
+        self.auth_mgr = SupabaseAuthManager(
             account_device_mgr=self.account_mgr,
-            storage_path=self.auth_file,
-            email_provider=MockEmailVerificationProvider()
+            supabase_jwt_secret="api-test-jwt-secret-key-32chars!!"
         )
         AccountDeviceManager._instance = self.account_mgr
         AccountDeviceManager._default_instance = self.account_mgr
@@ -529,125 +508,143 @@ class TestTenantIsolationAndAPIEndpoints(unittest.TestCase):
         AccountAuthManager._default_instance = None
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_27_multi_tenant_isolation(self):
-        """Scenario 27: User A's session cannot access User B's resources or devices."""
-        _, _, user_a, sess_a = self.auth_mgr.register(username="user_a", password="PasswordA123!")
-        _, _, user_b, sess_b = self.auth_mgr.register(username="user_b", password="PasswordB123!")
-
-        # User A registers a device
-        self.account_mgr.register_device(user_id=user_a.id, device_id="pc_a", name="Laptop A")
-        # User B registers a device
-        dev_b = self.account_mgr.register_device(user_id=user_b.id, device_id="pc_b", name="Laptop B")
-
-        # User A requests devices using their Bearer token
-        req_a = MockRequest(headers={"Authorization": f"Bearer {sess_a.token}"})
-        uid_extracted = _get_request_user_id(req_a)
-        self.assertEqual(uid_extracted, user_a.id)
-
-        # User A should only see Laptop A
-        devices_a = self.account_mgr.get_devices_for_user(uid_extracted)
-        self.assertEqual(len(devices_a), 1)
-        self.assertEqual(devices_a[0].device_id, "pc_a")
-
-        # User A cannot rename User B's device
-        ok, msg, dev = self.account_mgr.rename_device(device_id_or_uuid="pc_b", user_id=uid_extracted, new_name="Hacked")
-        self.assertFalse(ok)
-        self.assertEqual(dev_b.name, "Laptop B")
-
-    def test_28_api_auth_register_and_login_flow(self):
-        """Scenario 28: End-to-end API registration and login via HTTP handlers."""
+    def test_25_api_me_authenticated_with_bearer_token(self):
+        """Scenario 25: GET /api/auth/me returns 200 and user profile when Bearer JWT is valid."""
         async def _run():
-            # 1. Register via API
-            reg_req = MockRequest(body={
-                "username": "api_user_1",
-                "password": "ApiPassword123!",
-                "confirm_password": "ApiPassword123!",
-                "email": "api1@example.com"
-            })
-            resp = await handle_auth_register(reg_req)
-            self.assertEqual(resp.status, 201)
-            data = json.loads(resp.text)
-            self.assertTrue(data["ok"])
-            self.assertEqual(data["user"]["username"], "api_user_1")
-            token = data["session_token"]
-            self.assertTrue(len(token) >= 32)
-
-            # 2. Login via API
-            login_req = MockRequest(body={
-                "username": "api_user_1",
-                "password": "ApiPassword123!"
-            })
-            login_resp = await handle_auth_login(login_req)
-            self.assertEqual(login_resp.status, 200)
-            login_data = json.loads(login_resp.text)
-            self.assertTrue(login_data["ok"])
-            self.assertEqual(login_data["user"]["username"], "api_user_1")
-
-        asyncio.run(_run())
-
-    def test_29_api_auth_me_authenticated_and_unauthenticated(self):
-        """Scenario 29: GET /api/auth/me returns user data when authenticated, 401 when not."""
-        async def _run():
-            _, _, user, sess = self.auth_mgr.register(username="me_user", password="Password123!")
-
-            # Authenticated request
-            auth_req = MockRequest(headers={"Authorization": f"Bearer {sess.token}"})
-            resp = await handle_auth_me(auth_req)
+            token = self.auth_mgr.create_mock_jwt(
+                user_id="user-uuid-api-me",
+                email="me@mikasa.ai",
+                username="meperson",
+                display_name="Me Person",
+                secret=self.auth_mgr.supabase_jwt_secret
+            )
+            req = MockRequest(headers={"Authorization": f"Bearer {token}"})
+            resp = await handle_auth_me(req)
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.text)
             self.assertTrue(data["ok"])
             self.assertTrue(data["authenticated"])
-            self.assertEqual(data["user"]["username"], "me_user")
-
-            # Unauthenticated request
-            unauth_req = MockRequest()
-            resp_unauth = await handle_auth_me(unauth_req)
-            self.assertEqual(resp_unauth.status, 401)
-            data_unauth = json.loads(resp_unauth.text)
-            self.assertFalse(data_unauth["authenticated"])
+            self.assertEqual(data["user"]["id"], "user-uuid-api-me")
+            self.assertEqual(data["user"]["username"], "meperson")
+            self.assertEqual(data["user"]["email"], "me@mikasa.ai")
+            self.assertNotIn("password", data["user"])
 
         asyncio.run(_run())
 
-    def test_30_api_auth_password_reset_flow(self):
-        """Scenario 30: Forgot password -> reset password -> login with new password via API."""
+    def test_26_api_me_unauthenticated_returns_401(self):
+        """Scenario 26: GET /api/auth/me returns 401 Unauthorized when Bearer token is missing or invalid."""
         async def _run():
-            _, _, user, _ = self.auth_mgr.register(
-                username="reset_api_user",
-                email="reset_api@example.com",
-                password="OldPassword123!"
-            )
+            # Missing Authorization header
+            req1 = MockRequest()
+            resp1 = await handle_auth_me(req1)
+            self.assertEqual(resp1.status, 401)
+            data1 = json.loads(resp1.text)
+            self.assertFalse(data1["authenticated"])
 
-            # 1. Forgot password
-            forgot_req = MockRequest(body={"email": "reset_api@example.com"})
-            resp_forgot = await handle_auth_forgot_password(forgot_req)
-            self.assertEqual(resp_forgot.status, 200)
-            forgot_data = json.loads(resp_forgot.text)
-            self.assertTrue(forgot_data["ok"])
-            reset_token = forgot_data.get("token")
-            self.assertIsNotNone(reset_token)
-
-            # 2. Reset password with token
-            reset_req = MockRequest(body={
-                "token": reset_token,
-                "new_password": "BrandNewPassword456!",
-                "confirm_password": "BrandNewPassword456!"
-            })
-            resp_reset = await handle_auth_reset_password(reset_req)
-            self.assertEqual(resp_reset.status, 200)
-            reset_data = json.loads(resp_reset.text)
-            self.assertTrue(reset_data["ok"])
-
-            # 3. Login with new password
-            login_req = MockRequest(body={
-                "username": "reset_api_user",
-                "password": "BrandNewPassword456!"
-            })
-            resp_login = await handle_auth_login(login_req)
-            self.assertEqual(resp_login.status, 200)
-            login_data = json.loads(resp_login.text)
-            self.assertTrue(login_data["ok"])
+            # Invalid token
+            req2 = MockRequest(headers={"Authorization": "Bearer invalid.jwt.token"})
+            resp2 = await handle_auth_me(req2)
+            self.assertEqual(resp2.status, 401)
+            data2 = json.loads(resp2.text)
+            self.assertFalse(data2["authenticated"])
 
         asyncio.run(_run())
+
+    def test_27_api_devices_authenticated_with_bearer_token(self):
+        """Scenario 27: GET /api/devices uses Bearer token to isolate user's registered devices."""
+        async def _run():
+            uid_a = "user-uuid-api-dev-a"
+            uid_b = "user-uuid-api-dev-b"
+            self.account_mgr.register_device(user_id=uid_a, device_id="dev-a1", name="Device A")
+            self.account_mgr.register_device(user_id=uid_b, device_id="dev-b1", name="Device B")
+
+            token_a = self.auth_mgr.create_mock_jwt(
+                user_id=uid_a,
+                email="a@example.com",
+                secret=self.auth_mgr.supabase_jwt_secret
+            )
+            req_a = MockRequest(headers={"Authorization": f"Bearer {token_a}"})
+            extracted_uid = _get_request_user_id(req_a)
+            self.assertEqual(extracted_uid, uid_a)
+
+            resp = await handle_devices_list(req_a)
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.text)
+            self.assertTrue(data["ok"])
+            self.assertEqual(data["user_id"], uid_a)
+            device_ids = [d["device_id"] for d in data["devices"]]
+            self.assertIn("dev-a1", device_ids)
+            self.assertNotIn("dev-b1", device_ids)
+
+        asyncio.run(_run())
+
+    def test_28_api_direct_auth_notices(self):
+        """Scenario 28: Direct auth endpoints inform clients to use Supabase Auth client SDK."""
+        async def _run():
+            dummy = MockRequest()
+            handlers = [
+                (handle_auth_register, "POST /api/auth/register"),
+                (handle_auth_login, "POST /api/auth/login"),
+                (handle_auth_verify_email, "POST /api/auth/verify-email"),
+                (handle_auth_forgot_password, "POST /api/auth/forgot-password"),
+                (handle_auth_reset_password, "POST /api/auth/reset-password"),
+                (handle_auth_change_password, "POST /api/auth/change-password"),
+            ]
+            for handler, name in handlers:
+                resp = await handler(dummy)
+                self.assertEqual(resp.status, 200, f"Failed on {name}")
+                data = json.loads(resp.text)
+                self.assertTrue(data["ok"])
+                self.assertEqual(data.get("provider"), "supabase_auth")
+
+        asyncio.run(_run())
+
+    def test_29_separation_of_supabase_auth_and_remote_auth_session(self):
+        """Scenario 29: SupabaseSessionClaims and RemoteAuthSession are strictly decoupled."""
+        # Supabase Session: identity, email, exp, role
+        supa_session = SupabaseSessionClaims(
+            user_id="user-uuid-sep",
+            email="sep@example.com",
+            role="authenticated",
+            exp=time.time() + 3600
+        )
+        # RemoteAuthSession: hardware device_id, challenge-response, agent permissions
+        remote_session = RemoteAuthSession(
+            user_id="user-uuid-sep",
+            device_id="hardware-pc-id",
+            expires_at=time.time() + 900,
+            permissions=["screen.read", "terminal.execute"]
+        )
+
+        self.assertFalse(hasattr(supa_session, "device_id"))
+        self.assertTrue(hasattr(remote_session, "device_id"))
+        self.assertFalse(hasattr(supa_session, "permissions"))
+        self.assertTrue(hasattr(remote_session, "permissions"))
+        self.assertEqual(remote_session.device_id, "hardware-pc-id")
+        self.assertIn("screen.read", remote_session.permissions)
+
+    def test_30_env_configuration_security(self):
+        """Scenario 30: Frontend .env never contains service role or JWT secrets, root .env does."""
+        root_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.example")
+        frontend_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mikasa-7", ".env.example")
+
+        self.assertTrue(os.path.exists(root_env_path))
+        self.assertTrue(os.path.exists(frontend_env_path))
+
+        with open(root_env_path, "r", encoding="utf-8") as f:
+            root_env = f.read()
+        with open(frontend_env_path, "r", encoding="utf-8") as f:
+            fe_env = f.read()
+
+        # Root backend config
+        self.assertIn("SUPABASE_SERVICE_ROLE_KEY", root_env)
+        self.assertIn("SUPABASE_JWT_SECRET", root_env)
+
+        # Frontend config MUST NOT contain service role key or JWT secret assignments
+        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY=", fe_env)
+        self.assertNotIn("SUPABASE_JWT_SECRET=", fe_env)
+        self.assertIn("VITE_SUPABASE_URL=", fe_env)
+        self.assertIn("VITE_SUPABASE_ANON_KEY=", fe_env)
 
 
 if __name__ == "__main__":

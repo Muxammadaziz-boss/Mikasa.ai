@@ -2,6 +2,8 @@
 // Mikasa AI 7.1.0 — Desktop Frontend to Python Backend Connector
 // Connects to local aiohttp API Server at http://127.0.0.1:18420
 
+import { supabase } from "./supabaseClient";
+
 export interface BackendStatus {
   status: "online" | "offline" | "connecting";
   app?: string;
@@ -1819,17 +1821,51 @@ class BackendService {
     confirm_password?: string;
   }): Promise<AuthResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const email = payload.email || `${payload.username.toLowerCase()}@mikasa.local`;
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: payload.password,
+        options: {
+          data: {
+            username: payload.username,
+            display_name: payload.username,
+          },
+        },
       });
-      const data: AuthResponse = await res.json();
-      if (data.ok && data.session_token) {
-        this.setAuthToken(data.session_token);
-        this.notifyAuthChange(data.user || null);
+
+      if (error) {
+        return { ok: false, error: error.message };
       }
-      return data;
+
+      const sessionToken = data.session?.access_token || "";
+      if (sessionToken) {
+        this.setAuthToken(sessionToken);
+      }
+
+      const user: MikasaAuthUser | undefined = data.user
+        ? {
+            id: data.user.id,
+            username: payload.username,
+            email: data.user.email || email,
+            is_active: true,
+            is_verified: Boolean(data.user.email_confirmed_at),
+            created_at: Date.now() / 1000,
+          }
+        : undefined;
+
+      if (user && sessionToken) {
+        this.notifyAuthChange(user);
+      }
+
+      return {
+        ok: true,
+        message: data.session
+          ? "Akkaunt muvaffaqiyatli yaratildi!"
+          : "Hisob yaratildi! Iltimos, email manzilingizga yuborilgan tasdiqlash xatini tekshiring.",
+        user,
+        session_token: sessionToken,
+        expires_at: data.session?.expires_at,
+      };
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -1838,22 +1874,51 @@ class BackendService {
   public async login(payload: {
     username_or_email: string;
     password: string;
+    email?: string;
   }): Promise<AuthResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username_or_email: payload.username_or_email,
-          password: payload.password,
-        }),
+      const targetEmail =
+        payload.email ||
+        (payload.username_or_email.includes("@")
+          ? payload.username_or_email
+          : `${payload.username_or_email.toLowerCase()}@mikasa.local`);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: payload.password,
       });
-      const data: AuthResponse = await res.json();
-      if (data.ok && data.session_token) {
-        this.setAuthToken(data.session_token);
-        this.notifyAuthChange(data.user || null);
+
+      if (error) {
+        return { ok: false, error: error.message };
       }
-      return data;
+
+      const sessionToken = data.session?.access_token || "";
+      if (sessionToken) {
+        this.setAuthToken(sessionToken);
+      }
+
+      const user: MikasaAuthUser | undefined = data.user
+        ? {
+            id: data.user.id,
+            username: data.user.user_metadata?.username || payload.username_or_email,
+            email: data.user.email || targetEmail,
+            is_active: true,
+            is_verified: Boolean(data.user.email_confirmed_at),
+            created_at: Date.now() / 1000,
+          }
+        : undefined;
+
+      if (user) {
+        this.notifyAuthChange(user);
+      }
+
+      return {
+        ok: true,
+        message: "Tizimga muvaffaqiyatli kirildi",
+        user,
+        session_token: sessionToken,
+        expires_at: data.session?.expires_at,
+      };
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -1861,18 +1926,19 @@ class BackendService {
 
   public async logout(): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
-      const token = this.getAuthToken();
-      const res = await fetch(`${API_BASE}/api/auth/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...this.getAuthHeaders(),
-        },
-        body: JSON.stringify({ session_token: token }),
-      });
+      await supabase.auth.signOut();
+      try {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...this.getAuthHeaders(),
+          },
+        });
+      } catch {}
       this.setAuthToken(null);
       this.notifyAuthChange(null);
-      return await res.json();
+      return { ok: true, message: "Muvaffaqiyatli chiqildi" };
     } catch (err: any) {
       this.setAuthToken(null);
       this.notifyAuthChange(null);
@@ -1882,16 +1948,10 @@ class BackendService {
 
   public async logoutAllAccounts(): Promise<{ ok: boolean; message?: string; count?: number; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/logout-all`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...this.getAuthHeaders(),
-        },
-      });
+      await supabase.auth.signOut({ scope: "global" });
       this.setAuthToken(null);
       this.notifyAuthChange(null);
-      return await res.json();
+      return { ok: true, message: "Barcha qurilmalardan chiqildi" };
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -1899,89 +1959,96 @@ class BackendService {
 
   public async getMe(): Promise<AuthMeResponse> {
     try {
-      const token = this.getAuthToken();
-      if (!token) {
-        return { ok: false, authenticated: false, error: "No session token" };
-      }
-      const res = await fetch(`${API_BASE}/api/auth/me`, {
-        headers: {
-          ...this.getAuthHeaders(),
-        },
-      });
-      const data: AuthMeResponse = await res.json();
-      if (!data.ok || !data.authenticated) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user) {
         this.setAuthToken(null);
         this.notifyAuthChange(null);
-      } else if (data.user) {
-        this.notifyAuthChange(data.user);
+        return { ok: false, authenticated: false };
       }
-      return data;
+
+      this.setAuthToken(session.access_token);
+
+      // Verify and fetch profile from backend
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: {
+            ...this.getAuthHeaders(),
+          },
+        });
+        if (res.ok) {
+          const backendData = await res.json();
+          if (backendData.ok && backendData.user) {
+            this.notifyAuthChange(backendData.user);
+            return backendData;
+          }
+        }
+      } catch {}
+
+      const user: MikasaAuthUser = {
+        id: session.user.id,
+        username: session.user.user_metadata?.username || session.user.email?.split("@")[0] || "User",
+        email: session.user.email || "",
+        is_active: true,
+        is_verified: Boolean(session.user.email_confirmed_at),
+        created_at: Date.now() / 1000,
+      };
+      this.notifyAuthChange(user);
+      return {
+        ok: true,
+        authenticated: true,
+        user,
+        session: {
+          session_id: session.user.id,
+          user_id: session.user.id,
+          created_at: Date.now() / 1000,
+          expires_at: session.expires_at || 0,
+          last_activity_at: Date.now() / 1000,
+          is_active: true,
+        },
+      };
     } catch (err: any) {
       return { ok: false, authenticated: false, error: String(err) };
     }
   }
 
-  public async verifyEmail(token: string): Promise<{ ok: boolean; message?: string; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      return await res.json();
-    } catch (err: any) {
-      return { ok: false, error: String(err) };
-    }
+  public async verifyEmail(_token: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    return { ok: true, message: "Email Supabase Auth tasdiqlash havolasi orqali tasdiqlanadi." };
   }
 
   public async forgotPassword(target: string): Promise<{ ok: boolean; message?: string; token?: string; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: target, username_or_email: target }),
-      });
-      return await res.json();
+      const { error } = await supabase.auth.resetPasswordForEmail(target);
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, message: "Parolni tiklash bo'yicha yo'riqnoma email manzilingizga yuborildi." };
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
   }
 
   public async resetPassword(payload: {
-    token: string;
     new_password: string;
     confirm_password?: string;
+    token?: string;
   }): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      return await res.json();
+      const { error } = await supabase.auth.updateUser({ password: payload.new_password });
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, message: "Yangi parol muvaffaqiyatli o'rnatildi!" };
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
   }
 
   public async changePassword(payload: {
-    old_password: string;
     new_password: string;
+    old_password?: string;
     confirm_password?: string;
   }): Promise<{ ok: boolean; message?: string; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...this.getAuthHeaders(),
-        },
-        body: JSON.stringify(payload),
-      });
-      return await res.json();
-    } catch (err: any) {
-      return { ok: false, error: String(err) };
-    }
+    return this.resetPassword(payload);
   }
 }
 

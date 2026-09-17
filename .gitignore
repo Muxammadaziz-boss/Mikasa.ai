@@ -28,6 +28,7 @@ foydalanuvchi_ismi.txt
 ovoz_turi.txt
 buyruqlar_tarixi.txt
 eslatmalar.txt
+data/*.json
 
 # Arxiv va vaqtinchalik
 *.rar

@@ -20,13 +20,15 @@ logger = logging.getLogger("core.v8.account_device")
 @dataclass
 class MikasaUser:
     """
-    Mikasa foydalanuvchi hisobi.
-    Barcha qurilmalar, Telegram bog'lanishlari va ruxsatlarning asosiy egasi.
+    Mikasa foydalanuvchi hisobi / public.profiles.
+    Supabase auth.users.id bilan 1:1 bog'langan.
+    Parol Mikasa tizimida hech qachon saqlanmaydi (Supabase Auth boshqaradi).
     """
-    id: str
+    id: str  # auth.users.id (UUID)
     username: str
     email: str = ""
-    password_hash: str = ""
+    display_name: str = ""
+    avatar_url: str = ""
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     status: str = "ACTIVE"  # ACTIVE, DISABLED, REVOKED
@@ -41,19 +43,20 @@ class MikasaUser:
     def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
         data = asdict(self)
         data["is_active"] = self.is_active
-        if not include_sensitive:
-            data.pop("password_hash", None)
         return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MikasaUser":
         valid_fields = {
-            "id", "username", "email", "password_hash",
+            "id", "username", "email", "display_name", "avatar_url",
             "created_at", "updated_at", "status",
             "is_verified", "last_login_at", "metadata"
         }
         filtered = {k: v for k, v in data.items() if k in valid_fields}
         return cls(**filtered)
+
+
+MikasaProfile = MikasaUser
 
 
 @dataclass
@@ -220,7 +223,6 @@ class AccountDeviceManager:
     def get_instance(cls, *args, **kwargs) -> "AccountDeviceManager":
         return cls.get_default_instance(*args, **kwargs)
 
-
     # ========================================================
     # 1. USER ACCOUNT MANAGEMENT
     # ========================================================
@@ -289,20 +291,25 @@ class AccountDeviceManager:
     def create_user(
         self,
         username: str,
-        email: str,
-        password_hash: str,
+        email: str = "",
         user_id: Optional[str] = None,
+        display_name: Optional[str] = None,
+        avatar_url: Optional[str] = None,
         status: str = "ACTIVE",
         is_verified: bool = False,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> MikasaUser:
-        """Yangi Mikasa foydalanuvchi hisobini yaratish"""
+        """Yangi Mikasa foydalanuvchi hisobi/profilini yaratish (auth.users.id bilan bog'langan)"""
         uid = str(user_id or uuid.uuid4()).strip()
+        uname = str(username).strip()
+        disp_name = str(display_name or uname).strip()
         user = MikasaUser(
             id=uid,
-            username=str(username).strip(),
+            username=uname,
             email=str(email).strip().lower(),
-            password_hash=str(password_hash),
+            display_name=disp_name,
+            avatar_url=str(avatar_url or ""),
             created_at=time.time(),
             updated_at=time.time(),
             status=status.upper(),
@@ -310,6 +317,53 @@ class AccountDeviceManager:
             metadata=metadata or {}
         )
         self._users[uid] = user
+        self.save()
+        return user
+
+    def upsert_profile_from_supabase(
+        self,
+        user_id: str,
+        email: str = "",
+        username: Optional[str] = None,
+        display_name: Optional[str] = None,
+        avatar_url: Optional[str] = None,
+        is_verified: bool = False,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> MikasaUser:
+        """Supabase auth.users JWT ma'lumotlaridan Mikasa profilini yaratish yoki yangilash"""
+        uid = str(user_id).strip()
+        user = self._users.get(uid)
+        uname = (username or (user.username if user else "") or (email.split("@")[0] if email else uid)).strip()
+        disp = (display_name or (user.display_name if user else "") or uname).strip()
+
+        if user:
+            user.email = str(email or user.email).strip().lower()
+            if username:
+                user.username = uname
+            if display_name:
+                user.display_name = disp
+            if avatar_url is not None:
+                user.avatar_url = avatar_url
+            user.is_verified = is_verified or user.is_verified
+            user.updated_at = time.time()
+            if metadata:
+                user.metadata.update(metadata)
+            self._users[uid] = user
+        else:
+            user = MikasaUser(
+                id=uid,
+                username=uname,
+                email=str(email).strip().lower(),
+                display_name=disp,
+                avatar_url=str(avatar_url or ""),
+                created_at=time.time(),
+                updated_at=time.time(),
+                status="ACTIVE",
+                is_verified=is_verified,
+                metadata=metadata or {}
+            )
+            self._users[uid] = user
+
         self.save()
         return user
 

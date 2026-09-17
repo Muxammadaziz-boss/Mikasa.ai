@@ -2594,148 +2594,61 @@ async def handle_account_sessions_logout_all(request):
     })
 
 
-# ========== 8.2. PHASE 41: ACCOUNT REGISTRATION & AUTHENTICATION API ==========
+# ========== 8.2. PHASE 41: SUPABASE AUTHENTICATION API ==========
 
 async def handle_auth_register(request):
-    """POST /api/auth/register - Yangi foydalanuvchi hisobini ro'yxatdan o'tkazish"""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    username = body.get("username", "")
-    password = body.get("password", "")
-    email = body.get("email", "")
-    confirm_password = body.get("confirm_password")
-
-    if confirm_password is not None and confirm_password != password:
-        return web.json_response({"ok": False, "error": "Parollar mos kelmadi"}, status=400)
-
-    client_ip = request.headers.get("X-Forwarded-For", request.remote or "127.0.0.1").split(",")[0].strip()
-    user_agent = request.headers.get("User-Agent", "")
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg, user, session = auth_mgr.register(
-        username=username,
-        password=password,
-        email=email,
-        client_ip=client_ip,
-        user_agent=user_agent
-    )
-
-    if not ok or not user or not session:
-        status_code = 429 if ("cooldown" in msg.lower() or "limit" in msg.lower()) else 400
-        return web.json_response({"ok": False, "error": msg}, status=status_code)
-
-    await broadcast_ws("ACCOUNT_REGISTERED", {
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email
-    })
-
+    """POST /api/auth/register - Supabase Auth xabarnomasi"""
     return web.json_response({
         "ok": True,
-        "message": msg,
-        "user": user.to_dict(),
-        "session_token": session.token,
-        "expires_at": session.expires_at
-    }, status=201)
+        "message": "Supabase Auth orqali ro'yxatdan o'tish frontend mijozida (supabase.auth.signUp) to'g'ridan-to'g'ri amalga oshiriladi. Mikasa backend parollarni qabul qilmaydi va saqlamaydi.",
+        "provider": "supabase_auth"
+    }, status=200)
 
 
 async def handle_auth_login(request):
-    """POST /api/auth/login - Foydalanuvchi tizimga kirishi"""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    username_or_email = body.get("username") or body.get("email") or body.get("username_or_email", "")
-    password = body.get("password", "")
-
-    client_ip = request.headers.get("X-Forwarded-For", request.remote or "127.0.0.1").split(",")[0].strip()
-    user_agent = request.headers.get("User-Agent", "")
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg, user, session = auth_mgr.login(
-        username_or_email=username_or_email,
-        password=password,
-        client_ip=client_ip,
-        user_agent=user_agent
-    )
-
-    if not ok or not user or not session:
-        status_code = 429 if ("urinish" in msg.lower() or "cooldown" in msg.lower() or "limit" in msg.lower()) else 401
-        return web.json_response({"ok": False, "error": msg}, status=status_code)
-
-    await broadcast_ws("ACCOUNT_LOGIN_SUCCESS", {
-        "user_id": user.id,
-        "username": user.username
-    })
-
+    """POST /api/auth/login - Supabase Auth xabarnomasi"""
     return web.json_response({
         "ok": True,
-        "message": msg,
-        "user": user.to_dict(),
-        "session_token": session.token,
-        "expires_at": session.expires_at
-    })
+        "message": "Supabase Auth orqali kirish frontend mijozida (supabase.auth.signInWithPassword) amalga oshiriladi. Backend JWT Bearer token bilan tekshiradi.",
+        "provider": "supabase_auth"
+    }, status=200)
 
 
 async def handle_auth_logout(request):
-    """POST /api/auth/logout - Joriy sessiyani yopish"""
-    token = get_auth_token_from_request(request)
-    if not token:
-        try:
-            body = await request.json()
-            token = body.get("session_token")
-        except Exception:
-            token = None
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    logged_out = False
-    if token:
-        logged_out = auth_mgr.logout(token)
+    """POST /api/auth/logout - Chiqish haqida xabar berish"""
+    session, user = get_authenticated_user(request)
+    user_id = user.id if user else "anonymous"
 
     await broadcast_ws("ACCOUNT_LOGOUT", {
-        "logged_out": logged_out
+        "user_id": user_id,
+        "logged_out": True
     })
 
     return web.json_response({
         "ok": True,
         "message": "Muvaffaqiyatli chiqildi",
-        "logged_out": logged_out
+        "logged_out": True
     })
 
 
 async def handle_auth_logout_all(request):
-    """POST /api/auth/logout-all - Foydalanuvchining barcha sessiyalarini yopish"""
+    """POST /api/auth/logout-all - Barcha qurilmalardan chiqish"""
     session, user = get_authenticated_user(request)
     user_id = user.id if user else _get_request_user_id(request)
 
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    count = auth_mgr.logout_all(user_id)
     await broadcast_ws("ACCOUNT_LOGOUT_ALL", {
-        "user_id": user_id,
-        "count": count
+        "user_id": user_id
     })
 
     return web.json_response({
         "ok": True,
-        "message": f"{count} ta barcha faol sessiyalar yopildi",
-        "count": count
+        "message": "Barcha faol sessiyalar to'xtatildi",
+        "user_id": user_id
     })
 
 
 async def handle_auth_me(request):
-    """GET /api/auth/me - Joriy autentifikatsiyadan o'tgan foydalanuvchi ma'lumotlari"""
+    """GET /api/auth/me - Joriy autentifikatsiyadan o'tgan foydalanuvchi ma'lumotlari (Supabase JWT)"""
     session, user = get_authenticated_user(request)
     if not user or not session:
         return web.json_response({
@@ -2753,105 +2666,39 @@ async def handle_auth_me(request):
 
 
 async def handle_auth_verify_email(request):
-    """POST /api/auth/verify-email - Email manzilini token orqali tasdiqlash"""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    token = body.get("token", "")
-    if not token:
-        return web.json_response({"ok": False, "error": "Tasdiqlash tokeni ko'rsatilmadi"}, status=400)
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg = auth_mgr.verify_email(token)
-    if not ok:
-        return web.json_response({"ok": False, "error": msg}, status=400)
-
-    await broadcast_ws("EMAIL_VERIFIED", {"message": msg})
-    return web.json_response({"ok": True, "message": msg})
+    """POST /api/auth/verify-email - Supabase Auth email confirmation notice"""
+    return web.json_response({
+        "ok": True,
+        "message": "Email tasdiqlash Supabase Auth tomonidan avtomatik tasdiqlash havolasi orqali amalga oshiriladi.",
+        "provider": "supabase_auth"
+    })
 
 
 async def handle_auth_forgot_password(request):
-    """POST /api/auth/forgot-password - Parolni tiklash so'rovi (Enumeration defense bilan)"""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    target = body.get("email") or body.get("username") or body.get("username_or_email", "")
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg, token = auth_mgr.request_password_reset(target)
-
-    resp_data = {
+    """POST /api/auth/forgot-password - Supabase Auth reset password notice"""
+    return web.json_response({
         "ok": True,
-        "message": msg
-    }
-    if token:
-        resp_data["token"] = token
-
-    return web.json_response(resp_data)
+        "message": "Parolni tiklash frontend mijozi orqali supabase.auth.resetPasswordForEmail() yordamida amalga oshiriladi.",
+        "provider": "supabase_auth"
+    })
 
 
 async def handle_auth_reset_password(request):
-    """POST /api/auth/reset-password - Token orqali yangi parol o'rnatish"""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    token = body.get("token", "")
-    new_password = body.get("new_password", "")
-    confirm_password = body.get("confirm_password")
-
-    if confirm_password is not None and confirm_password != new_password:
-        return web.json_response({"ok": False, "error": "Yangi parollar mos kelmadi"}, status=400)
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg = auth_mgr.reset_password(token, new_password)
-    if not ok:
-        return web.json_response({"ok": False, "error": msg}, status=400)
-
-    await broadcast_ws("PASSWORD_RESET_COMPLETED", {"message": msg})
-    return web.json_response({"ok": True, "message": msg})
+    """POST /api/auth/reset-password - Supabase Auth reset password notice"""
+    return web.json_response({
+        "ok": True,
+        "message": "Yangi parol Supabase Auth orqali supabase.auth.updateUser({ password }) bilan o'rnatiladi.",
+        "provider": "supabase_auth"
+    })
 
 
 async def handle_auth_change_password(request):
-    """POST /api/auth/change-password - Joriy foydalanuvchi parolini o'zgartirish"""
-    session, user = get_authenticated_user(request)
-    if not user:
-        return web.json_response({
-            "ok": False,
-            "error": "Avtorizatsiyadan o'tilmagan"
-        }, status=401)
-
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
-
-    old_password = body.get("old_password", "")
-    new_password = body.get("new_password", "")
-    confirm_password = body.get("confirm_password")
-
-    if confirm_password is not None and confirm_password != new_password:
-        return web.json_response({"ok": False, "error": "Yangi parollar mos kelmadi"}, status=400)
-
-    from core.v8 import AccountAuthManager
-    auth_mgr = AccountAuthManager.get_default_instance()
-
-    ok, msg = auth_mgr.change_password(user.id, old_password, new_password)
-    if not ok:
-        return web.json_response({"ok": False, "error": msg}, status=400)
-
-    await broadcast_ws("PASSWORD_CHANGED", {"user_id": user.id})
-    return web.json_response({"ok": True, "message": msg})
+    """POST /api/auth/change-password - Supabase Auth password update notice"""
+    return web.json_response({
+        "ok": True,
+        "message": "Parolni o'zgartirish Supabase Auth orqali supabase.auth.updateUser({ password }) bilan bajariladi.",
+        "provider": "supabase_auth"
+    })
 
 
 # ========== 9. WEBSOCKET HANDLER ==========
