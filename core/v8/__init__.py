@@ -1,5 +1,5 @@
 # ========== core/v8/__init__.py ==========
-# Mikasa AI v8.0.0 — Phase 36: Real Telegram ↔ Mikasa ↔ Windows PC Agent Integration
+# Mikasa AI v8.0.0 — Phase 37: Secure Remote Session Authentication
 # Package initialization, versioning & exports
 
 from core.v8.device import (
@@ -27,6 +27,11 @@ from core.v8.telegram_gateway import (
     MockTelegramTransport,
     AiohttpTelegramTransport
 )
+from core.v8.auth_session import (
+    RemoteAuthSession,
+    SessionManager,
+    RemoteAuthEngine
+)
 from core.v8.remote_orchestrator import RemoteOrchestrator
 from core.v8.planning_remote import create_remote_wake_and_verify_dag
 from core.v8.events import (
@@ -38,7 +43,7 @@ from core.v8.events import (
 )
 
 __version__ = "8.0.0"
-PHASE = 36
+PHASE = 37
 
 __all__ = [
     "__version__",
@@ -67,6 +72,10 @@ __all__ = [
     "TelegramTransport",
     "MockTelegramTransport",
     "AiohttpTelegramTransport",
+    # Session & Authentication
+    "RemoteAuthSession",
+    "SessionManager",
+    "RemoteAuthEngine",
     # Orchestrator & DAG
     "RemoteOrchestrator",
     "create_remote_wake_and_verify_dag",

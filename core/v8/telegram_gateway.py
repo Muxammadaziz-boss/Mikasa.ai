@@ -312,10 +312,15 @@ class TelegramRemoteGateway:
 
         # Buyruqlar: System info
         elif (
-            lower == "📊 system status"
+            lower.startswith("/system_info")
+            or lower.startswith("/sys")
+            or lower == "system_info"
+            or lower == "system info"
+            or lower == "📊 system status"
             or lower == "📊 tizim holati"
             or "tizim holati" in lower
             or "system info" in lower
+            or "system_info" in lower
         ):
             return {"action": "system_info", "params": {}}
 
@@ -336,6 +341,13 @@ class TelegramRemoteGateway:
             parts = raw.split(maxsplit=1)
             token = parts[1].strip() if len(parts) > 1 else ""
             return {"action": "pair", "params": {"pairing_token": token}}
+
+        # Buyruqlar: Session / Logout / Lock
+        elif lower.startswith("/logout") or lower.startswith("/lock") or "sessiyani yop" in lower:
+            return {"action": "logout", "params": {}}
+
+        elif lower.startswith("/session") or "sessiya holati" in lower:
+            return {"action": "session", "params": {}}
 
         # Buyruqlar: Cancel
         elif lower.startswith("/cancel") or lower == "❌ cancel" or lower == "bekor qilish":

@@ -29,6 +29,14 @@ class RemoteEventType(str, Enum):
     COMMAND_TIMEOUT = "COMMAND_TIMEOUT"
     AGENT_CONNECTED = "AGENT_CONNECTED"
     AGENT_DISCONNECTED = "AGENT_DISCONNECTED"
+    # Phase 37 — Session Authentication & Cooldown Events
+    AUTH_CHALLENGE_ISSUED = "AUTH_CHALLENGE_ISSUED"
+    AUTH_ATTEMPT_SUCCESS = "AUTH_ATTEMPT_SUCCESS"
+    AUTH_ATTEMPT_FAILED = "AUTH_ATTEMPT_FAILED"
+    AUTH_COOLDOWN_ACTIVATED = "AUTH_COOLDOWN_ACTIVATED"
+    SESSION_OPENED = "SESSION_OPENED"
+    SESSION_EXPIRED = "SESSION_EXPIRED"
+    SESSION_CLOSED = "SESSION_CLOSED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -48,7 +56,10 @@ def sanitize_sensitive_string(val: str) -> str:
 def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Tadbir parametrlari ichidagi maxfiy ma'lumotlarni tozalash"""
     cleaned = {}
-    sensitive_keys = {"token", "bot_token", "password", "secret", "pairing_token", "auth_header"}
+    sensitive_keys = {
+        "token", "bot_token", "password", "secret", "pairing_token",
+        "auth_header", "pin", "auth_code", "session_token"
+    }
     for k, v in data.items():
         if k.lower() in sensitive_keys:
             cleaned[k] = "***REDACTED***"
@@ -128,7 +139,9 @@ class RemoteAuditLogger:
             RemoteEventType.REMOTE_REQUEST_DENIED,
             RemoteEventType.DEVICE_AUTH_FAILED,
             RemoteEventType.COMMAND_FAILED,
-            RemoteEventType.WOL_FAILED
+            RemoteEventType.WOL_FAILED,
+            RemoteEventType.AUTH_ATTEMPT_FAILED,
+            RemoteEventType.AUTH_COOLDOWN_ACTIVATED
         )
         if event_type in warning_events:
             logger.warning(log_msg)

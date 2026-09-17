@@ -1,6 +1,6 @@
 # ========== core/v8/remote_orchestrator.py ==========
-# Phase 36 — Remote PC Control Master Orchestrator
-# Coordinates Telegram Gateway ↔ DeviceRegistry ↔ WoL ↔ Heartbeat ↔ AgentLoop ↔ PCAgent
+# Phase 36/37 — Remote PC Control Master Orchestrator
+# Coordinates Telegram Gateway ↔ Auth Engine ↔ DeviceRegistry ↔ WoL ↔ Heartbeat ↔ AgentLoop ↔ PCAgent
 
 import time
 import logging
@@ -15,6 +15,7 @@ from core.v8.telegram_gateway import TelegramRemoteGateway
 from core.v8.pc_agent import MikasaPCAgent
 from core.v8.planning_remote import create_remote_wake_and_verify_dag
 from core.v8.events import RemoteEventType, RemoteAuditLogger
+from core.v8.auth_session import RemoteAuthEngine, SessionManager
 
 logger = logging.getLogger("core.v8.orchestrator")
 
@@ -23,7 +24,7 @@ class RemoteOrchestrator:
     """
     Mikasa AI v8.0.0 Masofaviy Boshqaruv Markaziy Koordinatori.
     Barcha qatlamlarni birlashtiradi va xavfsiz boshqaradi:
-    Telegram -> Auth -> RateLimit -> Intent/DAG -> WoL -> Heartbeat -> AgentLoop -> PC.
+    Telegram -> Auth -> RateLimit -> Intent/DAG -> WoL -> Heartbeat -> Session Auth -> AgentLoop -> PC.
     """
 
     def __init__(
@@ -34,7 +35,10 @@ class RemoteOrchestrator:
         envelope_manager: Optional[EnvelopeManager] = None,
         device_registry: Optional[DeviceRegistry] = None,
         pc_agent: Optional[MikasaPCAgent] = None,
-        agent_loop=None
+        session_manager: Optional[SessionManager] = None,
+        auth_engine: Optional[RemoteAuthEngine] = None,
+        agent_loop=None,
+        require_session_auth: bool = True
     ):
         self.device_registry = device_registry or DeviceRegistry.get_default_instance()
         self.heartbeat_manager = heartbeat_manager or HeartbeatManager()
@@ -50,7 +54,10 @@ class RemoteOrchestrator:
             envelope_manager=self.envelope_manager,
             device_registry=self.device_registry
         )
+        self.session_manager = session_manager or SessionManager()
+        self.auth_engine = auth_engine or RemoteAuthEngine(session_manager=self.session_manager)
         self.agent_loop = agent_loop
+        self.require_session_auth = require_session_auth
         self._audit = RemoteAuditLogger.get_instance()
 
     def resolve_target_device(self, user_id: Union[str, int]) -> Optional[DeviceIdentity]:
@@ -76,9 +83,15 @@ class RemoteOrchestrator:
         Telegram foydalanuvchidan kelgan xabarni qabul qilish va boshqaruv ssenariysiga yo'naltirish.
         """
         user_str = str(user_id)
-        self._audit.log(RemoteEventType.REMOTE_REQUEST_RECEIVED, user_id=user_str, text=text)
+        clean_text = text.strip()
 
-        # 1. Avtorizatsiya tekshiruvi
+        # Parol yoki PIN kiritilayotgan bo'lsa logda maxfiy qilish
+        is_secret_input = self.auth_engine.is_auth_pending(user_str) and not clean_text.startswith("/")
+        log_text = "***PASSWORD_INPUT***" if is_secret_input else clean_text
+
+        self._audit.log(RemoteEventType.REMOTE_REQUEST_RECEIVED, user_id=user_str, text=log_text)
+
+        # 1. Avtorizatsiya tekshiruvi (Telegram ID allowlist)
         if not self.gateway.is_authorized(user_str):
             self._audit.log(RemoteEventType.REMOTE_REQUEST_DENIED, user_id=user_str, reason="Unauthorized")
             await self.gateway.transport.send_message(
@@ -89,27 +102,95 @@ class RemoteOrchestrator:
 
         self._audit.log(RemoteEventType.REMOTE_REQUEST_AUTHORIZED, user_id=user_str)
 
-        # 2. Buyruqni tahlil qilish (Uzbek NLP + slash commands)
-        parsed = self.gateway.parse_command(text)
+        # 2. Qurilmani aniqlash
+        device = self.resolve_target_device(user_str)
+        dev_id = device.device_id if device else (self.pc_agent.identity.device_id if self.pc_agent else "pc")
+        mac_addr = getattr(device, "mac_address", "") or "AA:BB:CC:DD:EE:FF"
+
+        # 3. Kutilayotgan Autentifikatsiya (Authentication Challenge) ni qayta ishlash
+        if self.auth_engine.is_auth_pending(user_str):
+            if clean_text.lower() in ("/cancel", "cancel", "bekor qilish"):
+                self.auth_engine.clear_auth_pending(user_str)
+                await self.gateway.transport.send_message(chat_id, "❌ **Autentifikatsiya bekor qilindi.**")
+                return {"success": True, "action": "auth_cancelled"}
+
+            pending_device = self.auth_engine.get_pending_device(user_str) or dev_id
+            ok, msg, session = self.auth_engine.verify_secret(user_str, pending_device, clean_text)
+
+            if ok and session:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "✅ **Parol tasdiqlandi! Masofaviy sessiya ochildi.**\n\n"
+                    "⏱️ Sessiya muddati: 15 daqiqa.\n"
+                    "🤖 Mikasa Agent: READY\n\n"
+                    "Masofaviy buyruqlarni yuborishingiz mumkin."
+                )
+                return {
+                    "success": True,
+                    "action": "auth_success",
+                    "session_id": session.session_id,
+                    "device_id": pending_device
+                }
+            else:
+                if "COOLDOWN" in msg:
+                    await self.gateway.transport.send_message(
+                        chat_id,
+                        "🚫 **Xavfsizlik blokirovkasi!**\n"
+                        "Ketma-ket 3 marta noto'g'ri parol kiritildi. "
+                        "Tizim 5 daqiqaga bloklandi. Iltimos, keyinroq qayta urining."
+                    )
+                else:
+                    remaining = self.auth_engine.get_remaining_attempts(user_str)
+                    await self.gateway.transport.send_message(
+                        chat_id,
+                        f"❌ **Noto'g'ri parol yoki PIN kod!**\n"
+                        f"Qolgan urinishlar: `{remaining}` ta. Qayta urinib ko'ring:"
+                    )
+                return {"success": False, "action": "auth_failed", "error": msg}
+
+        # 4. Buyruqni tahlil qilish (Uzbek NLP + slash commands)
+        parsed = self.gateway.parse_command(clean_text)
         action = parsed["action"]
         params = parsed.get("params", {})
 
-        # 3. Qurilmani aniqlash
-        device = self.resolve_target_device(user_str)
-        if not device:
-            await self.gateway.transport.send_message(
-                chat_id,
-                "⚠️ **Qurilma topilmadi!**\nKompyuter hali ro'yxatdan o'tmagan yoki sizga bog'lanmagan."
-            )
-            return {"success": False, "error": "DEVICE_NOT_FOUND"}
+        # 5. Sessiyani boshqarish buyruqlari (/logout, /lock, /session)
+        if action == "logout":
+            closed = self.session_manager.close_session(user_str, dev_id)
+            if closed:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "🔒 **Sessiya yopildi.** Masofaviy boshqaruv bloklandi."
+                )
+            else:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "ℹ️ Faol sessiya topilmadi."
+                )
+            return {"success": True, "action": "logout", "closed": closed}
 
-        dev_id = device.device_id
-        mac_addr = getattr(device, "mac_address", "") or "AA:BB:CC:DD:EE:FF"
+        elif action == "session":
+            active_sess = self.session_manager.get_active_session(user_str, dev_id)
+            if active_sess:
+                rem = int(max(0, active_sess.expires_at - time.time()))
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    f"🟢 **Sessiya faol!**\n"
+                    f"• ID: `{active_sess.session_id[:8]}...`\n"
+                    f"• Qolgan vaqt: `{rem}` soniya\n"
+                    f"• Qurilma: `{dev_id}`"
+                )
+                return {"success": True, "action": "session_status", "active": True, "remaining": rem}
+            else:
+                await self.gateway.transport.send_message(
+                    chat_id,
+                    "🔴 **Faol sessiya mavjud emas.**\nBuyruq bajarish uchun parolni tasdiqlang."
+                )
+                return {"success": True, "action": "session_status", "active": False}
 
-        # 4. Action bo'yicha marshrutlash
+        # 6. Standart buyruqlar
         if action == "status":
             current_state = self.heartbeat_manager.get_device_state(dev_id)
-            info = device.to_dict() if hasattr(device, "to_dict") else {}
+            info = device.to_dict() if device and hasattr(device, "to_dict") else {}
             msg = self.gateway.format_status_message(info, current_state)
             await self.gateway.transport.send_message(
                 chat_id,
@@ -170,7 +251,23 @@ class RemoteOrchestrator:
             return {"success": True, "action": "cancel"}
 
         else:
-            # Standart / boshqa asboblar (system_info, chat, va boshqalar)
+            # Sessiya ruxsati tekshiruvi (ixtiyoriy asboblar faol sessiya talab qiladi)
+            if self.require_session_auth:
+                active_sess = self.session_manager.get_active_session(user_str, dev_id)
+                if not active_sess:
+                    self.auth_engine.set_auth_pending(user_str, dev_id, True, chat_id=chat_id)
+                    await self.gateway.transport.send_message(
+                        chat_id,
+                        "🔐 **Parolni tasdiqlang!**\n"
+                        "Masofaviy buyruqni bajarish uchun parol yoki PIN kodni kiriting:"
+                    )
+                    return {
+                        "success": False,
+                        "error": "SESSION_REQUIRED",
+                        "auth_required": True
+                    }
+
+            # Standart asboblar (system_info, chat, va boshqalar)
             envelope = self.envelope_manager.create_envelope(
                 device_id=dev_id,
                 action=action,
@@ -284,9 +381,10 @@ class RemoteOrchestrator:
     ) -> Dict[str, Any]:
         """
         Masofadan kompyuterni uyg'otish va tekshirish E2E pipeline (Planning 2.0 DAG asosida):
-        CHECK_DEVICE -> WAKE_DEVICE -> WAIT_HEARTBEAT -> VERIFY_ONLINE -> GET_STATUS
+        CHECK_DEVICE -> WAKE_DEVICE -> WAIT_HEARTBEAT -> VERIFY_ONLINE -> AUTH_CHALLENGE -> GET_STATUS
         """
-        self._audit.log(RemoteEventType.WOL_REQUESTED, device_id=device_id, user_id=user_id)
+        user_str = str(user_id) if user_id is not None else ""
+        self._audit.log(RemoteEventType.WOL_REQUESTED, device_id=device_id, user_id=user_str)
 
         # [1/5] Qurilma holatini tekshirish
         current_state = self.heartbeat_manager.get_device_state(device_id)
@@ -361,11 +459,25 @@ class RemoteOrchestrator:
         # [5/5] Status olinmoqda va yakun
         if chat_id:
             await self.gateway.send_progress(chat_id, 5, 5, "Status olinmoqda...")
+
+        # Phase 37: Sessiya autentifikatsiyasi so'rovi (Challenge)
+        has_active_sess = bool(user_str and self.session_manager.get_active_session(user_str, device_id))
+        auth_pending = False
+
+        if not has_active_sess and user_str:
+            self.auth_engine.set_auth_pending(user_str, device_id, True, chat_id=chat_id)
+            auth_pending = True
+
+        if chat_id:
+            remaining = self.auth_engine.get_remaining_attempts(user_str) if user_str else 3
             final_text = (
                 "⚡ **Kompyuterni uyg'otish boshlandi.**\n\n"
                 "⏳ Mikasa PC Agent kutilmoqda...\n\n"
                 "🟢 **Kompyuter online bo'ldi.**\n"
                 "🤖 **Mikasa Agent:** READY\n\n"
+                "🔐 **Parolni tasdiqlang!**\n"
+                "Masofaviy sessiyani ochish uchun maxfiy parol yoki PIN kodni yuboring.\n"
+                f"⏳ Qolgan urinishlar: `{remaining}` ta\n\n"
                 "✅ **Masofaviy boshqaruv tayyor.**"
             )
             await self.gateway.transport.send_message(chat_id, final_text)
@@ -374,6 +486,7 @@ class RemoteOrchestrator:
             "success": True,
             "device_id": device_id,
             "state": "online",
+            "auth_required": auth_pending,
             "dag_id": dag.plan_id
         }
 
