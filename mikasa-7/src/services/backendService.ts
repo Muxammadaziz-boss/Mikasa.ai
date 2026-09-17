@@ -431,9 +431,12 @@ class BackendService {
   private metricsListeners: Set<(metrics: SystemMetrics) => void> = new Set();
   private remoteListeners: Set<(event: { type: string; data: any }) => void> = new Set();
   private generalListeners: Set<(event: any) => void> = new Set();
+  private authListeners: Set<(user: MikasaAuthUser | null) => void> = new Set();
   private clientVoiceStopFn: (() => void) | null = null;
+  private authToken: string | null = null;
 
   constructor() {
+    this.authToken = this.getAuthToken();
     this.connectWs();
     this.startHealthPolling();
   }
@@ -1763,6 +1766,223 @@ class BackendService {
       return { ok: false, error: String(err) };
     }
   }
+
+  // ========== Phase 41: Account Registration & Authentication ==========
+  public setAuthToken(token: string | null) {
+    this.authToken = token;
+    try {
+      if (token) {
+        localStorage.setItem("mikasa_session_token", token);
+      } else {
+        localStorage.removeItem("mikasa_session_token");
+      }
+    } catch {}
+  }
+
+  public getAuthToken(): string | null {
+    if (!this.authToken && typeof window !== "undefined") {
+      try {
+        this.authToken = localStorage.getItem("mikasa_session_token");
+      } catch {}
+    }
+    return this.authToken;
+  }
+
+  public getAuthHeaders(): Record<string, string> {
+    const token = this.getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
+  public onAuthChange(cb: (user: MikasaAuthUser | null) => void): () => void {
+    this.authListeners.add(cb);
+    return () => this.authListeners.delete(cb);
+  }
+
+  private notifyAuthChange(user: MikasaAuthUser | null) {
+    this.authListeners.forEach((cb) => {
+      try {
+        cb(user);
+      } catch (err) {
+        console.error("Error in auth listener", err);
+      }
+    });
+  }
+
+  public async register(payload: {
+    username: string;
+    password: string;
+    email?: string;
+    confirm_password?: string;
+  }): Promise<AuthResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data: AuthResponse = await res.json();
+      if (data.ok && data.session_token) {
+        this.setAuthToken(data.session_token);
+        this.notifyAuthChange(data.user || null);
+      }
+      return data;
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async login(payload: {
+    username_or_email: string;
+    password: string;
+  }): Promise<AuthResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username_or_email: payload.username_or_email,
+          password: payload.password,
+        }),
+      });
+      const data: AuthResponse = await res.json();
+      if (data.ok && data.session_token) {
+        this.setAuthToken(data.session_token);
+        this.notifyAuthChange(data.user || null);
+      }
+      return data;
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async logout(): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const token = this.getAuthToken();
+      const res = await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify({ session_token: token }),
+      });
+      this.setAuthToken(null);
+      this.notifyAuthChange(null);
+      return await res.json();
+    } catch (err: any) {
+      this.setAuthToken(null);
+      this.notifyAuthChange(null);
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async logoutAllAccounts(): Promise<{ ok: boolean; message?: string; count?: number; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/logout-all`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+      });
+      this.setAuthToken(null);
+      this.notifyAuthChange(null);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getMe(): Promise<AuthMeResponse> {
+    try {
+      const token = this.getAuthToken();
+      if (!token) {
+        return { ok: false, authenticated: false, error: "No session token" };
+      }
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: {
+          ...this.getAuthHeaders(),
+        },
+      });
+      const data: AuthMeResponse = await res.json();
+      if (!data.ok || !data.authenticated) {
+        this.setAuthToken(null);
+        this.notifyAuthChange(null);
+      } else if (data.user) {
+        this.notifyAuthChange(data.user);
+      }
+      return data;
+    } catch (err: any) {
+      return { ok: false, authenticated: false, error: String(err) };
+    }
+  }
+
+  public async verifyEmail(token: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async forgotPassword(target: string): Promise<{ ok: boolean; message?: string; token?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: target, username_or_email: target }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async resetPassword(payload: {
+    token: string;
+    new_password: string;
+    confirm_password?: string;
+  }): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async changePassword(payload: {
+    old_password: string;
+    new_password: string;
+    confirm_password?: string;
+  }): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
 }
 
 export interface TelegramLinkStartResponse {
@@ -1908,6 +2128,46 @@ export interface AccountSessionsResponse {
   user_id?: string;
   sessions: UserSession[];
   total: number;
+  error?: string;
+}
+
+// Phase 41: Account Registration & Authentication Interfaces
+export interface MikasaAuthUser {
+  id: string;
+  username: string;
+  email: string;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: number;
+  last_login_at?: number | null;
+  role?: string;
+}
+
+export interface MikasaAccountSession {
+  session_id: string;
+  user_id: string;
+  created_at: number;
+  expires_at: number;
+  last_activity_at: number;
+  is_active: boolean;
+  client_ip?: string;
+  user_agent?: string;
+}
+
+export interface AuthResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  user?: MikasaAuthUser;
+  session_token?: string;
+  expires_at?: number;
+}
+
+export interface AuthMeResponse {
+  ok: boolean;
+  authenticated: boolean;
+  user?: MikasaAuthUser;
+  session?: MikasaAccountSession;
   error?: string;
 }
 

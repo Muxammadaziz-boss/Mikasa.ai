@@ -26,6 +26,7 @@ import {
   backendService,
   AccountSettings,
   UserSession,
+  MikasaAuthUser,
 } from "../services/backendService";
 
 interface AccountPageProps {
@@ -33,6 +34,8 @@ interface AccountPageProps {
   onNavigateToDevices?: () => void;
   onNavigateToTelegram?: () => void;
   onUserUpdated?: (name: string, avatar?: string) => void;
+  currentUser?: MikasaAuthUser | null;
+  onLogout?: () => void;
 }
 
 type TabType =
@@ -58,6 +61,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   onNavigateToDevices,
   onNavigateToTelegram,
   onUserUpdated,
+  currentUser,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [loading, setLoading] = useState(true);
@@ -67,6 +72,16 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [clearingHistory, setClearingHistory] = useState(false);
   const [clearSuccess, setClearSuccess] = useState(false);
+
+  // Phase 41 Auth & Account State
+  const [authAccount, setAuthAccount] = useState<MikasaAuthUser | null>(currentUser || null);
+  const [changePwdModalOpen, setChangePwdModalOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwdChangeError, setPwdChangeError] = useState<string | null>(null);
+  const [pwdChangeSuccess, setPwdChangeSuccess] = useState<string | null>(null);
+  const [pwdChangeSubmitting, setPwdChangeSubmitting] = useState(false);
 
   // Profile Form State
   const [name, setName] = useState(() => localStorage.getItem("mikasa_user_name") || "Ustoz");
@@ -307,6 +322,76 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!currentUser) {
+      backendService.getMe().then((res) => {
+        if (res.ok && res.user) {
+          setAuthAccount(res.user);
+        }
+      });
+    } else {
+      setAuthAccount(currentUser);
+    }
+  }, [currentUser]);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword) {
+      setPwdChangeError("Eski va yangi parolni kiriting");
+      return;
+    }
+    if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPwdChangeError("Yangi parol kamida 8 belgi, harf va raqamdan iborat bo'lishi kerak");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdChangeError("Yangi parollar bir-biriga mos kelmadi");
+      return;
+    }
+    setPwdChangeSubmitting(true);
+    setPwdChangeError(null);
+    setPwdChangeSuccess(null);
+    try {
+      const res = await backendService.changePassword({
+        old_password: oldPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      if (res.ok) {
+        setPwdChangeSuccess(res.message || "Parol muvaffaqiyatli yangilandi");
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setTimeout(() => {
+          setChangePwdModalOpen(false);
+          setPwdChangeSuccess(null);
+        }, 1200);
+      } else {
+        setPwdChangeError(res.error || "Parolni o'zgartirishda xatolik");
+      }
+    } catch (err: any) {
+      setPwdChangeError(err.message || "Server bilan aloqada xatolik");
+    } finally {
+      setPwdChangeSubmitting(false);
+    }
+  };
+
+  const handleLogoutAction = async () => {
+    await backendService.logout();
+    if (onLogout) {
+      onLogout();
+    }
+  };
+
+  const handleLogoutAllAction = async () => {
+    if (window.confirm("Barcha sessiyalardan chiqishni tasdiqlaysizmi?")) {
+      await backendService.logoutAllAccounts();
+      if (onLogout) {
+        onLogout();
+      }
+    }
+  };
+
   const effectiveInitials = (() => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
@@ -539,6 +624,138 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
                     Sizning ismingiz, avataringiz va shaxsiy parametrlaringiz
                   </p>
+                </div>
+
+                {/* Mikasa Account & Security Card (Phase 41) */}
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)",
+                    border: "1px solid rgba(16, 185, 129, 0.25)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: "rgba(16, 185, 129, 0.15)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <ShieldIcon size={18} color="#10B981" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F8FAFC" }}>
+                          Mikasa Akkaunt
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>
+                          Foydalanuvchi: <strong style={{ color: "#34D399" }}>{authAccount?.username || name}</strong>
+                          {authAccount?.email ? ` (${authAccount.email})` : ""}
+                        </div>
+                      </div>
+                    </div>
+                    {authAccount?.is_verified ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          background: "rgba(16, 185, 129, 0.18)",
+                          color: "#34D399",
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          border: "1px solid rgba(16, 185, 129, 0.35)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontWeight: 500,
+                        }}
+                      >
+                        <CheckIcon size={12} color="#34D399" /> Tasdiqlangan
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#FBBF24",
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          border: "1px solid rgba(245, 158, 11, 0.3)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Tasdiqlanmagan
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPwdChangeError(null);
+                        setPwdChangeSuccess(null);
+                        setChangePwdModalOpen(true);
+                      }}
+                      style={{
+                        padding: "7px 14px",
+                        background: "rgba(255, 255, 255, 0.08)",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        borderRadius: 8,
+                        color: "#F8FAFC",
+                        fontSize: 12.5,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      <KeyIcon size={13} color="#34D399" /> Parolni o'zgartirish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogoutAction}
+                      style={{
+                        padding: "7px 14px",
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.25)",
+                        borderRadius: 8,
+                        color: "#FCA5A5",
+                        fontSize: 12.5,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      Tizimdan chiqish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogoutAllAction}
+                      style={{
+                        padding: "7px 14px",
+                        background: "rgba(239, 68, 68, 0.05)",
+                        border: "1px solid rgba(239, 68, 68, 0.15)",
+                        borderRadius: 8,
+                        color: "#F87171",
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      Barcha qurilmalardan chiqish
+                    </button>
+                  </div>
                 </div>
 
                 {/* Avatar Palette Selector */}
@@ -1760,6 +1977,182 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Change Password Modal (Phase 41) */}
+        {changePwdModalOpen && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: "20px",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: "420px",
+                background: "#0F172A",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                borderRadius: "16px",
+                padding: "24px 28px",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#FFFFFF" }}>
+                  Parolni o'zgartirish
+                </h3>
+                <button
+                  onClick={() => setChangePwdModalOpen(false)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#94A3B8",
+                    fontSize: "18px",
+                    cursor: "pointer",
+                    padding: "4px",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {pwdChangeError && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
+                    color: "#FCA5A5",
+                    fontSize: "12.5px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  {pwdChangeError}
+                </div>
+              )}
+
+              {pwdChangeSuccess && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(16, 185, 129, 0.12)",
+                    border: "1px solid rgba(16, 185, 129, 0.25)",
+                    color: "#6EE7B7",
+                    fontSize: "12.5px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  {pwdChangeSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordChangeSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Joriy parol</label>
+                  <input
+                    type="password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: "9px 12px",
+                      background: "rgba(0, 0, 0, 0.3)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      borderRadius: "8px",
+                      color: "#FFFFFF",
+                      fontSize: "13.5px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Yangi parol (kamida 8 belgi, harf va raqam)</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: "9px 12px",
+                      background: "rgba(0, 0, 0, 0.3)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      borderRadius: "8px",
+                      color: "#FFFFFF",
+                      fontSize: "13.5px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Yangi parolni tasdiqlang</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: "9px 12px",
+                      background: "rgba(0, 0, 0, 0.3)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      borderRadius: "8px",
+                      color: "#FFFFFF",
+                      fontSize: "13.5px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setChangePwdModalOpen(false)}
+                    style={{
+                      padding: "8px 14px",
+                      background: "transparent",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      borderRadius: "8px",
+                      color: "#94A3B8",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={pwdChangeSubmitting}
+                    style={{
+                      padding: "8px 16px",
+                      background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                      border: "none",
+                      borderRadius: "8px",
+                      color: "#052E16",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: pwdChangeSubmitting ? "default" : "pointer",
+                    }}
+                  >
+                    {pwdChangeSubmitting ? "Saqlanmoqda..." : "Saqlash"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

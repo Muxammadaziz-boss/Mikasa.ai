@@ -70,6 +70,18 @@ class RemoteEventType(str, Enum):
     SESSION_LOCKED = "SESSION_LOCKED"
     SESSION_LOGOUT = "SESSION_LOGOUT"
     SESSION_EXPIRED_P40 = "SESSION_EXPIRED"
+    # Phase 41 — Account Registration & Authentication Events
+    ACCOUNT_REGISTERED = "ACCOUNT_REGISTERED"
+    ACCOUNT_LOGIN_SUCCESS = "ACCOUNT_LOGIN_SUCCESS"
+    ACCOUNT_LOGIN_FAILED = "ACCOUNT_LOGIN_FAILED"
+    ACCOUNT_LOGOUT = "ACCOUNT_LOGOUT"
+    ACCOUNT_LOGOUT_ALL = "ACCOUNT_LOGOUT_ALL"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
+    PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED"
+    PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED"
+    EMAIL_VERIFICATION_REQUESTED = "EMAIL_VERIFICATION_REQUESTED"
+    EMAIL_VERIFIED = "EMAIL_VERIFIED"
+    SESSION_REVOKED = "SESSION_REVOKED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -93,7 +105,11 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "token", "bot_token", "password", "secret", "pairing_token",
         "auth_header", "pin", "auth_code", "session_token",
         "pairing_code", "pairing_secret", "raw_file_content", "private_key",
-        "secret_hash", "otp", "otp_hash", "link_token"
+        "secret_hash", "otp", "otp_hash", "link_token",
+        "password_confirmation", "raw_password", "current_password",
+        "new_password", "new_password_confirmation", "raw_token",
+        "raw_otp", "reset_token", "verification_token", "password_hash",
+        "token_hash"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:

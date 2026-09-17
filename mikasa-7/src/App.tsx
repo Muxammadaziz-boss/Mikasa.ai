@@ -2,7 +2,8 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { AppShell } from "./layout/AppShell";
 import { CommandPalette } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { backendService } from "./services/backendService";
+import { backendService, MikasaAuthUser } from "./services/backendService";
+import { AuthPage } from "./pages/AuthPage";
 
 const LandingPage = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
 const ChatPage = lazy(() => import("./pages/ChatPage").then(m => ({ default: m.ChatPage })));
@@ -49,12 +50,65 @@ export function App() {
   const [currentPath, setCurrentPath] = useState<string>("/");
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string>("");
   const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<MikasaAuthUser | null>(null);
   const [userName, setUserName] = useState<string>(() => {
     return localStorage.getItem("mikasa_user_name") || "Ustoz";
   });
   const [userAvatar, setUserAvatar] = useState<string>(() => {
     return localStorage.getItem("mikasa_user_avatar") || "emerald";
   });
+
+  // Verify auth session on startup
+  useEffect(() => {
+    let mounted = true;
+    const verifyAuth = async () => {
+      try {
+        const res = await backendService.getMe();
+        if (mounted) {
+          if (res.ok && res.authenticated && res.user) {
+            setIsAuthenticated(true);
+            setCurrentUser(res.user);
+            setUserName(res.user.username);
+            try {
+              localStorage.setItem("mikasa_user_name", res.user.username);
+            } catch {}
+          } else {
+            setIsAuthenticated(false);
+            setCurrentUser(null);
+          }
+        }
+      } catch {
+        if (mounted) {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setAuthChecking(false);
+        }
+      }
+    };
+
+    verifyAuth();
+
+    const unsubAuth = backendService.onAuthChange((user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        setCurrentUser(user);
+        setUserName(user.username);
+      } else {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubAuth();
+    };
+  }, []);
 
   // Listen to status updates to keep username synchronized
   useEffect(() => {
@@ -153,12 +207,40 @@ export function App() {
             onNavigateToDevices={() => handleNavigate("/devices")}
             onNavigateToTelegram={() => handleNavigate("/telegram")}
             onUserUpdated={handleUserUpdated}
+            currentUser={currentUser}
+            onLogout={handleLogout}
           />
         );
       default:
         return <LandingPage userName={userName} onNavigate={handleNavigate} />;
     }
   };
+
+  const handleLogout = async () => {
+    await backendService.logout();
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setCurrentPath("/");
+  };
+
+  if (authChecking) {
+    return <PageLoadingFallback />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <AuthPage
+        onAuthSuccess={(user) => {
+          setIsAuthenticated(true);
+          setCurrentUser(user);
+          setUserName(user.username);
+          try {
+            localStorage.setItem("mikasa_user_name", user.username);
+          } catch {}
+        }}
+      />
+    );
+  }
 
   return (
     <>

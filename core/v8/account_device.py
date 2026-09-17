@@ -25,21 +25,33 @@ class MikasaUser:
     """
     id: str
     username: str
+    email: str = ""
+    password_hash: str = ""
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     status: str = "ACTIVE"  # ACTIVE, DISABLED, REVOKED
+    is_verified: bool = False
+    last_login_at: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_active(self) -> bool:
         return self.status.upper() == "ACTIVE"
 
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+    def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
+        data = asdict(self)
+        data["is_active"] = self.is_active
+        if not include_sensitive:
+            data.pop("password_hash", None)
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MikasaUser":
-        valid_fields = {"id", "username", "created_at", "updated_at", "status", "metadata"}
+        valid_fields = {
+            "id", "username", "email", "password_hash",
+            "created_at", "updated_at", "status",
+            "is_verified", "last_login_at", "metadata"
+        }
         filtered = {k: v for k, v in data.items() if k in valid_fields}
         return cls(**filtered)
 
@@ -198,9 +210,16 @@ class AccountDeviceManager:
 
     @classmethod
     def get_default_instance(cls, storage_path: Optional[str] = None) -> "AccountDeviceManager":
-        if cls._default_instance is None:
+        inst = getattr(cls, "_instance", None) or cls._default_instance
+        if inst is None:
             cls._default_instance = cls(storage_path=storage_path)
-        return cls._default_instance
+            return cls._default_instance
+        return inst
+
+    @classmethod
+    def get_instance(cls, *args, **kwargs) -> "AccountDeviceManager":
+        return cls.get_default_instance(*args, **kwargs)
+
 
     # ========================================================
     # 1. USER ACCOUNT MANAGEMENT
@@ -246,6 +265,59 @@ class AccountDeviceManager:
     def list_users(self) -> List[MikasaUser]:
         """Barcha foydalanuvchilar ro'yxati"""
         return list(self._users.values())
+
+    def get_user_by_username(self, username: str) -> Optional[MikasaUser]:
+        """Foydalanuvchini username (case-insensitive) orqali olish"""
+        uname = str(username).strip().lower()
+        if not uname:
+            return None
+        for user in self._users.values():
+            if user.username.strip().lower() == uname:
+                return user
+        return None
+
+    def get_user_by_email(self, email: str) -> Optional[MikasaUser]:
+        """Foydalanuvchini email (case-insensitive canonical) orqali olish"""
+        em = str(email).strip().lower()
+        if not em:
+            return None
+        for user in self._users.values():
+            if user.email.strip().lower() == em:
+                return user
+        return None
+
+    def create_user(
+        self,
+        username: str,
+        email: str,
+        password_hash: str,
+        user_id: Optional[str] = None,
+        status: str = "ACTIVE",
+        is_verified: bool = False,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> MikasaUser:
+        """Yangi Mikasa foydalanuvchi hisobini yaratish"""
+        uid = str(user_id or uuid.uuid4()).strip()
+        user = MikasaUser(
+            id=uid,
+            username=str(username).strip(),
+            email=str(email).strip().lower(),
+            password_hash=str(password_hash),
+            created_at=time.time(),
+            updated_at=time.time(),
+            status=status.upper(),
+            is_verified=is_verified,
+            metadata=metadata or {}
+        )
+        self._users[uid] = user
+        self.save()
+        return user
+
+    def update_user(self, user: MikasaUser):
+        """Foydalanuvchi ma'lumotlarini saqlash"""
+        user.updated_at = time.time()
+        self._users[user.id] = user
+        self.save()
 
     def update_user_status(self, user_id: str, status: str) -> bool:
         """Foydalanuvchi holatini yangilash (ACTIVE, DISABLED, REVOKED)"""
