@@ -7,13 +7,13 @@ import sys
 import time
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from core.v8 import (
+from core.v8 import (  # noqa: E402
     DeviceIdentity,
     DeviceIdentityManager,
     DeviceState,
