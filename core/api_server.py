@@ -2131,6 +2131,194 @@ async def handle_remote_audit(request):
     })
 
 
+# ========== 8.5. PHASE 39: UNIVERSAL TELEGRAM BOT & IDENTITY API ==========
+
+async def handle_telegram_link_start(request):
+    """POST /api/telegram/link/start - 6 xonali OTP va Telegram deep-link yaratish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    mikasa_user_id = body.get("mikasa_user_id", "admin")
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot")
+
+    req, otp, deep_link, err = mgr.create_link_request(
+        mikasa_user_id=mikasa_user_id,
+        bot_username=bot_username
+    )
+    if err or not req:
+        return web.json_response({"ok": False, "error": err or "Kod yaratishda xatolik"}, status=400)
+
+    await broadcast_ws("PAIRING_CREATED", {
+        "request_id": req.request_id,
+        "mikasa_user_id": req.mikasa_user_id,
+        "expires_at": req.expires_at,
+        "ttl_seconds": int(mgr.DEFAULT_TTL)
+    })
+    await broadcast_ws("PAIRING_WAITING", {
+        "request_id": req.request_id,
+        "mikasa_user_id": req.mikasa_user_id
+    })
+
+    return web.json_response({
+        "ok": True,
+        "request_id": req.request_id,
+        "otp": otp,
+        "link_token": req.link_token,
+        "deep_link": deep_link,
+        "expires_at": req.expires_at,
+        "ttl_seconds": int(mgr.DEFAULT_TTL),
+        "bot_username": bot_username
+    })
+
+
+async def handle_telegram_link_verify(request):
+    """POST /api/telegram/link/verify - OTP kodni tekshirish va hisobni bog'lash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    otp = body.get("otp", "")
+    tg_id = body.get("telegram_user_id")
+    username = body.get("username")
+    first_name = body.get("first_name")
+    request_id = body.get("request_id")
+
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+
+    ok, msg, link = mgr.verify_otp(
+        otp=otp,
+        telegram_user_id=tg_id,
+        first_name=first_name,
+        username=username,
+        request_id=request_id
+    )
+
+    if ok and link:
+        await broadcast_ws("PAIRING_VERIFIED", {
+            "telegram_user_id": link.telegram_user_id,
+            "mikasa_user_id": link.mikasa_user_id
+        })
+        await broadcast_ws("TELEGRAM_CONNECTED", {
+            "telegram_user_id": link.telegram_user_id,
+            "mikasa_user_id": link.mikasa_user_id,
+            "linked_at": link.linked_at
+        })
+        return web.json_response({
+            "ok": True,
+            "message": msg,
+            "link": link.to_dict(),
+            "mikasa_user_id": link.mikasa_user_id
+        })
+
+    await broadcast_ws("PAIRING_FAILED", {
+        "error": msg
+    })
+    return web.json_response({"ok": False, "error": msg}, status=400)
+
+
+async def handle_telegram_link_status(request):
+    """GET /api/telegram/link/status - Bog'lanish holatini tekshirish"""
+    mikasa_user_id = request.query.get("mikasa_user_id", "admin")
+    request_id = request.query.get("request_id")
+
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+
+    link = mgr.get_link_by_mikasa_user(mikasa_user_id)
+    if link and link.is_active:
+        return web.json_response({
+            "ok": True,
+            "status": "CONNECTED",
+            "is_linked": True,
+            "telegram_user_id": link.telegram_user_id,
+            "link": link.to_dict()
+        })
+
+    if request_id:
+        req = mgr.get_request(request_id)
+        if not req:
+            return web.json_response({"ok": False, "error": "So'rov topilmadi"}, status=404)
+        ttl_left = max(0, int(req.expires_at - time.time()))
+        status_name = "EXPIRED" if req.is_expired() else req.status
+        return web.json_response({
+            "ok": True,
+            "status": status_name,
+            "is_linked": req.status == "VERIFIED",
+            "attempt_count": req.attempt_count,
+            "expires_at": req.expires_at,
+            "ttl_seconds": ttl_left
+        })
+
+    return web.json_response({
+        "ok": True,
+        "status": "NOT_CONNECTED",
+        "is_linked": False,
+        "telegram_user_id": None
+    })
+
+
+async def handle_telegram_unlink(request):
+    """POST /api/telegram/unlink - Telegram bog'lanishini bekor qilish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    mikasa_user_id = body.get("mikasa_user_id", "admin")
+    tg_id = body.get("telegram_user_id")
+
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+
+    unlinked = mgr.unlink(mikasa_user_id=mikasa_user_id, telegram_user_id=tg_id)
+    if unlinked:
+        await broadcast_ws("TELEGRAM_DISCONNECTED", {
+            "mikasa_user_id": mikasa_user_id
+        })
+        return web.json_response({"ok": True, "message": "Telegram hisobi muvaffaqiyatli uzildi"})
+
+    return web.json_response({"ok": False, "error": "Faol bog'lanish topilmadi"}, status=400)
+
+
+async def handle_telegram_account(request):
+    """GET /api/telegram/account - Foydalanuvchining Telegram profili va bog'lanish ma'lumotlari"""
+    mikasa_user_id = request.query.get("mikasa_user_id", "admin")
+
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+
+    link = mgr.get_link_by_mikasa_user(mikasa_user_id)
+    ident = mgr.get_identity(link.telegram_user_id) if link else None
+
+    return web.json_response({
+        "ok": True,
+        "is_linked": link is not None and link.is_active,
+        "link": link.to_dict() if link else None,
+        "telegram_identity": ident.to_dict() if ident else None
+    })
+
+
+async def handle_telegram_status(request):
+    """GET /api/telegram/status - Telegram Bot tizim holati"""
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot")
+
+    return web.json_response({
+        "ok": True,
+        "configured": bool(os.environ.get("TELEGRAM_BOT_TOKEN") or True),
+        "bot_username": bot_username,
+        "active_links_count": mgr.count_active_links(),
+        "pending_requests_count": mgr.count_pending_requests()
+    })
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -2289,6 +2477,14 @@ def create_app():
     app.router.add_post("/api/remote/session/lock", handle_remote_session_lock)
     app.router.add_post("/api/remote/session/logout", handle_remote_session_logout)
     app.router.add_get("/api/remote/audit", handle_remote_audit)
+
+    # Phase 39: Universal Telegram Bot & Identity
+    app.router.add_post("/api/telegram/link/start", handle_telegram_link_start)
+    app.router.add_post("/api/telegram/link/verify", handle_telegram_link_verify)
+    app.router.add_get("/api/telegram/link/status", handle_telegram_link_status)
+    app.router.add_post("/api/telegram/unlink", handle_telegram_unlink)
+    app.router.add_get("/api/telegram/account", handle_telegram_account)
+    app.router.add_get("/api/telegram/status", handle_telegram_status)
 
     return app
 

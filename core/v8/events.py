@@ -49,6 +49,14 @@ class RemoteEventType(str, Enum):
     COMMAND_AUTHORIZED = "COMMAND_AUTHORIZED"
     COMMAND_DENIED = "COMMAND_DENIED"
     COMMAND_EXECUTED = "COMMAND_EXECUTED"
+    # Phase 39 — Universal Telegram Bot ↔ Mikasa User Account Linking Events
+    TELEGRAM_LINK_REQUEST_CREATED = "TELEGRAM_LINK_REQUEST_CREATED"
+    TELEGRAM_OTP_VERIFICATION_SUCCESS = "TELEGRAM_OTP_VERIFICATION_SUCCESS"
+    TELEGRAM_OTP_VERIFICATION_FAILED = "TELEGRAM_OTP_VERIFICATION_FAILED"
+    TELEGRAM_ACCOUNT_LINKED = "TELEGRAM_ACCOUNT_LINKED"
+    TELEGRAM_ACCOUNT_UNLINKED = "TELEGRAM_ACCOUNT_UNLINKED"
+    TELEGRAM_LINK_EXPIRED = "TELEGRAM_LINK_EXPIRED"
+    TELEGRAM_LINK_RATE_LIMITED = "TELEGRAM_LINK_RATE_LIMITED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -72,7 +80,7 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "token", "bot_token", "password", "secret", "pairing_token",
         "auth_header", "pin", "auth_code", "session_token",
         "pairing_code", "pairing_secret", "raw_file_content", "private_key",
-        "secret_hash"
+        "secret_hash", "otp", "otp_hash", "link_token"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:
@@ -155,7 +163,10 @@ class RemoteAuditLogger:
             RemoteEventType.COMMAND_FAILED,
             RemoteEventType.WOL_FAILED,
             RemoteEventType.AUTH_ATTEMPT_FAILED,
-            RemoteEventType.AUTH_COOLDOWN_ACTIVATED
+            RemoteEventType.AUTH_COOLDOWN_ACTIVATED,
+            RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
+            RemoteEventType.TELEGRAM_LINK_RATE_LIMITED,
+            RemoteEventType.TELEGRAM_LINK_EXPIRED
         )
         if event_type in warning_events:
             logger.warning(log_msg)

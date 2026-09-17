@@ -12,6 +12,7 @@ const MemoryPage = lazy(() => import("./pages/MemoryPage").then(m => ({ default:
 const SchedulerPage = lazy(() => import("./pages/SchedulerPage").then(m => ({ default: m.SchedulerPage })));
 const PluginsPage = lazy(() => import("./pages/PluginsPage").then(m => ({ default: m.PluginsPage })));
 const RemoteControlPage = lazy(() => import("./pages/RemoteControlPage").then(m => ({ default: m.RemoteControlPage })));
+const TelegramIntegrationPage = lazy(() => import("./pages/TelegramIntegrationPage").then(m => ({ default: m.TelegramIntegrationPage })));
 const AccountPage = lazy(() => import("./pages/AccountPage").then(m => ({ default: m.AccountPage })));
 
 const PageLoadingFallback = () => (
@@ -140,6 +141,8 @@ export function App() {
         return <PluginsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/remote":
         return <RemoteControlPage onNavigateHome={() => handleNavigate("/")} />;
+      case "/telegram":
+        return <TelegramIntegrationPage onNavigateHome={() => handleNavigate("/")} />;
       case "/account":
         return (
           <AccountPage

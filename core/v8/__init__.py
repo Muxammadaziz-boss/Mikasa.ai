@@ -33,11 +33,17 @@ from core.v8.auth_session import (
     RemoteAuthEngine
 )
 from core.v8.user_linking import (
-    TelegramIdentity,
     PairingToken,
     UserDeviceLink,
     UserLinkingStore
 )
+from core.v8.telegram_identity import (
+    TelegramIdentity,
+    TelegramLinkRequest,
+    UserTelegramLink,
+    TelegramIdentityManager
+)
+from core.v8.universal_bot import UniversalTelegramBot
 from core.v8.permission_center import (
     PermissionCategory,
     PermissionDefinition,
@@ -60,7 +66,7 @@ from core.v8.events import (
 )
 
 __version__ = "8.0.0"
-PHASE = 38
+PHASE = 39
 
 __all__ = [
     "__version__",
@@ -103,6 +109,11 @@ __all__ = [
     "UserPermissionProfile",
     "PermissionStore",
     "STANDARD_PERMISSIONS",
+    # Universal Telegram Bot & Identity (Phase 39)
+    "TelegramLinkRequest",
+    "UserTelegramLink",
+    "TelegramIdentityManager",
+    "UniversalTelegramBot",
     # Remote Tools (Phase 38)
     "RemoteToolDefinition",
     "RemoteToolRegistry",

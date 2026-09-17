@@ -485,6 +485,11 @@ class BackendService {
     return () => this.remoteListeners.delete(cb);
   }
 
+  public onWsMessage(cb: (event: { type: string; data?: any }) => void): () => void {
+    this.remoteListeners.add(cb);
+    return () => this.remoteListeners.delete(cb);
+  }
+
   private notifyStatus(status: BackendStatus) {
     this.currentStatus = status;
     this.statusListeners.forEach((cb) => {
@@ -587,7 +592,12 @@ class BackendService {
               }
             });
           } else if (
-            ["permission_changed", "pairing_code_generated", "device_paired", "device_unpaired", "session_locked", "session_logout"].includes(payload.type)
+            [
+              "permission_changed", "pairing_code_generated", "device_paired", "device_unpaired",
+              "session_locked", "session_logout",
+              "PAIRING_CREATED", "PAIRING_WAITING", "PAIRING_VERIFIED", "PAIRING_FAILED", "PAIRING_EXPIRED",
+              "TELEGRAM_CONNECTED", "TELEGRAM_DISCONNECTED",
+            ].includes(payload.type)
           ) {
             this.remoteListeners.forEach((cb) => {
               try {
@@ -1557,6 +1567,175 @@ class BackendService {
       return { ok: false, total: 0, events: [], error: String(err) };
     }
   }
+
+  // ========== Phase 39: Universal Telegram Identity & OTP Linking API ==========
+
+  public async startTelegramLink(mikasaUserId: string = "admin"): Promise<TelegramLinkStartResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/telegram/link/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mikasa_user_id: mikasaUserId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async verifyTelegramLink(
+    otp: string,
+    telegramUserId: number,
+    username?: string,
+    firstName?: string,
+    requestId?: string
+  ): Promise<TelegramLinkVerifyResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/telegram/link/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          otp,
+          telegram_user_id: telegramUserId,
+          username,
+          first_name: firstName,
+          request_id: requestId,
+        }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getTelegramLinkStatus(
+    requestId?: string,
+    mikasaUserId: string = "admin"
+  ): Promise<TelegramLinkStatusResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (requestId) params.append("request_id", requestId);
+      if (mikasaUserId) params.append("mikasa_user_id", mikasaUserId);
+      const res = await fetch(`${API_BASE}/api/telegram/link/status?${params.toString()}`);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, status: "ERROR", is_linked: false, error: String(err) };
+    }
+  }
+
+  public async unlinkTelegramAccount(
+    mikasaUserId: string = "admin",
+    telegramUserId?: number
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/telegram/unlink`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mikasa_user_id: mikasaUserId, telegram_user_id: telegramUserId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getTelegramAccount(mikasaUserId: string = "admin"): Promise<TelegramAccountResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/telegram/account?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, is_linked: false, error: String(err) };
+    }
+  }
+
+  public async getTelegramBotStatus(): Promise<TelegramBotStatusResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/telegram/status`);
+      return await res.json();
+    } catch (err: any) {
+      return {
+        ok: false,
+        configured: false,
+        bot_username: "MikasaUniversalBot",
+        active_links_count: 0,
+        pending_requests_count: 0,
+        error: String(err),
+      };
+    }
+  }
+}
+
+export interface TelegramLinkStartResponse {
+  ok: boolean;
+  request_id?: string;
+  otp?: string;
+  link_token?: string;
+  deep_link?: string;
+  expires_at?: number;
+  ttl_seconds?: number;
+  bot_username?: string;
+  error?: string;
+}
+
+export interface TelegramLinkVerifyResponse {
+  ok: boolean;
+  message?: string;
+  link?: {
+    id: string;
+    mikasa_user_id: string;
+    telegram_user_id: number;
+    linked_at: number;
+    last_verified_at: number;
+    status: string;
+    metadata?: Record<string, any>;
+  };
+  mikasa_user_id?: string;
+  error?: string;
+}
+
+export interface TelegramLinkStatusResponse {
+  ok: boolean;
+  status: string;
+  is_linked: boolean;
+  telegram_user_id?: number | null;
+  link?: any;
+  attempt_count?: number;
+  expires_at?: number;
+  ttl_seconds?: number;
+  error?: string;
+}
+
+export interface TelegramAccountResponse {
+  ok: boolean;
+  is_linked: boolean;
+  link?: {
+    id: string;
+    mikasa_user_id: string;
+    telegram_user_id: number;
+    linked_at: number;
+    last_verified_at: number;
+    status: string;
+    metadata?: Record<string, any>;
+  } | null;
+  telegram_identity?: {
+    telegram_user_id: number;
+    first_name?: string;
+    username?: string;
+    created_at?: number;
+    last_seen_at?: number;
+    is_verified?: boolean;
+    is_linked?: boolean;
+  } | null;
+  error?: string;
+}
+
+export interface TelegramBotStatusResponse {
+  ok: boolean;
+  configured: boolean;
+  bot_username: string;
+  active_links_count: number;
+  pending_requests_count: number;
+  error?: string;
 }
 
 export const backendService = new BackendService();

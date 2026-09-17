@@ -8,6 +8,7 @@ import {
   SchedulerIcon,
   PluginsIcon,
   RemoteControlIcon,
+  TelegramIcon,
   CollapseSidebarIcon,
   ExpandSidebarIcon,
   SearchIcon,
@@ -50,6 +51,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
       { id: "scheduler", path: "/scheduler", label: "Rejalashtiruvchi", icon: SchedulerIcon },
       { id: "plugins", path: "/plugins", label: "Plaginlar", icon: PluginsIcon },
       { id: "remote", path: "/remote", label: "Masofaviy Boshqaruv", icon: RemoteControlIcon },
+      { id: "telegram", path: "/telegram", label: "Telegram Bot", icon: TelegramIcon },
     ],
   },
 ];
