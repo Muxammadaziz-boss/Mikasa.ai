@@ -1,7 +1,6 @@
 # ========== core/v8/planning_remote.py ==========
 # Phase 35 — Remote Multi-Step Task Planning DAG
 
-from typing import List, Dict
 from core.intelligence.types import PlanStep, AgentPlan, PlanStatus
 from core.intelligence.planner import DependencyGraph
 
