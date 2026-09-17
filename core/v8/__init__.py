@@ -69,8 +69,27 @@ from core.v8.remote_tools import (
     RemoteToolDefinition,
     RemoteToolRegistry
 )
-from core.v8.remote_orchestrator import RemoteOrchestrator
-from core.v8.planning_remote import create_remote_wake_and_verify_dag
+from core.v8.remote_orchestrator import (
+    RemoteOrchestrator,
+    create_remote_wake_and_verify_dag
+)
+from core.v8.device_pairing import (
+    DevicePairingSession,
+    DevicePairingManager
+)
+from core.v8.device_enrollment import (
+    DeviceCredential,
+    SecureCredentialStore,
+    WindowsCredentialStore,
+    MockCredentialStore,
+    DeviceEnrollmentManager
+)
+from core.v8.device_auth import (
+    DeviceAuthChallenge,
+    DeviceSession,
+    DeviceAuthManager
+)
+from core.v8.device_agent_crypto import DeviceAgentCrypto
 from core.v8.events import (
     RemoteEventType,
     RemoteAuditLogger,
@@ -80,7 +99,7 @@ from core.v8.events import (
 )
 
 __version__ = "8.0.0"
-PHASE = 41
+PHASE = 42
 
 __all__ = [
     "__version__",
@@ -151,4 +170,16 @@ __all__ = [
     "RemoteAuditEvent",
     "sanitize_sensitive_string",
     "sanitize_event_data",
+    # PC Agent Enrollment & Pairing (Phase 42)
+    "DevicePairingSession",
+    "DevicePairingManager",
+    "DeviceCredential",
+    "SecureCredentialStore",
+    "WindowsCredentialStore",
+    "MockCredentialStore",
+    "DeviceEnrollmentManager",
+    "DeviceAuthChallenge",
+    "DeviceSession",
+    "DeviceAuthManager",
+    "DeviceAgentCrypto",
 ]

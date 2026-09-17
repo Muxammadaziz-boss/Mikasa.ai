@@ -2381,6 +2381,7 @@ def _get_request_user_id(request) -> str:
 
     uid = (
         request.headers.get("X-Mikasa-User-Id")
+        or request.headers.get("X-User-Id")
         or request.query.get("user_id")
         or request.query.get("mikasa_user_id")
         or "admin"
@@ -2701,6 +2702,239 @@ async def handle_auth_change_password(request):
     })
 
 
+# ========== 8.3. PHASE 42: DEVICE ENROLLMENT & PAIRING API ==========
+
+async def handle_device_pairing_start(request):
+    """POST /api/devices/pairing/start - Yangi PC Agent juftlash kodini generatsiya qilish"""
+    session, user = get_authenticated_user(request)
+    user_id = user.id if user else _get_request_user_id(request)
+    if not user_id:
+        return web.json_response({
+            "ok": False,
+            "error": "Avtorizatsiyadan o'tilmagan. Ro'yxatdan o'tgan foydalanuvchi talab qilinadi."
+        }, status=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    ttl = body.get("ttl", 300.0)
+    meta = body.get("metadata", {})
+
+    from core.v8.device_pairing import DevicePairingManager
+    mgr = DevicePairingManager.get_default_instance()
+
+    try:
+        pairing_sess, raw_code = mgr.start_pairing(
+            user_id=user_id,
+            ttl_seconds=float(ttl),
+            request_metadata=meta
+        )
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+    await broadcast_ws("DEVICE_PAIRING_STARTED", {
+        "user_id": user_id,
+        "pairing_id": pairing_sess.id,
+        "expires_at": pairing_sess.expires_at
+    })
+
+    return web.json_response({
+        "ok": True,
+        "success": True,
+        "pairing_id": pairing_sess.id,
+        "code": raw_code,
+        "expires_at": pairing_sess.expires_at,
+        "expires_in": int(pairing_sess.remaining_seconds)
+    })
+
+
+async def handle_device_pairing_status(request):
+    """GET /api/devices/pairing/{pairing_id} - Juftlash sessiyasi holatini tekshirish"""
+    pairing_id = request.match_info.get("pairing_id", "")
+    from core.v8.device_pairing import DevicePairingManager
+    mgr = DevicePairingManager.get_default_instance()
+    sess = mgr.get_session(pairing_id)
+
+    if not sess:
+        return web.json_response({"ok": False, "error": "Juftlash sessiyasi topilmadi"}, status=404)
+
+    return web.json_response({
+        "ok": True,
+        "session": sess.to_dict(),
+        "status": sess.status,
+        "remaining_seconds": sess.remaining_seconds,
+        "device_id": sess.device_id
+    })
+
+
+async def handle_device_pairing_cancel(request):
+    """POST /api/devices/pairing/{pairing_id}/cancel - Juftlash sessiyasini bekor qilish"""
+    session, user = get_authenticated_user(request)
+    user_id = user.id if user else _get_request_user_id(request)
+    pairing_id = request.match_info.get("pairing_id", "")
+
+    from core.v8.device_pairing import DevicePairingManager
+    mgr = DevicePairingManager.get_default_instance()
+    ok, msg = mgr.cancel_pairing(pairing_id, user_id=user_id)
+
+    if not ok:
+        status_code = 404 if "NOT_FOUND" in msg else 403
+        return web.json_response({"ok": False, "error": msg}, status=status_code)
+
+    await broadcast_ws("DEVICE_PAIRING_CANCELLED", {
+        "user_id": user_id,
+        "pairing_id": pairing_id
+    })
+
+    return web.json_response({"ok": True, "message": msg})
+
+
+async def handle_device_pairing_complete(request):
+    """POST /api/devices/pairing/complete - PC Agent enrollment va juftlashni yakunlash"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    pairing_id = body.get("pairing_id", "")
+    code = body.get("code", "")
+    public_key = body.get("public_key", "")
+    dev_info = body.get("device", {}) or {}
+
+    if not pairing_id or not code:
+        return web.json_response({"ok": False, "error": "pairing_id va code kiritilishi shart"}, status=400)
+
+    if not public_key:
+        return web.json_response({"ok": False, "error": "public_key (Ed25519) kiritilishi shart"}, status=400)
+
+    from core.v8.device_pairing import DevicePairingManager
+    from core.v8.device_enrollment import DeviceEnrollmentManager
+    pairing_mgr = DevicePairingManager.get_default_instance()
+    enroll_mgr = DeviceEnrollmentManager.get_default_instance()
+
+    # 1. Kodni tekshirish
+    ok, msg, sess = pairing_mgr.verify_code(pairing_id, code)
+    if not ok or not sess:
+        status_code = 404 if "NOT_FOUND" in msg else 400
+        return web.json_response({"ok": False, "error": msg}, status=status_code)
+
+    # 2. Qurilma identifikatsiyasini aniqlash
+    dev_id = dev_info.get("device_id")
+    hostname = dev_info.get("hostname", "Mikasa-PC")
+    platform_name = dev_info.get("platform", "Windows")
+    os_version = dev_info.get("os_version", "10")
+    fingerprint = dev_info.get("fingerprint", "")
+    friendly_name = dev_info.get("name") or hostname
+
+    if not dev_id:
+        from core.v8.device import DeviceIdentityManager
+        fp = fingerprint or DeviceIdentityManager.compute_fingerprint(hostname=hostname)
+        dev_id = f"{hostname}@{fp[:8]}"
+
+    # 3. Qurilmani hisob egasiga (sess.user_id) enroll qilish
+    enroll_ok, enroll_msg, cred, device = enroll_mgr.enroll_device(
+        user_id=sess.user_id,
+        device_id=dev_id,
+        public_key=public_key,
+        name=friendly_name,
+        hostname=hostname,
+        platform_name=platform_name,
+        os_version=os_version,
+        fingerprint=fingerprint,
+        metadata=dev_info.get("metadata", {})
+    )
+
+    if not enroll_ok or not device or not cred:
+        return web.json_response({"ok": False, "error": enroll_msg}, status=400)
+
+    # 4. Juftlash sessiyasini yakunlash
+    pairing_mgr.complete_pairing(
+        pairing_id=pairing_id,
+        code=code,
+        device_id=device.device_id,
+        device_info=dev_info,
+        user_id=sess.user_id
+    )
+
+    await broadcast_ws("DEVICE_ENROLLED", {
+        "user_id": sess.user_id,
+        "device_id": device.device_id,
+        "device": device.to_dict()
+    })
+
+    return web.json_response({
+        "ok": True,
+        "success": True,
+        "message": "Qurilma muvaffaqiyatli hisobga biriktirildi (enrolled)",
+        "device": device.to_dict(),
+        "credential": {
+            "id": cred.id,
+            "algorithm": cred.algorithm,
+            "public_key": cred.public_key,
+            "enrolled_at": cred.enrolled_at
+        }
+    })
+
+
+async def handle_device_auth_challenge(request):
+    """POST /api/devices/{device_id}/challenge - Autentifikatsiya uchun bir martalik nonce olish"""
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8.device_auth import DeviceAuthManager
+    auth_mgr = DeviceAuthManager.get_default_instance()
+
+    ok, msg, data = auth_mgr.issue_challenge(dev_id)
+    if not ok or not data:
+        status_code = 404 if "NOT_ENROLLED" in msg else 400
+        return web.json_response({"ok": False, "error": msg}, status=status_code)
+
+    return web.json_response({
+        "ok": True,
+        "success": True,
+        **data
+    })
+
+
+async def handle_device_auth_authenticate(request):
+    """POST /api/devices/{device_id}/authenticate - Imzolangan chaqiriqni tekshirish va DeviceSession berish"""
+    dev_id = request.match_info.get("device_id", "")
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    challenge_id = body.get("challenge_id", "")
+    signature = body.get("signature", "")
+    context = body.get("context", {})
+
+    if not challenge_id or not signature:
+        return web.json_response({"ok": False, "error": "challenge_id va signature kiritilishi shart"}, status=400)
+
+    from core.v8.device_auth import DeviceAuthManager
+    auth_mgr = DeviceAuthManager.get_default_instance()
+
+    ok, msg, dev_sess = auth_mgr.verify_challenge_response(
+        device_id=dev_id,
+        challenge_id=challenge_id,
+        signature_hex=signature,
+        context=context
+    )
+
+    if not ok or not dev_sess:
+        status_code = 401 if "INVALID_SIGNATURE" in msg or "REPLAY" in msg else 400
+        return web.json_response({"ok": False, "error": msg}, status=status_code)
+
+    return web.json_response({
+        "ok": True,
+        "success": True,
+        "session_token": dev_sess.token,
+        "session_id": dev_sess.session_id,
+        "expires_at": dev_sess.expires_at,
+        "protocol_version": dev_sess.protocol_version
+    })
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -2889,6 +3123,14 @@ def create_app():
     app.router.add_post("/api/auth/forgot-password", handle_auth_forgot_password)
     app.router.add_post("/api/auth/reset-password", handle_auth_reset_password)
     app.router.add_post("/api/auth/change-password", handle_auth_change_password)
+
+    # Phase 42: Device Enrollment & Cryptographic Pairing
+    app.router.add_post("/api/devices/pairing/start", handle_device_pairing_start)
+    app.router.add_post("/api/devices/pairing/complete", handle_device_pairing_complete)
+    app.router.add_get("/api/devices/pairing/{pairing_id}", handle_device_pairing_status)
+    app.router.add_post("/api/devices/pairing/{pairing_id}/cancel", handle_device_pairing_cancel)
+    app.router.add_post("/api/devices/{device_id}/challenge", handle_device_auth_challenge)
+    app.router.add_post("/api/devices/{device_id}/authenticate", handle_device_auth_authenticate)
 
     return app
 

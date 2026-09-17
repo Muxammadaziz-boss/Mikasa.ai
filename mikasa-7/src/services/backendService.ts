@@ -2050,6 +2050,119 @@ class BackendService {
   }): Promise<{ ok: boolean; message?: string; error?: string }> {
     return this.resetPassword(payload);
   }
+
+  // ========== Phase 42: Device Enrollment & Pairing ==========
+  public async startDevicePairing(ttl: number = 300): Promise<DevicePairingStartResponse> {
+    try {
+      const headers = {
+        ...this.getAuthHeaders(),
+        "Content-Type": "application/json",
+      };
+      const res = await fetch(`${API_BASE}/api/devices/pairing/start`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ttl }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  public async getDevicePairingStatus(pairingId: string): Promise<DevicePairingStatusResponse> {
+    try {
+      const headers = this.getAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/devices/pairing/${encodeURIComponent(pairingId)}`, {
+        method: "GET",
+        headers,
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  public async cancelDevicePairing(pairingId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const headers = {
+        ...this.getAuthHeaders(),
+        "Content-Type": "application/json",
+      };
+      const res = await fetch(`${API_BASE}/api/devices/pairing/${encodeURIComponent(pairingId)}/cancel`, {
+        method: "POST",
+        headers,
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  public async completeDevicePairing(payload: {
+    pairing_id: string;
+    code: string;
+    public_key: string;
+    device: {
+      hostname: string;
+      platform?: string;
+      os_version?: string;
+      name?: string;
+      fingerprint?: string;
+      device_id?: string;
+    };
+  }): Promise<DevicePairingCompleteResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/pairing/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+}
+
+export interface DevicePairingStartResponse {
+  ok: boolean;
+  success?: boolean;
+  pairing_id?: string;
+  code?: string;
+  expires_at?: number;
+  expires_in?: number;
+  error?: string;
+}
+
+export interface DevicePairingStatusResponse {
+  ok: boolean;
+  session?: {
+    id: string;
+    user_id: string;
+    status: string;
+    remaining_seconds: number;
+    device_id?: string;
+    created_at: number;
+    expires_at: number;
+  };
+  status?: string;
+  remaining_seconds?: number;
+  device_id?: string;
+  error?: string;
+}
+
+export interface DevicePairingCompleteResponse {
+  ok: boolean;
+  success?: boolean;
+  message?: string;
+  device?: UserDevice;
+  credential?: {
+    id: string;
+    algorithm: string;
+    public_key: string;
+    enrolled_at?: number;
+  };
+  error?: string;
 }
 
 export interface TelegramLinkStartResponse {

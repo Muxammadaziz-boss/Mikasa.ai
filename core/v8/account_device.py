@@ -628,6 +628,31 @@ class AccountDeviceManager:
             if ctx.device_id in (dev.device_id, dev.id):
                 self.clear_selected_device(uid)
 
+        # 6. Phase 42 Kaskad: DeviceCredential va DeviceSession bekor qilish
+        try:
+            from core.v8.device_enrollment import DeviceEnrollmentManager
+            dem = DeviceEnrollmentManager.get_default_instance()
+            dem.revoke_credential(dev.device_id, user_id=dev.mikasa_user_id)
+            dem.revoke_credential(dev.id, user_id=dev.mikasa_user_id)
+        except Exception as e:
+            logger.debug(f"[AccountDeviceManager] Credential bekor qilishda ogohlantirish: {e}")
+
+        try:
+            from core.v8.device_auth import DeviceAuthManager
+            dam = DeviceAuthManager.get_default_instance()
+            dam.terminate_device_sessions(dev.device_id)
+            dam.terminate_device_sessions(dev.id)
+        except Exception as e:
+            logger.debug(f"[AccountDeviceManager] Device session to'xtatishda ogohlantirish: {e}")
+
+        try:
+            from core.v8.device_pairing import DevicePairingManager
+            dpm = DevicePairingManager.get_default_instance()
+            dpm.revoke_sessions_for_device(dev.device_id, user_id=dev.mikasa_user_id)
+            dpm.revoke_sessions_for_device(dev.id, user_id=dev.mikasa_user_id)
+        except Exception as e:
+            logger.debug(f"[AccountDeviceManager] Pairing sessiyalarni bekor qilishda ogohlantirish: {e}")
+
         self.save()
 
         self._audit.log(

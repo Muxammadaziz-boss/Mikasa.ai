@@ -82,6 +82,15 @@ class RemoteEventType(str, Enum):
     EMAIL_VERIFICATION_REQUESTED = "EMAIL_VERIFICATION_REQUESTED"
     EMAIL_VERIFIED = "EMAIL_VERIFIED"
     SESSION_REVOKED = "SESSION_REVOKED"
+    # Phase 42 — Secure PC Agent Enrollment & Pairing Events
+    DEVICE_PAIRING_STARTED = "DEVICE_PAIRING_STARTED"
+    DEVICE_PAIRING_FAILED = "DEVICE_PAIRING_FAILED"
+    DEVICE_PAIRING_EXPIRED = "DEVICE_PAIRING_EXPIRED"
+    DEVICE_PAIRING_COMPLETED = "DEVICE_PAIRING_COMPLETED"
+    DEVICE_ENROLLED = "DEVICE_ENROLLED"
+    DEVICE_CREDENTIAL_CREATED = "DEVICE_CREDENTIAL_CREATED"
+    DEVICE_AUTH_SUCCESS = "DEVICE_AUTH_SUCCESS"
+    DEVICE_REENROLLED = "DEVICE_REENROLLED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -104,7 +113,9 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
     sensitive_keys = {
         "token", "bot_token", "password", "secret", "pairing_token",
         "auth_header", "pin", "auth_code", "session_token",
-        "pairing_code", "pairing_secret", "raw_file_content", "private_key",
+        "pairing_code", "raw_code", "code", "pairing_secret", "raw_file_content",
+        "private_key", "device_private_key", "raw_nonce", "raw_credential",
+        "challenge_nonce", "keypair", "device_session_token",
         "secret_hash", "otp", "otp_hash", "link_token",
         "password_confirmation", "raw_password", "current_password",
         "new_password", "new_password_confirmation", "raw_token",
