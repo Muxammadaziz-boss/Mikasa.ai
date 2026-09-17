@@ -123,8 +123,8 @@ class HeartbeatManager:
 
     def _notify_state_change(self, device_id: str, old_state: DeviceState, new_state: DeviceState):
         logger.info(f"[Heartbeat] Qurilma '{device_id}': {old_state.value} -> {new_state.value}")
-        for l in self._listeners:
+        for listener in self._listeners:
             try:
-                l(device_id, old_state, new_state)
+                listener(device_id, old_state, new_state)
             except Exception as e:
                 logger.error(f"Listener error: {e}")

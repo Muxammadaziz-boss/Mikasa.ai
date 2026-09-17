@@ -95,6 +95,7 @@ class WakeOnLanManager:
                 if res:
                     successful_attempts += 1
                     logger.info(f"[WoL] Magic packet muvaffaqiyatli yuborildi ({attempt}/{self.retry_count}) -> {mac_address}")
+                    break
             except Exception as e:
                 last_err = str(e)
                 logger.warning(f"[WoL] Urinish {attempt} muvaffaqiyatsiz: {e}")
