@@ -57,11 +57,18 @@ class SessionManager:
     """
     Faol masofaviy sessiyalar registratori va muddati o'tgan sessiyalarni tozalash dvigateli.
     """
+    _default_instance: Optional["SessionManager"] = None
 
     def __init__(self, default_ttl: float = 900.0):
         self.default_ttl = default_ttl  # Standart: 15 daqiqa (900s)
         self._sessions: Dict[str, RemoteAuthSession] = {}  # f"{user_id}:{device_id}" -> session
         self._audit = RemoteAuditLogger.get_instance()
+
+    @classmethod
+    def get_default_instance(cls, default_ttl: float = 900.0) -> "SessionManager":
+        if cls._default_instance is None:
+            cls._default_instance = cls(default_ttl=default_ttl)
+        return cls._default_instance
 
     def _get_key(self, user_id: str, device_id: str) -> str:
         return f"{str(user_id)}:{str(device_id)}"
@@ -154,6 +161,53 @@ class SessionManager:
                 session.close()
                 closed_count += 1
         return closed_count
+
+    def get_sessions_for_user(self, user_id: str, current_time: Optional[float] = None) -> List[RemoteAuthSession]:
+        """Foydalanuvchining barcha faol sessiyalarini olish (Phase 40)"""
+        now = current_time if current_time is not None else time.time()
+        active = []
+        user_str = str(user_id)
+        for session in list(self._sessions.values()):
+            if session.user_id == user_str:
+                if session.is_valid(now):
+                    active.append(session)
+                elif session.is_active:
+                    session.close()
+        return active
+
+    def logout_all_sessions(self, user_id: str) -> int:
+        """Foydalanuvchining barcha faol sessiyalarini yopish (Phase 40)"""
+        user_str = str(user_id)
+        count = 0
+        for session in list(self._sessions.values()):
+            if session.user_id == user_str and session.is_active:
+                session.close()
+                count += 1
+                self._audit.log(
+                    RemoteEventType.SESSION_LOGOUT,
+                    user_id=user_str,
+                    device_id=session.device_id,
+                    session_id=session.session_id
+                )
+        return count
+
+    def terminate_device_sessions(self, device_id: str, user_id: Optional[str] = None) -> int:
+        """Berilgan qurilmadagi barcha faol sessiyalarni yopish (Phase 40)"""
+        dev_str = str(device_id)
+        user_str = str(user_id) if user_id is not None else None
+        count = 0
+        for session in list(self._sessions.values()):
+            if session.device_id == dev_str and (user_str is None or session.user_id == user_str) and session.is_active:
+                session.close()
+                count += 1
+                self._audit.log(
+                    RemoteEventType.SESSION_CLOSED,
+                    user_id=session.user_id,
+                    device_id=session.device_id,
+                    session_id=session.session_id,
+                    reason="device_revoked"
+                )
+        return count
 
 
 class RemoteAuthEngine:

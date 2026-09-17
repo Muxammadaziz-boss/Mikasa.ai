@@ -337,6 +337,21 @@ class PermissionStore:
         profile = self.get_profile(user_id, device_id)
         return [k for k, v in profile.capabilities.items() if v]
 
+    def revoke_device_permissions(self, user_id: str, device_id: str) -> bool:
+        """Qurilma o'chirilganda yoki bekor qilinganda uning ruxsat profilini tozalash (Phase 40)"""
+        key = self._get_key(user_id, device_id)
+        if key in self._profiles:
+            del self._profiles[key]
+            self.save()
+            self._audit.log(
+                RemoteEventType.PERMISSION_REVOKED,
+                user_id=str(user_id),
+                device_id=str(device_id),
+                details={"reason": "device_revoked"}
+            )
+            return True
+        return False
+
     def add_observer(self, callback: Callable):
         """Observer listener qo'shish"""
         self.subscribe(callback)

@@ -17,15 +17,21 @@ import {
   KeyIcon,
   PlayIcon,
   TrashIcon,
+  LaptopIcon,
+  TelegramIcon,
+  ExternalLinkIcon,
 } from "../components/icons/Icons";
 import { Avatar } from "../components/Avatar";
 import {
   backendService,
   AccountSettings,
+  UserSession,
 } from "../services/backendService";
 
 interface AccountPageProps {
   onNavigateHome: () => void;
+  onNavigateToDevices?: () => void;
+  onNavigateToTelegram?: () => void;
   onUserUpdated?: (name: string, avatar?: string) => void;
 }
 
@@ -47,7 +53,12 @@ const AVATAR_PALETTES = [
   { id: "rose", name: "Nozik Atirgul", color: "#F43F5E" },
 ];
 
-export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUserUpdated }) => {
+export const AccountPage: React.FC<AccountPageProps> = ({
+  onNavigateHome,
+  onNavigateToDevices,
+  onNavigateToTelegram,
+  onUserUpdated,
+}) => {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -105,6 +116,13 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
     license: "Personal / Commercial AI Assistant",
   });
 
+  // Phase 40 Multi-Device, Sessions, and Telegram States
+  const [deviceCount, setDeviceCount] = useState<number>(0);
+  const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null);
+  const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
+  const [loggingOutSessions, setLoggingOutSessions] = useState<boolean>(false);
+  const [telegramStatus, setTelegramStatus] = useState<{ is_linked: boolean; username?: string; id?: number } | null>(null);
+
   useEffect(() => {
     let mounted = true;
     const fetchAccount = async () => {
@@ -151,6 +169,38 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
           setAppInfo((prev) => ({ ...prev, ...data.app_info }));
         }
 
+        // Phase 40: Load devices, sessions, and Telegram status
+        try {
+          const devRes = await backendService.getDevices();
+          if (mounted && devRes.ok && devRes.devices) {
+            setDeviceCount(devRes.devices.length);
+            const sel = devRes.devices.find(
+              (d) => d.device_id === devRes.selected_device_id || d.id === devRes.selected_device_id
+            );
+            setSelectedDeviceName(sel ? sel.name : null);
+          }
+        } catch {}
+
+        try {
+          const sessRes = await backendService.getAccountSessions();
+          if (mounted && sessRes.ok && sessRes.sessions) {
+            setActiveSessions(sessRes.sessions);
+          }
+        } catch {}
+
+        try {
+          const tgRes = await backendService.getTelegramAccount();
+          if (mounted && tgRes.ok) {
+            setTelegramStatus({
+              is_linked: tgRes.is_linked,
+              username: tgRes.telegram_identity?.username,
+              id:
+                tgRes.telegram_identity?.telegram_user_id ||
+                (tgRes.link ? tgRes.link.telegram_user_id : undefined),
+            });
+          }
+        } catch {}
+
         setLoading(false);
       }
     };
@@ -159,6 +209,24 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
       mounted = false;
     };
   }, []);
+
+  const handleLogoutAllSessions = async () => {
+    if (!window.confirm("Barcha boshqa qurilmalardagi faol masofaviy sessiyalardan chiqishni tasdiqlaysizmi?")) {
+      return;
+    }
+    setLoggingOutSessions(true);
+    try {
+      const res = await backendService.logoutAllSessions();
+      if (res.ok) {
+        setActiveSessions([]);
+        alert(`${res.terminated_count || 0} ta faol sessiya muvaffaqiyatli yakunlandi.`);
+      }
+    } catch (err: any) {
+      alert(`Xatolik: ${err.message || err}`);
+    } finally {
+      setLoggingOutSessions(false);
+    }
+  };
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -609,6 +677,215 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigateHome, onUser
                         {lang.label}
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Phase 40: Multi-Device & Account Security Summary */}
+                <div
+                  style={{
+                    paddingTop: 16,
+                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary, #F8FAFC)" }}>
+                    Qurilmalar va Masofaviy Boshqaruv (Phase 40)
+                  </h3>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {/* Device Summary Card */}
+                    <div
+                      style={{
+                        padding: "14px 16px",
+                        borderRadius: 10,
+                        background: "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid rgba(255, 255, 255, 0.07)",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary, #94A3B8)", fontSize: 12 }}>
+                          <LaptopIcon size={15} color="#10B981" />
+                          <span>Ulangan Kompyuterlar</span>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>
+                          {deviceCount} ta kompyuter
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)", marginTop: 2 }}>
+                          Faol: {selectedDeviceName || "Tanlanmagan"}
+                        </div>
+                      </div>
+
+                      {onNavigateToDevices && (
+                        <button
+                          type="button"
+                          onClick={onNavigateToDevices}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "var(--primary-glow, #10B981)",
+                            background: "transparent",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            fontWeight: 500,
+                          }}
+                        >
+                          <span>Boshqaruv paneliga o'tish</span>
+                          <ExternalLinkIcon size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Telegram Identity Card */}
+                    <div
+                      style={{
+                        padding: "14px 16px",
+                        borderRadius: 10,
+                        background: "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid rgba(255, 255, 255, 0.07)",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary, #94A3B8)", fontSize: 12 }}>
+                          <TelegramIcon size={15} color="#38BDF8" />
+                          <span>Telegram Bog'lanishi</span>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                          <span
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              backgroundColor: telegramStatus?.is_linked ? "#10B981" : "#64748B",
+                            }}
+                          />
+                          <span>{telegramStatus?.is_linked ? "Bog'langan (Faol)" : "Bog'lanmagan"}</span>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)", marginTop: 2 }}>
+                          {telegramStatus?.username
+                            ? `@${telegramStatus.username}`
+                            : telegramStatus?.id
+                            ? `ID: ${telegramStatus.id}`
+                            : "Ulanish uchun Telegram sahifasiga o'ting"}
+                        </div>
+                      </div>
+
+                      {onNavigateToTelegram && (
+                        <button
+                          type="button"
+                          onClick={onNavigateToTelegram}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "#38BDF8",
+                            background: "transparent",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            fontWeight: 500,
+                          }}
+                        >
+                          <span>Telegram sozlamalari</span>
+                          <ExternalLinkIcon size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Active Remote Sessions Section */}
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: 10,
+                      background: "rgba(0, 0, 0, 0.25)",
+                      border: "1px solid rgba(255, 255, 255, 0.07)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #F8FAFC)" }}>
+                          Faol Masofaviy Sessiyalar ({activeSessions.length})
+                        </span>
+                        <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-secondary, #94A3B8)" }}>
+                          Turli xil kompyuterlar orqali ochilgan faol boshqaruv sessiyalari
+                        </p>
+                      </div>
+
+                      {activeSessions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleLogoutAllSessions}
+                          disabled={loggingOutSessions}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            background: "rgba(239, 68, 68, 0.15)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            color: "#EF4444",
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {loggingOutSessions ? "Chiqilmoqda..." : "Barcha sessiyalardan chiqish"}
+                        </button>
+                      )}
+                    </div>
+
+                    {activeSessions.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "var(--text-muted, #64748B)", padding: "6px 0" }}>
+                        Hozirda birorta ham faol masofaviy sessiya mavjud emas.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {activeSessions.map((sess) => (
+                          <div
+                            key={sess.session_id}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 6,
+                              background: "rgba(255, 255, 255, 0.02)",
+                              border: "1px solid rgba(255, 255, 255, 0.05)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              fontSize: 12,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#10B981" }} />
+                              <span style={{ fontWeight: 500, color: "var(--text-primary, #F8FAFC)" }}>
+                                {sess.device_name || sess.device_id}
+                              </span>
+                              <span style={{ color: "var(--text-muted, #64748B)", fontFamily: "monospace", fontSize: 11 }}>
+                                (ID: {sess.session_id.slice(0, 8)}...)
+                              </span>
+                            </div>
+                            <span style={{ color: "var(--text-muted, #64748B)", fontSize: 11 }}>
+                              Amal qilish muddati: {new Date(sess.expires_at * 1000).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

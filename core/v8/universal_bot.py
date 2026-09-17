@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, Union
 
 from core.v8.telegram_gateway import TelegramTransport, MockTelegramTransport
 from core.v8.telegram_identity import TelegramIdentityManager, TelegramIdentity
+from core.v8.account_device import AccountDeviceManager
 
 logger = logging.getLogger("core.v8.universal_bot")
 
@@ -27,10 +28,12 @@ class UniversalTelegramBot:
         self,
         transport: Optional[TelegramTransport] = None,
         identity_manager: Optional[TelegramIdentityManager] = None,
+        account_device_manager: Optional[AccountDeviceManager] = None,
         bot_username: str = "MikasaUniversalBot"
     ):
         self.transport: TelegramTransport = transport or MockTelegramTransport()
         self.identity_mgr: TelegramIdentityManager = identity_manager or TelegramIdentityManager.get_default_instance()
+        self.account_device_mgr: AccountDeviceManager = account_device_manager or AccountDeviceManager.get_default_instance()
         self.bot_username: str = bot_username.lstrip("@").strip()
 
     async def process_update(self, update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -113,11 +116,21 @@ class UniversalTelegramBot:
         if text.startswith("/account"):
             return await self._handle_account(chat_id, tg_user_id, first_name, username)
 
-        # 6. /status
+        # 6. /devices (Phase 40)
+        if text.startswith("/devices"):
+            return await self._handle_devices(chat_id, tg_user_id)
+
+        # 7. /select <query> (Phase 40)
+        if text.startswith("/select"):
+            parts = text.split(maxsplit=1)
+            query = parts[1].strip() if len(parts) > 1 else ""
+            return await self._handle_select(chat_id, tg_user_id, query)
+
+        # 8. /status
         if text.startswith("/status"):
             return await self._handle_status(chat_id, tg_user_id)
 
-        # 7. /help
+        # 9. /help
         if text.startswith("/help"):
             return await self._handle_help(chat_id, first_name)
 
@@ -233,20 +246,27 @@ class UniversalTelegramBot:
         first_name: Optional[str],
         username: Optional[str]
     ) -> Dict[str, Any]:
-        """Handle /account to inspect linking and identity state."""
+        """Handle /account to inspect linking, identity, and device state."""
         link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
         ident = self.identity_mgr.get_identity(tg_user_id)
 
         if link and link.is_active:
             linked_dt = datetime.fromtimestamp(link.linked_at).strftime("%Y-%m-%d %H:%M:%S")
             uname = f"@{ident.username}" if (ident and ident.username) else (f"@{username}" if username else "Mavjud emas")
+            devices = self.account_device_mgr.get_devices_for_user(link.mikasa_user_id, include_revoked=False)
+            selected = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+            selected_str = f"{selected.name} (`{selected.device_id}`)" if selected else "Tanlanmagan"
+
             text = (
                 "👤 *Mikasa Hisob Ma'lumotlari:*\n\n"
                 f"• Mikasa User ID: `{link.mikasa_user_id}`\n"
                 f"• Telegram ID: `{tg_user_id}`\n"
                 f"• Username: {uname}\n"
                 f"• Bog'langan vaqt: `{linked_dt}`\n"
-                f"• Holat: 🟢 Faol (Active)\n\n"
+                f"• Holat: 🟢 Faol (Active)\n"
+                f"• Ulangan kompyuterlar: {len(devices)} ta\n"
+                f"• Faol tanlangan kompyuter: {selected_str}\n\n"
+                "Qurilmalar ro'yxati: /devices\n"
                 "Hisobni uzish uchun: /unlink"
             )
         else:
@@ -260,6 +280,72 @@ class UniversalTelegramBot:
             )
         return await self._send_reply(chat_id, text)
 
+    async def _handle_devices(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Handle /devices to list user's owned devices and current selection."""
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        if not link or not link.is_active:
+            text = (
+                "🔒 *Hisob bog'lanmagan.*\n\n"
+                "Qurilmalarni ko'rish uchun avval Mikasa hisobingizni bog'lang:\n"
+                "1. Mikasa ilovasidan 6 xonali kod oling.\n"
+                "2. Botga `/link <kod>` yuboring."
+            )
+            return await self._send_reply(chat_id, text)
+
+        devices = self.account_device_mgr.get_devices_for_user(link.mikasa_user_id, include_revoked=False)
+        if not devices:
+            text = (
+                "💻 *Qurilmalar ro'yxati:*\n\n"
+                "Sizning hisobingizga hozircha birorta ham kompyuter ulanmagan.\n"
+                "Mikasa Desktop ilovasi orqali kompyuteringizni ro'yxatdan o'tkazing."
+            )
+            return await self._send_reply(chat_id, text)
+
+        selected = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        selected_dev_id = selected.device_id if selected else None
+
+        lines = ["💻 *Sizning Kompyuterlaringiz:*\n"]
+        for idx, dev in enumerate(devices, start=1):
+            status_dot = "🟢" if dev.is_online else ("🟡" if dev.status.lower() == "standby" else "⚪")
+            selected_badge = " *(Faol)*" if (selected_dev_id and dev.device_id == selected_dev_id) else ""
+            lines.append(f"{idx}. {status_dot} *{dev.name}*{selected_badge}")
+            lines.append(f"   ID: `{dev.device_id}` | Holat: {dev.status.capitalize()}")
+
+        lines.append("\nQurilmani tanlash uchun:\n`/select <nom_yoki_id>`")
+        return await self._send_reply(chat_id, "\n".join(lines))
+
+    async def _handle_select(self, chat_id: Union[int, str], tg_user_id: int, query: str) -> Dict[str, Any]:
+        """Handle /select <name_or_id> to set user's active device."""
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        if not link or not link.is_active:
+            text = (
+                "🔒 *Hisob bog'lanmagan.*\n\n"
+                "Qurilmani tanlash uchun avval hisobingizni bog'lang: /link <kod>"
+            )
+            return await self._send_reply(chat_id, text)
+
+        if not query:
+            text = (
+                "ℹ️ *Qurilma nomi yoki ID talab qilinadi.*\n\n"
+                "Foydalanish: `/select <nom_yoki_id>`\n"
+                "Mavjud qurilmalarni ko'rish uchun: /devices"
+            )
+            return await self._send_reply(chat_id, text)
+
+        ok, msg, dev = self.account_device_mgr.select_device_by_query(link.mikasa_user_id, query)
+        if ok and dev:
+            text = (
+                f"✅ *Faol qurilma tanlandi:*\n\n"
+                f"• Nomi: *{dev.name}*\n"
+                f"• Apparat ID: `{dev.device_id}`\n"
+                f"• Holat: {dev.status.capitalize()}\n\n"
+                "Barcha buyruqlar endi ushbu qurilmaga yo'naltiriladi."
+            )
+            return await self._send_reply(chat_id, text)
+        else:
+            text = f"❌ *Xatolik:*\n{msg}\n\nQurilmalar ro'yxati: /devices"
+            return await self._send_reply(chat_id, text)
+
     async def _handle_status(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
         """Handle /status for system health check."""
         active_links = self.identity_mgr.count_active_links()
@@ -270,7 +356,7 @@ class UniversalTelegramBot:
             f"• Bot Username: `@{self.bot_username}`\n"
             f"• Faol ulanishlar: {active_links}\n"
             f"• Kutilayotgan so'rovlar: {pending_reqs}\n"
-            "• Versiya: `v8.0.0 Phase 39`"
+            "• Versiya: `v8.0.0 Phase 39 / Phase 40`"
         )
         return await self._send_reply(chat_id, text)
 
@@ -281,7 +367,9 @@ class UniversalTelegramBot:
             "• `/start` — Botni ishga tushirish va yo'riqnoma\n"
             "• `/link <kod>` — Mikasa 6 xonali kodi orqali bog'lash\n"
             "• `/unlink` — Telegram hisobini Mikasadan uzish\n"
-            "• `/account` — Bog'langan hisob tafsilotlarini ko'rish\n"
+            "• `/account` — Bog'langan hisob va qurilmalar tafsilotlari\n"
+            "• `/devices` — Sizning barcha kompyuterlaringiz ro'yxati\n"
+            "• `/select <nom>` — Masofaviy boshqaruv uchun faol kompyuterni tanlash\n"
             "• `/status` — Bot va server holatini tekshirish\n"
             "• `/help` — Ushbu yordam menyusi\n\n"
             "💡 *Maslahat:* 6 xonali tasdiqlash kodini to'g'ridan-to'g'ri xabar sifatida ham yuborishingiz mumkin (masalan: `583921`)."

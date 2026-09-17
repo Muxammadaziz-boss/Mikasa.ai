@@ -1639,6 +1639,21 @@ async def handle_account_get(request):
     _, _, mem, _, _, _ = get_modules()
     mem_profile = mem.get_profile() if mem else {}
 
+    # Phase 40 Multi-User Account & Device Management
+    user_id = (
+        request.headers.get("X-Mikasa-User-Id")
+        or request.query.get("user_id")
+        or request.query.get("mikasa_user_id")
+        or "admin"
+    )
+    user_id = str(user_id).strip()
+    from core.v8 import AccountDeviceManager, TelegramIdentityManager
+    from core.v8.auth_session import SessionManager
+    adm = AccountDeviceManager.get_default_instance()
+    tg_mgr = TelegramIdentityManager.get_default_instance()
+    sess_mgr = SessionManager.get_default_instance()
+    account_summary = adm.get_user_account_summary(user_id, tg_identity_mgr=tg_mgr, session_mgr=sess_mgr)
+
     name = user_name or user_cfg.get("name") or mem_profile.get("ism", "Ustoz")
     avatar = user_cfg.get("avatar") or mem_profile.get("avatar", "emerald")
     role = user_cfg.get("role") or mem_profile.get("kasb", "Dasturchi / Muhandis")
@@ -1649,6 +1664,13 @@ async def handle_account_get(request):
 
     return web.json_response({
         "ok": True,
+        "user_id": user_id,
+        "account": account_summary,
+        "devices_count": account_summary["devices_count"],
+        "active_sessions_count": account_summary["active_sessions_count"],
+        "selected_device": account_summary["selected_device"],
+        "telegram_linked": account_summary["telegram_linked"],
+        "telegram_identity": account_summary["telegram_identity"],
         "name": name,
         "avatar": avatar,
         "role": role,
@@ -2319,6 +2341,225 @@ async def handle_telegram_status(request):
     })
 
 
+# ========== 8.1. PHASE 40: UNIVERSAL ACCOUNT & MULTI-DEVICE MANAGEMENT API ==========
+
+def _get_request_user_id(request) -> str:
+    """So'rovdan foydalanuvchi identifikatorini olish (Header, Query yoki Default)."""
+    uid = (
+        request.headers.get("X-Mikasa-User-Id")
+        or request.query.get("user_id")
+        or request.query.get("mikasa_user_id")
+        or "admin"
+    )
+    return str(uid).strip()
+
+
+async def handle_devices_list(request):
+    """GET /api/devices and GET /api/account/devices - Foydalanuvchining ulangan kompyuterlari ro'yxati"""
+    user_id = _get_request_user_id(request)
+    from core.v8 import AccountDeviceManager
+    mgr = AccountDeviceManager.get_default_instance()
+
+    devices = mgr.get_devices_for_user(user_id, include_revoked=False)
+    selected = mgr.get_selected_device(user_id)
+
+    # Agar ro'yxat bo'sh bo'lsa va default admin bo'lsa, lokal qurilmani kiritish
+    if not devices and user_id == "admin":
+        from core.v8 import DeviceIdentityManager
+        loc = DeviceIdentityManager.create_local_identity()
+        dev = mgr.register_device(
+            user_id="admin",
+            device_id=loc.device_id,
+            name="Asosiy Kompyuter",
+            hostname=loc.hostname,
+            platform=loc.os_name.lower(),
+            agent_version=loc.agent_version,
+            status="online"
+        )
+        devices = [dev]
+        mgr.select_device("admin", dev.device_id)
+        selected = dev
+
+    return web.json_response({
+        "ok": True,
+        "user_id": user_id,
+        "devices": [d.to_dict() for d in devices],
+        "selected_device_id": selected.device_id if selected else None
+    })
+
+
+async def handle_device_detail(request):
+    """GET /api/devices/{device_id} - Muayyan qurilma tafsilotlari"""
+    user_id = _get_request_user_id(request)
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8 import AccountDeviceManager
+    mgr = AccountDeviceManager.get_default_instance()
+
+    dev = mgr.get_device(dev_id, user_id=user_id)
+    if not dev or dev.is_revoked:
+        return web.json_response({
+            "ok": False,
+            "error": "Qurilma topilmadi yoki hisobingizga tegishli emas"
+        }, status=404)
+
+    selected = mgr.get_selected_device(user_id)
+    is_selected = selected is not None and (selected.device_id == dev.device_id or selected.id == dev.id)
+
+    return web.json_response({
+        "ok": True,
+        "device": {
+            **dev.to_dict(),
+            "is_selected": is_selected
+        }
+    })
+
+
+async def handle_device_rename(request):
+    """PATCH /api/devices/{device_id} - Qurilma do'stona nomini yangilash"""
+    user_id = _get_request_user_id(request)
+    dev_id = request.match_info.get("device_id", "")
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    new_name = body.get("name", "")
+    from core.v8 import AccountDeviceManager
+    mgr = AccountDeviceManager.get_default_instance()
+
+    ok, msg, dev = mgr.rename_device(dev_id, user_id=user_id, new_name=new_name)
+    if not ok or not dev:
+        status_code = 404 if "NOT_FOUND" in msg else 400
+        return web.json_response({"ok": False, "error": msg}, status=status_code)
+
+    await broadcast_ws("DEVICE_RENAMED", {
+        "user_id": user_id,
+        "device": dev.to_dict()
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": msg,
+        "device": dev.to_dict()
+    })
+
+
+async def handle_device_revoke(request):
+    """DELETE /api/devices/{device_id} - Qurilmani bekor qilish (Revoke & Cascade)"""
+    user_id = _get_request_user_id(request)
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8 import AccountDeviceManager
+    mgr = AccountDeviceManager.get_default_instance()
+
+    ok, msg = mgr.revoke_device(dev_id, user_id=user_id)
+    if not ok:
+        return web.json_response({"ok": False, "error": msg}, status=404)
+
+    await broadcast_ws("DEVICE_REVOKED", {
+        "user_id": user_id,
+        "device_id": dev_id
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": msg,
+        "device_id": dev_id
+    })
+
+
+async def handle_device_select(request):
+    """POST /api/devices/{device_id}/select - Faol qurilmani tanlash"""
+    user_id = _get_request_user_id(request)
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8 import AccountDeviceManager
+    mgr = AccountDeviceManager.get_default_instance()
+
+    ok, msg, dev = mgr.select_device(user_id=user_id, device_id_or_uuid=dev_id)
+    if not ok or not dev:
+        return web.json_response({"ok": False, "error": msg}, status=404)
+
+    await broadcast_ws("DEVICE_SELECTED", {
+        "user_id": user_id,
+        "selected_device_id": dev.device_id,
+        "device": dev.to_dict()
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": msg,
+        "selected_device": dev.to_dict()
+    })
+
+
+async def handle_device_permissions(request):
+    """GET /api/devices/{device_id}/permissions - Qurilma uchun foydalanuvchi ruxsatlari"""
+    user_id = _get_request_user_id(request)
+    dev_id = request.match_info.get("device_id", "")
+    from core.v8 import AccountDeviceManager, PermissionStore
+    mgr = AccountDeviceManager.get_default_instance()
+
+    dev = mgr.get_device(dev_id, user_id=user_id)
+    if not dev or dev.is_revoked:
+        return web.json_response({
+            "ok": False,
+            "error": "Qurilma topilmadi yoki hisobingizga tegishli emas"
+        }, status=404)
+
+    store = PermissionStore.get_default_instance()
+    profile = store.get_profile(user_id, dev.device_id)
+
+    return web.json_response({
+        "ok": True,
+        "device_id": dev.device_id,
+        "profile": profile.to_dict(),
+        "catalog": store.get_catalog()
+    })
+
+
+async def handle_account_sessions(request):
+    """GET /api/account/sessions - Foydalanuvchining barcha faol sessiyalari"""
+    user_id = _get_request_user_id(request)
+    from core.v8.auth_session import SessionManager
+    from core.v8 import AccountDeviceManager
+    sm = SessionManager.get_default_instance()
+    adm = AccountDeviceManager.get_default_instance()
+
+    sessions = sm.get_sessions_for_user(user_id)
+    sessions_data = []
+    for s in sessions:
+        dev = adm.get_device(s.device_id, user_id=user_id)
+        dev_name = dev.name if dev else s.device_id
+        d = s.to_dict()
+        d["device_name"] = dev_name
+        sessions_data.append(d)
+
+    return web.json_response({
+        "ok": True,
+        "user_id": user_id,
+        "sessions": sessions_data,
+        "total": len(sessions_data)
+    })
+
+
+async def handle_account_sessions_logout_all(request):
+    """POST /api/account/sessions/logout-all - Barcha sessiyalarni to'xtatish"""
+    user_id = _get_request_user_id(request)
+    from core.v8.auth_session import SessionManager
+    sm = SessionManager.get_default_instance()
+
+    count = sm.logout_all_sessions(user_id)
+    await broadcast_ws("SESSION_LOGOUT", {
+        "user_id": user_id,
+        "terminated_count": count
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": f"Barcha ({count} ta) faol sessiyalar muvaffaqiyatli to'xtatildi",
+        "terminated_count": count
+    })
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -2395,7 +2636,7 @@ async def cors_middleware(request, handler):
 
     allowed_header_origin = origin if origin else "tauri://localhost"
     response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, OPTIONS, DELETE"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
@@ -2485,6 +2726,17 @@ def create_app():
     app.router.add_post("/api/telegram/unlink", handle_telegram_unlink)
     app.router.add_get("/api/telegram/account", handle_telegram_account)
     app.router.add_get("/api/telegram/status", handle_telegram_status)
+
+    # Phase 40: Universal Account & Multi-Device Management
+    app.router.add_get("/api/account/devices", handle_devices_list)
+    app.router.add_get("/api/devices", handle_devices_list)
+    app.router.add_get("/api/devices/{device_id}", handle_device_detail)
+    app.router.add_patch("/api/devices/{device_id}", handle_device_rename)
+    app.router.add_delete("/api/devices/{device_id}", handle_device_revoke)
+    app.router.add_post("/api/devices/{device_id}/select", handle_device_select)
+    app.router.add_get("/api/devices/{device_id}/permissions", handle_device_permissions)
+    app.router.add_get("/api/account/sessions", handle_account_sessions)
+    app.router.add_post("/api/account/sessions/logout-all", handle_account_sessions_logout_all)
 
     return app
 

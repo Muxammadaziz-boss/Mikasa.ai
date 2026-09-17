@@ -468,6 +468,13 @@ export const ArrowLeftIcon: React.FC<IconProps> = ({ size = 16, color = "current
   </svg>
 );
 
+export const LaptopIcon: React.FC<IconProps> = ({ size = 16, color = "currentColor", className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <line x1="2" y1="20" x2="22" y2="20" />
+  </svg>
+);
+
 
 
 

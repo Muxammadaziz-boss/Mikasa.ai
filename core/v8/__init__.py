@@ -44,6 +44,13 @@ from core.v8.telegram_identity import (
     TelegramIdentityManager
 )
 from core.v8.universal_bot import UniversalTelegramBot
+from core.v8.account_device import (
+    MikasaUser,
+    Device,
+    UserDeviceLink as AccountUserDeviceLink,
+    UserDeviceContext,
+    AccountDeviceManager
+)
 from core.v8.permission_center import (
     PermissionCategory,
     PermissionDefinition,
@@ -66,12 +73,17 @@ from core.v8.events import (
 )
 
 __version__ = "8.0.0"
-PHASE = 39
+PHASE = 40
 
 __all__ = [
     "__version__",
     "PHASE",
-    # Device
+    # Device & Accounts (Phase 40)
+    "MikasaUser",
+    "Device",
+    "AccountDeviceManager",
+    "UserDeviceContext",
+    # Device (Phase 35)
     "DeviceIdentity",
     "DeviceIdentityManager",
     "DevicePairingRecord",

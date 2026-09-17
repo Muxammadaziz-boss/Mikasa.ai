@@ -430,6 +430,7 @@ class BackendService {
   private agentListeners: Set<(event: AgentEventData) => void> = new Set();
   private metricsListeners: Set<(metrics: SystemMetrics) => void> = new Set();
   private remoteListeners: Set<(event: { type: string; data: any }) => void> = new Set();
+  private generalListeners: Set<(event: any) => void> = new Set();
   private clientVoiceStopFn: (() => void) | null = null;
 
   constructor() {
@@ -438,6 +439,11 @@ class BackendService {
   }
 
   // ========== Listeners ==========
+  public subscribe(cb: (event: any) => void): () => void {
+    this.generalListeners.add(cb);
+    return () => this.generalListeners.delete(cb);
+  }
+
   public onStatusChange(cb: (status: BackendStatus) => void): () => void {
     this.statusListeners.add(cb);
     cb(this.currentStatus);
@@ -530,6 +536,13 @@ class BackendService {
       this.ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
+          this.generalListeners.forEach((cb) => {
+            try {
+              cb(payload);
+            } catch (e) {
+              console.error(e);
+            }
+          });
           if (payload.type === "voice_state" && payload.data?.state) {
             this.notifyVoiceState(payload.data.state);
           } else if (payload.type === "ai_response" && payload.data?.text) {
@@ -597,6 +610,8 @@ class BackendService {
               "session_locked", "session_logout",
               "PAIRING_CREATED", "PAIRING_WAITING", "PAIRING_VERIFIED", "PAIRING_FAILED", "PAIRING_EXPIRED",
               "TELEGRAM_CONNECTED", "TELEGRAM_DISCONNECTED",
+              "DEVICE_ADDED", "DEVICE_RENAMED", "DEVICE_SELECTED", "DEVICE_REVOKED",
+              "SESSION_CREATED", "SESSION_LOCKED", "SESSION_LOGOUT",
             ].includes(payload.type)
           ) {
             this.remoteListeners.forEach((cb) => {
@@ -1475,15 +1490,12 @@ class BackendService {
     }
   }
 
-  public async getDevicePermissions(deviceId: string): Promise<{
-    ok: boolean;
-    device_id: string;
-    profile: PermissionProfileData;
-    catalog: Record<string, PermissionDefinitionItem[]>;
-    error?: string;
-  }> {
+  public async getDevicePermissions(deviceId: string, userId?: string): Promise<DevicePermissionsResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`);
+      const url = userId
+        ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/permissions?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/remote/permissions/${encodeURIComponent(deviceId)}`;
+      const res = await fetch(url);
       return await res.json();
     } catch (err: any) {
       return { ok: false, device_id: deviceId, profile: {} as any, catalog: {}, error: String(err) };
@@ -1663,6 +1675,94 @@ class BackendService {
       };
     }
   }
+
+  // ==========================================
+  // Phase 40: Universal Account & Device Management
+  // ==========================================
+
+  public async getDevices(userId?: string): Promise<DevicesListResponse> {
+    try {
+      const url = userId ? `${API_BASE}/api/devices?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/devices`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, devices: [], error: String(err) };
+    }
+  }
+
+  public async getDevice(deviceId: string, userId?: string): Promise<DeviceDetailResponse> {
+    try {
+      const url = userId
+        ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async renameDevice(deviceId: string, name: string, userId?: string): Promise<DeviceRenameResponse> {
+    try {
+      const url = userId
+        ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async revokeDevice(deviceId: string, userId?: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const url = userId
+        ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
+      const res = await fetch(url, { method: "DELETE" });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async selectDevice(deviceId: string, userId?: string): Promise<DeviceSelectResponse> {
+    try {
+      const url = userId
+        ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select`;
+      const res = await fetch(url, { method: "POST" });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getAccountSessions(userId?: string): Promise<AccountSessionsResponse> {
+    try {
+      const url = userId ? `${API_BASE}/api/account/sessions?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/account/sessions`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, sessions: [], total: 0, error: String(err) };
+    }
+  }
+
+  public async logoutAllSessions(userId?: string): Promise<{ ok: boolean; message?: string; terminated_count?: number; error?: string }> {
+    try {
+      const url = userId
+        ? `${API_BASE}/api/account/sessions/logout-all?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE}/api/account/sessions/logout-all`;
+      const res = await fetch(url, { method: "POST" });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
 }
 
 export interface TelegramLinkStartResponse {
@@ -1735,6 +1835,79 @@ export interface TelegramBotStatusResponse {
   bot_username: string;
   active_links_count: number;
   pending_requests_count: number;
+  error?: string;
+}
+
+// Phase 40: Universal Account & Multi-Device Interfaces
+export interface UserDevice {
+  id: string;
+  mikasa_user_id: string;
+  device_id: string;
+  name: string;
+  hostname: string;
+  platform: string;
+  agent_version: string;
+  status: "online" | "offline" | "standby" | "revoked" | string;
+  created_at: number;
+  last_seen_at?: number | null;
+  last_heartbeat_at?: number | null;
+  metadata?: Record<string, any>;
+  is_selected?: boolean;
+}
+
+export interface DevicesListResponse {
+  ok: boolean;
+  user_id?: string;
+  devices: UserDevice[];
+  selected_device_id?: string | null;
+  error?: string;
+}
+
+export interface DeviceDetailResponse {
+  ok: boolean;
+  device?: UserDevice;
+  error?: string;
+}
+
+export interface DeviceRenameResponse {
+  ok: boolean;
+  message?: string;
+  device?: UserDevice;
+  error?: string;
+}
+
+export interface DeviceSelectResponse {
+  ok: boolean;
+  message?: string;
+  selected_device?: UserDevice;
+  error?: string;
+}
+
+export interface DevicePermissionsResponse {
+  ok: boolean;
+  device_id?: string;
+  profile?: PermissionProfileData;
+  catalog?: Record<string, PermissionDefinitionItem[]> | any;
+  error?: string;
+}
+
+export interface UserSession {
+  user_id: string;
+  device_id: string;
+  device_name?: string;
+  session_id: string;
+  created_at: number;
+  expires_at: number;
+  is_active: boolean;
+  permissions: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface AccountSessionsResponse {
+  ok: boolean;
+  user_id?: string;
+  sessions: UserSession[];
+  total: number;
   error?: string;
 }
 
