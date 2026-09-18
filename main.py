@@ -1,9 +1,9 @@
 # ========== main.py ===============================
 # Mikasa AI — Shaxsiy sun'iy intellekt yordamchi
-# Versiya: 7.0.0
+# Versiya: 8.0.0
 # ========== Ogohlantirishlarni yashirish ==========
 
-VERSION = "7.0.0"
+VERSION = "8.0.0"
 APP_NAME = "Mikasa AI"
 import os
 import logging
@@ -501,7 +501,7 @@ def kayfiyat_aniqla(matn):
 
 def ovoz_chiqar_tez(text):
     """
-    Mikasa AI 7.1.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
+    Mikasa AI 8.0.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
     Edge TTS (uz-UZ-MadinaNeural / uz-UZ-SardorNeural) orqali ovoz yaratadi
     va sounddevice / pygame orqali ijro etadi.
     """

@@ -21,9 +21,10 @@ from core.api_server import (
 
 
 class MockRequest:
-    def __init__(self, json_data=None, query_data=None):
+    def __init__(self, json_data=None, query_data=None, headers=None):
         self._json_data = json_data or {}
         self.query = query_data or {}
+        self.headers = headers or {}
 
     async def json(self):
         return self._json_data
@@ -84,7 +85,7 @@ class TestAccountAPI(unittest.TestCase):
 
             # App info
             self.assertEqual(data["app_info"]["name"], "Mikasa AI")
-            self.assertEqual(data["app_info"]["version"], "7.1.0")
+            self.assertEqual(data["app_info"]["version"], "8.0.0")
 
         asyncio.run(_run())
 

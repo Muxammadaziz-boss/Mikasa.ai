@@ -1,6 +1,6 @@
 // ========== package_release.cjs ==========
-// Mikasa AI 7.0 — Release Packaging and Version Management Script
-// Places every built version into: yordamchi_7.0.0/release/v<version>/
+// Mikasa AI 8.0 — Release Packaging and Version Management Script
+// Places every built version into: yordamchi_8.0.0/release/v<version>/
 
 const fs = require("fs");
 const path = require("path");
@@ -9,10 +9,10 @@ const crypto = require("crypto");
 // 1. Get current version from package.json
 const packageJsonPath = path.resolve(__dirname, "../package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-const version = packageJson.version || "7.0.0";
+const version = packageJson.version || "8.0.0";
 const versionName = `v${version}`;
 
-// 2. Define release target directory inside yordamchi_7.0.0/release/v<version>
+// 2. Define release target directory inside yordamchi_8.0.0/release/v<version>
 const projectRoot = path.resolve(__dirname, "../../");
 const releaseBaseDir = path.resolve(projectRoot, "release");
 const releaseVersionDir = path.join(releaseBaseDir, versionName);
@@ -33,7 +33,19 @@ if (!fs.existsSync(releaseVersionDir)) {
 const tauriReleaseDir = path.resolve(__dirname, "../src-tauri/target/release");
 const tauriBundleDir = path.join(tauriReleaseDir, "bundle");
 
-const exeSource = path.join(tauriReleaseDir, "mikasa-7.exe");
+let exeSource = path.join(tauriReleaseDir, "mikasa-7.exe");
+const candidateExes = [
+  path.join(tauriReleaseDir, "mikasa-7.exe"),
+  path.join(tauriReleaseDir, "Mikasa AI.exe"),
+  path.join(tauriReleaseDir, "Mikasa-AI.exe"),
+  path.join(tauriReleaseDir, "mikasa.exe"),
+];
+for (const cand of candidateExes) {
+  if (fs.existsSync(cand)) {
+    exeSource = cand;
+    break;
+  }
+}
 const exeTarget = path.join(releaseVersionDir, `Mikasa-AI-${versionName}.exe`);
 
 const manifest = {

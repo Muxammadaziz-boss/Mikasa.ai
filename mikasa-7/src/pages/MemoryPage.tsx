@@ -1,5 +1,5 @@
 // ========== MemoryPage.tsx ==========
-// Mikasa AI 7.1.0 — Intelligent Knowledge Space & Memory Center
+// Mikasa AI 8.0.0 — Intelligent Knowledge Space & Memory Center
 // Sections: Profile, Knowledge, Conversation Context (RAM), Saved Information (History)
 // Actions: Search, Add, Edit, Delete, Inspect, Clear
 

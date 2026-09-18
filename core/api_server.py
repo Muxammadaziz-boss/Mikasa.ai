@@ -1,5 +1,5 @@
 # ========== api_server.py ==========
-# Mikasa AI 7.1.0 — Desktop Background Backend API Server
+# Mikasa AI 8.0.0 — Desktop Background Backend API Server
 # Ushbu server Tauri frontend (React) va Python AI yadrosi (main.py, ai_engine,
 # agent_memory, agent_scheduler, agent_tools, command_dispatcher) orasidagi
 # to'liq asinxron ko'prik (REST + WebSocket) hisoblanadi.
@@ -199,7 +199,7 @@ async def handle_status(request):
     return web.json_response({
         "status": "online",
         "app": "MIKASA AI",
-        "version": "7.1.0",
+        "version": "8.0.0",
         "user": user,
         "ai_available": ai_ok,
         "voice_state": _voice_state,
@@ -295,7 +295,7 @@ async def handle_system_metrics(request):
 # ========== 2. CHAT & VOICE HANDLERS ==========
 def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask") -> str:
     """
-    Mikasa AI 7.1.0 — Unified Command & AI Pipeline
+    Mikasa AI 8.0.0 — Unified Command & AI Pipeline
     Mahalliy buyruqlarni darhol kompyuterda bajaradi, murakkab savollarni AI ga yo'naltiradi.
     """
     clean_text = text.strip()
@@ -1641,10 +1641,12 @@ async def handle_account_get(request):
     mem_profile = mem.get_profile() if mem else {}
 
     # Phase 40 Multi-User Account & Device Management
+    req_headers = getattr(request, "headers", {}) or {}
+    req_query = getattr(request, "query", {}) or {}
     user_id = (
-        request.headers.get("X-Mikasa-User-Id")
-        or request.query.get("user_id")
-        or request.query.get("mikasa_user_id")
+        req_headers.get("X-Mikasa-User-Id")
+        or req_query.get("user_id")
+        or req_query.get("mikasa_user_id")
         or "admin"
     )
     user_id = str(user_id).strip()
@@ -1691,10 +1693,10 @@ async def handle_account_get(request):
         "ai_mode": ai_cfg.get("mode", "balanced"),
         "thinking_enabled": ai_cfg.get("thinking_enabled", True),
         "has_gemini_key": has_gemini,
-        "version": "7.1.0",
+        "version": "8.0.0",
         "app_info": {
             "name": "Mikasa AI",
-            "version": "7.1.0",
+            "version": "8.0.0",
             "codename": "Quiet Intelligence",
             "engine": "Tauri 2.0 (Native Rust) + Python 3.11+",
             "architecture": "Windows x64 Native Desktop",
@@ -2949,7 +2951,7 @@ async def handle_ws(request):
         "data": {
             "status": "online",
             "voice_state": _voice_state,
-            "version": "7.1.0"
+            "version": "8.0.0"
         },
         "timestamp": datetime.now().isoformat()
     }))
@@ -3137,7 +3139,7 @@ def create_app():
 
 def run_server(host="127.0.0.1", port=18420):
     global _main_loop
-    logger.info(f"MIKASA AI 7.1.0 Background API Server boshlanmoqda: http://{host}:{port}")
+    logger.info(f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: http://{host}:{port}")
     get_modules()
     app = create_app()
     _main_loop = asyncio.get_event_loop()

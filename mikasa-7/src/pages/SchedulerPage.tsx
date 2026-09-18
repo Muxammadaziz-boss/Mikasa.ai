@@ -1,5 +1,5 @@
 // ========== SchedulerPage.tsx ==========
-// Mikasa AI 7.1.0 — Rejalashtiruvchi va Eslatmalar Tizimi
+// Mikasa AI 8.0.0 — Rejalashtiruvchi va Eslatmalar Tizimi
 // agent_scheduler.py va scheduled_tasks.json bilan real vaqtda bog'langan
 // 5 ta holat: active, repeating, completed, failed, cancelled
 

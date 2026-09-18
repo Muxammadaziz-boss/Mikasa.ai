@@ -2042,7 +2042,7 @@ dependencies = [
 
 [[package]]
 name = "mikasa-7"
-version = "7.3.0"
+version = "8.0.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -1,5 +1,5 @@
 // ========== lib.rs ==========
-// Mikasa AI 7.x — Native Desktop Window Management & Runtime Backend Supervisor
+// Mikasa AI 8.x — Native Desktop Window Management & Runtime Backend Supervisor
 // [Phase 1 & 2] To'liq mahalliy boshqaruv, dinamik yo'llar, va bolalar jarayonlarini xavfsiz tozalash
 
 use std::net::TcpStream;
@@ -46,8 +46,8 @@ fn resolve_base_dir() -> Option<PathBuf> {
             if parent.join("core").join("api_server.py").exists() {
                 return Some(parent.to_path_buf());
             }
-            if parent.join("yordamchi_7.0.0").join("core").join("api_server.py").exists() {
-                return Some(parent.join("yordamchi_7.0.0"));
+            if parent.join("yordamchi_8.0.0").join("core").join("api_server.py").exists() {
+                return Some(parent.join("yordamchi_8.0.0"));
             }
             curr = parent;
         }
@@ -58,16 +58,16 @@ fn resolve_base_dir() -> Option<PathBuf> {
         if cwd.join("core").join("api_server.py").exists() {
             return Some(cwd);
         }
-        if cwd.join("yordamchi_7.0.0").join("core").join("api_server.py").exists() {
-            return Some(cwd.join("yordamchi_7.0.0"));
+        if cwd.join("yordamchi_8.0.0").join("core").join("api_server.py").exists() {
+            return Some(cwd.join("yordamchi_8.0.0"));
         }
         let mut curr = cwd.as_path();
         while let Some(parent) = curr.parent() {
             if parent.join("core").join("api_server.py").exists() {
                 return Some(parent.to_path_buf());
             }
-            if parent.join("yordamchi_7.0.0").join("core").join("api_server.py").exists() {
-                return Some(parent.join("yordamchi_7.0.0"));
+            if parent.join("yordamchi_8.0.0").join("core").join("api_server.py").exists() {
+                return Some(parent.join("yordamchi_8.0.0"));
             }
             curr = parent;
         }

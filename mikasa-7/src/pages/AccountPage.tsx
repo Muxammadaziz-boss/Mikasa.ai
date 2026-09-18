@@ -1,5 +1,5 @@
 // ========== AccountPage.tsx ==========
-// Mikasa AI 7.1.0 — Phase 15: Foydalanuvchi Hisobi va Tizim Sozlamalari
+// Mikasa AI 8.0.0 — Phase 15: Foydalanuvchi Hisobi va Tizim Sozlamalari
 // Profil, Tashqi ko'rinish, Ovoz, AI modeli, Bildirishnomalar, Maxfiylik va Dastur haqida
 
 import React, { useState, useEffect } from "react";
@@ -123,7 +123,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   // App Info State
   const [appInfo, setAppInfo] = useState({
     name: "Mikasa AI",
-    version: "7.1.0",
+    version: "8.0.0",
     codename: "Quiet Intelligence",
     engine: "Tauri 2.0 (Native Rust) + Python 3.11+",
     architecture: "Windows x64 Native Desktop",
@@ -456,7 +456,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   border: "1px solid rgba(16, 185, 129, 0.25)",
                 }}
               >
-                v7.1.0
+                v8.0.0
               </span>
             </div>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-secondary, #94A3B8)" }}>
@@ -1922,7 +1922,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                 <div>
                   <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Dastur Haqida</h2>
                   <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Mikasa AI 7.1.0 tizim arxitekturasi va texnik xususiyatlari
+                    Mikasa AI 8.0.0 tizim arxitekturasi va texnik xususiyatlari
                   </p>
                 </div>
 

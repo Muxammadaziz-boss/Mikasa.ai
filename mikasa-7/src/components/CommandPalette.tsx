@@ -1,5 +1,5 @@
 // ========== CommandPalette.tsx ==========
-// Mikasa AI 7.1.0 — Phase 16: Global Command Palette (Ctrl+K)
+// Mikasa AI 8.0.0 — Phase 16: Global Command Palette (Ctrl+K)
 // Qidiruv, Navigatsiya, Tezkor Amallar va Tizim Asboblarini to'g'ridan-to'g'ri bajarish
 
 import React, { useState, useEffect, useRef, useMemo } from "react";

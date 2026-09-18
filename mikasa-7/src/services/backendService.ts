@@ -1,5 +1,5 @@
 // ========== backendService.ts ==========
-// Mikasa AI 7.1.0 — Desktop Frontend to Python Backend Connector
+// Mikasa AI 8.0.0 — Desktop Frontend to Python Backend Connector
 // Connects to local aiohttp API Server at http://127.0.0.1:18420
 
 import { supabase } from "./supabaseClient";
@@ -1382,7 +1382,7 @@ class BackendService {
         theme: "dark",
         tts_speed: 2.0,
         ai_model: "gemini",
-        version: "7.1.0",
+        version: "8.0.0",
         voices_available: [
           { id: "ayol", name: "Madina (Ayol)", lang: "uz-UZ-MadinaNeural" },
           { id: "erkak", name: "Sardor (Erkak)", lang: "uz-UZ-SardorNeural" },

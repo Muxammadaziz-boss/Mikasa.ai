@@ -73,7 +73,7 @@ class TestE2ELifecycle(unittest.TestCase):
             self.assertEqual(status_resp.status, 200)
             status_data = json.loads(status_resp.text)
             self.assertEqual(status_data.get("status"), "online")
-            self.assertEqual(status_data.get("version"), "7.1.0")
+            self.assertEqual(status_data.get("version"), "8.0.0")
 
             # 2. HOME / LANDING
             acc_resp = await handle_account_get(MockRequest())

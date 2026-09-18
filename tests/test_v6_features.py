@@ -119,15 +119,15 @@ class TestV6SystemAgent(unittest.TestCase):
 
 
 class TestV6VersionAndConfig(unittest.TestCase):
-    """Versiya 6.0.0 ekanligini tasdiqlash testi"""
+    """Versiya 8.0.0 ekanligini tasdiqlash testi"""
 
     def test_version_number(self):
         from main import VERSION
-        self.assertEqual(VERSION, "7.0.0")
+        self.assertEqual(VERSION, "8.0.0")
 
     def test_config_version(self):
         version = get_config("app.version")
-        self.assertEqual(version, "7.0.0")
+        self.assertEqual(version, "8.0.0")
 
 
 if __name__ == "__main__":

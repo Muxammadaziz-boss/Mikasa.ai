@@ -1,5 +1,5 @@
 # ========== logger.py ==========
-# Mikasa AI 7.1.0 — Production Logging Subsystem [Phase 22]
+# Mikasa AI 8.0.0 — Production Logging Subsystem [Phase 22]
 # Provides structured rotating logs:
 #   - logs/mikasa.log  (General application events, AI engine, memory, tools)
 #   - logs/backend.log (API server requests, WebSocket, supervisor lifecycle)
