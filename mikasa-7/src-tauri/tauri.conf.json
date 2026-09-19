@@ -27,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: http://localhost:18420 ws://localhost:18420 http://127.0.0.1:18420 ws://127.0.0.1:18420; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset:; font-src 'self' data:;"
+      "csp": "default-src 'self' tauri: http://localhost:18420 ws://localhost:18420 http://127.0.0.1:18420 ws://127.0.0.1:18420; connect-src 'self' tauri: http://localhost:18420 ws://localhost:18420 http://127.0.0.1:18420 ws://127.0.0.1:18420 https://*.supabase.co wss://*.supabase.co https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https:; font-src 'self' data:;"
     }
   },
   "bundle": {

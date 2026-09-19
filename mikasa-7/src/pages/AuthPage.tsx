@@ -2,11 +2,15 @@
 // Mikasa AI v8.0.0 — Phase 41: Account Registration & Authentication System
 // Glassmorphic Auth Gate for Login, Registration, Password Reset and Email Verification
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   backendService,
   MikasaAuthUser,
 } from "../services/backendService";
+import {
+  supabase,
+  isSupabaseConfigured,
+} from "../services/supabaseClient";
 import {
   SparklesIcon,
   ShieldIcon,
@@ -14,6 +18,7 @@ import {
   UserIcon,
   CheckIcon,
   AlertTriangleIcon,
+  GoogleIcon,
 } from "../components/icons/Icons";
 
 interface AuthPageProps {
@@ -34,6 +39,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
   // Status & Feedback
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -43,6 +49,53 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     setErrorMsg(null);
     setSuccessMsg(null);
   };
+
+  // Listen for OAuth redirect sessions
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+        const user: MikasaAuthUser = {
+          id: session.user.id,
+          username:
+            session.user.user_metadata?.full_name ||
+            session.user.user_metadata?.name ||
+            session.user.email?.split("@")[0] ||
+            "User",
+          email: session.user.email || "",
+          is_active: true,
+          is_verified: Boolean(session.user.email_confirmed_at),
+          created_at: Date.now() / 1000,
+        };
+        onAuthSuccess(user);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [onAuthSuccess]);
+
+  // Google OAuth handler
+  const handleGoogleSignIn = async () => {
+    if (loading || oauthLoading) return;
+    setOauthLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await backendService.signInWithGoogle();
+      if (!res.ok) {
+        setErrorMsg(res.error || "Google orqali kirishda xatolik yuz berdi");
+        setOauthLoading(false);
+      } else {
+        setSuccessMsg("Google xizmatiga yo'naltirilmoqda...");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Google tizimiga ulanishda xatolik");
+      setOauthLoading(false);
+    }
+  };
+
 
   // Password validation helper
   const isPasswordStrong = (pwd: string) => {
@@ -378,6 +431,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           </button>
         </div>
 
+        {/* Supabase Unconfigured Warning Banner */}
+        {!isSupabaseConfigured && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              padding: "12px 14px",
+              borderRadius: "10px",
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+              color: "#FDE68A",
+              fontSize: "12.5px",
+              marginBottom: "18px",
+              lineHeight: 1.45,
+            }}
+          >
+            <AlertTriangleIcon size={18} color="#F59E0B" />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: "2px" }}>Supabase sozlanmagan</div>
+              <div>
+                Tizimga kirish yoki ro'yxatdan o'tish uchun <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>mikasa-7/.env</code> faylida <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_URL</code> va <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_ANON_KEY</code> sozlamalarini kiriting.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Alerts / Feedback */}
         {errorMsg && (
           <div
@@ -424,6 +504,58 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {/* TAB 1: LOGIN FORM */}
         {activeTab === "login" && (
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Google OAuth Button */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading || oauthLoading}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                padding: "11px 16px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: "10px",
+                color: "#F8FAFC",
+                fontSize: "13.5px",
+                fontWeight: 600,
+                cursor: loading || oauthLoading ? "not-allowed" : "pointer",
+                transition: "all 0.18s ease",
+                opacity: loading || oauthLoading ? 0.65 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && !oauthLoading) {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+              }}
+            >
+              <GoogleIcon size={18} />
+              <span>{oauthLoading ? "Google orqali ulanilmoqda..." : "Google bilan davom etish"}</span>
+            </button>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                margin: "2px 0",
+                color: "#64748B",
+                fontSize: "12px",
+              }}
+            >
+              <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }} />
+              <span>yoki login va parol</span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }} />
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <label style={{ fontSize: "12.5px", color: "#94A3B8", fontWeight: 500 }}>
                 Foydalanuvchi nomi yoki Email
@@ -434,6 +566,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin yoki user@example.com"
+                  autoComplete="username"
                   required
                   style={{
                     width: "100%",
@@ -482,6 +615,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                   style={{
                     width: "100%",
@@ -506,7 +640,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || oauthLoading}
               style={{
                 marginTop: "8px",
                 padding: "12px 18px",
@@ -516,10 +650,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 color: "#052E16",
                 fontSize: "14.5px",
                 fontWeight: 600,
-                cursor: loading ? "default" : "pointer",
+                cursor: loading || oauthLoading ? "default" : "pointer",
                 boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
                 transition: "all 0.15s ease",
-                opacity: loading ? 0.7 : 1,
+                opacity: loading || oauthLoading ? 0.7 : 1,
               }}
             >
               {loading ? "Kirilmoqda..." : "Tizimga kirish"}
@@ -530,6 +664,58 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {/* TAB 2: REGISTER FORM */}
         {activeTab === "register" && (
           <form onSubmit={handleRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {/* Google OAuth Button */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading || oauthLoading}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                padding: "11px 16px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: "10px",
+                color: "#F8FAFC",
+                fontSize: "13.5px",
+                fontWeight: 600,
+                cursor: loading || oauthLoading ? "not-allowed" : "pointer",
+                transition: "all 0.18s ease",
+                opacity: loading || oauthLoading ? 0.65 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && !oauthLoading) {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+              }}
+            >
+              <GoogleIcon size={18} />
+              <span>{oauthLoading ? "Google orqali ulanilmoqda..." : "Google bilan davom etish"}</span>
+            </button>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                margin: "2px 0",
+                color: "#64748B",
+                fontSize: "12px",
+              }}
+            >
+              <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }} />
+              <span>yoki yangi akkaunt ochish</span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255, 255, 255, 0.1)" }} />
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <label style={{ fontSize: "12.5px", color: "#94A3B8", fontWeight: 500 }}>
                 Foydalanuvchi nomi
@@ -540,6 +726,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="masalan: sherzod_dev"
+                  autoComplete="username"
                   required
                   style={{
                     width: "100%",
@@ -568,6 +755,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="user@example.com"
+                autoComplete="email"
                 style={{
                   width: "100%",
                   padding: "10px 14px",
@@ -592,6 +780,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
                   style={{
                     width: "100%",
@@ -620,6 +809,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete="new-password"
                 required
                 style={{
                   width: "100%",
@@ -637,7 +827,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || oauthLoading}
               style={{
                 marginTop: "8px",
                 padding: "12px 18px",
@@ -647,10 +837,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 color: "#052E16",
                 fontSize: "14.5px",
                 fontWeight: 600,
-                cursor: loading ? "default" : "pointer",
+                cursor: loading || oauthLoading ? "default" : "pointer",
                 boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
                 transition: "all 0.15s ease",
-                opacity: loading ? 0.7 : 1,
+                opacity: loading || oauthLoading ? 0.7 : 1,
               }}
             >
               {loading ? "Yaratilmoqda..." : "Hisob yaratish"}
@@ -930,15 +1120,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            fontSize: "11.5px",
+            fontSize: "12px",
             color: "#64748B",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <ShieldIcon size={14} color="#10B981" />
-            <span>PBKDF2 600k HMAC-SHA256</span>
+            <span style={{ color: "#34D399", fontWeight: 500 }}>Secured by Supabase Auth</span>
           </div>
-          <span>v8.0.0 Dev</span>
+          <span style={{ color: "#94A3B8" }}>v8.0.0 Dev</span>
         </div>
       </div>
     </div>

@@ -7,12 +7,24 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+const rawUrl = import.meta.env.VITE_SUPABASE_URL;
+const rawAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+  rawUrl &&
+  rawAnonKey &&
+  !rawUrl.includes('placeholder-project') &&
+  rawAnonKey !== 'placeholder-anon-key'
 );
+
+const supabaseUrl = isSupabaseConfigured ? rawUrl : 'https://placeholder-project.supabase.co';
+const supabaseAnonKey = isSupabaseConfigured ? rawAnonKey : 'placeholder-anon-key';
+
+export const getSupabaseConfigStatus = () => ({
+  configured: isSupabaseConfigured,
+  hasUrl: Boolean(rawUrl && !rawUrl.includes('placeholder-project')),
+  hasKey: Boolean(rawAnonKey && rawAnonKey !== 'placeholder-anon-key'),
+});
 
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -22,3 +34,4 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
     storage: window.localStorage
   }
 });
+

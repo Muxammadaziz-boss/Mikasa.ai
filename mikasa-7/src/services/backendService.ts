@@ -2,7 +2,30 @@
 // Mikasa AI 8.0.0 — Desktop Frontend to Python Backend Connector
 // Connects to local aiohttp API Server at http://127.0.0.1:18420
 
-import { supabase } from "./supabaseClient";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
+
+function formatAuthError(err: any): string {
+  const msg = (err && (err.message || String(err))) || "";
+  if (
+    msg.includes("Failed to fetch") ||
+    msg.includes("NetworkError") ||
+    msg.includes("ENOTFOUND") ||
+    msg.includes("ERR_NAME_NOT_RESOLVED") ||
+    msg.includes("fetch failed")
+  ) {
+    return "Supabase serveriga ulanib bo'lmadi. Internet aloqangiz yoki loyiha URL manzilini tekshiring.";
+  }
+  if (msg.includes("Invalid login credentials")) {
+    return "Foydalanuvchi nomi yoki parol noto'g'ri.";
+  }
+  if (msg.includes("User already registered") || msg.includes("already registered")) {
+    return "Bu foydalanuvchi yoki email bilan allaqachon ro'yxatdan o'tilgan.";
+  }
+  if (msg.includes("Password should be at least")) {
+    return "Parol kamida 6-8 ta belgidan iborat bo'lishi kerak.";
+  }
+  return msg || "Autentifikatsiya jarayonida xatolik yuz berdi";
+}
 
 export interface BackendStatus {
   status: "online" | "offline" | "connecting";
@@ -1820,6 +1843,12 @@ class BackendService {
     email?: string;
     confirm_password?: string;
   }): Promise<AuthResponse> {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+      };
+    }
     try {
       const email = payload.email || `${payload.username.toLowerCase()}@mikasa.local`;
       const { data, error } = await supabase.auth.signUp({
@@ -1834,7 +1863,7 @@ class BackendService {
       });
 
       if (error) {
-        return { ok: false, error: error.message };
+        return { ok: false, error: formatAuthError(error) };
       }
 
       const sessionToken = data.session?.access_token || "";
@@ -1867,7 +1896,7 @@ class BackendService {
         expires_at: data.session?.expires_at,
       };
     } catch (err: any) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -1876,6 +1905,12 @@ class BackendService {
     password: string;
     email?: string;
   }): Promise<AuthResponse> {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+      };
+    }
     try {
       const targetEmail =
         payload.email ||
@@ -1889,7 +1924,7 @@ class BackendService {
       });
 
       if (error) {
-        return { ok: false, error: error.message };
+        return { ok: false, error: formatAuthError(error) };
       }
 
       const sessionToken = data.session?.access_token || "";
@@ -1920,7 +1955,35 @@ class BackendService {
         expires_at: data.session?.expires_at,
       };
     } catch (err: any) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
+    }
+  }
+
+  public async signInWithGoogle(): Promise<{ ok: boolean; error?: string; url?: string }> {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        error: "Supabase konfiguratsiyasi topilmadi. Google OAuth uchun .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+      };
+    }
+    try {
+      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+      if (error) {
+        return { ok: false, error: formatAuthError(error) };
+      }
+      return { ok: true, url: data.url };
+    } catch (err: any) {
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -1942,7 +2005,7 @@ class BackendService {
     } catch (err: any) {
       this.setAuthToken(null);
       this.notifyAuthChange(null);
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -1953,7 +2016,7 @@ class BackendService {
       this.notifyAuthChange(null);
       return { ok: true, message: "Barcha qurilmalardan chiqildi" };
     } catch (err: any) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -2007,7 +2070,7 @@ class BackendService {
         },
       };
     } catch (err: any) {
-      return { ok: false, authenticated: false, error: String(err) };
+      return { ok: false, authenticated: false, error: formatAuthError(err) };
     }
   }
 
@@ -2016,14 +2079,20 @@ class BackendService {
   }
 
   public async forgotPassword(target: string): Promise<{ ok: boolean; message?: string; token?: string; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+      };
+    }
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(target);
       if (error) {
-        return { ok: false, error: error.message };
+        return { ok: false, error: formatAuthError(error) };
       }
       return { ok: true, message: "Parolni tiklash bo'yicha yo'riqnoma email manzilingizga yuborildi." };
     } catch (err: any) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -2032,14 +2101,20 @@ class BackendService {
     confirm_password?: string;
     token?: string;
   }): Promise<{ ok: boolean; message?: string; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+      };
+    }
     try {
       const { error } = await supabase.auth.updateUser({ password: payload.new_password });
       if (error) {
-        return { ok: false, error: error.message };
+        return { ok: false, error: formatAuthError(error) };
       }
       return { ok: true, message: "Yangi parol muvaffaqiyatli o'rnatildi!" };
     } catch (err: any) {
-      return { ok: false, error: String(err) };
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 
@@ -2049,6 +2124,25 @@ class BackendService {
     confirm_password?: string;
   }): Promise<{ ok: boolean; message?: string; error?: string }> {
     return this.resetPassword(payload);
+  }
+
+  public async getHealth(): Promise<{
+    status: string;
+    app: string;
+    version: string;
+    supabase: string;
+    environment: string;
+    timestamp?: number;
+  } | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/health`);
+      if (res.ok) {
+        return await res.json();
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   // ========== Phase 42: Device Enrollment & Pairing ==========

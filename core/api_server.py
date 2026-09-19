@@ -2704,6 +2704,30 @@ async def handle_auth_change_password(request):
     })
 
 
+async def handle_health(request):
+    """GET /api/health - Tizim holati va diagnostika (sensitive keys hech qachon chiqmaydi)"""
+    import time
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    is_supabase_configured = bool(
+        supabase_url
+        and supabase_anon_key
+        and "placeholder-project" not in supabase_url
+        and supabase_anon_key != "placeholder-anon-key"
+    )
+    env_name = os.environ.get("ENVIRONMENT", "development")
+
+    return web.json_response({
+        "status": "ok",
+        "app": "Mikasa AI",
+        "version": "8.0.0",
+        "supabase": "configured" if is_supabase_configured else "not_configured",
+        "environment": env_name,
+        "timestamp": time.time()
+    }, status=200)
+
+
+
 # ========== 8.3. PHASE 42: DEVICE ENROLLMENT & PAIRING API ==========
 
 async def handle_device_pairing_start(request):
@@ -3013,7 +3037,7 @@ async def cors_middleware(request, handler):
 
     allowed_header_origin = origin if origin else "tauri://localhost"
     response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, OPTIONS, DELETE"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, OPTIONS, DELETE"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
@@ -3023,6 +3047,7 @@ def create_app():
     app = web.Application(middlewares=[cors_middleware])
     # Tizim va Bosh sahifa
     app.router.add_get("/api/status", handle_status)
+    app.router.add_get("/api/health", handle_health)
     app.router.add_get("/api/system/metrics", handle_system_metrics)
     app.router.add_get("/api/ws", handle_ws)
     
