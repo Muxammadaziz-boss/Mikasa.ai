@@ -54,13 +54,25 @@ class HeartbeatManager:
     """
     Heartbeat monitoring va qurilma holatini aniqlash (Online / Offline / Waking).
     """
+    _default_instance: Optional["HeartbeatManager"] = None
 
     def __init__(self, stale_timeout: float = 60.0):
         self.stale_timeout = stale_timeout
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._listeners: List[Callable[[str, DeviceState, DeviceState], None]] = []
 
-    def register_device(self, device_id: str, initial_state: DeviceState = DeviceState.OFFLINE, info: Optional[Dict[str, Any]] = None):
+    @classmethod
+    def get_default_instance(cls) -> "HeartbeatManager":
+        if cls._default_instance is None:
+            cls._default_instance = cls()
+        return cls._default_instance
+
+    def register_device(
+        self,
+        device_id: str,
+        initial_state: DeviceState = DeviceState.OFFLINE,
+        info: Optional[Dict[str, Any]] = None
+    ):
         if device_id not in self._devices:
             self._devices[device_id] = {
                 "state": initial_state,

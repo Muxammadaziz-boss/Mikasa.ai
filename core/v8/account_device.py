@@ -537,6 +537,10 @@ class AccountDeviceManager:
 
         return dev
 
+    def get_device_by_hw_id(self, hw_id: str, user_id: Optional[str] = None) -> Optional[Device]:
+        """Apparat device_id bo'yicha qurilmani olish (alias)"""
+        return self.get_device(hw_id, user_id=user_id)
+
     # ========================================================
     # 3. FRIENDLY RENAMING
     # ========================================================

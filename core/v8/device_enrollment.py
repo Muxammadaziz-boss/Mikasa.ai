@@ -85,12 +85,16 @@ class SecureCredentialStore(ABC):
 
 class MockCredentialStore(SecureCredentialStore):
     """Sinovlar va xotiradagi vaqtinchalik agentlar uchun mock xotira"""
-    def __init__(self):
+    def __init__(self, base_dir: Optional[str] = None):
+        self.base_dir = base_dir
         self._store: Dict[str, str] = {}
 
     def save_credential(self, key: str, secret_data: str) -> bool:
         self._store[key] = str(secret_data)
         return True
+
+    def store_credential(self, key: str, secret_data: str) -> bool:
+        return self.save_credential(key, secret_data)
 
     def load_credential(self, key: str) -> Optional[str]:
         return self._store.get(key)

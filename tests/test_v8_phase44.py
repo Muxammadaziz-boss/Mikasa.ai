@@ -81,6 +81,7 @@ class BasePhase44Test(unittest.TestCase):
     """Base setup with temporary isolated database and auth manager."""
 
     def setUp(self):
+        self._orig_env = dict(os.environ)
         self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_p44_")
         self.db_path = os.path.join(self.test_dir, "test_p44.db")
         self.jwt_secret = "test-secret-key-phase44-strong-64bytes-padding-1234567890abcdef"
@@ -107,6 +108,8 @@ class BasePhase44Test(unittest.TestCase):
             _pending_oauth_sessions.clear()
         AccountDeviceManager._default_instance = None
         SupabaseAuthManager._default_instance = None
+        os.environ.clear()
+        os.environ.update(self._orig_env)
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
 

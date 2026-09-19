@@ -3758,6 +3758,98 @@ async def handle_device_auth_authenticate(request):
     })
 
 
+async def handle_device_heartbeat(request):
+    """POST /api/devices/{device_id}/heartbeat - PC Agent davriy heartbeat qabul qilish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+
+    # 1. DeviceSession tokenini tekshirish (Header: Authorization: Bearer <token> yoki X-Mikasa-Device-Token)
+    auth_header = request.headers.get("Authorization", "").strip()
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+
+    from core.v8.device_auth import DeviceAuthManager
+    from core.v8.device_enrollment import DeviceEnrollmentManager
+    from core.v8.account_device import AccountDeviceManager
+    from core.v8.heartbeat import HeartbeatManager, HeartbeatPayload, DeviceState
+
+    auth_mgr = DeviceAuthManager.get_default_instance()
+    enroll_mgr = DeviceEnrollmentManager.get_default_instance()
+    adm = AccountDeviceManager.get_default_instance()
+
+    # 2. Kredensial holatini tekshirish (Revocation check)
+    cred = enroll_mgr.get_credential(dev_id)
+    if not cred or cred.is_revoked:
+        return web.json_response({
+            "ok": False,
+            "error": "DEVICE_REVOKED",
+            "message": "Ushbu qurilma ruxsati bekor qilingan (revoked)"
+        }, status=403)
+
+    # 3. Sessiyani topish va verifikatsiya qilish
+    sess = None
+    if token:
+        for s in auth_mgr._sessions.values():
+            if s.token == token and s.device_id == dev_id and s.is_valid:
+                sess = s
+                break
+
+    if not sess:
+        return web.json_response({
+            "ok": False,
+            "error": "UNAUTHORIZED",
+            "message": "Yaroqli qurilma sessiyasi topilmadi yoki muddati o'tgan"
+        }, status=401)
+
+    # 4. Heartbeat payloadni o'qish
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    agent_version = str(body.get("agent_version", "8.0.0"))
+    state_str = str(body.get("state", "online")).lower()
+    metrics = body.get("metrics", {})
+
+    try:
+        dev_state = DeviceState(state_str)
+    except ValueError:
+        dev_state = DeviceState.ONLINE
+
+    now = time.time()
+    sess.last_heartbeat_at = now
+
+    hb_mgr = HeartbeatManager.get_default_instance()
+    hb_mgr.record_heartbeat(HeartbeatPayload(
+        device_id=dev_id,
+        timestamp=now,
+        agent_version=agent_version,
+        state=dev_state,
+        metrics=metrics
+    ))
+
+    # AccountDeviceManager da ham last_seen_at va status yangilanadi
+    device_obj = adm.get_device(dev_id)
+    if device_obj:
+        device_obj.status = dev_state.value
+        device_obj.last_seen_at = now
+        device_obj.agent_version = agent_version
+        if metrics:
+            device_obj.metadata["latest_metrics"] = metrics
+        adm.save()
+
+    return web.json_response({
+        "ok": True,
+        "success": True,
+        "device_id": dev_id,
+        "state": dev_state.value,
+        "acknowledged": True,
+        "timestamp": now
+    })
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -3978,6 +4070,7 @@ def create_app():
     app.router.add_post("/api/devices/pairing/{pairing_id}/cancel", handle_device_pairing_cancel)
     app.router.add_post("/api/devices/{device_id}/challenge", handle_device_auth_challenge)
     app.router.add_post("/api/devices/{device_id}/authenticate", handle_device_auth_authenticate)
+    app.router.add_post("/api/devices/{device_id}/heartbeat", handle_device_heartbeat)
 
     return app
 

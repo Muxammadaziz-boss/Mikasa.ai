@@ -99,6 +99,24 @@ class RemoteEventType(str, Enum):
     GOOGLE_LINK_COMPLETED = "GOOGLE_LINK_COMPLETED"
     GOOGLE_LINK_FAILED = "GOOGLE_LINK_FAILED"
     GOOGLE_UNLINKED = "GOOGLE_UNLINKED"
+    # Phase 45 — Real Windows PC Agent Lifecycle Events
+    AGENT_STARTED = "AGENT_STARTED"
+    AGENT_STOPPING = "AGENT_STOPPING"
+    AGENT_STOPPED = "AGENT_STOPPED"
+    ENROLLMENT_STARTED = "ENROLLMENT_STARTED"
+    ENROLLMENT_COMPLETED = "ENROLLMENT_COMPLETED"
+    ENROLLMENT_FAILED = "ENROLLMENT_FAILED"
+    AUTH_STARTED = "AUTH_STARTED"
+    AUTH_SUCCESS = "AUTH_SUCCESS"
+    AUTH_FAILED = "AUTH_FAILED"
+    HEARTBEAT_SENT = "HEARTBEAT_SENT"
+    HEARTBEAT_FAILED = "HEARTBEAT_FAILED"
+    RECONNECT_STARTED = "RECONNECT_STARTED"
+    RECONNECT_SUCCESS = "RECONNECT_SUCCESS"
+    RECONNECT_FAILED = "RECONNECT_FAILED"
+    CREDENTIAL_LOADED = "CREDENTIAL_LOADED"
+    CREDENTIAL_REVOKED = "CREDENTIAL_REVOKED"
+    CRASH_RECOVERY = "CRASH_RECOVERY"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -129,7 +147,8 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "new_password", "new_password_confirmation", "raw_token",
         "raw_otp", "reset_token", "verification_token", "password_hash",
         "token_hash", "access_token", "refresh_token", "authorization_code",
-        "client_secret", "google_token", "id_token"
+        "client_secret", "google_token", "id_token", "authorization_header",
+        "session_secret"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:
@@ -232,12 +251,17 @@ class RemoteAuditLogger:
 
     def log_event(self, event: RemoteAuditEvent) -> RemoteAuditEvent:
         """RemoteAuditEvent obyektini to'g'ridan-to'g'ri qayd qilish"""
+        details = dict(event.details)
+        dev_id = details.pop("device_id", event.device_id)
+        req_id = details.pop("request_id", event.request_id)
+        u_id = details.pop("user_id", event.user_id)
+        ev_type = details.pop("event_type", event.event_type)
         return self.log(
-            event_type=event.event_type,
-            request_id=event.request_id,
-            device_id=event.device_id,
-            user_id=event.user_id,
-            **event.details
+            event_type=ev_type,
+            request_id=req_id,
+            device_id=dev_id,
+            user_id=u_id,
+            **details
         )
 
     def get_history(

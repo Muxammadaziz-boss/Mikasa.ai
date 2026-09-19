@@ -42,7 +42,20 @@ class DeviceIdentity:
         data = asdict(self)
         if isinstance(self.status, DeviceState):
             data["status"] = self.status.value
+        data["hardware_fingerprint"] = self.fingerprint
         return data
+
+    @property
+    def hardware_fingerprint(self) -> str:
+        return self.fingerprint
+
+    @property
+    def platform(self) -> str:
+        return self.os_name
+
+    @property
+    def name(self) -> str:
+        return str(self.metadata.get("friendly_name") or self.hostname)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DeviceIdentity":
