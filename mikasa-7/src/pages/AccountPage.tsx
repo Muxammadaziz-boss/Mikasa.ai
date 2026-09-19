@@ -569,14 +569,14 @@ export const AccountPage: React.FC<AccountPageProps> = ({
       <div
         style={{
           position: "fixed",
-          top: 24,
+          top: 76,
           right: 24,
-          zIndex: 999999,
+          zIndex: 99999,
           display: "flex",
           flexDirection: "column",
           gap: 12,
           pointerEvents: "none",
-          maxWidth: 400,
+          maxWidth: 420,
           width: "calc(100% - 48px)",
         }}
       >
@@ -585,90 +585,210 @@ export const AccountPage: React.FC<AccountPageProps> = ({
           const isError = toast.type === "error";
           const isWarning = toast.type === "warning";
 
-          const bg = isSuccess
-            ? "rgba(6, 78, 59, 0.95)"
-            : isError
-            ? "rgba(127, 29, 29, 0.95)"
-            : isWarning
-            ? "rgba(120, 53, 15, 0.95)"
-            : "rgba(15, 23, 42, 0.95)";
-          const border = isSuccess
-            ? "1px solid rgba(16, 185, 129, 0.6)"
-            : isError
-            ? "1px solid rgba(239, 68, 68, 0.6)"
-            : isWarning
-            ? "1px solid rgba(245, 158, 11, 0.6)"
-            : "1px solid rgba(56, 189, 248, 0.6)";
           const accentColor = isSuccess ? "#34D399" : isError ? "#F87171" : isWarning ? "#FBBF24" : "#38BDF8";
-          const icon = isSuccess ? "✓" : isError ? "✕" : isWarning ? "⚠" : "ℹ";
+          const accentGradient = isSuccess
+            ? "linear-gradient(135deg, #10B981, #059669)"
+            : isError
+            ? "linear-gradient(135deg, #EF4444, #DC2626)"
+            : isWarning
+            ? "linear-gradient(135deg, #F59E0B, #D97706)"
+            : "linear-gradient(135deg, #38BDF8, #0284C7)";
+
+          const badgeLabel = isSuccess
+            ? "MUVAFFAQIYAT"
+            : isError
+            ? "XATOLIK"
+            : isWarning
+            ? "OGOHLANTIRISH"
+            : "BILDIRISHNOMA";
+
+          const borderShadow = isSuccess
+            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(16, 185, 129, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+            : isError
+            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(239, 68, 68, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+            : isWarning
+            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(245, 158, 11, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+            : "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(56, 189, 248, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)";
 
           return (
             <div
               key={toast.id}
               style={{
+                position: "relative",
                 pointerEvents: "auto",
-                padding: "16px 18px",
-                borderRadius: "14px",
-                backgroundColor: bg,
-                backdropFilter: "blur(24px)",
-                WebkitBackdropFilter: "blur(24px)",
-                border: border,
-                boxShadow: "0 14px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 0, 0, 0.4)",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "12px",
+                borderRadius: "16px",
+                overflow: "hidden",
+                animation: "toastSlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                backgroundColor: "rgba(11, 17, 33, 0.94)",
+                backgroundImage: "linear-gradient(145deg, rgba(17, 24, 48, 0.92) 0%, rgba(9, 14, 28, 0.98) 100%)",
+                backdropFilter: "blur(28px)",
+                WebkitBackdropFilter: "blur(28px)",
+                border: `1px solid ${isSuccess ? "rgba(16, 185, 129, 0.45)" : isError ? "rgba(239, 68, 68, 0.45)" : isWarning ? "rgba(245, 158, 11, 0.45)" : "rgba(56, 189, 248, 0.45)"}`,
+                boxShadow: borderShadow,
                 color: "#FFFFFF",
-                transition: "all 0.25s ease",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
+              {/* Glowing Left Neon Accent Strip */}
               <div
                 style={{
-                  width: "26px",
-                  height: "26px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: "4px",
+                  background: accentGradient,
+                  boxShadow: `0 0 12px ${accentColor}`,
+                }}
+              />
+
+              <div
+                style={{
+                  padding: "16px 18px 16px 20px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  color: accentColor,
-                  flexShrink: 0,
+                  alignItems: "flex-start",
+                  gap: "14px",
                 }}
               >
-                {icon}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#FFFFFF", marginBottom: "3px" }}>
-                  {toast.title}
-                </div>
+                {/* Visual Icon Squircle Badge */}
                 <div
                   style={{
-                    fontSize: "12px",
-                    color: "rgba(255, 255, 255, 0.88)",
-                    lineHeight: 1.45,
-                    wordBreak: "break-word",
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "12px",
+                    backgroundColor: isSuccess
+                      ? "rgba(16, 185, 129, 0.16)"
+                      : isError
+                      ? "rgba(239, 68, 68, 0.16)"
+                      : isWarning
+                      ? "rgba(245, 158, 11, 0.16)"
+                      : "rgba(56, 189, 248, 0.16)",
+                    border: `1px solid ${accentColor}44`,
+                    boxShadow: `0 0 16px ${accentColor}26`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  {toast.message}
+                  {isSuccess ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : isError ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="15" y1="9" x2="9" y2="15" />
+                      <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  ) : isWarning ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                  )}
                 </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+                    <span
+                      style={{
+                        fontSize: "13.5px",
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {toast.title}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9.5px",
+                        fontWeight: 700,
+                        letterSpacing: "0.05em",
+                        padding: "1px 7px",
+                        borderRadius: "10px",
+                        backgroundColor: `${accentColor}18`,
+                        border: `1px solid ${accentColor}33`,
+                        color: accentColor,
+                      }}
+                    >
+                      {badgeLabel}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "rgba(226, 232, 240, 0.9)",
+                      lineHeight: 1.5,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {toast.message}
+                  </div>
+                </div>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => removeRightToast(toast.id)}
+                  title="Yopish"
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    color: "#94A3B8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+                    e.currentTarget.style.color = "#FFFFFF";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
+                    e.currentTarget.style.color = "#94A3B8";
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => removeRightToast(toast.id)}
+
+              {/* Bottom Progress Countdown Bar */}
+              <div
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "rgba(255, 255, 255, 0.6)",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                  padding: "2px",
-                  lineHeight: 1,
-                  alignSelf: "flex-start",
+                  height: "2.5px",
+                  width: "100%",
+                  backgroundColor: "rgba(255, 255, 255, 0.06)",
+                  overflow: "hidden",
                 }}
               >
-                ✕
-              </button>
+                <div
+                  style={{
+                    height: "100%",
+                    background: accentGradient,
+                    animation: "toastProgressShrink 7s linear forwards",
+                  }}
+                />
+              </div>
             </div>
           );
         })}

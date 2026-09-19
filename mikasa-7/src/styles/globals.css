@@ -447,3 +447,28 @@ input {
   backface-visibility: hidden;
 }
 
+/* Premium Floating Toast Keyframes */
+@keyframes toastSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translate3d(60px, -6px, 0) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(-4px, 0, 0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes toastProgressShrink {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
