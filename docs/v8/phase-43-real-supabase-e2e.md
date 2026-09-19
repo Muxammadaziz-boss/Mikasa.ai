@@ -172,19 +172,17 @@ Returns the verified profile and session metadata:
 
 ### 6.2. Live Database Status
 - **Supabase Auth API**: **OPERATIONAL** (Users can sign up, sign in, reset passwords).
-- **PostgreSQL Tables (`public.profiles`, `public.devices`, etc.)**: **PENDING EXECUTION IN SQL EDITOR**.
-  - Current PostgREST status: `PGRST205` ("Could not find table in the schema cache").
-  - This is expected until the project owner executes the SQL migration files in the Supabase Dashboard.
-
-### 6.3. Step-by-Step Instructions to Apply Migrations:
-1. Log into your Supabase Dashboard: `https://supabase.com/dashboard/project/vdcssmzguxfknqkfxbed`.
-2. Open the **SQL Editor** from the left navigation menu.
-3. Click **New Query**.
-4. Copy the entire content of `supabase/migrations/20260918_phase41_supabase_auth.sql` and paste it into the editor.
-5. Click **Run** (Ctrl+Enter). Confirm that all tables (`profiles`, `devices`, `telegram_links`, `permissions`) and RLS policies are created successfully.
-6. Create another **New Query**.
-7. Copy the entire content of `supabase/migrations/20260918_phase42_device_enrollment.sql` and paste it into the editor.
-8. Click **Run** (Ctrl+Enter). Confirm that `device_credentials`, `device_pairing_sessions`, and `device_auth_challenges` tables are created with RLS enabled.
+- **PostgreSQL Tables (`public.profiles`, `public.devices`, etc.)**: **PROVISIONED & VERIFIED (HTTP 200)**.
+  - Successfully executed migrations in Supabase SQL Editor.
+  - Live probe confirmed HTTP 200 on all 7 user-owned tables:
+    - `public.profiles`: HTTP 200 (RLS active)
+    - `public.devices`: HTTP 200 (RLS active)
+    - `public.telegram_links`: HTTP 200 (RLS active)
+    - `public.permissions`: HTTP 200 (RLS active)
+    - `public.device_pairing_sessions`: HTTP 200 (RLS active)
+    - `public.device_credentials`: HTTP 200 (RLS active)
+    - `public.device_auth_challenges`: HTTP 200 (RLS active)
+  - PostgREST schema cache is fully synchronized.
 
 ---
 
