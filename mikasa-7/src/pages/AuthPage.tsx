@@ -89,6 +89,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         setOauthLoading(false);
       } else {
         setSuccessMsg("Google xizmatiga yo'naltirilmoqda...");
+        if (res.url && typeof window !== "undefined") {
+          window.location.href = res.url;
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Google tizimiga ulanishda xatolik");

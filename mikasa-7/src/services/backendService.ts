@@ -15,6 +15,12 @@ function formatAuthError(err: any): string {
   ) {
     return "Supabase serveriga ulanib bo'lmadi. Internet aloqangiz yoki loyiha URL manzilini tekshiring.";
   }
+  if (msg.includes("provider is not enabled") || msg.includes("Unsupported provider")) {
+    return "Google orqali kirish Supabase Dashboard'da yoqilmagan. Supabase -> Authentication -> Providers bo'limida Google'ni yoqing va Client ID/Secret'ni kiriting.";
+  }
+  if (msg.includes("email_address_invalid") || msg.includes("Email address") && msg.includes("is invalid")) {
+    return "Kiritilgan email manzili noto'g'ri yoki qabul qilinmadi. Iltimos, haqiqiy email kiriting (masalan: example@gmail.com).";
+  }
   if (msg.includes("Invalid login credentials")) {
     return "Foydalanuvchi nomi yoki parol noto'g'ri.";
   }
