@@ -350,10 +350,10 @@ class SupabaseAuthManager:
         )
 
     @classmethod
-    def get_default_instance(cls, storage_path: Optional[str] = None) -> "SupabaseAuthManager":
+    def get_default_instance(cls, *args, **kwargs) -> "SupabaseAuthManager":
         inst = getattr(cls, "_instance", None) or cls._default_instance
         if inst is None:
-            cls._default_instance = cls(storage_path=storage_path)
+            cls._default_instance = cls(*args, **kwargs)
             return cls._default_instance
         return inst
 
@@ -584,7 +584,10 @@ class SupabaseAuthManager:
         issuer: Optional[str] = None,
         alg: str = "HS256",
         kid: Optional[str] = None,
-        private_key: Optional[Any] = None
+        private_key: Optional[Any] = None,
+        app_metadata: Optional[Dict[str, Any]] = None,
+        user_metadata: Optional[Dict[str, Any]] = None,
+        extra_claims: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Sinovlar va lokal muhit uchun haqiqiy Supabase formatidagi JWT yaratish.
@@ -597,6 +600,13 @@ class SupabaseAuthManager:
             header["kid"] = kid
 
         iss = issuer or (f"{self.supabase_url}/auth/v1" if self.supabase_url else "https://test.supabase.co/auth/v1")
+        user_meta = {
+            "username": username or (email.split("@")[0] if email else user_id),
+            "display_name": display_name or username or (email.split("@")[0] if email else user_id)
+        }
+        if user_metadata:
+            user_meta.update(user_metadata)
+
         payload = {
             "iss": iss,
             "sub": str(user_id),
@@ -605,11 +615,11 @@ class SupabaseAuthManager:
             "aud": "authenticated",
             "iat": now,
             "exp": now + exp_seconds,
-            "user_metadata": {
-                "username": username or (email.split("@")[0] if email else user_id),
-                "display_name": display_name or username or (email.split("@")[0] if email else user_id)
-            }
+            "user_metadata": user_meta,
+            "app_metadata": app_metadata or {"provider": "email", "providers": ["email"]}
         }
+        if extra_claims:
+            payload.update(extra_claims)
 
         header_b64 = self._base64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
         payload_b64 = self._base64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))

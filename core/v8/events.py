@@ -91,6 +91,14 @@ class RemoteEventType(str, Enum):
     DEVICE_CREDENTIAL_CREATED = "DEVICE_CREDENTIAL_CREATED"
     DEVICE_AUTH_SUCCESS = "DEVICE_AUTH_SUCCESS"
     DEVICE_REENROLLED = "DEVICE_REENROLLED"
+    # Phase 44 — Google OAuth & Account Linking Events
+    OAUTH_STARTED = "OAUTH_STARTED"
+    OAUTH_COMPLETED = "OAUTH_COMPLETED"
+    OAUTH_FAILED = "OAUTH_FAILED"
+    GOOGLE_LINK_STARTED = "GOOGLE_LINK_STARTED"
+    GOOGLE_LINK_COMPLETED = "GOOGLE_LINK_COMPLETED"
+    GOOGLE_LINK_FAILED = "GOOGLE_LINK_FAILED"
+    GOOGLE_UNLINKED = "GOOGLE_UNLINKED"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -120,7 +128,8 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "password_confirmation", "raw_password", "current_password",
         "new_password", "new_password_confirmation", "raw_token",
         "raw_otp", "reset_token", "verification_token", "password_hash",
-        "token_hash"
+        "token_hash", "access_token", "refresh_token", "authorization_code",
+        "client_secret", "google_token", "id_token"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:
@@ -220,6 +229,16 @@ class RemoteAuditLogger:
                 logger.error(f"Audit subscriber error: {e}")
 
         return event
+
+    def log_event(self, event: RemoteAuditEvent) -> RemoteAuditEvent:
+        """RemoteAuditEvent obyektini to'g'ridan-to'g'ri qayd qilish"""
+        return self.log(
+            event_type=event.event_type,
+            request_id=event.request_id,
+            device_id=event.device_id,
+            user_id=event.user_id,
+            **event.details
+        )
 
     def get_history(
         self,

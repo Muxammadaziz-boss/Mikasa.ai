@@ -3329,6 +3329,13 @@ async def handle_oauth_session_save(request):
         except Exception:
             pass
 
+    from core.v8.events import RemoteEventType, RemoteAuditEvent, RemoteAuditLogger
+    audit = RemoteAuditLogger.get_instance()
+    audit.log_event(RemoteAuditEvent(
+        event_type=RemoteEventType.OAUTH_COMPLETED,
+        details={"state": state, "status": "completed"}
+    ))
+
     # Xavfsizlik: raw tokenlarni websocketga tarqatmaslik! Faqat xavfsiz holat hodisasi
     safe_event = {
         "ok": True,
@@ -3356,7 +3363,7 @@ async def handle_oauth_session_get(request):
                 if exp > now:
                     sess_data = data
         else:
-            # State berilmagan taqdirda eng so'nggi yaroqli sessiyani olish (backward-compatibility)
+            # Backward-compatibility for callers where state was omitted
             valid_keys = [k for k, (exp, _) in _pending_oauth_sessions.items() if exp > now]
             if valid_keys:
                 latest_key = max(valid_keys, key=lambda k: _pending_oauth_sessions[k][0])
@@ -3370,6 +3377,156 @@ async def handle_oauth_session_get(request):
         "session": None,
         "error": "Sessiya topilmadi yoki muddati o'tgan"
     }, status=404)
+
+
+# ========== 8.2.2. PHASE 44: ACCOUNT IDENTITIES & LINKING API ==========
+
+async def handle_account_identities_get(request):
+    """GET /api/account/identities - Foydalanuvchining ulangan shaxslari (Email, Google) va xavfsiz holati"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    raw_claims = getattr(session, "raw_claims", {}) or {}
+    app_metadata = raw_claims.get("app_metadata", {}) or {}
+    user_metadata = raw_claims.get("user_metadata", {}) or {}
+
+    providers = app_metadata.get("providers", [])
+    primary_provider = app_metadata.get("provider", "email")
+    if not providers:
+        providers = [primary_provider] if primary_provider else ["email"]
+
+    if "google" not in providers and (
+        primary_provider == "google" or
+        str(user_metadata.get("iss", "")).startswith("https://accounts.google.com") or
+        user_metadata.get("avatar_url") or
+        user_metadata.get("picture")
+    ):
+        providers.append("google")
+
+    identities = []
+    user_email = getattr(session, "email", "") or (user.email if user else "")
+
+    # 1. Email identity
+    if "email" in providers or primary_provider == "email" or user_email:
+        identities.append({
+            "provider": "email",
+            "email": user_email,
+            "is_primary": primary_provider == "email",
+            "is_verified": bool(getattr(user, "is_verified", True))
+        })
+
+    # 2. Google identity
+    is_google_linked = "google" in providers or primary_provider == "google"
+    if is_google_linked:
+        identities.append({
+            "provider": "google",
+            "email": user_metadata.get("email") or user_email,
+            "name": user_metadata.get("full_name") or user_metadata.get("name") or getattr(session, "display_name", ""),
+            "avatar_url": getattr(session, "avatar_url", "") or user_metadata.get("avatar_url") or user_metadata.get("picture", ""),
+            "is_primary": primary_provider == "google"
+        })
+
+    # Lockout himoyasi: Google'ni faqat muqobil kirish usuli bo'lgandagina uzish mumkin!
+    can_unlink_google = is_google_linked and ("email" in providers and len(identities) > 1)
+
+    return web.json_response({
+        "ok": True,
+        "user_id": user_id,
+        "providers": providers,
+        "primary_provider": primary_provider,
+        "identities": identities,
+        "is_google_linked": is_google_linked,
+        "can_unlink_google": can_unlink_google
+    })
+
+
+async def handle_account_identities_unlink(request):
+    """POST /api/account/identities/unlink - Foydalanuvchining qo'shimcha Google hisobini uzish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    provider = str(body.get("provider", "")).strip().lower()
+    if provider != "google":
+        return web.json_response({
+            "ok": False,
+            "error": "Faqat qo'shimcha Google hisobini uzish qo'llab-quvvatlanadi"
+        }, status=400)
+
+    raw_claims = getattr(session, "raw_claims", {}) or {}
+    app_metadata = raw_claims.get("app_metadata", {}) or {}
+    providers = app_metadata.get("providers", [])
+    primary_provider = app_metadata.get("provider", "email")
+
+    is_google = "google" in providers or primary_provider == "google"
+    if not is_google:
+        return web.json_response({
+            "ok": False,
+            "error": "Google hisobi ushbu akkauntga ulanmagan"
+        }, status=400)
+
+    # Lockout tekshiruvi: Agar foydalanuvchi faqat Google orqali ro'yxatdan o'tgan bo'lsa va email/parol bo'lmasa
+    has_alternative = "email" in providers and len(providers) > 1
+    if not has_alternative:
+        return web.json_response({
+            "ok": False,
+            "error": "Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang."
+        }, status=400)
+
+    from core.v8.events import RemoteEventType, RemoteAuditEvent, RemoteAuditLogger
+    audit = RemoteAuditLogger.get_instance()
+    audit.log_event(RemoteAuditEvent(
+        event_type=RemoteEventType.GOOGLE_UNLINKED,
+        user_id=user_id,
+        details={"provider": "google"}
+    ))
+
+    return web.json_response({
+        "ok": True,
+        "message": "Google hisobi muvaffaqiyatli uzildi",
+        "user_id": user_id,
+        "unlinked_provider": "google"
+    })
+
+
+async def handle_account_identities_link_initiate(request):
+    """POST /api/account/identities/link/initiate - Akkauntni Google bilan xavfsiz bog'lash uchun sessiya kodi yaratish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    import secrets
+    link_state = f"link_{secrets.token_urlsafe(24)}"
+    now = time.time()
+    expires_at = now + OAUTH_SESSION_TTL_SECONDS
+
+    with _pending_oauth_lock:
+        _pending_oauth_sessions[link_state] = (expires_at, {
+            "action": "link",
+            "user_id": user_id,
+            "timestamp": now
+        })
+
+    from core.v8.events import RemoteEventType, RemoteAuditEvent, RemoteAuditLogger
+    audit = RemoteAuditLogger.get_instance()
+    audit.log_event(RemoteAuditEvent(
+        event_type=RemoteEventType.GOOGLE_LINK_STARTED,
+        user_id=user_id,
+        details={"state": link_state}
+    ))
+
+    return web.json_response({
+        "ok": True,
+        "state": link_state,
+        "user_id": user_id,
+        "expires_in": int(OAUTH_SESSION_TTL_SECONDS)
+    })
 
 
 # ========== 8.3. PHASE 42: DEVICE ENROLLMENT & PAIRING API ==========
@@ -3809,6 +3966,11 @@ def create_app():
     app.router.add_get("/api/auth/callback/session", handle_oauth_session_get)
     # Root route fallback for port 1420 OAuth redirects
     app.router.add_get("/", handle_oauth_callback)
+
+    # Phase 44: Account Identities & Linking
+    app.router.add_get("/api/account/identities", handle_account_identities_get)
+    app.router.add_post("/api/account/identities/unlink", handle_account_identities_unlink)
+    app.router.add_post("/api/account/identities/link/initiate", handle_account_identities_link_initiate)
 
     # Phase 42: Device Enrollment & Cryptographic Pairing
     app.router.add_post("/api/devices/pairing/start", handle_device_pairing_start)

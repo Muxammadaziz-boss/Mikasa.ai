@@ -44,6 +44,28 @@ function formatAuthError(err: any): string {
   if (msg.includes("Password should be at least") || msg.includes("weak_password")) {
     return "Parol kamida 8 ta belgidan iborat bo'lib, harf va raqam qatnashishi kerak.";
   }
+  if (msg.includes("access_denied") || msg.includes("popup_closed") || msg.includes("cancelled") || msg.includes("user_cancelled")) {
+    return "Google orqali kirish bekor qilindi.";
+  }
+  if (
+    msg.includes("identity_already_exists") ||
+    msg.includes("already linked") ||
+    msg.includes("boshqa Mikasa akkauntiga ulangan") ||
+    msg.includes("Identity is already linked")
+  ) {
+    return "Bu Google hisob allaqachon boshqa Mikasa akkauntiga ulangan.";
+  }
+  if (
+    msg.includes("bad_oauth_state") ||
+    msg.includes("state mismatch") ||
+    msg.includes("state expired") ||
+    msg.includes("Sessiya topilmadi yoki muddati o'tgan")
+  ) {
+    return "Google sessiyasi muddati tugagan yoki tasdiqlanmadi. Qaytadan urinib ko'ring.";
+  }
+  if (msg.includes("yagona kirish usulingizdir") || msg.includes("lockout")) {
+    return "Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang.";
+  }
   return msg || "Autentifikatsiya jarayonida xatolik yuz berdi";
 }
 
@@ -2057,6 +2079,94 @@ class BackendService {
       return { ok: false };
     } catch {
       return { ok: false };
+    }
+  }
+
+  public async getAccountIdentities(): Promise<{
+    ok: boolean;
+    user_id?: string;
+    providers?: string[];
+    primary_provider?: string;
+    identities?: Array<{ provider: string; email?: string; name?: string; avatar_url?: string; is_primary?: boolean; is_verified?: boolean }>;
+    is_google_linked?: boolean;
+    can_unlink_google?: boolean;
+    error?: string;
+  }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+      const res = await fetch(`${API_BASE}/api/account/identities`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { ok: false, error: formatAuthError(err) };
+    }
+  }
+
+  public async unlinkGoogleIdentity(): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+      const res = await fetch(`${API_BASE}/api/account/identities/unlink`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ provider: "google" })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        return { ok: false, error: data.error || "Google hisobini uzishda xatolik yuz berdi" };
+      }
+      try {
+        const { data: idData } = await supabase.auth.getUserIdentities();
+        const googleId = idData?.identities?.find((id: any) => id.provider === "google");
+        if (googleId) {
+          await supabase.auth.unlinkIdentity(googleId);
+        }
+      } catch {
+        // Backend verification completed
+      }
+      return { ok: true, message: data.message || "Google hisobi muvaffaqiyatli uzildi" };
+    } catch (err: any) {
+      return { ok: false, error: formatAuthError(err) };
+    }
+  }
+
+  public async linkGoogleAccount(customState?: string): Promise<{ ok: boolean; url?: string; state?: string; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { ok: false, error: "Supabase konfiguratsiyasi topilmadi" };
+    }
+    try {
+      const state =
+        customState ||
+        (typeof window !== "undefined" && window.crypto?.randomUUID
+          ? `link_${window.crypto.randomUUID()}`
+          : `link_${Date.now()}`);
+      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
+      const { data, error } = await supabase.auth.linkIdentity({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent"
+          }
+        }
+      });
+      if (error) {
+        return { ok: false, error: formatAuthError(error) };
+      }
+      return { ok: true, url: data?.url, state };
+    } catch (err: any) {
+      return { ok: false, error: formatAuthError(err) };
     }
   }
 

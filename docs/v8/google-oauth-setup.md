@@ -84,6 +84,23 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 ### Desktop App Content Security Policy
 In `mikasa-7/src-tauri/tauri.conf.json`, `connect-src` is configured with:
 ```
-connect-src 'self' tauri: http://localhost:18420 ws://localhost:18420 http://127.0.0.1:18420 ws://127.0.0.1:18420 https://*.supabase.co wss://*.supabase.co https://accounts.google.com;
+connect-src 'self' tauri: http://localhost:18420 ws://localhost:18420 http://127.0.0.1:18420 ws://127.0.0.1:18420 https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://*.googleapis.com;
 ```
-This ensures that the WebView2 engine does not block OAuth redirects or token exchanges.
+This ensures that the WebView2 engine does not block OAuth redirects, Google UserInfo APIs, or token exchanges.
+
+---
+
+## 5. Phase 44: Account Linking & Lockout Protection
+
+### Explicit Linking Flow
+1. Authenticated user navigates to **Sozlamalar -> Akkaunt -> Ulangan hisoblar**.
+2. Frontend calls `/api/account/identities/link/initiate` to obtain a session-bound `link_` cryptographic state token.
+3. OAuth flow authenticates Google and links it to the active Supabase user identity.
+
+### Anti-Auto-Merge Policy
+Identical emails do not automatically merge accounts. If another user attempts to link an already linked Google account, an explicit error is returned:
+> *"Bu Google hisob allaqachon boshqa Mikasa akkauntiga ulangan."*
+
+### Account Lockout Prevention
+If Google is the only authentication method on the account, unlinking is blocked (`can_unlink_google: false`):
+> *"Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang."*

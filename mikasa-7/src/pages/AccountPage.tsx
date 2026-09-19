@@ -219,6 +219,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [savedGithubToken, setSavedGithubToken] = useState<string | null>(() => backendService.getGitHubToken());
   const [githubTokenSaved, setGithubTokenSaved] = useState<boolean>(false);
   const [linkingGoogle, setLinkingGoogle] = useState<boolean>(false);
+  const [unlinkingGoogle, setUnlinkingGoogle] = useState<boolean>(false);
+  const [identitiesData, setIdentitiesData] = useState<any>(null);
   const [unlinkingTelegram, setUnlinkingTelegram] = useState<boolean>(false);
 
   useEffect(() => {
@@ -308,6 +310,12 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "linked-accounts") {
+      refreshIdentities();
+    }
+  }, [activeTab]);
+
   const handleLogoutAllSessions = async () => {
     if (!window.confirm("Barcha boshqa qurilmalardagi faol masofaviy sessiyalardan chiqishni tasdiqlaysizmi?")) {
       return;
@@ -341,17 +349,59 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     setGithubToken("");
   };
 
-  const handleStartGoogleOAuth = async () => {
-    setLinkingGoogle(true);
+  const refreshIdentities = async () => {
     try {
-      const res = await backendService.signInWithGoogle();
-      if (res.ok && res.url) {
-        await backendService.openExternalUrl(res.url);
+      const res = await backendService.getAccountIdentities();
+      if (res && res.ok) {
+        setIdentitiesData(res);
       }
     } catch {
       // ignore
+    }
+  };
+
+  const handleStartGoogleOAuth = async () => {
+    if (linkingGoogle || unlinkingGoogle) return;
+    setLinkingGoogle(true);
+    try {
+      const res = await backendService.linkGoogleAccount();
+      if (res.ok && res.url) {
+        addRightToast("info", "Google Ulanmoqda", "Brauzeringizda ochilgan oynada Google hisobingizni tasdiqlang...");
+        await backendService.openExternalUrl(res.url);
+      } else {
+        addRightToast("error", "Xatolik", res.error || "Google bilan ulanishda xatolik yuz berdi");
+      }
+    } catch (err: any) {
+      addRightToast("error", "Xatolik", err?.message || "Google tizimiga ulanib bo'lmadi");
     } finally {
       setLinkingGoogle(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (unlinkingGoogle || linkingGoogle) return;
+    if (identitiesData && !identitiesData.can_unlink_google) {
+      addRightToast(
+        "warning",
+        "Uzib bo'lmaydi",
+        "Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang."
+      );
+      return;
+    }
+    if (!window.confirm("Google hisobini ushbu Mikasa akkauntidan uzishni tasdiqlaysizmi?")) return;
+    setUnlinkingGoogle(true);
+    try {
+      const res = await backendService.unlinkGoogleIdentity();
+      if (res.ok) {
+        addRightToast("success", "Uzildi", "Google hisobi muvaffaqiyatli uzildi");
+        await refreshIdentities();
+      } else {
+        addRightToast("error", "Xatolik", res.error || "Google hisobini uzishda xatolik yuz berdi");
+      }
+    } catch (err: any) {
+      addRightToast("error", "Xatolik", err?.message || "Google hisobini uzishda xatolik yuz berdi");
+    } finally {
+      setUnlinkingGoogle(false);
     }
   };
 
@@ -1499,7 +1549,61 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   </p>
                 </div>
 
-                {/* 1. Google Account Card */}
+                {/* 1. Email / Parol Account Card */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(56, 189, 248, 0.1)",
+                          border: "1px solid rgba(56, 189, 248, 0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <KeyIcon size={20} color="#38BDF8" />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Email & Parol</span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              padding: "2px 8px",
+                              borderRadius: 12,
+                              background: "rgba(16, 185, 129, 0.15)",
+                              color: "#34D399",
+                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Ulangan (Asosiy)
+                          </span>
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          {authAccount?.email || "Foydalanuvchi elektron pochta manzili"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Google Account Card */}
                 <div
                   style={{
                     background: "rgba(8, 14, 28, 0.55)",
@@ -1531,7 +1635,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Google Akkaunt</span>
-                          {authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com") ? (
+                          {identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url ? (
                             <span
                               style={{
                                 fontSize: 11,
@@ -1567,44 +1671,99 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleStartGoogleOAuth}
-                      disabled={linkingGoogle}
-                      style={{
-                        padding: "8px 16px",
-                        background: "rgba(255, 255, 255, 0.08)",
-                        border: "1px solid rgba(255, 255, 255, 0.15)",
-                        borderRadius: 8,
-                        color: "#FFFFFF",
-                        fontSize: "12.5px",
-                        fontWeight: 600,
-                        cursor: linkingGoogle ? "default" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!linkingGoogle) e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                      }}
-                    >
-                      <GoogleIcon size={14} />
-                      <span>
-                        {linkingGoogle
-                          ? "Ulanmoqda..."
-                          : authAccount?.provider === "google" || authAccount?.avatar_url
-                          ? "Qayta ulanish"
-                          : "Google bilan ulash"}
-                      </span>
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {/* Unlink Button (shown only when Google is connected) */}
+                      {(identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url) && (
+                        <button
+                          type="button"
+                          onClick={handleUnlinkGoogle}
+                          disabled={unlinkingGoogle || linkingGoogle}
+                          style={{
+                            padding: "8px 14px",
+                            background: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.25)",
+                            borderRadius: 8,
+                            color: "#F87171",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: unlinkingGoogle || linkingGoogle ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!unlinkingGoogle) e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)";
+                          }}
+                        >
+                          <UnlinkIcon size={13} />
+                          <span>{unlinkingGoogle ? "Uzilmoqda..." : "Hisobni uzish"}</span>
+                        </button>
+                      )}
+
+                      {/* Connect / Reconnect Button */}
+                      <button
+                        type="button"
+                        onClick={handleStartGoogleOAuth}
+                        disabled={linkingGoogle || unlinkingGoogle}
+                        style={{
+                          padding: "8px 16px",
+                          background: "rgba(255, 255, 255, 0.08)",
+                          border: "1px solid rgba(255, 255, 255, 0.15)",
+                          borderRadius: 8,
+                          color: "#FFFFFF",
+                          fontSize: "12.5px",
+                          fontWeight: 600,
+                          cursor: linkingGoogle || unlinkingGoogle ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!linkingGoogle) e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                        }}
+                      >
+                        <GoogleIcon size={14} />
+                        <span>
+                          {linkingGoogle
+                            ? "Ulanmoqda..."
+                            : identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url
+                            ? "Qayta ulanish"
+                            : "Google bilan ulash"}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Lockout Warning Notice if sole identity */}
+                  {identitiesData && !identitiesData.can_unlink_google && identitiesData.is_google_linked && (
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        background: "rgba(245, 158, 11, 0.1)",
+                        border: "1px solid rgba(245, 158, 11, 0.25)",
+                        color: "#FDE68A",
+                        fontSize: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <InfoIcon size={15} color="#F59E0B" />
+                      <span>Google sizning yagona kirish usulingizdir. Akkauntdan chiqib qolmaslik uchun uzishdan oldin parol o'rnating.</span>
+                    </div>
+                  )}
+
                   {/* Google Profile Details if available */}
-                  {(authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com")) && (
+                  {(identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com")) && (
                     <div
                       style={{
                         padding: "12px 14px",

@@ -725,8 +725,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             {/* Google OAuth Button */}
             <button
               type="button"
+              role="button"
+              aria-label="Google orqali tizimga kirish"
               onClick={handleGoogleSignIn}
-              disabled={loading || oauthLoading}
+              disabled={loading || oauthLoading || oauthWaiting}
               style={{
                 width: "100%",
                 display: "flex",
@@ -742,13 +744,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 color: "#F8FAFC",
                 fontSize: "13.5px",
                 fontWeight: 600,
-                cursor: loading || oauthLoading ? "not-allowed" : "pointer",
+                cursor: loading || oauthLoading || oauthWaiting ? "not-allowed" : "pointer",
                 transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                opacity: loading || oauthLoading ? 0.65 : 1,
+                opacity: loading || oauthLoading || oauthWaiting ? 0.65 : 1,
                 boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
               }}
               onMouseEnter={(e) => {
-                if (!loading && !oauthLoading) {
+                if (!loading && !oauthLoading && !oauthWaiting) {
                   e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
                   e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
                   e.currentTarget.style.transform = "translateY(-1.5px)";
@@ -919,8 +921,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             {/* Google OAuth Button */}
             <button
               type="button"
+              role="button"
+              aria-label="Google orqali ro'yxatdan o'tish"
               onClick={handleGoogleSignIn}
-              disabled={loading || oauthLoading}
+              disabled={loading || oauthLoading || oauthWaiting}
               style={{
                 width: "100%",
                 display: "flex",
@@ -936,13 +940,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 color: "#F8FAFC",
                 fontSize: "13.5px",
                 fontWeight: 600,
-                cursor: loading || oauthLoading ? "not-allowed" : "pointer",
+                cursor: loading || oauthLoading || oauthWaiting ? "not-allowed" : "pointer",
                 transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                opacity: loading || oauthLoading ? 0.65 : 1,
+                opacity: loading || oauthLoading || oauthWaiting ? 0.65 : 1,
                 boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
               }}
               onMouseEnter={(e) => {
-                if (!loading && !oauthLoading) {
+                if (!loading && !oauthLoading && !oauthWaiting) {
                   e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
                   e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
                   e.currentTarget.style.transform = "translateY(-1.5px)";
