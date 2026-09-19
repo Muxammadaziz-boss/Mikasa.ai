@@ -239,15 +239,27 @@ export const MikasaOrb: React.FC<MikasaOrbProps> = ({
           position: "absolute",
           width: "88%",
           height: "88%",
-          borderRadius: "50%",
-          border: `1px dashed ${colors.ring2}`,
           transform: "rotateX(60deg) rotateZ(30deg)",
-          animation: getRingAnimation(1),
+          transformStyle: "preserve-3d",
           pointerEvents: "none",
-          opacity: isActive ? 0.8 : 0.3,
-          transition: "opacity 0.5s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            border: `1px dashed ${colors.ring2}`,
+            animation: getRingAnimation(1),
+            opacity: isActive ? 0.8 : 0.3,
+            transition: "opacity 0.5s ease",
+            willChange: "transform",
+          }}
+        />
+      </div>
 
       {/* ── Layer 4: Orbital Ring 3 (perpendicular) ── */}
       <div
@@ -255,15 +267,27 @@ export const MikasaOrb: React.FC<MikasaOrbProps> = ({
           position: "absolute",
           width: "82%",
           height: "82%",
-          borderRadius: "50%",
-          border: `1px dotted ${colors.ring3}`,
           transform: "rotateX(75deg) rotateZ(-45deg)",
-          animation: getRingAnimation(2),
+          transformStyle: "preserve-3d",
           pointerEvents: "none",
-          opacity: isActive ? 0.7 : 0.2,
-          transition: "opacity 0.5s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            border: `1px dotted ${colors.ring3}`,
+            animation: getRingAnimation(2),
+            opacity: isActive ? 0.7 : 0.2,
+            transition: "opacity 0.5s ease",
+            willChange: "transform",
+          }}
+        />
+      </div>
 
       {/* ── Layer 5: Floating Particles ── */}
       {particles.map((p, i) => {

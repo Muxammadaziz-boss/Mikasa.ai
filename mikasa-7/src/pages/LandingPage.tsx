@@ -647,6 +647,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   stroke="url(#sparkline-gradient-id)"
                   strokeWidth="2.2"
                   strokeDasharray="8 4"
+                  className="telemetry-wave-animated"
                   style={{ animation: "wave-sparkline-flow 4s linear infinite" }}
                 />
                 <defs>
@@ -802,32 +803,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       setHoveredIcon(null);
                     }}
                   >
-                    {/* Counter-rotating icon button so icon remains upright */}
-                    <button
-                      onClick={() => {
-                        handleRunQuery(item.prompt);
-                      }}
-                      title={`${item.title} — ${item.prompt}`}
+                    {/* Counter-rotating icon wrapper so icon remains upright */}
+                    <div
+                      className="orb-counter-rotate-node"
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: "42px",
-                        height: "42px",
-                        borderRadius: "50%",
-                        backgroundColor: isHovered ? "rgba(18, 28, 52, 0.95)" : "rgba(12, 18, 36, 0.72)",
-                        border: isHovered ? `1.5px solid ${item.color}` : "1px solid rgba(255, 255, 255, 0.14)",
-                        boxShadow: isHovered ? `0 0 20px ${item.color}88, inset 0 0 10px ${item.color}44` : `0 4px 14px rgba(0, 0, 0, 0.4)`,
-                        color: isHovered ? "#FFFFFF" : item.color,
-                        cursor: "pointer",
-                        transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, border-color 0.2s, box-shadow 0.2s",
-                        transform: isHovered ? "scale(1.2)" : "scale(1)",
                         animation: "orbit-counter-rotate 32s linear infinite",
                         animationPlayState: isOrbitPaused ? "paused" : "running",
                       }}
                     >
-                      {item.icon}
-                    </button>
+                      <button
+                        onClick={() => {
+                          handleRunQuery(item.prompt);
+                        }}
+                        title={`${item.title} — ${item.prompt}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "42px",
+                          height: "42px",
+                          borderRadius: "50%",
+                          backgroundColor: isHovered ? "rgba(18, 28, 52, 0.95)" : "rgba(12, 18, 36, 0.72)",
+                          border: isHovered ? `1.5px solid ${item.color}` : "1px solid rgba(255, 255, 255, 0.14)",
+                          boxShadow: isHovered ? `0 0 20px ${item.color}88, inset 0 0 10px ${item.color}44` : `0 4px 14px rgba(0, 0, 0, 0.4)`,
+                          color: isHovered ? "#FFFFFF" : item.color,
+                          cursor: "pointer",
+                          transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, border-color 0.2s, box-shadow 0.2s",
+                          transform: isHovered ? "scale(1.2)" : "scale(1)",
+                        }}
+                      >
+                        {item.icon}
+                      </button>
+                    </div>
 
                     {/* Hover tooltip popup with title & random command prompt */}
                     {isHovered && (

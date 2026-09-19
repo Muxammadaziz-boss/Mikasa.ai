@@ -174,11 +174,9 @@ input {
   border-width: 0;
 }
 
-/* Reduced Motion preference */
+/* Accessibility: Gracefully respect reduced motion without breaking core AI visual identity */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  .allow-reduced-motion {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -437,3 +435,15 @@ input {
     stroke-dashoffset: -60;
   }
 }
+
+/* Hardware-accelerated smooth 60/120 FPS animation targets */
+.orb-interactive-ring-container,
+.orb-counter-rotate-node,
+.mikasa-orb-wrapper,
+.telemetry-wave-animated {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
