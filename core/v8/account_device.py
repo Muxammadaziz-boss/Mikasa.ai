@@ -512,6 +512,23 @@ class AccountDeviceManager:
             dev = self._devices.get(self._devices_by_hw_id[query])
 
         if not dev:
+            import urllib.parse
+            unquoted = urllib.parse.unquote(query)
+            for d in self._devices.values():
+                if (
+                    d.id == query
+                    or d.device_id == query
+                    or (bool(d.hostname) and d.hostname.lower() == query.lower())
+                    or (unquoted != query and (
+                        d.id == unquoted
+                        or d.device_id == unquoted
+                        or (bool(d.hostname) and d.hostname.lower() == unquoted.lower())
+                    ))
+                ):
+                    dev = d
+                    break
+
+        if not dev:
             return None
 
         if user_id is not None and dev.mikasa_user_id != str(user_id).strip():

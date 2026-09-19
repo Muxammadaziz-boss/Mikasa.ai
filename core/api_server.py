@@ -17,6 +17,7 @@ from typing import Optional, Tuple, Any
 import requests
 import socket
 import time
+import urllib.parse
 
 # Ishchi katalogni to'g'ri o'rnatish
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -550,7 +551,7 @@ async def handle_chat(request):
 
 
 async def handle_ai_test_key(request):
-    """POST /api/ai/test-key - Google Gemini API kalitini jonli sinovdan o'tkazish"""
+    """POST /api/ai/test-key - Google Gemini API kalitini jonli sinovdan o'tkazish (ListModels + multi-model fallback)"""
     try:
         body = await request.json()
     except Exception:
@@ -571,25 +572,108 @@ async def handle_ai_test_key(request):
             "error": "API kaliti kiritilmagan. Iltimos, Google Gemini API kalitini kiriting."
         })
 
-    # Jonli Google Gemini REST API so'rovi orqali tekshirish
-    test_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    payload = {
-        "contents": [{"parts": [{"text": "Salom"}]}],
-        "generationConfig": {"maxOutputTokens": 10}
-    }
-
     loop = asyncio.get_running_loop()
 
-    def _ping():
+    def _verify_gemini():
+        # 1-qadam: Rasmiy Google ListModels orqali tekshirish
+        list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        supported_models = []
         try:
-            resp = requests.post(test_url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
-            return resp.status_code, resp.text
+            list_resp = requests.get(list_url, timeout=10)
+            if list_resp.status_code == 200:
+                try:
+                    data = list_resp.json()
+                    for m in data.get("models", []):
+                        m_name = m.get("name", "").replace("models/", "")
+                        methods = m.get("supportedGenerationMethods", [])
+                        if "generateContent" in methods:
+                            supported_models.append(m_name)
+                except Exception:
+                    pass
+            elif list_resp.status_code in (400, 403):
+                # Aniq kalit xatosi (API_KEY_INVALID, PERMISSION_DENIED, LEAKED)
+                try:
+                    err_json = list_resp.json().get("error", {})
+                    msg = err_json.get("message", "API kaliti yaroqsiz.")
+                    reason = err_json.get("status", "API_KEY_INVALID")
+                    details = err_json.get("details", [])
+                    if details and isinstance(details, list) and "reason" in details[0]:
+                        reason = details[0]["reason"]
+                    return False, reason, msg, []
+                except Exception:
+                    return False, "API_KEY_INVALID", list_resp.text[:150], []
         except Exception as ex:
-            return -1, str(ex)
+            logger.warning(f"[API_TEST_KEY] ListModels so'rovida tarmoq ogohlantirishi: {ex}")
 
-    status_code, text = await loop.run_in_executor(None, _ping)
+        # 2-qadam: generateContent orqali tezkor 1-tokenlik sinov
+        candidates = []
+        pref_order = [
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+            "gemini-2.0-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-pro-latest",
+            "gemini-pro"
+        ]
+        if supported_models:
+            for p in pref_order:
+                if p in supported_models and p not in candidates:
+                    candidates.append(p)
+            for m in supported_models:
+                if m not in candidates:
+                    candidates.append(m)
+        else:
+            candidates = pref_order
 
-    if status_code == 200:
+        last_error_reason = "API_KEY_INVALID"
+        last_error_msg = "Google Gemini API kaliti yaroqsiz."
+        working_model = None
+
+        for model in candidates[:5]:
+            gen_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": "Salom"}]}],
+                "generationConfig": {"maxOutputTokens": 10}
+            }
+            try:
+                resp = requests.post(gen_url, json=payload, headers={"Content-Type": "application/json"}, timeout=8)
+                if resp.status_code == 200:
+                    working_model = model
+                    break
+                elif resp.status_code == 429:
+                    # 429 - kvota limitiga yetgan, lekin kalit to'g'ri va tasdiqlangan
+                    working_model = model
+                    break
+                elif resp.status_code in (400, 403):
+                    try:
+                        g_err = resp.json().get("error", {})
+                        last_error_msg = g_err.get("message", last_error_msg)
+                        last_error_reason = g_err.get("status", last_error_reason)
+                        details = g_err.get("details", [])
+                        if details and isinstance(details, list) and "reason" in details[0]:
+                            last_error_reason = details[0]["reason"]
+                        if last_error_reason in ("API_KEY_INVALID", "PERMISSION_DENIED"):
+                            return False, last_error_reason, last_error_msg, supported_models
+                    except Exception:
+                        pass
+                elif resp.status_code == 404:
+                    # Ushbu model topilmadi, keyingi modelga o'tish (xatolik deb hisoblanmaydi)
+                    continue
+            except Exception as ex:
+                last_error_msg = str(ex)
+
+        if working_model or supported_models:
+            chosen = working_model or (supported_models[0] if supported_models else "gemini-2.5-flash")
+            return True, "OK", "Kalit muvaffaqiyatli tasdiqlandi!", [chosen] + supported_models
+
+        return False, last_error_reason, last_error_msg, []
+
+    is_valid, reason, msg, model_list = await loop.run_in_executor(None, _verify_gemini)
+
+    if is_valid:
         # Kalit to'g'ri va ishlaydi!
         os.environ["GEMINI_API_KEY"] = api_key
         os.environ["GOOGLE_API_KEY"] = api_key
@@ -608,39 +692,36 @@ async def handle_ai_test_key(request):
         except Exception:
             pass
 
+        # Shuningdek data/config.json ga avtomatik saqlash
+        try:
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "config.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                if "ai" not in cfg:
+                    cfg["ai"] = {}
+                cfg["ai"]["gemini_api_key"] = api_key
+                cfg["gemini_api_key"] = api_key
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, ensure_ascii=False, indent=2)
+        except Exception as ce:
+            logger.warning(f"config.json ga API kalitni saqlashda xatolik: {ce}")
+
+        active_model = model_list[0] if model_list else "gemini-2.5-flash"
         return web.json_response({
             "ok": True,
             "valid": True,
-            "message": "Google Gemini API kaliti muvaffaqiyatli tekshirildi va faollashtirildi!",
-            "model": "gemini-1.5-flash"
+            "message": f"Google Gemini API kaliti faol va tasdiqlangan! (Model: {active_model})",
+            "model": active_model,
+            "available_models": model_list[:5]
         })
 
-    # Google qaytargan xatolikni tahlil qilish
-    error_reason = "API_KEY_INVALID"
-    err_message = "Google Gemini API kaliti yaroqsiz."
-    try:
-        err_json = json.loads(text)
-        if "error" in err_json:
-            g_err = err_json["error"]
-            err_message = g_err.get("message", err_message)
-            details = g_err.get("details", [])
-            if details and isinstance(details, list) and "reason" in details[0]:
-                error_reason = details[0]["reason"]
-            elif "status" in g_err:
-                error_reason = g_err["status"]
-    except Exception:
-        if status_code == -1:
-            err_message = f"Tarmoq xatosi: Google API serveriga ulanib bo'lmadi ({text[:100]})."
-        else:
-            err_message = f"HTTP {status_code}: {text[:150]}"
-
-    logger.warning(f"[API_TEST_KEY] Gemini API tekshiruvi muvaffaqiyatsiz: status={status_code}, reason={error_reason}, msg={err_message}")
+    logger.warning(f"[API_TEST_KEY] Gemini API tekshiruvi muvaffaqiyatsiz: reason={reason}, msg={msg}")
     return web.json_response({
         "ok": False,
         "valid": False,
-        "error_code": error_reason,
-        "error": f"API kaliti yaroqsiz ({error_reason}): {err_message}",
-        "status_code": status_code
+        "error_code": reason,
+        "error": f"API kaliti yaroqsiz ({reason}): {msg}"
     })
 
 
@@ -2562,13 +2643,17 @@ async def handle_devices_list(request):
         devices = [dev]
         mgr.select_device(user_id, dev.device_id)
 
-    # 2. Agar mavjud yagona qurilma eski dummy (dev-sess-1 va bo'sh xost) bo'lsa, uni joriy kompyuter bilan almashtirish/yangilash
-    if len(devices) == 1 and devices[0].device_id == "dev-sess-1" and not devices[0].hostname:
+    # 2. Agar mavjud yagona qurilma eski dummy (dev-sess-1) bo'lsa, uni joriy kompyuter bilan bog'lash
+    if len(devices) == 1 and devices[0].device_id == "dev-sess-1":
         d0 = devices[0]
-        d0.name = f"{loc.hostname or 'Asosiy Kompyuter'} (Joriy kompyuter)"
+        if not d0.name or d0.name == "dev-sess-1":
+            d0.name = f"{loc.hostname or 'Asosiy Kompyuter'} (Joriy kompyuter)"
         d0.hostname = loc.hostname
         d0.status = "online"
         d0.last_seen_at = time.time()
+        d0.platform = loc.os_name.lower()
+        d0.agent_version = loc.agent_version
+        mgr._devices_by_hw_id[loc.device_id] = d0.id
         mgr.save()
 
     # 3. Joriy kompyuterni belgilash va yangilash
@@ -2578,8 +2663,10 @@ async def handle_devices_list(request):
             local_dev = d
             d.status = "online"
             d.last_seen_at = time.time()
-            if not d.hostname:
-                d.hostname = loc.hostname
+            d.hostname = loc.hostname
+            d.platform = loc.os_name.lower()
+            d.agent_version = loc.agent_version
+            mgr._devices_by_hw_id[loc.device_id] = d.id
             break
 
     # Agar ro'yxatda faqat 1 ta qurilma bo'lsa va local_dev topilmagan bo'lsa, ushbu yagona qurilma joriy desktop qurilmasi deb hisoblanadi
@@ -2587,6 +2674,11 @@ async def handle_devices_list(request):
         local_dev = devices[0]
         local_dev.status = "online"
         local_dev.last_seen_at = time.time()
+        local_dev.hostname = loc.hostname
+        local_dev.platform = loc.os_name.lower()
+        local_dev.agent_version = loc.agent_version
+        mgr._devices_by_hw_id[loc.device_id] = local_dev.id
+        mgr.save()
 
     selected = mgr.get_selected_device(user_id)
     if not selected or selected.is_revoked:
@@ -2622,7 +2714,7 @@ async def handle_devices_list(request):
 async def handle_device_detail(request):
     """GET /api/devices/{device_id} - Muayyan qurilma tafsilotlari"""
     user_id = _get_request_user_id(request)
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
 
@@ -2648,7 +2740,7 @@ async def handle_device_detail(request):
 async def handle_device_rename(request):
     """PATCH /api/devices/{device_id} - Qurilma do'stona nomini yangilash"""
     user_id = _get_request_user_id(request)
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     try:
         body = await request.json()
     except Exception:
@@ -2656,29 +2748,40 @@ async def handle_device_rename(request):
 
     new_name = body.get("name", "")
     from core.v8 import AccountDeviceManager
+    from core.v8.device import DeviceIdentityManager
     mgr = AccountDeviceManager.get_default_instance()
+    loc = DeviceIdentityManager.create_local_identity()
 
     ok, msg, dev = mgr.rename_device(dev_id, user_id=user_id, new_name=new_name)
     if not ok or not dev:
         status_code = 404 if "NOT_FOUND" in msg else 400
         return web.json_response({"ok": False, "error": msg}, status=status_code)
 
+    dev_dict = dev.to_dict()
+    is_curr = (
+        dev.device_id == loc.device_id
+        or (bool(dev.hostname) and dev.hostname.lower() == loc.hostname.lower())
+    )
+    dev_dict["is_current"] = bool(is_curr)
+    if is_curr:
+        dev_dict["status"] = "online"
+
     await broadcast_ws("DEVICE_RENAMED", {
         "user_id": user_id,
-        "device": dev.to_dict()
+        "device": dev_dict
     })
 
     return web.json_response({
         "ok": True,
         "message": msg,
-        "device": dev.to_dict()
+        "device": dev_dict
     })
 
 
 async def handle_device_revoke(request):
     """DELETE /api/devices/{device_id} - Qurilmani bekor qilish (Revoke & Cascade)"""
     user_id = _get_request_user_id(request)
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
 
@@ -2701,7 +2804,7 @@ async def handle_device_revoke(request):
 async def handle_device_select(request):
     """POST /api/devices/{device_id}/select - Faol qurilmani tanlash"""
     user_id = _get_request_user_id(request)
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
 
@@ -2725,7 +2828,7 @@ async def handle_device_select(request):
 async def handle_device_permissions(request):
     """GET /api/devices/{device_id}/permissions - Qurilma uchun foydalanuvchi ruxsatlari"""
     user_id = _get_request_user_id(request)
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager, PermissionStore
     mgr = AccountDeviceManager.get_default_instance()
 

@@ -472,7 +472,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               alignItems: "center",
               gap: "7px",
               padding: "3px 8px 3px 4px",
-              maxWidth: "145px",
+              maxWidth: "180px",
               borderRadius: "24px",
               backgroundColor: currentPath === "/account" ? "rgba(56, 189, 248, 0.15)" : "rgba(255, 255, 255, 0.05)",
               border: currentPath === "/account"
@@ -497,7 +497,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   fontSize: "12px",
                   fontWeight: 700,
                   color: "#FFFFFF",
-                  maxWidth: "80px",
+                  maxWidth: "115px",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",

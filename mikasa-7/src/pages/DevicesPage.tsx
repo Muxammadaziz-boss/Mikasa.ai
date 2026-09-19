@@ -243,13 +243,12 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
 
     setRenameSubmitting(true);
     try {
-      const res = await backendService.renameDevice(deviceToRename.device_id, cleanName);
-      if (res.ok && res.device) {
-        setDevices((prev) =>
-          prev.map((d) => (d.id === res.device!.id ? res.device! : d))
-        );
+      const targetId = deviceToRename.id || deviceToRename.device_id;
+      const res = await backendService.renameDevice(targetId, cleanName);
+      if (res.ok) {
+        await loadDevices();
         setRenameModalOpen(false);
-        showNotification("success", "Qurilma nomi muvaffaqiyatli o'zgartirildi.");
+        showNotification("success", `Qurilma nomi muvaffaqiyatli "${cleanName}" deb o'zgartirildi.`);
       } else {
         setRenameError(res.error || "Nomni o'zgartirishda xatolik.");
       }
