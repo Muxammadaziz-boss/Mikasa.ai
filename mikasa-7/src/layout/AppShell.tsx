@@ -13,6 +13,7 @@ interface AppShellProps {
   currentPath: string;
   userName?: string;
   userAvatar?: string;
+  userAvatarUrl?: string;
   onNavigate: (path: string, initialPrompt?: string) => void;
   onOpenCommandPalette?: () => void;
   children: React.ReactNode;
@@ -22,6 +23,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   currentPath,
   userName = "Muxammadaziz",
   userAvatar,
+  userAvatarUrl,
   onNavigate,
   onOpenCommandPalette,
   children,
@@ -476,7 +478,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               e.currentTarget.style.borderColor = currentPath === "/account" ? "rgba(56, 189, 248, 0.35)" : "rgba(255, 255, 255, 0.08)";
             }}
           >
-            <Avatar initials={effectiveInitials} size={28} avatarStyle={currentAvatarStyle} />
+            <Avatar initials={effectiveInitials} size={28} avatarStyle={currentAvatarStyle} avatarUrl={userAvatarUrl} />
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
               <span style={{ fontSize: "12px", fontWeight: 700, color: "#FFFFFF" }}>
                 {userName}

@@ -5,6 +5,7 @@ export interface AvatarProps {
   size?: number;
   className?: string;
   avatarStyle?: string;
+  avatarUrl?: string;
 }
 
 const AVATAR_GRADIENTS: Record<string, string> = {
@@ -21,8 +22,40 @@ export const Avatar: React.FC<AvatarProps> = ({
   size = 32,
   className = "",
   avatarStyle = "emerald",
+  avatarUrl,
 }) => {
+  const [imageError, setImageError] = React.useState(false);
   const gradient = AVATAR_GRADIENTS[avatarStyle] || AVATAR_GRADIENTS.emerald;
+
+  if (avatarUrl && !imageError) {
+    return (
+      <div
+        className={`user-avatar ${className}`}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: "50%",
+          overflow: "hidden",
+          border: "1.5px solid rgba(255, 255, 255, 0.2)",
+          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
+          flexShrink: 0,
+          position: "relative",
+        }}
+      >
+        <img
+          src={avatarUrl}
+          alt={initials}
+          onError={() => setImageError(true)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

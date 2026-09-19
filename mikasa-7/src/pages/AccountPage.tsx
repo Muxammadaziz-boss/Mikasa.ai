@@ -20,6 +20,10 @@ import {
   LaptopIcon,
   TelegramIcon,
   ExternalLinkIcon,
+  LinkIcon,
+  UnlinkIcon,
+  GoogleIcon,
+  GithubIcon,
 } from "../components/icons/Icons";
 import { Avatar } from "../components/Avatar";
 import {
@@ -40,6 +44,7 @@ interface AccountPageProps {
 
 type TabType =
   | "profile"
+  | "linked-accounts"
   | "appearance"
   | "voice"
   | "ai"
@@ -137,6 +142,13 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
   const [loggingOutSessions, setLoggingOutSessions] = useState<boolean>(false);
   const [telegramStatus, setTelegramStatus] = useState<{ is_linked: boolean; username?: string; id?: number } | null>(null);
+
+  // Linked Accounts (Phase 43) States
+  const [githubToken, setGithubToken] = useState<string>("");
+  const [savedGithubToken, setSavedGithubToken] = useState<string | null>(() => backendService.getGitHubToken());
+  const [githubTokenSaved, setGithubTokenSaved] = useState<boolean>(false);
+  const [linkingGoogle, setLinkingGoogle] = useState<boolean>(false);
+  const [unlinkingTelegram, setUnlinkingTelegram] = useState<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -240,6 +252,50 @@ export const AccountPage: React.FC<AccountPageProps> = ({
       alert(`Xatolik: ${err.message || err}`);
     } finally {
       setLoggingOutSessions(false);
+    }
+  };
+
+  const handleSaveGitHubToken = () => {
+    if (!githubToken.trim()) return;
+    backendService.setGitHubToken(githubToken.trim());
+    setSavedGithubToken(githubToken.trim());
+    setGithubToken("");
+    setGithubTokenSaved(true);
+    setTimeout(() => setGithubTokenSaved(false), 3000);
+  };
+
+  const handleRemoveGitHubToken = () => {
+    backendService.setGitHubToken(null);
+    setSavedGithubToken(null);
+    setGithubToken("");
+  };
+
+  const handleStartGoogleOAuth = async () => {
+    setLinkingGoogle(true);
+    try {
+      const res = await backendService.signInWithGoogle();
+      if (res.ok && res.url) {
+        await backendService.openExternalUrl(res.url);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    if (!window.confirm("Telegram hisobini uzishni tasdiqlaysizmi?")) return;
+    setUnlinkingTelegram(true);
+    try {
+      const res = await backendService.unlinkTelegramAccount();
+      if (res.ok) {
+        setTelegramStatus({ is_linked: false });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setUnlinkingTelegram(false);
     }
   };
 
@@ -402,6 +458,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
   const tabs: Array<{ id: TabType; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }> = [
     { id: "profile", label: "Profil", icon: UserIcon },
+    { id: "linked-accounts", label: "Ulangan hisoblar", icon: LinkIcon },
     { id: "appearance", label: "Tashqi ko'rinish", icon: PaletteIcon },
     { id: "voice", label: "Ovoz", icon: VolumeIcon },
     { id: "ai", label: "AI Modeli", icon: CpuIcon },
@@ -439,7 +496,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Avatar initials={effectiveInitials} size={42} avatarStyle={avatar} />
+          <Avatar initials={effectiveInitials} size={42} avatarStyle={avatar} avatarUrl={authAccount?.avatar_url} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
@@ -764,7 +821,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                     Profil Avatari Rang Uslubi
                   </label>
                   <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-                    <Avatar initials={effectiveInitials} size={64} avatarStyle={avatar} />
+                    <Avatar initials={effectiveInitials} size={64} avatarStyle={avatar} avatarUrl={authAccount?.avatar_url} />
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {AVATAR_PALETTES.map((pal) => (
                         <div
@@ -1104,6 +1161,671 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: ULANGAN HISOBLAR (LINKED ACCOUNTS) */}
+            {activeTab === "linked-accounts" && (
+              <div
+                style={{
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
+                  borderRadius: 14,
+                  padding: "24px 28px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 22,
+                }}
+              >
+                <div>
+                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Ulangan Hisoblar va Integratsiyalar</h2>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
+                    Google, Telegram, GitHub va bulutli xizmatlar bilan xavfsiz integratsiya
+                  </p>
+                </div>
+
+                {/* 1. Google Account Card */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(255, 255, 255, 0.06)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <GoogleIcon size={22} />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Google Akkaunt</span>
+                          {authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com") ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#34D399",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Ulangan (Faol)
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(148, 163, 184, 0.12)",
+                                color: "#94A3B8",
+                                border: "1px solid rgba(148, 163, 184, 0.2)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Ulanmagan
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          Google OAuth 2.0 orqali bir martalik xavfsiz autentifikatsiya va profil ma'lumotlari
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleStartGoogleOAuth}
+                      disabled={linkingGoogle}
+                      style={{
+                        padding: "8px 16px",
+                        background: "rgba(255, 255, 255, 0.08)",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        borderRadius: 8,
+                        color: "#FFFFFF",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                        cursor: linkingGoogle ? "default" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!linkingGoogle) e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                      }}
+                    >
+                      <GoogleIcon size={14} />
+                      <span>
+                        {linkingGoogle
+                          ? "Ulanmoqda..."
+                          : authAccount?.provider === "google" || authAccount?.avatar_url
+                          ? "Qayta ulanish"
+                          : "Google bilan ulash"}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Google Profile Details if available */}
+                  {(authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com")) && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255, 255, 255, 0.03)",
+                        border: "1px solid rgba(255, 255, 255, 0.06)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <Avatar
+                        initials={effectiveInitials}
+                        size={36}
+                        avatarStyle={avatar}
+                        avatarUrl={authAccount?.avatar_url}
+                      />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#F1F5F9" }}>
+                          {authAccount?.username || name}
+                        </span>
+                        <span style={{ fontSize: 11.5, color: "#94A3B8" }}>
+                          {authAccount?.email}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Telegram Bot & Notification Card */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(56, 189, 248, 0.12)",
+                          border: "1px solid rgba(56, 189, 248, 0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <TelegramIcon size={22} color="#38BDF8" />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Telegram Bot & Masofaviy Boshqaruv</span>
+                          {telegramStatus?.is_linked ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#34D399",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Bog'langan (Faol)
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(245, 158, 11, 0.12)",
+                                color: "#FBBF24",
+                                border: "1px solid rgba(245, 158, 11, 0.25)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Bog'lanmagan
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          Masofadan kompyuterni boshqarish, skrinshot olish va bildirishnomalar qabul qilish
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {telegramStatus?.is_linked && (
+                        <button
+                          type="button"
+                          onClick={handleUnlinkTelegram}
+                          disabled={unlinkingTelegram}
+                          style={{
+                            padding: "8px 12px",
+                            background: "rgba(239, 68, 68, 0.12)",
+                            border: "1px solid rgba(239, 68, 68, 0.25)",
+                            borderRadius: 8,
+                            color: "#FCA5A5",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            cursor: unlinkingTelegram ? "default" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <UnlinkIcon size={14} color="#FCA5A5" />
+                          <span>{unlinkingTelegram ? "Uzilmoqda..." : "Uzish"}</span>
+                        </button>
+                      )}
+                      {onNavigateToTelegram && (
+                        <button
+                          type="button"
+                          onClick={onNavigateToTelegram}
+                          style={{
+                            padding: "8px 16px",
+                            background: "rgba(56, 189, 248, 0.15)",
+                            border: "1px solid rgba(56, 189, 248, 0.35)",
+                            borderRadius: 8,
+                            color: "#38BDF8",
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(56, 189, 248, 0.25)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(56, 189, 248, 0.15)";
+                          }}
+                        >
+                          <TelegramIcon size={14} color="#38BDF8" />
+                          <span>{telegramStatus?.is_linked ? "Telegram Sozlamalari" : "Telegramga Bog'lash"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {telegramStatus?.is_linked && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255, 255, 255, 0.03)",
+                        border: "1px solid rgba(255, 255, 255, 0.06)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981" }} />
+                        <span style={{ color: "#F1F5F9", fontWeight: 500 }}>
+                          {telegramStatus.username ? `@${telegramStatus.username}` : "Telegram Foydalanuvchisi"}
+                        </span>
+                        {telegramStatus.id && (
+                          <span style={{ color: "#64748B", fontFamily: "monospace" }}>
+                            (ID: {telegramStatus.id})
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ color: "#34D399", fontSize: 11.5, fontWeight: 500 }}>
+                        ✓ Faol xabarlar almashinuvi yoqilgan
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. GitHub Integration Card */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(255, 255, 255, 0.06)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <GithubIcon size={22} color="#FFFFFF" />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>GitHub Repozitoriyalar & Tooling</span>
+                          {savedGithubToken ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#34D399",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Ulangan (Token Saqlangan)
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 12,
+                                background: "rgba(148, 163, 184, 0.12)",
+                                color: "#94A3B8",
+                                border: "1px solid rgba(148, 163, 184, 0.2)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Ulanmagan
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          AI yordamchining GitHub omborlari, kod tahlili va repozitoriy vositalari bilan ishlashi
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GitHub Token Management Form */}
+                  {savedGithubToken ? (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255, 255, 255, 0.03)",
+                        border: "1px solid rgba(255, 255, 255, 0.06)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <KeyIcon size={16} color="#34D399" />
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#F1F5F9" }}>
+                            Personal Access Token
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
+                            ghp_••••••••••••••••{savedGithubToken.slice(-4)}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveGitHubToken}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          background: "rgba(239, 68, 68, 0.12)",
+                          border: "1px solid rgba(239, 68, 68, 0.25)",
+                          color: "#FCA5A5",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Tokenni o'chirish
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <input
+                          type="password"
+                          value={githubToken}
+                          onChange={(e) => setGithubToken(e.target.value)}
+                          placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                          style={{
+                            flex: 1,
+                            padding: "9px 12px",
+                            background: "rgba(8, 14, 28, 0.65)",
+                            border: "1px solid rgba(255, 255, 255, 0.12)",
+                            borderRadius: "8px",
+                            color: "#FFFFFF",
+                            fontSize: "13px",
+                            outline: "none",
+                          }}
+                          onFocus={(e) => (e.target.style.borderColor = "#38BDF8")}
+                          onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveGitHubToken}
+                          disabled={!githubToken.trim()}
+                          style={{
+                            padding: "9px 18px",
+                            background: githubToken.trim() ? "linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)" : "rgba(255, 255, 255, 0.08)",
+                            border: "none",
+                            borderRadius: "8px",
+                            color: "#FFFFFF",
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                            cursor: githubToken.trim() ? "pointer" : "default",
+                            opacity: githubToken.trim() ? 1 : 0.5,
+                          }}
+                        >
+                          Saqlash
+                        </button>
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>Tavsiya etilgan ruxsatlar: <code>repo</code>, <code>read:user</code></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {githubTokenSaved && (
+                    <div style={{ fontSize: "12px", color: "#34D399", fontWeight: 500 }}>
+                      ✓ GitHub tokeni muvaffaqiyatli saqlandi!
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Supabase Cloud Sync Card */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(16, 185, 129, 0.12)",
+                          border: "1px solid rgba(16, 185, 129, 0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <ShieldIcon size={22} color="#10B981" />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Supabase Cloud Database & Auth</span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              padding: "2px 8px",
+                              borderRadius: 12,
+                              background: "rgba(16, 185, 129, 0.15)",
+                              color: "#34D399",
+                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Faol & Sinxron
+                          </span>
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          Foydalanuvchi ma'lumotlari va sessiyalari Supabase Cloud orqali xavfsiz himoyalangan
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 10,
+                      paddingTop: 4,
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, color: "#64748B" }}>Foydalanuvchi UUID</div>
+                      <div style={{ fontSize: 12, color: "#F1F5F9", fontFamily: "monospace", marginTop: 2 }}>
+                        {authAccount?.id || "Lokal sessiya"}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        background: "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, color: "#64748B" }}>Autentifikatsiya Holati</div>
+                      <div style={{ fontSize: 12, color: "#34D399", fontWeight: 600, marginTop: 2 }}>
+                        {authAccount?.is_verified ? "Tasdiqlangan Foydalanuvchi" : "Faol Sessiya"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Faol Qurilmalar va Masofaviy Sessiyalar */}
+                <div
+                  style={{
+                    background: "rgba(8, 14, 28, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 10,
+                          background: "rgba(129, 140, 248, 0.12)",
+                          border: "1px solid rgba(129, 140, 248, 0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <LaptopIcon size={22} color="#818CF8" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>
+                          Faol Qurilmalar va Masofaviy Sessiyalar ({activeSessions.length})
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
+                          Ulangan kompyuterlar soni: {deviceCount} ta. Turli xil qurilmalardagi faol boshqaruv sessiyalari
+                        </p>
+                      </div>
+                    </div>
+
+                    {activeSessions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleLogoutAllSessions}
+                        disabled={loggingOutSessions}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 8,
+                          background: "rgba(239, 68, 68, 0.15)",
+                          border: "1px solid rgba(239, 68, 68, 0.3)",
+                          color: "#EF4444",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: loggingOutSessions ? "default" : "pointer",
+                        }}
+                      >
+                        {loggingOutSessions ? "Chiqilmoqda..." : "Barcha sessiyalardan chiqish"}
+                      </button>
+                    )}
+                  </div>
+
+                  {activeSessions.length === 0 ? (
+                    <div style={{ fontSize: 12.5, color: "#64748B", padding: "8px 0" }}>
+                      Hozirda birorta ham faol masofaviy sessiya mavjud emas.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {activeSessions.map((sess) => (
+                        <div
+                          key={sess.session_id}
+                          style={{
+                            padding: "10px 14px",
+                            borderRadius: 8,
+                            background: "rgba(255, 255, 255, 0.02)",
+                            border: "1px solid rgba(255, 255, 255, 0.05)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            fontSize: 12.5,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#10B981" }} />
+                            <span style={{ fontWeight: 600, color: "#F8FAFC" }}>
+                              {sess.device_name || sess.device_id}
+                            </span>
+                            <span style={{ color: "#64748B", fontFamily: "monospace", fontSize: 11 }}>
+                              (ID: {sess.session_id.slice(0, 8)}...)
+                            </span>
+                          </div>
+                          <span style={{ color: "#94A3B8", fontSize: 11.5 }}>
+                            Amal qilish muddati: {new Date(sess.expires_at * 1000).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

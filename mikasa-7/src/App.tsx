@@ -248,6 +248,7 @@ export function App() {
         currentPath={currentPath}
         userName={userName}
         userAvatar={userAvatar}
+        userAvatarUrl={currentUser?.avatar_url}
         onNavigate={handleNavigate}
         onOpenCommandPalette={() => setIsPaletteOpen(true)}
       >

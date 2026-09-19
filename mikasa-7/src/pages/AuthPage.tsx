@@ -69,6 +69,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           is_active: true,
           is_verified: Boolean(session.user.email_confirmed_at),
           created_at: Date.now() / 1000,
+          avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
+          provider: session.user.app_metadata?.provider || "google",
         };
         onAuthSuccess(user);
       }
@@ -108,6 +110,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 is_active: true,
                 is_verified: true,
                 created_at: Date.now() / 1000,
+                avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || undefined,
+                provider: data.user.app_metadata?.provider || "google",
               };
               setOauthWaiting(false);
               setTimeout(() => {
@@ -359,7 +363,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         justifyContent: "center",
         minHeight: "100vh",
         width: "100%",
-        background: "radial-gradient(ellipse at 50% 20%, rgba(16, 185, 129, 0.12) 0%, rgba(10, 15, 29, 0.98) 70%, #050811 100%)",
+        backgroundColor: "var(--bg-darkest, #060913)",
         color: "#F8FAFC",
         fontFamily: "inherit",
         position: "relative",
@@ -368,6 +372,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         boxSizing: "border-box",
       }}
     >
+      {/* Cinematic Abstract Wallpaper Layer */}
+      <div className="cinematic-bg" style={{ opacity: 0.92 }} />
+
+      {/* Subtle Atmospheric Vignette Overlay */}
+      <div className="cinematic-vignette" />
+
       {/* ═══ TOP CHROME HEADER (Native Window Drag & Controls) ═══ */}
       <header
         data-tauri-drag-region
@@ -376,21 +386,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           top: 0,
           left: 0,
           right: 0,
-          height: "44px",
+          height: "46px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 8px 0 16px",
+          padding: "0 10px 0 18px",
           zIndex: 1000,
           userSelect: "none",
-          background: "rgba(11, 15, 25, 0.4)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+          background: "rgba(8, 14, 28, 0.55)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         }}
       >
-        <div data-tauri-drag-region style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "default" }}>
-          <SparklesIcon size={16} color="#10B981" />
-          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#94A3B8", letterSpacing: "0.04em" }}>
+        <div data-tauri-drag-region style={{ display: "flex", alignItems: "center", gap: "9px", cursor: "default" }}>
+          <SparklesIcon size={16} color="#38BDF8" />
+          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#E2E8F0", letterSpacing: "0.04em" }}>
             MIKASA AI v8.0.0
           </span>
         </div>
@@ -398,51 +409,55 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         <WindowControls />
       </header>
 
-      {/* Ambient background blur elements */}
+      {/* Atmospheric Glowing Cosmic Nebula Orbs */}
       <div
         style={{
           position: "absolute",
-          top: "15%",
-          left: "25%",
-          width: "380px",
-          height: "380px",
+          top: "10%",
+          left: "15%",
+          width: "480px",
+          height: "480px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)",
-          filter: "blur(60px)",
+          background: "radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, rgba(99, 102, 241, 0.09) 50%, transparent 70%)",
+          filter: "blur(90px)",
           pointerEvents: "none",
+          zIndex: 1,
         }}
       />
       <div
         style={{
           position: "absolute",
-          bottom: "15%",
-          right: "25%",
-          width: "420px",
-          height: "420px",
+          bottom: "10%",
+          right: "15%",
+          width: "520px",
+          height: "520px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(6, 182, 212, 0.07) 0%, transparent 70%)",
-          filter: "blur(70px)",
+          background: "radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 70%)",
+          filter: "blur(95px)",
           pointerEvents: "none",
+          zIndex: 1,
         }}
       />
 
-      {/* Main Glass Card */}
+      {/* Main Frosted Glass Card */}
       <div
+        className="glass-panel"
         style={{
           width: "100%",
           maxWidth: "460px",
-          background: "rgba(15, 23, 42, 0.75)",
-          backdropFilter: "blur(24px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "20px",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(16, 185, 129, 0.06)",
+          background: "rgba(10, 16, 32, 0.65)",
+          backdropFilter: "blur(28px)",
+          WebkitBackdropFilter: "blur(28px)",
+          border: "1px solid rgba(255, 255, 255, 0.12)",
+          borderRadius: "24px",
+          boxShadow: "0 24px 64px rgba(0, 0, 0, 0.65), 0 0 40px rgba(56, 189, 248, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.15)",
           padding: "36px 32px",
           position: "relative",
           zIndex: 10,
         }}
       >
         {/* Header Branding */}
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+        <div style={{ textAlign: "center", marginBottom: "26px" }}>
           <div
             style={{
               display: "inline-flex",
@@ -450,22 +465,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               justifyContent: "center",
               width: "56px",
               height: "56px",
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.15) 100%)",
-              border: "1px solid rgba(16, 185, 129, 0.4)",
-              boxShadow: "0 0 20px rgba(16, 185, 129, 0.25)",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.2) 100%)",
+              border: "1px solid rgba(56, 189, 248, 0.35)",
+              boxShadow: "0 0 25px rgba(56, 189, 248, 0.3), inset 0 0 12px rgba(168, 85, 247, 0.2)",
               marginBottom: "14px",
             }}
           >
-            <SparklesIcon size={26} color="#10B981" />
+            <SparklesIcon size={26} color="#38BDF8" />
           </div>
           <h1
             style={{
               margin: "0 0 6px",
-              fontSize: "22px",
-              fontWeight: 700,
+              fontSize: "23px",
+              fontWeight: 800,
               letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg, #FFFFFF 30%, #A7F3D0 100%)",
+              background: "linear-gradient(135deg, #FFFFFF 30%, #38BDF8 70%, #C084FC 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             }}
@@ -477,15 +492,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           </p>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation Segmented Glass Control */}
         <div
           style={{
             display: "flex",
-            background: "rgba(0, 0, 0, 0.3)",
-            borderRadius: "10px",
+            background: "rgba(6, 10, 22, 0.6)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            borderRadius: "12px",
             padding: "4px",
             marginBottom: "24px",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
           }}
         >
           <button
@@ -493,15 +510,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             onClick={() => handleTabChange("login")}
             style={{
               flex: 1,
-              padding: "9px 0",
-              border: "none",
-              borderRadius: "8px",
-              background: activeTab === "login" ? "rgba(16, 185, 129, 0.22)" : "transparent",
-              color: activeTab === "login" ? "#34D399" : "#94A3B8",
+              padding: "10px 0",
+              border: activeTab === "login" ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid transparent",
+              borderRadius: "9px",
+              background: activeTab === "login" ? "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.18) 100%)" : "transparent",
+              color: activeTab === "login" ? "#FFFFFF" : "#94A3B8",
               fontSize: "13.5px",
-              fontWeight: activeTab === "login" ? 600 : 500,
+              fontWeight: activeTab === "login" ? 700 : 500,
               cursor: "pointer",
-              transition: "all 0.15s ease",
+              transition: "all 0.2s ease",
+              boxShadow: activeTab === "login" ? "0 2px 10px rgba(56, 189, 248, 0.2)" : "none",
             }}
           >
             Kirish
@@ -511,15 +529,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             onClick={() => handleTabChange("register")}
             style={{
               flex: 1,
-              padding: "9px 0",
-              border: "none",
-              borderRadius: "8px",
-              background: activeTab === "register" ? "rgba(16, 185, 129, 0.22)" : "transparent",
-              color: activeTab === "register" ? "#34D399" : "#94A3B8",
+              padding: "10px 0",
+              border: activeTab === "register" ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid transparent",
+              borderRadius: "9px",
+              background: activeTab === "register" ? "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.18) 100%)" : "transparent",
+              color: activeTab === "register" ? "#FFFFFF" : "#94A3B8",
               fontSize: "13.5px",
-              fontWeight: activeTab === "register" ? 600 : 500,
+              fontWeight: activeTab === "register" ? 700 : 500,
               cursor: "pointer",
-              transition: "all 0.15s ease",
+              transition: "all 0.2s ease",
+              boxShadow: activeTab === "register" ? "0 2px 10px rgba(56, 189, 248, 0.2)" : "none",
             }}
           >
             Ro'yxatdan o'tish
@@ -704,30 +723,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "10px",
-                padding: "11px 16px",
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: "10px",
+                gap: "11px",
+                padding: "12px 18px",
+                background: "rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                borderRadius: "12px",
                 color: "#F8FAFC",
                 fontSize: "13.5px",
                 fontWeight: 600,
                 cursor: loading || oauthLoading ? "not-allowed" : "pointer",
-                transition: "all 0.18s ease",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.65 : 1,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
               }}
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading) {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
+                  e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+                  e.currentTarget.style.transform = "translateY(-1.5px)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(56, 189, 248, 0.25)";
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.3)";
               }}
             >
-              <GoogleIcon size={18} />
+              <GoogleIcon size={19} />
               <span>{oauthLoading ? "Google orqali ulanilmoqda..." : "Google bilan davom etish"}</span>
             </button>
 
@@ -736,7 +762,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 display: "flex",
                 alignItems: "center",
                 gap: "12px",
-                margin: "2px 0",
+                margin: "4px 0",
                 color: "#64748B",
                 fontSize: "12px",
               }}
@@ -760,20 +786,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   required
                   style={{
                     width: "100%",
-                    padding: "11px 14px 11px 38px",
-                    background: "rgba(0, 0, 0, 0.3)",
+                    padding: "12px 14px 12px 42px",
+                    background: "rgba(8, 14, 28, 0.65)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "10px",
+                    borderRadius: "12px",
                     color: "#FFFFFF",
                     fontSize: "14px",
                     outline: "none",
                     boxSizing: "border-box",
-                    transition: "border-color 0.15s ease",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#10B981")}
-                  onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#38BDF8";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
-                <div style={{ position: "absolute", left: "12px", top: "12px", opacity: 0.5 }}>
+                <div style={{ position: "absolute", left: "14px", top: "13px", opacity: 0.55, pointerEvents: "none" }}>
                   <UserIcon size={16} />
                 </div>
               </div>
@@ -791,8 +825,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     background: "none",
                     border: "none",
                     padding: 0,
-                    color: "#34D399",
+                    color: "#38BDF8",
                     fontSize: "12px",
+                    fontWeight: 500,
                     cursor: "pointer",
                   }}
                 >
@@ -809,20 +844,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   required
                   style={{
                     width: "100%",
-                    padding: "11px 14px 11px 38px",
-                    background: "rgba(0, 0, 0, 0.3)",
+                    padding: "12px 14px 12px 42px",
+                    background: "rgba(8, 14, 28, 0.65)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "10px",
+                    borderRadius: "12px",
                     color: "#FFFFFF",
                     fontSize: "14px",
                     outline: "none",
                     boxSizing: "border-box",
-                    transition: "border-color 0.15s ease",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#10B981")}
-                  onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#38BDF8";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
-                <div style={{ position: "absolute", left: "12px", top: "12px", opacity: 0.5 }}>
+                <div style={{ position: "absolute", left: "14px", top: "13px", opacity: 0.55, pointerEvents: "none" }}>
                   <KeyIcon size={16} />
                 </div>
               </div>
@@ -833,17 +876,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               disabled={loading || oauthLoading}
               style={{
                 marginTop: "8px",
-                padding: "12px 18px",
-                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                padding: "13px 20px",
+                background: "linear-gradient(135deg, #0284C7 0%, #38BDF8 50%, #818CF8 100%)",
                 border: "none",
-                borderRadius: "10px",
-                color: "#052E16",
+                borderRadius: "12px",
+                color: "#FFFFFF",
                 fontSize: "14.5px",
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: loading || oauthLoading ? "default" : "pointer",
-                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
-                transition: "all 0.15s ease",
+                boxShadow: "0 4px 20px rgba(56, 189, 248, 0.35)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && !oauthLoading) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(56, 189, 248, 0.45)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(56, 189, 248, 0.35)";
               }}
             >
               {loading ? "Kirilmoqda..." : "Tizimga kirish"}
@@ -864,30 +917,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "10px",
-                padding: "11px 16px",
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: "10px",
+                gap: "11px",
+                padding: "12px 18px",
+                background: "rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                borderRadius: "12px",
                 color: "#F8FAFC",
                 fontSize: "13.5px",
                 fontWeight: 600,
                 cursor: loading || oauthLoading ? "not-allowed" : "pointer",
-                transition: "all 0.18s ease",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.65 : 1,
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
               }}
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading) {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
+                  e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+                  e.currentTarget.style.transform = "translateY(-1.5px)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(56, 189, 248, 0.25)";
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.3)";
               }}
             >
-              <GoogleIcon size={18} />
+              <GoogleIcon size={19} />
               <span>{oauthLoading ? "Google orqali ulanilmoqda..." : "Google bilan davom etish"}</span>
             </button>
 
@@ -920,17 +980,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   required
                   style={{
                     width: "100%",
-                    padding: "10px 14px 10px 38px",
-                    background: "rgba(0, 0, 0, 0.3)",
+                    padding: "11px 14px 11px 40px",
+                    background: "rgba(8, 14, 28, 0.65)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "10px",
+                    borderRadius: "12px",
                     color: "#FFFFFF",
                     fontSize: "13.5px",
                     outline: "none",
                     boxSizing: "border-box",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#38BDF8";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                    e.target.style.boxShadow = "none";
                   }}
                 />
-                <div style={{ position: "absolute", left: "12px", top: "11px", opacity: 0.5 }}>
+                <div style={{ position: "absolute", left: "13px", top: "12px", opacity: 0.55, pointerEvents: "none" }}>
                   <UserIcon size={16} />
                 </div>
               </div>
@@ -948,14 +1019,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 autoComplete="email"
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#38BDF8";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -974,17 +1056,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   required
                   style={{
                     width: "100%",
-                    padding: "10px 14px 10px 38px",
-                    background: "rgba(0, 0, 0, 0.3)",
+                    padding: "11px 14px 11px 40px",
+                    background: "rgba(8, 14, 28, 0.65)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: "10px",
+                    borderRadius: "12px",
                     color: "#FFFFFF",
                     fontSize: "13.5px",
                     outline: "none",
                     boxSizing: "border-box",
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#38BDF8";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                    e.target.style.boxShadow = "none";
                   }}
                 />
-                <div style={{ position: "absolute", left: "12px", top: "11px", opacity: 0.5 }}>
+                <div style={{ position: "absolute", left: "13px", top: "12px", opacity: 0.55, pointerEvents: "none" }}>
                   <KeyIcon size={16} />
                 </div>
               </div>
@@ -1003,14 +1096,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 required
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#38BDF8";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1020,17 +1124,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               disabled={loading || oauthLoading}
               style={{
                 marginTop: "8px",
-                padding: "12px 18px",
-                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                padding: "13px 20px",
+                background: "linear-gradient(135deg, #0284C7 0%, #38BDF8 50%, #818CF8 100%)",
                 border: "none",
-                borderRadius: "10px",
-                color: "#052E16",
+                borderRadius: "12px",
+                color: "#FFFFFF",
                 fontSize: "14.5px",
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: loading || oauthLoading ? "default" : "pointer",
-                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
-                transition: "all 0.15s ease",
+                boxShadow: "0 4px 20px rgba(56, 189, 248, 0.35)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && !oauthLoading) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(56, 189, 248, 0.45)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(56, 189, 248, 0.35)";
               }}
             >
               {loading ? "Yaratilmoqda..." : "Hisob yaratish"}
@@ -1061,13 +1175,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 style={{
                   width: "100%",
                   padding: "11px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
-                  fontSize: "14px",
+                  fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#10B981";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1077,14 +1202,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               disabled={loading}
               style={{
                 marginTop: "4px",
-                padding: "11px 18px",
-                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                padding: "13px 20px",
+                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
                 border: "none",
-                borderRadius: "10px",
-                color: "#052E16",
-                fontSize: "14px",
-                fontWeight: 600,
+                borderRadius: "12px",
+                color: "#FFFFFF",
+                fontSize: "14.5px",
+                fontWeight: 700,
                 cursor: loading ? "default" : "pointer",
+                boxShadow: "0 4px 20px rgba(16, 185, 129, 0.35)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: loading ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(16, 185, 129, 0.45)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(16, 185, 129, 0.35)";
               }}
             >
               {loading ? "Yuborilmoqda..." : "Tiklash kodini yuborish"}
@@ -1100,7 +1238,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   color: "#94A3B8",
                   fontSize: "12.5px",
                   cursor: "pointer",
+                  transition: "color 0.15s ease",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F1F5F9")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#94A3B8")}
               >
                 ← Kirishga qaytish
               </button>
@@ -1113,7 +1254,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   color: "#34D399",
                   fontSize: "12.5px",
                   cursor: "pointer",
+                  fontWeight: 600,
+                  transition: "color 0.15s ease",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#6EE7B7")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#34D399")}
               >
                 Kodingiz bormi? Tiklash →
               </button>
@@ -1140,14 +1285,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 required
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#10B981";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1164,14 +1320,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 required
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#10B981";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1188,14 +1355,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 required
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#10B981";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1205,14 +1383,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               disabled={loading}
               style={{
                 marginTop: "6px",
-                padding: "11px 18px",
-                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                padding: "13px 20px",
+                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
                 border: "none",
-                borderRadius: "10px",
-                color: "#052E16",
-                fontSize: "14px",
-                fontWeight: 600,
+                borderRadius: "12px",
+                color: "#FFFFFF",
+                fontSize: "14.5px",
+                fontWeight: 700,
                 cursor: loading ? "default" : "pointer",
+                boxShadow: "0 4px 20px rgba(16, 185, 129, 0.35)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: loading ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(16, 185, 129, 0.45)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(16, 185, 129, 0.35)";
               }}
             >
               {loading ? "Yangilanmoqda..." : "Parolni yangilash"}
@@ -1228,7 +1419,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 fontSize: "12.5px",
                 cursor: "pointer",
                 marginTop: "4px",
+                transition: "color 0.15s ease",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#F1F5F9")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94A3B8")}
             >
               ← Kirishga qaytish
             </button>
@@ -1254,14 +1448,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 required
                 style={{
                   width: "100%",
-                  padding: "10px 14px",
-                  background: "rgba(0, 0, 0, 0.3)",
+                  padding: "11px 14px",
+                  background: "rgba(8, 14, 28, 0.65)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "10px",
+                  borderRadius: "12px",
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#10B981";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.22)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
@@ -1271,14 +1476,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               disabled={loading}
               style={{
                 marginTop: "4px",
-                padding: "11px 18px",
-                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                padding: "13px 20px",
+                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
                 border: "none",
-                borderRadius: "10px",
-                color: "#052E16",
-                fontSize: "14px",
-                fontWeight: 600,
+                borderRadius: "12px",
+                color: "#FFFFFF",
+                fontSize: "14.5px",
+                fontWeight: 700,
                 cursor: loading ? "default" : "pointer",
+                boxShadow: "0 4px 20px rgba(16, 185, 129, 0.35)",
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: loading ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(16, 185, 129, 0.45)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(16, 185, 129, 0.35)";
               }}
             >
               {loading ? "Tasdiqlanmoqda..." : "Emailni tasdiqlash"}
@@ -1294,7 +1512,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 fontSize: "12.5px",
                 cursor: "pointer",
                 marginTop: "4px",
+                transition: "color 0.15s ease",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#F1F5F9")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94A3B8")}
             >
               ← Kirishga qaytish
             </button>

@@ -2,13 +2,13 @@
   "app": "Mikasa AI",
   "version": "8.0.0",
   "version_name": "v8.0.0",
-  "release_date": "2026-09-19T01:56:36.459Z",
+  "release_date": "2026-09-19T02:18:40.498Z",
   "files": [
     {
       "name": "Mikasa-AI-v8.0.0.exe",
-      "size_bytes": 5094912,
+      "size_bytes": 5097472,
       "size_mb": 4.86,
-      "sha256": "fd03f7ec8552328268e6c1b7773ace364067ee1baf6e31a190734e8f691f5ff9"
+      "sha256": "1d31dc6fff739e019e452f616d02b001e6f00dab2e1c8e92a8688006facef66a"
     },
     {
       "name": "WebView2Loader.dll",
@@ -18,15 +18,15 @@
     },
     {
       "name": "Mikasa-AI-v8.0.0.msi",
-      "size_bytes": 2813952,
-      "size_mb": 2.68,
-      "sha256": "79c6255318c84370ea8d28858bf290b6b5862e976fc6931cc03118341d009c26"
+      "size_bytes": 2818048,
+      "size_mb": 2.69,
+      "sha256": "285c51af4ac4eb45a3c4b0c1ac4968d46139a8364228941fa16c8a86bf8bf200"
     },
     {
       "name": "Mikasa-AI-Setup-v8.0.0.exe",
-      "size_bytes": 2093496,
+      "size_bytes": 2096110,
       "size_mb": 2,
-      "sha256": "ba9f30a292f334e986a7c153bb6f22fe704971477ab32d49d991f77da1795cb4"
+      "sha256": "be8e866f77b3b7f5d37e64ede420a94dcbcb6d734e78fcfa9628bfac54e95e55"
     }
   ],
   "backend": {

@@ -2084,11 +2084,18 @@ class BackendService {
 
       const user: MikasaAuthUser = {
         id: session.user.id,
-        username: session.user.user_metadata?.username || session.user.email?.split("@")[0] || "User",
+        username:
+          session.user.user_metadata?.full_name ||
+          session.user.user_metadata?.name ||
+          session.user.user_metadata?.username ||
+          session.user.email?.split("@")[0] ||
+          "User",
         email: session.user.email || "",
         is_active: true,
         is_verified: Boolean(session.user.email_confirmed_at),
         created_at: Date.now() / 1000,
+        avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
+        provider: session.user.app_metadata?.provider || (session.user.app_metadata?.providers?.[0]) || "email",
       };
       this.notifyAuthChange(user);
       return {
@@ -2250,6 +2257,24 @@ class BackendService {
     } catch (err: any) {
       return { ok: false, error: err.message || String(err) };
     }
+  }
+
+  public getGitHubToken(): string | null {
+    try {
+      return localStorage.getItem("mikasa_github_token") || null;
+    } catch {
+      return null;
+    }
+  }
+
+  public setGitHubToken(token: string | null): void {
+    try {
+      if (token) {
+        localStorage.setItem("mikasa_github_token", token);
+      } else {
+        localStorage.removeItem("mikasa_github_token");
+      }
+    } catch {}
   }
 }
 
@@ -2450,6 +2475,8 @@ export interface MikasaAuthUser {
   created_at: number;
   last_login_at?: number | null;
   role?: string;
+  avatar_url?: string;
+  provider?: string;
 }
 
 export interface MikasaAccountSession {
