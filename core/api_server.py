@@ -2727,6 +2727,150 @@ async def handle_health(request):
     }, status=200)
 
 
+# ========== 8.2.1. OAUTH REDIRECT & SESSION RECEIVER ==========
+_pending_oauth_session = None
+
+async def handle_oauth_callback(request):
+    """GET /api/auth/callback - OAuth redirect landing page for Desktop & Web"""
+    html_content = """<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mikasa AI — Kirish muvaffaqiyatli</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0B0F19;
+      color: #F8FAFC;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      max-width: 440px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6), 0 0 30px rgba(16, 185, 129, 0.15);
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      border-radius: 18px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+    h1 { font-size: 22px; color: #FFFFFF; margin-bottom: 8px; font-weight: 700; }
+    p { font-size: 14px; color: #94A3B8; line-height: 1.5; margin-bottom: 24px; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.12);
+      color: #34D399;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status.error {
+      background: rgba(239, 68, 68, 0.12);
+      color: #F87171;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✨</div>
+    <h1>Mikasa AI</h1>
+    <p id="msg">Google orqali autentifikatsiya yakunlanmoqda...</p>
+    <div id="badge" class="status">Kutilmoqda...</div>
+  </div>
+  <script>
+    (function() {
+      const hash = window.location.hash.substring(1);
+      const search = window.location.search.substring(1);
+      const params = new URLSearchParams(hash || search);
+      
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const code = params.get('code');
+      const error = params.get('error') || params.get('error_description');
+
+      const msgEl = document.getElementById('msg');
+      const badgeEl = document.getElementById('badge');
+
+      if (error) {
+        msgEl.textContent = "Xatolik: " + decodeURIComponent(error);
+        badgeEl.textContent = "Muvaffaqiyatsiz";
+        badgeEl.className = "status error";
+        return;
+      }
+
+      if (accessToken || code) {
+        fetch('http://127.0.0.1:18420/api/auth/callback/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            code: code,
+            timestamp: Date.now()
+          })
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          msgEl.innerHTML = "Tizimga muvaffaqiyatli kirdingiz!<br>Ushbu oynani yopib, Mikasa ilovasiga qaytishingiz mumkin.";
+          badgeEl.textContent = "Tasdiqlandi ✓";
+          setTimeout(function() {
+            try { window.close(); } catch(e) {}
+          }, 1500);
+        }).catch(function(err) {
+          msgEl.textContent = "Tizimga kirish tasdiqlandi. Mikasa ilovasiga qaytishingiz mumkin.";
+          badgeEl.textContent = "Tayyor ✓";
+        });
+      } else {
+        msgEl.textContent = "Avtorizatsiya tokeni qabul qilinmadi.";
+        badgeEl.textContent = "Xatolik";
+        badgeEl.className = "status error";
+      }
+    })();
+  </script>
+</body>
+</html>"""
+    return web.Response(text=html_content, content_type="text/html")
+
+
+async def handle_oauth_session_save(request):
+    """POST /api/auth/callback/session - Brauzerdan kelgan sessiya tokenlarini saqlash"""
+    global _pending_oauth_session
+    try:
+        data = await request.json()
+        _pending_oauth_session = data
+        sync_broadcast("oauth_completed", data, _main_loop)
+        return web.json_response({"ok": True, "status": "saved"})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=400)
+
+
+async def handle_oauth_session_get(request):
+    """GET /api/auth/callback/session - Desktop ilova uchun kutilayotgan sessiyani olish"""
+    global _pending_oauth_session
+    if _pending_oauth_session:
+        sess = _pending_oauth_session
+        _pending_oauth_session = None  # consume once
+        return web.json_response({"ok": True, "session": sess})
+    return web.json_response({"ok": False, "session": None})
+
+
 
 # ========== 8.3. PHASE 42: DEVICE ENROLLMENT & PAIRING API ==========
 
@@ -3151,6 +3295,13 @@ def create_app():
     app.router.add_post("/api/auth/reset-password", handle_auth_reset_password)
     app.router.add_post("/api/auth/change-password", handle_auth_change_password)
 
+    # Phase 41.1: OAuth Redirect & Session Receiver
+    app.router.add_get("/api/auth/callback", handle_oauth_callback)
+    app.router.add_post("/api/auth/callback/session", handle_oauth_session_save)
+    app.router.add_get("/api/auth/callback/session", handle_oauth_session_get)
+    # Root route fallback for port 1420 OAuth redirects
+    app.router.add_get("/", handle_oauth_callback)
+
     # Phase 42: Device Enrollment & Cryptographic Pairing
     app.router.add_post("/api/devices/pairing/start", handle_device_pairing_start)
     app.router.add_post("/api/devices/pairing/complete", handle_device_pairing_complete)
@@ -3167,8 +3318,35 @@ def run_server(host="127.0.0.1", port=18420):
     logger.info(f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: http://{host}:{port}")
     get_modules()
     app = create_app()
-    _main_loop = asyncio.get_event_loop()
-    web.run_app(app, host=host, port=port, print=None)
+
+    async def _serve():
+        global _main_loop
+        _main_loop = asyncio.get_running_loop()
+        runner = web.AppRunner(app)
+        await runner.setup()
+
+        # Primary port (18420)
+        primary_site = web.TCPSite(runner, host, port)
+        await primary_site.start()
+        logger.info(f"Asosiy API server ishga tushdi: http://{host}:{port}")
+
+        # Auxiliary port (1420) - Fallback for OAuth redirects if 1420 is free
+        if port != 1420:
+            try:
+                aux_site = web.TCPSite(runner, host, 1420)
+                await aux_site.start()
+                logger.info("Qo'shimcha OAuth tinglovchisi ishga tushdi: http://127.0.0.1:1420")
+            except Exception as e:
+                logger.debug(f"Port 1420 band yoki ulanib bo'lmadi (dev server ishlamoqda): {e}")
+
+        # Run indefinitely
+        while True:
+            await asyncio.sleep(3600)
+
+    try:
+        asyncio.run(_serve())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("API Server to'xtatildi")
 
 
 if __name__ == "__main__":

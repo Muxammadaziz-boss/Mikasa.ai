@@ -1973,11 +1973,13 @@ class BackendService {
       };
     }
     try {
-      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+      // In Desktop/Tauri or localhost environments, route redirect to the Python backend callback handler
+      const redirectTo = "http://127.0.0.1:18420/api/auth/callback";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
+          skipBrowserRedirect: true, // Crucial: Do NOT navigate the main desktop window away!
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -1990,6 +1992,33 @@ class BackendService {
       return { ok: true, url: data.url };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
+    }
+  }
+
+  public async checkPendingOAuthSession(): Promise<{ ok: boolean; session?: { access_token?: string; refresh_token?: string; code?: string } }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/callback/session`);
+      if (res.ok) {
+        return await res.json();
+      }
+      return { ok: false };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  public async openExternalUrl(url: string): Promise<boolean> {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+      return true;
+    } catch {
+      try {
+        window.open(url, "_blank");
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 

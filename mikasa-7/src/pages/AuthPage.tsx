@@ -20,6 +20,7 @@ import {
   AlertTriangleIcon,
   GoogleIcon,
 } from "../components/icons/Icons";
+import { WindowControls } from "../components/WindowControls";
 
 interface AuthPageProps {
   onAuthSuccess: (user: MikasaAuthUser) => void;
@@ -40,6 +41,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // Status & Feedback
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthWaiting, setOauthWaiting] = useState(false);
+  const [oauthUrl, setOauthUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -48,6 +51,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     setActiveTab(tab);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setOauthWaiting(false);
   };
 
   // Listen for OAuth redirect sessions
@@ -75,9 +79,63 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     };
   }, [onAuthSuccess]);
 
+  // Poll backend session when waiting for OAuth completion in browser
+  useEffect(() => {
+    if (!oauthWaiting) return;
+    let timer: any = null;
+    let isCancelled = false;
+
+    const poll = async () => {
+      try {
+        const res = await backendService.checkPendingOAuthSession();
+        if (res.ok && res.session && !isCancelled) {
+          const { access_token, refresh_token } = res.session;
+          if (access_token) {
+            setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
+            const { data } = await supabase.auth.setSession({
+              access_token,
+              refresh_token: refresh_token || access_token,
+            });
+            if (data?.user && !isCancelled) {
+              const u: MikasaAuthUser = {
+                id: data.user.id,
+                username:
+                  data.user.user_metadata?.full_name ||
+                  data.user.user_metadata?.name ||
+                  data.user.email?.split("@")[0] ||
+                  "User",
+                email: data.user.email || "",
+                is_active: true,
+                is_verified: true,
+                created_at: Date.now() / 1000,
+              };
+              setOauthWaiting(false);
+              setTimeout(() => {
+                onAuthSuccess(u);
+              }, 400);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Continue polling
+      }
+      if (!isCancelled) {
+        timer = setTimeout(poll, 1200);
+      }
+    };
+
+    timer = setTimeout(poll, 1000);
+
+    return () => {
+      isCancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [oauthWaiting, onAuthSuccess]);
+
   // Google OAuth handler
   const handleGoogleSignIn = async () => {
-    if (loading || oauthLoading) return;
+    if (loading || oauthLoading || oauthWaiting) return;
     setOauthLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -87,11 +145,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       if (!res.ok) {
         setErrorMsg(res.error || "Google orqali kirishda xatolik yuz berdi");
         setOauthLoading(false);
+      } else if (res.url) {
+        setOauthUrl(res.url);
+        setOauthWaiting(true);
+        setOauthLoading(false);
+        setSuccessMsg("Brauzeringizda Google orqali tizimga kirishni tasdiqlang...");
+        await backendService.openExternalUrl(res.url);
       } else {
-        setSuccessMsg("Google xizmatiga yo'naltirilmoqda...");
-        if (res.url && typeof window !== "undefined") {
-          window.location.href = res.url;
-        }
+        setErrorMsg("Google avtorizatsiya manzili olinmadi");
+        setOauthLoading(false);
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Google tizimiga ulanishda xatolik");
@@ -306,6 +368,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         boxSizing: "border-box",
       }}
     >
+      {/* ═══ TOP CHROME HEADER (Native Window Drag & Controls) ═══ */}
+      <header
+        data-tauri-drag-region
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "44px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 8px 0 16px",
+          zIndex: 1000,
+          userSelect: "none",
+          background: "rgba(11, 15, 25, 0.4)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+        }}
+      >
+        <div data-tauri-drag-region style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "default" }}>
+          <SparklesIcon size={16} color="#10B981" />
+          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#94A3B8", letterSpacing: "0.04em" }}>
+            MIKASA AI v8.0.0
+          </span>
+        </div>
+        <div data-tauri-drag-region style={{ flex: 1, height: "100%", cursor: "default" }} />
+        <WindowControls />
+      </header>
+
       {/* Ambient background blur elements */}
       <div
         style={{
@@ -504,8 +596,103 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           </div>
         )}
 
-        {/* TAB 1: LOGIN FORM */}
-        {activeTab === "login" && (
+        {/* OAUTH WAITING CARD */}
+        {oauthWaiting ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "10px 4px 8px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "18px",
+                background: "linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 30px rgba(16, 185, 129, 0.25)",
+              }}
+            >
+              <GoogleIcon size={32} />
+            </div>
+
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: "17px", fontWeight: 700, color: "#FFFFFF" }}>
+                Google orqali kirish kutilmoqda...
+              </h3>
+              <p style={{ margin: 0, fontSize: "13px", color: "#94A3B8", lineHeight: 1.5 }}>
+                Tizimga kirish sahifasi tashqi brauzeringizda ochildi.
+                <br />
+                Google hisobingizni tanlang va ruxsat bering.
+              </p>
+            </div>
+
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
+              {oauthUrl && (
+                <button
+                  type="button"
+                  onClick={() => backendService.openExternalUrl(oauthUrl)}
+                  style={{
+                    width: "100%",
+                    padding: "11px 16px",
+                    background: "rgba(255, 255, 255, 0.09)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    borderRadius: "10px",
+                    color: "#F1F5F9",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.09)")}
+                >
+                  Brauzerda qayta ochish
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOauthWaiting(false);
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "9px 16px",
+                  background: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderRadius: "10px",
+                  color: "#94A3B8",
+                  fontSize: "12.5px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                  e.currentTarget.style.color = "#F87171";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                  e.currentTarget.style.color = "#94A3B8";
+                }}
+              >
+                Bekor qilish
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* TAB 1: LOGIN FORM */}
+            {activeTab === "login" && (
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Google OAuth Button */}
             <button
@@ -1112,6 +1299,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               ← Kirishga qaytish
             </button>
           </form>
+        )}
+        </>
         )}
 
         {/* Footer info */}

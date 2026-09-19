@@ -24,6 +24,9 @@ from core.v8.device_agent_crypto import DeviceAgentCrypto
 from core.v8.device_auth import DeviceAuthManager
 from core.api_server import (
     handle_health,
+    handle_oauth_callback,
+    handle_oauth_session_save,
+    handle_oauth_session_get,
 )
 
 
@@ -129,8 +132,54 @@ class TestV8MultiTenantIsolation(unittest.TestCase):
             else:
                 os.environ.pop("SUPABASE_JWT_SECRET", None)
 
+    def test_oauth_callback_html_serving(self):
+        """3. GET /api/auth/callback serves HTML callback page with token parsing logic"""
+        req = MockRequest(method="GET")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            resp = loop.run_until_complete(handle_oauth_callback(req))
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.content_type, "text/html")
+            self.assertIn("Mikasa AI", resp.text)
+            self.assertIn("access_token", resp.text)
+            self.assertIn("/api/auth/callback/session", resp.text)
+        finally:
+            loop.close()
+
+    def test_oauth_session_save_and_retrieve(self):
+        """4. Verify OAuth token exchange between browser callback and desktop app"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # 1. Browser posts tokens
+            post_req = MockRequest(
+                method="POST",
+                body={"access_token": "fake-oauth-access-token-123", "refresh_token": "fake-refresh-456"}
+            )
+            save_resp = loop.run_until_complete(handle_oauth_session_save(post_req))
+            self.assertEqual(save_resp.status, 200)
+            data = json.loads(save_resp.text)
+            self.assertTrue(data.get("ok"))
+
+            # 2. Desktop app retrieves tokens (one-time consume)
+            get_req = MockRequest(method="GET")
+            get_resp = loop.run_until_complete(handle_oauth_session_get(get_req))
+            self.assertEqual(get_resp.status, 200)
+            get_data = json.loads(get_resp.text)
+            self.assertTrue(get_data.get("ok"))
+            self.assertEqual(get_data.get("session", {}).get("access_token"), "fake-oauth-access-token-123")
+
+            # 3. Next call should return None (already consumed)
+            next_resp = loop.run_until_complete(handle_oauth_session_get(get_req))
+            next_data = json.loads(next_resp.text)
+            self.assertFalse(next_data.get("ok"))
+            self.assertIsNone(next_data.get("session"))
+        finally:
+            loop.close()
+
     def test_cross_tenant_device_isolation(self):
-        """3. User A device cannot be accessed, renamed, or modified by User B"""
+        """5. User A device cannot be accessed, renamed, or modified by User B"""
         dev_a = self.device_mgr.register_device(
             user_id=self.user_a.id,
             device_id="PC-AGENT-A1",
