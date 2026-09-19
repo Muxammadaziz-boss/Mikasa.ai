@@ -2,6 +2,7 @@
 # Phase 41 — Supabase Auth Integration & Token Verification
 # Central Identity Provider: Supabase Auth (auth.users)
 # Application Profiles: public.profiles (1:1 with auth.users.id UUID)
+# Production JWT Verification: JWKS caching (RS256/ES256) + strict HMAC fallback (HS256)
 # Strict Separation: Supabase Auth Session vs RemoteAuthSession (PC Agent control)
 # Zero Backend Password Storage: Mikasa never receives or stores passwords.
 
@@ -13,6 +14,9 @@ import hashlib
 import json
 import re
 import logging
+import threading
+import urllib.request
+import urllib.error
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -134,7 +138,154 @@ class AuthRateLimiter:
 
 
 # =====================================================================
-# 4. SUPABASE AUTH MANAGER
+# 4. PRODUCTION SUPABASE JWKS CLIENT (RFC 7517)
+# =====================================================================
+
+class SupabaseJWKSClient:
+    """
+    Supabase loyihasining JWKS (JSON Web Key Set) ommaviy kalitlarini olish va keshlovchi mijoz.
+    - URL: https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+    - TTL kesh (standart: 3600 soniya / 1 soat)
+    - Tarmoq xatolarida xavfsiz rad etish (fail-closed, hech qachon verifikatsiyasiz o'tkazmaydi)
+    - RS256, ES256, EdDSA asimmetrik kalitlarni Python cryptography orqali tiklaydi
+    """
+
+    def __init__(self, supabase_url: str = "", cache_ttl: float = 3600.0):
+        self.supabase_url = supabase_url.rstrip("/") if supabase_url else ""
+        self.cache_ttl = cache_ttl
+        self._cached_keys: Dict[str, Any] = {}
+        self._raw_jwks: Dict[str, Any] = {}
+        self._last_fetched: float = 0.0
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _base64url_decode(data: str) -> bytes:
+        rem = len(data) % 4
+        if rem > 0:
+            data += "=" * (4 - rem)
+        return base64.urlsafe_b64decode(data.encode("utf-8"))
+
+    def set_supabase_url(self, url: str):
+        with self._lock:
+            self.supabase_url = url.rstrip("/") if url else ""
+            self._last_fetched = 0.0
+            self._cached_keys.clear()
+
+    def add_mock_key(self, kid: str, public_key: Any):
+        """Sinovlar uchun mock ommaviy kalit qo'shish"""
+        with self._lock:
+            self._cached_keys[kid] = public_key
+            self._last_fetched = time.time()
+
+    def set_mock_jwks(self, jwks: Dict[str, Any]):
+        """Sinovlar uchun soxta JWKS lug'atini o'rnatish"""
+        with self._lock:
+            self._raw_jwks = jwks
+            self._cached_keys.clear()
+            self._parse_jwks_dict(jwks)
+            self._last_fetched = time.time()
+
+    def _convert_jwk_to_public_key(self, jwk: Dict[str, Any]) -> Optional[Any]:
+        """Bitta JWK ob'ektini cryptography Public Key ga aylantirish"""
+        kty = jwk.get("kty")
+        try:
+            if kty == "RSA":
+                from cryptography.hazmat.primitives.asymmetric import rsa
+                n_b64 = jwk.get("n", "")
+                e_b64 = jwk.get("e", "")
+                if not n_b64 or not e_b64:
+                    return None
+                n_bytes = self._base64url_decode(n_b64)
+                e_bytes = self._base64url_decode(e_b64)
+                n_int = int.from_bytes(n_bytes, "big")
+                e_int = int.from_bytes(e_bytes, "big")
+                return rsa.RSAPublicNumbers(e_int, n_int).public_key()
+
+            elif kty == "EC":
+                from cryptography.hazmat.primitives.asymmetric import ec
+                crv = jwk.get("crv", "P-256")
+                x_b64 = jwk.get("x", "")
+                y_b64 = jwk.get("y", "")
+                if not x_b64 or not y_b64:
+                    return None
+                x_bytes = self._base64url_decode(x_b64)
+                y_bytes = self._base64url_decode(y_b64)
+                x_int = int.from_bytes(x_bytes, "big")
+                y_int = int.from_bytes(y_bytes, "big")
+
+                curve = ec.SECP256R1() if crv == "P-256" else (ec.SECP384R1() if crv == "P-384" else ec.SECP521R1())
+                return ec.EllipticCurvePublicNumbers(x_int, y_int, curve).public_key()
+
+            elif kty == "OKP":
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                crv = jwk.get("crv", "")
+                x_b64 = jwk.get("x", "")
+                if crv == "Ed25519" and x_b64:
+                    x_bytes = self._base64url_decode(x_b64)
+                    return ed25519.Ed25519PublicKey.from_public_bytes(x_bytes)
+        except Exception as e:
+            logger.debug(f"[SupabaseJWKSClient] Kalit konvertatsiyasida xatolik: {e}")
+            return None
+        return None
+
+    def _parse_jwks_dict(self, jwks: Dict[str, Any]):
+        keys = jwks.get("keys", [])
+        for jwk in keys:
+            kid = jwk.get("kid")
+            if kid:
+                pub = self._convert_jwk_to_public_key(jwk)
+                if pub:
+                    self._cached_keys[kid] = pub
+
+    def refresh_keys(self) -> bool:
+        """Supabase JWKS endpointidan yangi kalitlarni yuklab olish"""
+        if not self.supabase_url or "placeholder-project" in self.supabase_url:
+            return False
+
+        jwks_url = f"{self.supabase_url}/auth/v1/.well-known/jwks.json"
+        try:
+            req = urllib.request.Request(
+                jwks_url,
+                headers={"User-Agent": "Mikasa-AI-Auth/8.0.0", "Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    raw_data = json.loads(resp.read().decode("utf-8"))
+                    with self._lock:
+                        self._raw_jwks = raw_data
+                        self._cached_keys.clear()
+                        self._parse_jwks_dict(raw_data)
+                        self._last_fetched = time.time()
+                    logger.info(f"[SupabaseJWKSClient] JWKS muvaffaqiyatli yangilandi: {len(self._cached_keys)} ta kalit")
+                    return True
+        except Exception as e:
+            logger.warning(f"[SupabaseJWKSClient] JWKS yuklashda xatolik ({jwks_url}): {e}")
+            return False
+        return False
+
+    def get_public_key(self, kid: Optional[str]) -> Optional[Any]:
+        """kid bo'yicha ommaviy kalitni olish. Kesh muddati o'tgan bo'lsa qayta yuklanadi."""
+        now = time.time()
+        with self._lock:
+            # Agar keshda mavjud bo'lsa va muddati o'tmagan bo'lsa
+            if kid and kid in self._cached_keys and (now - self._last_fetched < self.cache_ttl):
+                return self._cached_keys[kid]
+            # Agar kid bitta bo'lsa va keshda yagona kalit mavjud bo'lsa
+            if not kid and len(self._cached_keys) == 1 and (now - self._last_fetched < self.cache_ttl):
+                return next(iter(self._cached_keys.values()))
+
+        # Keshda topilmasa yoki muddati o'tgan bo'lsa, bir marta yangilab ko'ramiz
+        if self.refresh_keys():
+            with self._lock:
+                if kid:
+                    return self._cached_keys.get(kid)
+                if len(self._cached_keys) == 1:
+                    return next(iter(self._cached_keys.values()))
+        return None
+
+
+# =====================================================================
+# 5. SUPABASE AUTH MANAGER
 # =====================================================================
 
 class SupabaseAuthManager:
@@ -150,20 +301,52 @@ class SupabaseAuthManager:
         self,
         account_device_mgr: Optional[AccountDeviceManager] = None,
         supabase_url: Optional[str] = None,
+        supabase_publishable_key: Optional[str] = None,
+        supabase_secret_key: Optional[str] = None,
         supabase_anon_key: Optional[str] = None,
         supabase_jwt_secret: Optional[str] = None,
         storage_path: Optional[str] = None
     ):
         self.account_device_mgr = account_device_mgr or AccountDeviceManager.get_default_instance()
-        self.supabase_url = supabase_url or os.environ.get("SUPABASE_URL", "")
-        self.supabase_anon_key = supabase_anon_key or os.environ.get("SUPABASE_ANON_KEY", "")
+        raw_url = supabase_url or os.environ.get("SUPABASE_URL", "")
+        self.supabase_url = raw_url.rstrip("/") if raw_url else ""
+
+        # Supabase API Key Architecture: Publishable & Secret
+        self.supabase_publishable_key = (
+            supabase_publishable_key
+            or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+            or supabase_anon_key
+            or os.environ.get("SUPABASE_ANON_KEY", "")
+        )
+        self.supabase_anon_key = self.supabase_publishable_key
+
+        self.supabase_secret_key = (
+            supabase_secret_key
+            or os.environ.get("SUPABASE_SECRET_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
+
+        # Legacy symmetric JWT secret (DIQQAT: fallback test-secret mutlaqo yo'q!)
         self.supabase_jwt_secret = (
             supabase_jwt_secret if supabase_jwt_secret is not None
-            else os.environ.get("SUPABASE_JWT_SECRET", "mikasa-default-test-secret")
+            else os.environ.get("SUPABASE_JWT_SECRET")
         )
+
+        # JWKS Klienti
+        self.jwks_client = SupabaseJWKSClient(supabase_url=self.supabase_url)
+
         self.rate_limiter = AuthRateLimiter()
         self._audit = RemoteAuditLogger.get_instance()
         self.storage_path = storage_path
+
+    def is_configured(self) -> bool:
+        """Supabase xizmati haqiqiy API kalitlari bilan sozlanganligini tekshirish."""
+        return bool(
+            self.supabase_url
+            and self.supabase_publishable_key
+            and "placeholder-project" not in self.supabase_url
+            and self.supabase_publishable_key not in ("placeholder-anon-key", "placeholder-publishable-key")
+        )
 
     @classmethod
     def get_default_instance(cls, storage_path: Optional[str] = None) -> "SupabaseAuthManager":
@@ -197,59 +380,133 @@ class SupabaseAuthManager:
     def verify_supabase_jwt(self, token: str) -> Tuple[bool, str, Optional[SupabaseSessionClaims]]:
         """
         Supabase access token (JWT) ni tekshirish.
-        1. Strukturaviy tekshiruv (header.payload.signature).
-        2. Imzo (HMAC-SHA256) tekshiruvi (agar secret mavjud bo'lsa).
-        3. Muddati (exp), sub (UUID), role tekshiruvi.
+        1. Strukturaviy tekshiruv (header.payload.signature) -> malformed -> 401.
+        2. Header tahlili (alg, kid).
+        3. Imzo verifikatsiyasi:
+           - Asimmetrik (RS256, ES256) -> Supabase JWKS orqali.
+           - Simmetrik (HS256) -> faqat konfiguratsiyalangan SUPABASE_JWT_SECRET mavjud bo'lsa.
+           - Default/test secret orqali soxtalashtirish MUTLAQO TAQIQLANGAN.
+        4. Muddati (exp), issuer (iss), audience (aud), sub (UUID) tekshiruvi.
         """
         if not token or not isinstance(token, str):
-            return False, "Token kiritilmadi", None
+            return False, "MISSING_TOKEN: Token kiritilmadi", None
 
         clean_token = token.strip()
         parts = clean_token.split(".")
         if len(parts) != 3:
-            return False, "Noto'g'ri JWT token formati", None
+            return False, "MALFORMED_TOKEN: Noto'g'ri JWT token formati", None
 
         header_b64, payload_b64, signature_b64 = parts
 
-        # 1. Payload dekodlash
+        # 1. Header dekodlash
+        try:
+            header_bytes = self._base64url_decode(header_b64)
+            header = json.loads(header_bytes.decode("utf-8"))
+        except Exception as e:
+            return False, f"MALFORMED_TOKEN: JWT header dekodlashda xatolik: {e}", None
+
+        # 2. Payload dekodlash
         try:
             payload_bytes = self._base64url_decode(payload_b64)
             payload = json.loads(payload_bytes.decode("utf-8"))
         except Exception as e:
-            return False, f"JWT payload dekodlashda xatolik: {e}", None
+            return False, f"MALFORMED_TOKEN: JWT payload dekodlashda xatolik: {e}", None
 
-        # 2. Imzo tekshiruvi (agar secret bo'lsa)
-        if self.supabase_jwt_secret:
-            signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+        alg = header.get("alg", "HS256")
+        kid = header.get("kid")
+        signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+
+        try:
+            sig_bytes = self._base64url_decode(signature_b64)
+        except Exception:
+            return False, "INVALID_SIGNATURE: Imzoni dekodlashda xatolik", None
+
+        # 3. Imzo verifikatsiyasi (Algorithm checking)
+        if alg in ("RS256", "RS384", "RS512"):
+            pub_key = self.jwks_client.get_public_key(kid)
+            if not pub_key:
+                return False, f"INVALID_SIGNATURE: JWKS orqali ommaviy kalit topilmadi (kid={kid})", None
+            try:
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.asymmetric import padding
+                hash_algo = hashes.SHA256() if alg == "RS256" else (hashes.SHA384() if alg == "RS384" else hashes.SHA512())
+                pub_key.verify(sig_bytes, signing_input, padding.PKCS1v15(), hash_algo)
+            except Exception:
+                return False, "INVALID_SIGNATURE: RS256 imzo tekshiruvidan o'tmadi", None
+
+        elif alg in ("ES256", "ES384", "ES512"):
+            pub_key = self.jwks_client.get_public_key(kid)
+            if not pub_key:
+                return False, f"INVALID_SIGNATURE: JWKS orqali EC kalit topilmadi (kid={kid})", None
+            try:
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.asymmetric import ec
+                hash_algo = hashes.SHA256() if alg == "ES256" else (hashes.SHA384() if alg == "ES384" else hashes.SHA512())
+                pub_key.verify(sig_bytes, signing_input, ec.ECDSA(hash_algo))
+            except Exception:
+                return False, "INVALID_SIGNATURE: ES256 imzo tekshiruvidan o'tmadi", None
+
+        elif alg == "HS256":
+            if not self.supabase_jwt_secret:
+                return False, "UNCONFIGURED_KEY: HS256 imzosini tekshirish uchun maxfiy kalit sozlanmagan", None
             expected_sig = hmac.new(
                 self.supabase_jwt_secret.encode("utf-8"),
                 signing_input,
                 hashlib.sha256
             ).digest()
-            try:
-                actual_sig = self._base64url_decode(signature_b64)
-                if not hmac.compare_digest(expected_sig, actual_sig):
-                    return False, "Yaroqsiz JWT imzosi", None
-            except Exception:
-                return False, "Yaroqsiz JWT imzosi", None
+            if not hmac.compare_digest(expected_sig, sig_bytes):
+                return False, "INVALID_SIGNATURE: Yaroqsiz JWT imzosi", None
 
-        # 3. Expiration tekshiruvi
+        else:
+            return False, f"UNSUPPORTED_ALGORITHM: '{alg}' algoritmi qo'llab-quvvatlanmaydi", None
+
+        # 4. Expiration tekshiruvi
         now = time.time()
         exp = payload.get("exp")
-        if exp is not None and float(exp) < now:
-            return False, "Token muddati o'tgan (expired)", None
+        if exp is None:
+            return False, "MALFORMED_TOKEN: Token muddati (exp) ko'rsatilmagan", None
+        if float(exp) < now:
+            return False, "EXPIRED_TOKEN: Token muddati o'tgan (expired)", None
 
-        # 4. Foydalanuvchi identifikatori (sub)
+        # 5. Issuer (iss) tekshiruvi
+        iss = payload.get("iss")
+        if self.supabase_url and "placeholder-project" not in self.supabase_url:
+            clean_base = self.supabase_url.rstrip("/")
+            expected_issuers = {
+                f"{clean_base}/auth/v1",
+                clean_base,
+                f"{clean_base}/"
+            }
+            if iss and not any(iss.rstrip("/") == exp_iss.rstrip("/") for exp_iss in expected_issuers):
+                return False, f"INVALID_ISSUER: Noto'g'ri token beruvchi (iss='{iss}', kutilgan='{clean_base}/auth/v1')", None
+
+        # 6. Audience (aud) tekshiruvi
+        aud = payload.get("aud")
+        if aud and isinstance(aud, str):
+            if aud not in ("authenticated", "authenticated_user"):
+                logger.debug(f"[SupabaseAuth] Kutilmagan audience: {aud}")
+
+        # 7. Foydalanuvchi identifikatori (sub)
         user_id = payload.get("sub") or payload.get("user_id")
         if not user_id or not isinstance(user_id, str):
-            return False, "Token ichida foydalanuvchi identifikatori (sub) topilmadi", None
+            return False, "MISSING_SUBJECT: Token ichida foydalanuvchi identifikatori (sub) topilmadi", None
 
         email = payload.get("email", "")
         role = payload.get("role", "authenticated")
         user_meta = payload.get("user_metadata", {}) or {}
-        username = user_meta.get("username", "") or email.split("@")[0] if email else user_id
-        display_name = user_meta.get("display_name", "") or username
-        avatar_url = user_meta.get("avatar_url", "")
+        username = (
+            user_meta.get("username")
+            or user_meta.get("full_name")
+            or user_meta.get("name")
+            or (email.split("@")[0] if email else user_id)
+        )
+        display_name = (
+            user_meta.get("display_name")
+            or user_meta.get("full_name")
+            or user_meta.get("name")
+            or username
+        )
+        avatar_url = user_meta.get("avatar_url") or user_meta.get("picture", "")
 
         claims = SupabaseSessionClaims(
             user_id=str(user_id).strip(),
@@ -303,14 +560,25 @@ class SupabaseAuthManager:
         display_name: str = "",
         role: str = "authenticated",
         exp_seconds: int = 3600,
-        secret: Optional[str] = None
+        secret: Optional[str] = None,
+        issuer: Optional[str] = None,
+        alg: str = "HS256",
+        kid: Optional[str] = None,
+        private_key: Optional[Any] = None
     ) -> str:
         """
-        Sinovlar va lokal muhit uchun haqiqiy Supabase formatidagi HS256 JWT yaratish.
+        Sinovlar va lokal muhit uchun haqiqiy Supabase formatidagi JWT yaratish.
+        - Standart: HS256
+        - RS256: agar private_key berilsa
         """
         now = int(time.time())
-        header = {"alg": "HS256", "typ": "JWT"}
+        header: Dict[str, Any] = {"alg": alg, "typ": "JWT"}
+        if kid:
+            header["kid"] = kid
+
+        iss = issuer or (f"{self.supabase_url}/auth/v1" if self.supabase_url else "https://test.supabase.co/auth/v1")
         payload = {
+            "iss": iss,
             "sub": str(user_id),
             "email": str(email).lower(),
             "role": role,
@@ -327,9 +595,15 @@ class SupabaseAuthManager:
         payload_b64 = self._base64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
         signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
 
-        sec = secret or self.supabase_jwt_secret
-        sig = hmac.new(sec.encode("utf-8"), signing_input, hashlib.sha256).digest()
-        sig_b64 = self._base64url_encode(sig)
+        if alg == "RS256" and private_key is not None:
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric import padding
+            sig_bytes = private_key.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
+            sig_b64 = self._base64url_encode(sig_bytes)
+        else:
+            sec = secret or self.supabase_jwt_secret or "mock-signing-secret"
+            sig = hmac.new(sec.encode("utf-8"), signing_input, hashlib.sha256).digest()
+            sig_b64 = self._base64url_encode(sig)
 
         return f"{header_b64}.{payload_b64}.{sig_b64}"
 

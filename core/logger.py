@@ -26,13 +26,18 @@ CRASH_LOG_PATH = os.path.join(LOGS_DIR, "crash.log")
 # Regex patterns for sensitive data
 SENSITIVE_PATTERNS = [
     # Google API keys (AIza...)
-    (re.compile(r"AIza[0-9A-Za-z-_]{35}"), "AIza***MASKED_KEY***"),
+    (re.compile(r"AIza[0-9A-Za-z_-]{35}"), "AIza***MASKED_KEY***"),
     # OpenAI/Anthropic/OpenRouter keys (sk-...)
-    (re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"), "sk-***MASKED_KEY***"),
+    (re.compile(r"sk-[a-zA-Z0-9_-]{20,}"), "sk-***MASKED_KEY***"),
+    # Supabase new keys (sb_secret_..., sb_publishable_...)
+    (re.compile(r"sb_secret_[a-zA-Z0-9_-]{20,}"), "sb_secret_***MASKED***"),
+    (re.compile(r"sb_publishable_[a-zA-Z0-9_-]{20,}"), "sb_publishable_***MASKED***"),
     # Bearer tokens
     (re.compile(r"(Bearer\s+)[A-Za-z0-9_\-\.]{15,}", re.IGNORECASE), r"\1***MASKED_TOKEN***"),
-    # JSON password / token / secret / api_key fields
-    (re.compile(r'("(?:password|api_key|token|secret|access_token)"\s*:\s*)"[^"]+"', re.IGNORECASE), r'\1"***MASKED***"'),
+    # Private keys
+    (re.compile(r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----"), "***MASKED_PRIVATE_KEY***"),
+    # JSON password / token / secret / api_key / refresh_token fields
+    (re.compile(r'("(?:password|api_key|token|secret|access_token|refresh_token|session_token|service_role|private_key)"\s*:\s*)"[^"]+"', re.IGNORECASE), r'\1"***MASKED***"'),
 ]
 
 

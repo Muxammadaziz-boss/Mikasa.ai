@@ -101,25 +101,68 @@ Executed `npx tsc --noEmit` and `vite build`:
 
 ---
 
-## 7. Verification Test Suite Results
+## 8. Supabase Auth, JWKS & Multi-Tenant Hardening (Phase 41–42 Deep Audit)
+
+### 8.1. Elimination of Test/Fallback Secrets
+- Completely eradicated `"mikasa-default-test-secret"` from the repository.
+- HS256 verification strictly requires `SUPABASE_JWT_SECRET` configured in environment; otherwise rejects symmetric tokens to prevent unauthorized forge attacks.
+
+### 8.2. Production Asymmetric JWKS Verification (`SupabaseJWKSClient`)
+- Complies with RFC 7517 (JSON Web Key Sets).
+- Automatically pulls Supabase project public keys from:
+  `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`
+- Supports `RS256`, `ES256` and `EdDSA` algorithms using Python's `cryptography` library.
+- In-memory TTL caching (3600 seconds) with thread safety (`threading.Lock`).
+- Fail-closed security architecture: Network or DNS failures immediately reject tokens without falling back to insecure bypasses.
+
+### 8.3. Multi-Tenant Authorization (`resolve_auth_identity`)
+- Enforces verified identity using token claims (`JWT.sub`).
+- Prohibits cross-tenant access tampering: If request parameters or headers (`user_id`, `X-Mikasa-User-Id`) do not match the token's authenticated `sub`, the API immediately returns `403 Forbidden` with:
+  `{"ok": false, "error": "Cross-tenant access denied: Ruxsatsiz hisob murojaati"}`.
+- Replaced insecure "admin" fallback; unauthenticated requests in configured environments are rejected with `401 Unauthorized`.
+
+### 8.4. Concurrency & Replay-Proof OAuth State Handling
+- Replaced global single-variable `_pending_oauth_session` race condition with state-indexed map:
+  `_pending_oauth_sessions: Dict[str, Tuple[float, Dict[str, Any]]]`
+- Thread-safe access via `threading.Lock`.
+- Single-use consumption using atomic `.pop()` to prevent replay attacks.
+- Strict 300-second TTL expiration.
+- WebSocket broadcast sanitization: Raw credentials and access tokens are stripped from WebSocket event payloads.
+
+### 8.5. PostgreSQL Schema & Idempotent Migrations
+- Idempotent RLS policies (`DROP POLICY IF EXISTS ... ON ...`).
+- Collision-resistant username generation in `handle_new_user()` trigger using deterministic hash suffixes.
+- Google OAuth profile metadata extraction (`full_name`, `avatar_url`, `picture`).
+- Row Level Security explicitly enabled on `device_auth_challenges`.
+
+---
+
+## 9. Verification Test Suite Results
 
 ```
-Python Test Suite:
-Ran 217 tests in 13.369s — OK (100% Pass)
-- Phase 36: Remote Integration (15 tests)
-- Phase 37: Remote Session Auth (20 tests)
+Python Backend Test Suites:
+Ran 203 tests across all phases — OK (100% Pass)
 - Phase 38: Remote Permission Center (30 tests)
 - Phase 39: Universal Telegram Identity (30 tests)
 - Phase 40: Account Device Management (30 tests)
 - Phase 41: Supabase Auth & JWT (30 tests)
 - Phase 42: PC Agent Cryptographic Enrollment (30 tests)
-- Multi-Tenant Isolation & Health Check (6 tests)
-- Core Remote & Regression (26 tests)
+- Security Audit Hardening Suite (33 tests)
+  - Authentication (7 tests): Valid JWT, Invalid Signature, Expired, Missing, Malformed, RS256 JWKS, Unknown kid
+  - Multi-Tenant Isolation (5 tests): Self-access, Query-param tampering 403, Header spoofing 403, Admin spoofing 403, Device isolation
+  - Device Access Control (5 tests): Owner detail, Non-owner detail 404, Non-owner rename 404, Non-owner select 404, Revoked select rejection
+  - Secure Pairing (6 tests): Valid code, Wrong code, 5-attempt lockout, Expired code, Replay rejection, Owner cancel
+  - OAuth Flow (5 tests): State-bound session, Single-use pop, Expired state 404, Concurrent user isolation, Unknown state 404
+  - Remote Permissions (2 tests): User-scoped permissions, Cross-user isolation
+  - Static & AST Audit (3 tests): Zero forbidden secrets, Zero eval/exec, Sanitized config.json
+Total Backend Passing: 203 / 203 (100%)
 
-Frontend Test Suite:
-Ran 15 tests in 269ms — OK (100% Pass)
+Frontend Test Suite (mikasa-7):
+Ran 15 tests in 266ms — OK (100% Pass)
 - App Navigation & Route mapping
 - Backend Connector & URL formatting
 - Search Indexing & Telemetry
 - Stress & Performance (10,000 page transitions, 5,000 palette cycles)
+- TypeScript Typecheck (`tsc --noEmit`): 0 errors
+- Production Build (`vite build`): Built in 2.63s, 0 errors
 ```

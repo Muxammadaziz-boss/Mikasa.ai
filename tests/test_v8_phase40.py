@@ -593,6 +593,7 @@ class TestPhase40RestAPI(unittest.TestCase):
     """Scenarios 29-30: REST API handlers for devices, sessions, account summary"""
 
     def setUp(self):
+        self._orig_env = dict(os.environ)
         self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_api_")
         self.adm_storage = os.path.join(self.temp_dir, "api_adm.json")
         self.adm = AccountDeviceManager.get_default_instance(storage_path=self.adm_storage)
@@ -607,6 +608,11 @@ class TestPhase40RestAPI(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+        os.environ.clear()
+        os.environ.update(self._orig_env)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
 
     def test_29_rest_api_devices_endpoints(self):
         """Scenario 29: REST API device CRUD, rename, select, revoke."""

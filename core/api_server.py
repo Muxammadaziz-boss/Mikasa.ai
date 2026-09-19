@@ -13,7 +13,7 @@ import logging
 import threading
 from datetime import datetime
 from aiohttp import web
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict, List, Set
 import requests
 import socket
 import time
@@ -1829,6 +1829,11 @@ def _write_config(cfg):
 
 async def handle_account_get(request):
     """GET /api/account - Foydalanuvchi profili va tizim sozlamalari"""
+    user_id, user, session, err = resolve_auth_identity(request, required=False)
+    if err:
+        return err
+    user_id = user_id or get_current_user_name() or "local_user"
+
     user_name = get_current_user_name()
     voice_type = get_current_voice_type()
     cfg = _read_config()
@@ -1845,15 +1850,6 @@ async def handle_account_get(request):
     mem_profile = mem.get_profile() if mem else {}
 
     # Phase 40 Multi-User Account & Device Management
-    req_headers = getattr(request, "headers", {}) or {}
-    req_query = getattr(request, "query", {}) or {}
-    user_id = (
-        req_headers.get("X-Mikasa-User-Id")
-        or req_query.get("user_id")
-        or req_query.get("mikasa_user_id")
-        or "admin"
-    )
-    user_id = str(user_id).strip()
     from core.v8 import AccountDeviceManager, TelegramIdentityManager
     from core.v8.auth_session import SessionManager
     adm = AccountDeviceManager.get_default_instance()
@@ -1960,6 +1956,10 @@ async def handle_account_get(request):
 
 async def handle_account_update(request):
     """POST /api/account - Profil va sozlamalarni yangilash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=False)
+    if err:
+        return err
+
     try:
         body = await request.json()
     except Exception:
@@ -2156,6 +2156,9 @@ async def handle_account_update(request):
 
 async def handle_remote_devices(request):
     """GET /api/remote/devices - Ro'yxatdan o'tgan va bog'langan qurilmalar"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, DeviceIdentityManager
     reg = DeviceRegistry.get_default_instance()
     hb = HeartbeatManager()
@@ -2198,6 +2201,9 @@ async def handle_remote_devices(request):
 
 async def handle_remote_device_detail(request):
     """GET /api/remote/devices/{id} - Muayyan qurilma tafsilotlari"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = request.match_info.get("id", "")
     from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, PermissionStore
     reg = DeviceRegistry.get_default_instance()
@@ -2209,7 +2215,7 @@ async def handle_remote_device_detail(request):
     link = linking.get_link_by_device(dev_id)
     hb = HeartbeatManager()
     perm_store = PermissionStore.get_default_instance()
-    profile = perm_store.get_profile("admin", dev_id)
+    profile = perm_store.get_profile(user_id, dev_id)
 
     return web.json_response({
         "ok": True,
@@ -2225,10 +2231,13 @@ async def handle_remote_device_detail(request):
 
 async def handle_remote_permissions_get(request):
     """GET /api/remote/permissions/{device_id} - Ruxsatlar profili va katalogi"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = request.match_info.get("device_id", "")
     from core.v8 import PermissionStore
     store = PermissionStore.get_default_instance()
-    profile = store.get_profile("admin", dev_id)
+    profile = store.get_profile(user_id, dev_id)
 
     return web.json_response({
         "ok": True,
@@ -2240,6 +2249,9 @@ async def handle_remote_permissions_get(request):
 
 async def handle_remote_permissions_put(request):
     """PUT /api/remote/permissions/{device_id} - Ruxsatlarni zudlik bilan yangilash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = request.match_info.get("device_id", "")
     try:
         body = await request.json()
@@ -2251,7 +2263,7 @@ async def handle_remote_permissions_put(request):
 
     from core.v8 import PermissionStore
     store = PermissionStore.get_default_instance()
-    updated = store.update_permissions("admin", dev_id, new_perms, new_caps)
+    updated = store.update_permissions(user_id, dev_id, new_perms, new_caps)
 
     await broadcast_ws("permission_changed", {
         "device_id": dev_id,
@@ -2267,6 +2279,9 @@ async def handle_remote_permissions_put(request):
 
 async def handle_remote_pair(request):
     """POST /api/remote/pair - Kod generatsiya qilish (MK-XXXXXX) yoki bog'lash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     try:
         body = await request.json()
     except Exception:
@@ -2279,7 +2294,7 @@ async def handle_remote_pair(request):
     linking = UserLinkingStore.get_default_instance()
 
     if action == "generate":
-        code = linking.generate_pairing_code("admin", dev_id, ttl=300.0)
+        code = linking.generate_pairing_code(user_id, dev_id, ttl=300.0)
         await broadcast_ws("pairing_code_generated", {
             "device_id": dev_id,
             "code": code,
@@ -2308,6 +2323,9 @@ async def handle_remote_pair(request):
 
 async def handle_remote_unpair(request):
     """POST /api/remote/unpair - Telegram bog'lanishini uzish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     try:
         body = await request.json()
     except Exception:
@@ -2332,6 +2350,9 @@ async def handle_remote_unpair(request):
 
 async def handle_remote_session_lock(request):
     """POST /api/remote/session/lock - Masofaviy sessiyani bloklash / qulflash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     try:
         body = await request.json()
     except Exception:
@@ -2340,7 +2361,7 @@ async def handle_remote_session_lock(request):
     dev_id = body.get("device_id", "")
     from core.v8 import SessionManager
     sm = SessionManager()
-    closed = sm.close_session("admin", dev_id)
+    closed = sm.close_session(user_id, dev_id)
 
     await broadcast_ws("session_locked", {"device_id": dev_id})
     return web.json_response({
@@ -2352,6 +2373,9 @@ async def handle_remote_session_lock(request):
 
 async def handle_remote_session_logout(request):
     """POST /api/remote/session/logout - Masofaviy sessiyani yopish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     try:
         body = await request.json()
     except Exception:
@@ -2360,7 +2384,7 @@ async def handle_remote_session_logout(request):
     dev_id = body.get("device_id", "")
     from core.v8 import SessionManager
     sm = SessionManager()
-    closed = sm.close_session("admin", dev_id)
+    closed = sm.close_session(user_id, dev_id)
 
     await broadcast_ws("session_logout", {"device_id": dev_id})
     return web.json_response({
@@ -2387,22 +2411,26 @@ async def handle_remote_audit(request):
 
 async def handle_telegram_link_start(request):
     """POST /api/telegram/link/start - 6 xonali OTP va Telegram deep-link yaratish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    mikasa_user_id = body.get("mikasa_user_id", "admin")
+    mikasa_user_id = user_id
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
     bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot")
 
-    req, otp, deep_link, err = mgr.create_link_request(
+    req, otp, deep_link, err_msg = mgr.create_link_request(
         mikasa_user_id=mikasa_user_id,
         bot_username=bot_username
     )
-    if err or not req:
-        return web.json_response({"ok": False, "error": err or "Kod yaratishda xatolik"}, status=400)
+    if err_msg or not req:
+        return web.json_response({"ok": False, "error": err_msg or "Kod yaratishda xatolik"}, status=400)
 
     await broadcast_ws("PAIRING_CREATED", {
         "request_id": req.request_id,
@@ -2476,7 +2504,11 @@ async def handle_telegram_link_verify(request):
 
 async def handle_telegram_link_status(request):
     """GET /api/telegram/link/status - Bog'lanish holatini tekshirish"""
-    mikasa_user_id = request.query.get("mikasa_user_id", "admin")
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    mikasa_user_id = user_id
     request_id = request.query.get("request_id")
 
     from core.v8 import TelegramIdentityManager
@@ -2517,12 +2549,16 @@ async def handle_telegram_link_status(request):
 
 async def handle_telegram_unlink(request):
     """POST /api/telegram/unlink - Telegram bog'lanishini bekor qilish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    mikasa_user_id = body.get("mikasa_user_id", "admin")
+    mikasa_user_id = user_id
     tg_id = body.get("telegram_user_id")
 
     from core.v8 import TelegramIdentityManager
@@ -2540,8 +2576,11 @@ async def handle_telegram_unlink(request):
 
 async def handle_telegram_account(request):
     """GET /api/telegram/account - Foydalanuvchining Telegram profili va bog'lanish ma'lumotlari"""
-    mikasa_user_id = request.query.get("mikasa_user_id", "admin")
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
 
+    mikasa_user_id = user_id
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
 
@@ -2574,16 +2613,91 @@ async def handle_telegram_status(request):
 # ========== 8.1. PHASE 40 & 41: ACCOUNT & MULTI-DEVICE MANAGEMENT API ==========
 
 def get_auth_token_from_request(request) -> Optional[str]:
-    """So'rovdan sessiya tokenini ajratib olish (Authorization header, maxsus header yoki query)."""
-    auth_header = request.headers.get("Authorization", "")
+    """So'rovdan sessiya tokenini ajratib olish (Faqat Authorization Bearer yoki X-Mikasa-Session-Token header).
+    Xavfsizlik talabi: Query parametridan token o'qish (loglarda sizib chiqishi xavfi tufayli) to'liq bekor qilingan.
+    """
+    auth_header = getattr(request, "headers", {}).get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
         if token:
             return token
-    token = request.headers.get("X-Mikasa-Session-Token")
+    token = getattr(request, "headers", {}).get("X-Mikasa-Session-Token")
     if token:
         return token.strip()
-    return request.query.get("session_token") or request.query.get("token")
+    return None
+
+
+def resolve_auth_identity(
+    request,
+    required: bool = True
+) -> Tuple[Optional[str], Optional[Any], Optional[Any], Optional[web.Response]]:
+    """Multi-tenant xavfsiz foydalanuvchi identifikatsiyasini aniqlash.
+    Qaytaradi: (user_id, user, session, error_response).
+    1. So'rovdan Bearer tokenni oladi va AccountAuthManager orqali tekshiradi (JWT.sub).
+    2. Agar token berilgan bo'lsa:
+       - Yaroqsiz, muddati o'tgan yoki soxta bo'lsa -> 401 Unauthorized.
+       - Haqiqiy bo'lsa -> user_id = JWT.sub.
+       - Agar request parametri (query yoki header) orqali boshqa user_id uzatilgan bo'lsa -> 403 Forbidden ("Cross-tenant access denied").
+    3. Agar token berilmagan bo'lsa:
+       - Supabase sozlangan bo'lsa (yoki MIKASA_REQUIRE_AUTH yoqilgan bo'lsa) va required=True:
+         -> 401 Unauthorized.
+       - Offline / test rejimida (Supabase sozlanmagan bo'lsa):
+         parametr orqali kelgan user_id olinadi (yoki "local_user"), lekin hech qachon avtomatik "admin" ga fallback qilinmaydi.
+    """
+    from core.v8 import AccountAuthManager
+    auth_mgr = AccountAuthManager.get_default_instance()
+    token = get_auth_token_from_request(request)
+
+    req_headers = getattr(request, "headers", {}) or {}
+    req_query = getattr(request, "query", {}) or {}
+    param_user_id = (
+        req_headers.get("X-Mikasa-User-Id")
+        or req_headers.get("X-User-Id")
+        or req_query.get("user_id")
+        or req_query.get("mikasa_user_id")
+    )
+    if param_user_id:
+        param_user_id = str(param_user_id).strip()
+
+    if token:
+        session, user = auth_mgr.authenticate_token(token)
+        if not user or not session:
+            err_resp = web.json_response({
+                "ok": False,
+                "error": "Avtorizatsiyadan o'tilmagan: Token yaroqsiz yoki muddati o'tgan"
+            }, status=401)
+            return None, None, None, err_resp
+
+        authenticated_user_id = user.id
+        # Cross-tenant spoofing tekshiruvi:
+        if param_user_id and param_user_id != authenticated_user_id:
+            logger.warning(
+                f"Xavfsizlik: Cross-tenant murojaat aniqlandi! Autentifikatsiya={authenticated_user_id}, "
+                f"So'ralgan={param_user_id}"
+            )
+            err_resp = web.json_response({
+                "ok": False,
+                "error": "Cross-tenant access denied: Ruxsatsiz hisob murojaati"
+            }, status=403)
+            return None, None, None, err_resp
+
+        return authenticated_user_id, user, session, None
+
+    # Token yo'q holat
+    is_auth_enforced = auth_mgr.is_configured() or os.environ.get("MIKASA_REQUIRE_AUTH", "").lower() in ("true", "1")
+    if is_auth_enforced and required:
+        err_resp = web.json_response({
+            "ok": False,
+            "error": "Avtorizatsiyadan o'tilmagan: Bearer token talab qilinadi"
+        }, status=401)
+        return None, None, None, err_resp
+
+    # Supabase sozlanmagan offline / test rejimi
+    if param_user_id:
+        return param_user_id, None, None, None
+
+    local_id = get_current_user_name() or "local_user"
+    return local_id, None, None, None
 
 
 def get_authenticated_user(request) -> Tuple[Optional[Any], Optional[Any]]:
@@ -2603,24 +2717,16 @@ def get_authenticated_user(request) -> Tuple[Optional[Any], Optional[Any]]:
 
 
 def _get_request_user_id(request) -> str:
-    """So'rovdan foydalanuvchi identifikatorini olish (Session token, Header, Query yoki Default)."""
-    session, user = get_authenticated_user(request)
-    if user:
-        return user.id
-
-    uid = (
-        request.headers.get("X-Mikasa-User-Id")
-        or request.headers.get("X-User-Id")
-        or request.query.get("user_id")
-        or request.query.get("mikasa_user_id")
-        or "admin"
-    )
-    return str(uid).strip()
+    """So'rovdan foydalanuvchi identifikatorini olish (Xavfsiz: token tekshiruvi bilan)."""
+    uid, _, _, _ = resolve_auth_identity(request, required=False)
+    return uid or "local_user"
 
 
 async def handle_devices_list(request):
     """GET /api/devices and GET /api/account/devices - Foydalanuvchining ulangan kompyuterlari ro'yxati"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     from core.v8 import AccountDeviceManager
     from core.v8.device import DeviceIdentityManager
     mgr = AccountDeviceManager.get_default_instance()
@@ -2713,7 +2819,9 @@ async def handle_devices_list(request):
 
 async def handle_device_detail(request):
     """GET /api/devices/{device_id} - Muayyan qurilma tafsilotlari"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
@@ -2739,7 +2847,9 @@ async def handle_device_detail(request):
 
 async def handle_device_rename(request):
     """PATCH /api/devices/{device_id} - Qurilma do'stona nomini yangilash"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     try:
         body = await request.json()
@@ -2780,7 +2890,9 @@ async def handle_device_rename(request):
 
 async def handle_device_revoke(request):
     """DELETE /api/devices/{device_id} - Qurilmani bekor qilish (Revoke & Cascade)"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
@@ -2803,7 +2915,9 @@ async def handle_device_revoke(request):
 
 async def handle_device_select(request):
     """POST /api/devices/{device_id}/select - Faol qurilmani tanlash"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager
     mgr = AccountDeviceManager.get_default_instance()
@@ -2827,7 +2941,9 @@ async def handle_device_select(request):
 
 async def handle_device_permissions(request):
     """GET /api/devices/{device_id}/permissions - Qurilma uchun foydalanuvchi ruxsatlari"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import AccountDeviceManager, PermissionStore
     mgr = AccountDeviceManager.get_default_instance()
@@ -2852,7 +2968,9 @@ async def handle_device_permissions(request):
 
 async def handle_account_sessions(request):
     """GET /api/account/sessions - Foydalanuvchining barcha faol sessiyalari"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     from core.v8.auth_session import SessionManager
     from core.v8 import AccountDeviceManager
     sm = SessionManager.get_default_instance()
@@ -2877,7 +2995,9 @@ async def handle_account_sessions(request):
 
 async def handle_account_sessions_logout_all(request):
     """POST /api/account/sessions/logout-all - Barcha sessiyalarni to'xtatish"""
-    user_id = _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     from core.v8.auth_session import SessionManager
     sm = SessionManager.get_default_instance()
 
@@ -2933,8 +3053,9 @@ async def handle_auth_logout(request):
 
 async def handle_auth_logout_all(request):
     """POST /api/auth/logout-all - Barcha qurilmalardan chiqish"""
-    session, user = get_authenticated_user(request)
-    user_id = user.id if user else _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
 
     await broadcast_ws("ACCOUNT_LOGOUT_ALL", {
         "user_id": user_id
@@ -3005,12 +3126,16 @@ async def handle_health(request):
     """GET /api/health - Tizim holati va diagnostika (sensitive keys hech qachon chiqmaydi)"""
     import time
     supabase_url = os.environ.get("SUPABASE_URL", "")
-    supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    supabase_key = (
+        os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+        or ""
+    )
     is_supabase_configured = bool(
         supabase_url
-        and supabase_anon_key
+        and supabase_key
         and "placeholder-project" not in supabase_url
-        and supabase_anon_key != "placeholder-anon-key"
+        and supabase_key not in ("placeholder-anon-key", "placeholder-publishable-key")
     )
     env_name = os.environ.get("ENVIRONMENT", "development")
 
@@ -3025,7 +3150,20 @@ async def handle_health(request):
 
 
 # ========== 8.2.1. OAUTH REDIRECT & SESSION RECEIVER ==========
-_pending_oauth_session = None
+import threading
+_pending_oauth_sessions: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_pending_oauth_lock = threading.Lock()
+OAUTH_SESSION_TTL_SECONDS = 300.0  # 5 daqiqa
+
+
+def _clean_expired_oauth_sessions():
+    """Muddati o'tgan OAuth sessiyalarini xotiradan tozalash"""
+    now = time.time()
+    with _pending_oauth_lock:
+        expired_keys = [k for k, (exp, _) in _pending_oauth_sessions.items() if exp <= now]
+        for k in expired_keys:
+            _pending_oauth_sessions.pop(k, None)
+
 
 async def handle_oauth_callback(request):
     """GET /api/auth/callback - OAuth redirect landing page for Desktop & Web"""
@@ -3102,6 +3240,7 @@ async def handle_oauth_callback(request):
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
       const code = params.get('code');
+      const state = params.get('state') || '';
       const error = params.get('error') || params.get('error_description');
 
       const msgEl = document.getElementById('msg');
@@ -3115,13 +3254,14 @@ async def handle_oauth_callback(request):
       }
 
       if (accessToken || code) {
-        fetch('http://127.0.0.1:18420/api/auth/callback/session', {
+        fetch('/api/auth/callback/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             access_token: accessToken,
             refresh_token: refreshToken,
             code: code,
+            state: state,
             timestamp: Date.now()
           })
         }).then(function(res) { return res.json(); }).then(function(data) {
@@ -3147,64 +3287,98 @@ async def handle_oauth_callback(request):
 
 
 async def handle_oauth_session_save(request):
-    """POST /api/auth/callback/session - Brauzerdan kelgan sessiya tokenlarini saqlash"""
-    global _pending_oauth_session
+    """POST /api/auth/callback/session - Brauzerdan kelgan sessiya tokenlarini state bilan xavfsiz saqlash"""
     try:
         data = await request.json()
-        _pending_oauth_session = data
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
 
-        # Extract name from JWT if available to immediately sync user name
-        access_token = data.get("access_token")
-        if access_token and "." in access_token:
-            try:
-                import base64
-                parts = access_token.split(".")
-                if len(parts) >= 2:
-                    payload_b64 = parts[1]
-                    payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
-                    payload_json = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
-                    meta = payload_json.get("user_metadata", {})
-                    full_name = meta.get("full_name") or meta.get("name") or payload_json.get("email", "").split("@")[0]
-                    if full_name and full_name.strip():
-                        name_to_save = full_name.strip()
-                        cfg = _read_config()
-                        if "user" not in cfg:
-                            cfg["user"] = {}
-                        cfg["user"]["name"] = name_to_save
-                        _write_config(cfg)
+    state = str(data.get("state") or request.query.get("state") or "default").strip()
+    _clean_expired_oauth_sessions()
+
+    now = time.time()
+    expires_at = now + OAUTH_SESSION_TTL_SECONDS
+
+    with _pending_oauth_lock:
+        _pending_oauth_sessions[state] = (expires_at, data)
+
+    # Extract name from JWT if available to immediately sync user name
+    access_token = data.get("access_token")
+    if access_token and "." in access_token:
+        try:
+            import base64
+            parts = access_token.split(".")
+            if len(parts) >= 2:
+                payload_b64 = parts[1]
+                payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+                payload_json = json.loads(base64.urlsafe_b64decode(payload_b64).decode("utf-8"))
+                meta = payload_json.get("user_metadata", {})
+                full_name = meta.get("full_name") or meta.get("name") or payload_json.get("email", "").split("@")[0]
+                if full_name and full_name.strip():
+                    name_to_save = full_name.strip()
+                    cfg = _read_config()
+                    if "user" not in cfg:
+                        cfg["user"] = {}
+                    cfg["user"]["name"] = name_to_save
+                    _write_config(cfg)
+                    try:
                         with open(USER_NAME_FILE, "w", encoding="utf-8") as f:
                             f.write(name_to_save)
-            except Exception:
-                pass
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
-        sync_broadcast("oauth_completed", data, _main_loop)
-        return web.json_response({"ok": True, "status": "saved"})
-    except Exception as e:
-        return web.json_response({"ok": False, "error": str(e)}, status=400)
+    # Xavfsizlik: raw tokenlarni websocketga tarqatmaslik! Faqat xavfsiz holat hodisasi
+    safe_event = {
+        "ok": True,
+        "status": "completed",
+        "state": state,
+        "timestamp": now
+    }
+    sync_broadcast("oauth_completed", safe_event, _main_loop)
+    return web.json_response({"ok": True, "status": "saved", "state": state})
 
 
 async def handle_oauth_session_get(request):
-    """GET /api/auth/callback/session - Desktop ilova uchun kutilayotgan sessiyani olish"""
-    global _pending_oauth_session
-    if _pending_oauth_session:
-        sess = _pending_oauth_session
-        _pending_oauth_session = None  # consume once
-        return web.json_response({"ok": True, "session": sess})
-    return web.json_response({"ok": False, "session": None})
+    """GET /api/auth/callback/session - Desktop ilova uchun kutilayotgan sessiyani state orqali bir martalik olish"""
+    _clean_expired_oauth_sessions()
+    req_state = request.query.get("state", "").strip()
 
+    now = time.time()
+    sess_data = None
+
+    with _pending_oauth_lock:
+        if req_state:
+            item = _pending_oauth_sessions.pop(req_state, None)
+            if item:
+                exp, data = item
+                if exp > now:
+                    sess_data = data
+        else:
+            # State berilmagan taqdirda eng so'nggi yaroqli sessiyani olish (backward-compatibility)
+            valid_keys = [k for k, (exp, _) in _pending_oauth_sessions.items() if exp > now]
+            if valid_keys:
+                latest_key = max(valid_keys, key=lambda k: _pending_oauth_sessions[k][0])
+                _, sess_data = _pending_oauth_sessions.pop(latest_key)
+
+    if sess_data:
+        return web.json_response({"ok": True, "session": sess_data})
+
+    return web.json_response({
+        "ok": False,
+        "session": None,
+        "error": "Sessiya topilmadi yoki muddati o'tgan"
+    }, status=404)
 
 
 # ========== 8.3. PHASE 42: DEVICE ENROLLMENT & PAIRING API ==========
 
 async def handle_device_pairing_start(request):
     """POST /api/devices/pairing/start - Yangi PC Agent juftlash kodini generatsiya qilish"""
-    session, user = get_authenticated_user(request)
-    user_id = user.id if user else _get_request_user_id(request)
-    if not user_id:
-        return web.json_response({
-            "ok": False,
-            "error": "Avtorizatsiyadan o'tilmagan. Ro'yxatdan o'tgan foydalanuvchi talab qilinadi."
-        }, status=401)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
 
     try:
         body = await request.json()
@@ -3263,8 +3437,9 @@ async def handle_device_pairing_status(request):
 
 async def handle_device_pairing_cancel(request):
     """POST /api/devices/pairing/{pairing_id}/cancel - Juftlash sessiyasini bekor qilish"""
-    session, user = get_authenticated_user(request)
-    user_id = user.id if user else _get_request_user_id(request)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     pairing_id = request.match_info.get("pairing_id", "")
 
     from core.v8.device_pairing import DevicePairingManager
@@ -3476,10 +3651,17 @@ async def cors_middleware(request, handler):
         return web.HTTPForbidden(text="Xavfsizlik: Begona tarmoqdan murojaat taqiqlangan.")
 
     origin = request.headers.get("Origin", "")
+    is_allowed = False
     if origin:
         origin_clean = origin.strip().lower()
+        configured_origins = [
+            o.strip().lower()
+            for o in os.environ.get("MIKASA_ALLOWED_ORIGINS", "").split(",")
+            if o.strip()
+        ]
         is_allowed = (
             origin_clean in ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
+            or origin_clean in configured_origins
             or origin_clean == "http://localhost"
             or origin_clean.startswith("http://localhost:")
             or origin_clean == "http://127.0.0.1"
@@ -3501,10 +3683,10 @@ async def cors_middleware(request, handler):
         except web.HTTPException as ex:
             response = ex
 
-    allowed_header_origin = origin if origin else "tauri://localhost"
+    allowed_header_origin = origin if (origin and is_allowed) else "tauri://localhost"
     response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, OPTIONS, DELETE"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id"
     return response
 
 
@@ -3593,7 +3775,9 @@ def create_app():
     app.router.add_post("/api/telegram/link/start", handle_telegram_link_start)
     app.router.add_post("/api/telegram/link/verify", handle_telegram_link_verify)
     app.router.add_get("/api/telegram/link/status", handle_telegram_link_status)
+    app.router.add_post("/api/telegram/link/delete", handle_telegram_unlink)
     app.router.add_post("/api/telegram/unlink", handle_telegram_unlink)
+    app.router.add_get("/api/telegram/identity", handle_telegram_account)
     app.router.add_get("/api/telegram/account", handle_telegram_account)
     app.router.add_get("/api/telegram/status", handle_telegram_status)
 

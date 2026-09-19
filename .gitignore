@@ -1,8 +1,14 @@
 # Maxfiy fayllar va kalitlar
 .env
 *.env
+.env.local
+.env.production
 *.key
 .vault.key
+*.secret
+*.pem
+private_key*
+id_ed25519*
 *token*.txt
 *api*.txt
 Google_AI

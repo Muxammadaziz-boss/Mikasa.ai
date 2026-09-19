@@ -69,7 +69,7 @@
     "timeout": 15,
     "mode": "creative",
     "thinking_enabled": true,
-    "gemini_api_key": "AIzaSyAC3uc-Emild6gjacFV2Jll7e3I83jvU6k"
+    "gemini_api_key": ""
   },
   "notifications": {
     "scheduler": true,

@@ -12,14 +12,16 @@ Mikasa AI v8.0.0 uses **Supabase Auth** as the primary Identity Provider (IdP) f
 
 ### Frontend (`mikasa-7/.env`)
 > [!IMPORTANT]
-> Never store `SUPABASE_SERVICE_ROLE_KEY` in frontend `.env` files or bundles. Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are allowed.
+> Never store `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` in frontend `.env` files or bundles. Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (or `VITE_SUPABASE_ANON_KEY`) are allowed.
 
 ```env
 # Supabase Project URL
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 
-# Supabase Anonymous Public Key
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Supabase Publishable Key (New standard: VITE_SUPABASE_PUBLISHABLE_KEY)
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
+# Backward compatibility fallback
+VITE_SUPABASE_ANON_KEY=sb_publishable_your_key_here
 
 # Mikasa Local Backend URL
 VITE_API_URL=http://127.0.0.1:18420
@@ -29,9 +31,23 @@ VITE_API_URL=http://127.0.0.1:18420
 ```env
 # Supabase Configuration
 SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Publishable Key (sb_publishable_...)
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
+SUPABASE_ANON_KEY=sb_publishable_your_key_here
+
+# Backend Secret Key (sb_secret_... or service_role)
+SUPABASE_SECRET_KEY=sb_secret_your_key_here
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_your_key_here
+
+# Asymmetric / Symmetric JWT Verification
+# Supabase JWKS endpoint is queried automatically:
+# https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+# Optional symmetric secret:
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+
+# Security & CORS
+MIKASA_REQUIRE_AUTH=true
+MIKASA_ALLOWED_ORIGINS=http://localhost:1420,http://127.0.0.1:1420,tauri://localhost,https://tauri.localhost
 
 # Server Environment
 ENVIRONMENT=development

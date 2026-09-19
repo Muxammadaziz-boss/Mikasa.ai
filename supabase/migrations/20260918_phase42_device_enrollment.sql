@@ -74,18 +74,21 @@ CREATE INDEX IF NOT EXISTS idx_device_challenges_nonce ON public.device_auth_cha
 -- A. DEVICE PAIRING SESSIONS RLS
 ALTER TABLE public.device_pairing_sessions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "device_pairing_sessions_select_own" ON public.device_pairing_sessions;
 CREATE POLICY "device_pairing_sessions_select_own"
     ON public.device_pairing_sessions
     FOR SELECT
     TO authenticated
     USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_pairing_sessions_insert_own" ON public.device_pairing_sessions;
 CREATE POLICY "device_pairing_sessions_insert_own"
     ON public.device_pairing_sessions
     FOR INSERT
     TO authenticated
     WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_pairing_sessions_update_own" ON public.device_pairing_sessions;
 CREATE POLICY "device_pairing_sessions_update_own"
     ON public.device_pairing_sessions
     FOR UPDATE
@@ -93,6 +96,7 @@ CREATE POLICY "device_pairing_sessions_update_own"
     USING (user_id = auth.uid())
     WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_pairing_sessions_delete_own" ON public.device_pairing_sessions;
 CREATE POLICY "device_pairing_sessions_delete_own"
     ON public.device_pairing_sessions
     FOR DELETE
@@ -102,18 +106,21 @@ CREATE POLICY "device_pairing_sessions_delete_own"
 -- B. DEVICE CREDENTIALS RLS
 ALTER TABLE public.device_credentials ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "device_credentials_select_own" ON public.device_credentials;
 CREATE POLICY "device_credentials_select_own"
     ON public.device_credentials
     FOR SELECT
     TO authenticated
     USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_credentials_insert_own" ON public.device_credentials;
 CREATE POLICY "device_credentials_insert_own"
     ON public.device_credentials
     FOR INSERT
     TO authenticated
     WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_credentials_update_own" ON public.device_credentials;
 CREATE POLICY "device_credentials_update_own"
     ON public.device_credentials
     FOR UPDATE
@@ -121,8 +128,25 @@ CREATE POLICY "device_credentials_update_own"
     USING (user_id = auth.uid())
     WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "device_credentials_delete_own" ON public.device_credentials;
 CREATE POLICY "device_credentials_delete_own"
     ON public.device_credentials
     FOR DELETE
     TO authenticated
     USING (user_id = auth.uid());
+
+-- C. DEVICE AUTH CHALLENGES RLS (SINGLE-USE NONCES)
+ALTER TABLE public.device_auth_challenges ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "device_auth_challenges_select" ON public.device_auth_challenges;
+CREATE POLICY "device_auth_challenges_select"
+    ON public.device_auth_challenges
+    FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.devices
+            WHERE public.devices.device_id = public.device_auth_challenges.device_id
+              AND public.devices.user_id = auth.uid()
+        )
+    );

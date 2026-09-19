@@ -442,8 +442,9 @@ export interface RemoteAuditItem {
   details?: Record<string, any>;
 }
 
-const API_BASE = "http://127.0.0.1:18420";
-const WS_BASE = "ws://127.0.0.1:18420/api/ws";
+const DEFAULT_API_URL = "http://127.0.0.1:18420";
+const API_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+const WS_BASE = (import.meta.env.VITE_WS_URL || API_BASE.replace(/^http/, "ws")) + "/api/ws";
 
 class BackendService {
   private ws: WebSocket | null = null;
@@ -1881,7 +1882,7 @@ class BackendService {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
-        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_PUBLISHABLE_KEY ni sozlang.",
       };
     }
     try {
@@ -1914,6 +1915,7 @@ class BackendService {
             is_active: true,
             is_verified: Boolean(data.user.email_confirmed_at),
             created_at: Date.now() / 1000,
+            provider: "supabase_auth",
           }
         : undefined;
 
@@ -1943,7 +1945,7 @@ class BackendService {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
-        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_PUBLISHABLE_KEY ni sozlang.",
       };
     }
     try {
@@ -1994,16 +1996,21 @@ class BackendService {
     }
   }
 
-  public async signInWithGoogle(): Promise<{ ok: boolean; error?: string; url?: string }> {
+  public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string }> {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
-        error: "Supabase konfiguratsiyasi topilmadi. Google OAuth uchun .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+        error: "Supabase konfiguratsiyasi topilmadi. Google OAuth uchun .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_PUBLISHABLE_KEY ni sozlang.",
       };
     }
     try {
       // In Desktop/Tauri or localhost environments, route redirect to the Python backend callback handler
-      const redirectTo = "http://127.0.0.1:18420/api/auth/callback";
+      const state =
+        customState ||
+        (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID
+          ? window.crypto.randomUUID()
+          : Math.random().toString(36).substring(2) + Date.now().toString(36));
+      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -2018,15 +2025,18 @@ class BackendService {
       if (error) {
         return { ok: false, error: formatAuthError(error) };
       }
-      return { ok: true, url: data.url };
+      return { ok: true, url: data.url, state };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
     }
   }
 
-  public async checkPendingOAuthSession(): Promise<{ ok: boolean; session?: { access_token?: string; refresh_token?: string; code?: string } }> {
+  public async checkPendingOAuthSession(state?: string): Promise<{ ok: boolean; session?: { access_token?: string; refresh_token?: string; code?: string } }> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/callback/session`);
+      const url = state
+        ? `${API_BASE}/api/auth/callback/session?state=${encodeURIComponent(state)}`
+        : `${API_BASE}/api/auth/callback/session`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
@@ -2153,7 +2163,7 @@ class BackendService {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
-        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_PUBLISHABLE_KEY ni sozlang.",
       };
     }
     try {
@@ -2175,7 +2185,7 @@ class BackendService {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
-        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY ni sozlang.",
+        error: "Supabase konfiguratsiyasi topilmadi. Iltimos, .env faylida VITE_SUPABASE_URL va VITE_SUPABASE_PUBLISHABLE_KEY ni sozlang.",
       };
     }
     try {

@@ -43,6 +43,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   const [oauthLoading, setOauthLoading] = useState(false);
   const [oauthWaiting, setOauthWaiting] = useState(false);
   const [oauthUrl, setOauthUrl] = useState<string | null>(null);
+  const [oauthState, setOauthState] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -52,6 +53,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     setErrorMsg(null);
     setSuccessMsg(null);
     setOauthWaiting(false);
+    setOauthState(null);
   };
 
   // Listen for OAuth redirect sessions
@@ -89,7 +91,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
     const poll = async () => {
       try {
-        const res = await backendService.checkPendingOAuthSession();
+        const res = await backendService.checkPendingOAuthSession(oauthState || undefined);
         if (res.ok && res.session && !isCancelled) {
           const { access_token, refresh_token } = res.session;
           if (access_token) {
@@ -114,6 +116,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 provider: data.user.app_metadata?.provider || "google",
               };
               setOauthWaiting(false);
+              setOauthState(null);
               setTimeout(() => {
                 onAuthSuccess(u);
               }, 400);
@@ -135,7 +138,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       isCancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [oauthWaiting, onAuthSuccess]);
+  }, [oauthWaiting, oauthState, onAuthSuccess]);
 
   // Google OAuth handler
   const handleGoogleSignIn = async () => {
@@ -150,6 +153,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         setErrorMsg(res.error || "Google orqali kirishda xatolik yuz berdi");
         setOauthLoading(false);
       } else if (res.url) {
+        setOauthState(res.state || null);
         setOauthUrl(res.url);
         setOauthWaiting(true);
         setOauthLoading(false);
@@ -566,7 +570,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: "2px" }}>Supabase sozlanmagan</div>
               <div>
-                Tizimga kirish yoki ro'yxatdan o'tish uchun <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>mikasa-7/.env</code> faylida <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_URL</code> va <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_ANON_KEY</code> sozlamalarini kiriting.
+                Tizimga kirish yoki ro'yxatdan o'tish uchun <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>mikasa-7/.env</code> faylida <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_URL</code> va <code style={{ background: "rgba(0,0,0,0.3)", padding: "1px 4px", borderRadius: "4px" }}>VITE_SUPABASE_PUBLISHABLE_KEY</code> sozlamalarini kiriting.
               </div>
             </div>
           </div>

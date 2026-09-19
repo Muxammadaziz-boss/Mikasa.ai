@@ -151,7 +151,7 @@ class TestSupabaseJWTVerification(unittest.TestCase):
         self.assertFalse(expired_claims.is_valid)
 
     def test_06_supabase_jwt_unverified_dev_fallback(self):
-        """Scenario 6: When SUPABASE_JWT_SECRET is empty in development, decodes claims safely."""
+        """Scenario 6: Fail-closed security - when secret is unconfigured and JWKS unavailable, unverified token is rejected."""
         dev_mgr = SupabaseAuthManager(supabase_jwt_secret="")
         token = self.auth_mgr.create_mock_jwt(
             user_id="dev-user-01",
@@ -160,10 +160,9 @@ class TestSupabaseJWTVerification(unittest.TestCase):
             secret=self.secret
         )
         ok, msg, claims = dev_mgr.verify_supabase_jwt(token)
-        self.assertTrue(ok)
-        self.assertIsNotNone(claims)
-        self.assertEqual(claims.user_id, "dev-user-01")
-        self.assertEqual(claims.username, "devuser")
+        self.assertFalse(ok)
+        self.assertIsNone(claims)
+        self.assertIn("UNCONFIGURED_KEY", msg)
 
 
 class TestProfileAndZeroPasswordStorage(unittest.TestCase):
