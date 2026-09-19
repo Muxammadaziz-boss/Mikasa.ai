@@ -178,6 +178,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // 1. LOGIN HANDLER
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || oauthLoading || oauthWaiting) return;
     if (!username.trim() || !password) {
       setErrorMsg("Foydalanuvchi nomi yoki email va parolni kiriting");
       return;
@@ -211,6 +212,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // 2. REGISTER HANDLER
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || oauthLoading || oauthWaiting) return;
     if (!username.trim() || !password) {
       setErrorMsg("Foydalanuvchi nomi va parolni kiriting");
       return;
@@ -254,6 +256,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // 3. FORGOT PASSWORD HANDLER
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || oauthLoading || oauthWaiting) return;
     const target = email.trim() || username.trim();
     if (!target) {
       setErrorMsg("Email yoki foydalanuvchi nomingizni kiriting");
@@ -289,6 +292,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // 4. RESET PASSWORD HANDLER
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || oauthLoading || oauthWaiting) return;
     if (!token.trim()) {
       setErrorMsg("Tiklash tokenini kiriting");
       return;
@@ -333,6 +337,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // 5. VERIFY EMAIL HANDLER
   const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || oauthLoading || oauthWaiting) return;
     if (!token.trim()) {
       setErrorMsg("Tasdiqlash tokenini kiriting");
       return;

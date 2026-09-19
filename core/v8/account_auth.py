@@ -93,7 +93,8 @@ class SupabaseSessionClaims:
             "exp": self.exp,
             "is_valid": self.is_valid,
             "username": self.username,
-            "display_name": self.display_name
+            "display_name": self.display_name,
+            "avatar_url": self.avatar_url
         }
 
 
@@ -440,11 +441,30 @@ class SupabaseAuthManager:
                 return False, f"INVALID_SIGNATURE: JWKS orqali EC kalit topilmadi (kid={kid})", None
             try:
                 from cryptography.hazmat.primitives import hashes
-                from cryptography.hazmat.primitives.asymmetric import ec
+                from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+                # RFC 7515/7518: JWT ES256 xom imzosi R || S (64 bayt).
+                # Python cryptography kutubxonasi DER formatini kutadi, shuning uchun konvertatsiya qilamiz.
+                der_sig = sig_bytes
+                if alg == "ES256" and len(sig_bytes) == 64:
+                    r = int.from_bytes(sig_bytes[:32], "big")
+                    s = int.from_bytes(sig_bytes[32:], "big")
+                    der_sig = utils.encode_dss_signature(r, s)
+                elif alg == "ES384" and len(sig_bytes) == 96:
+                    r = int.from_bytes(sig_bytes[:48], "big")
+                    s = int.from_bytes(sig_bytes[48:], "big")
+                    der_sig = utils.encode_dss_signature(r, s)
+                elif alg == "ES512" and len(sig_bytes) in (131, 132):
+                    half = len(sig_bytes) // 2
+                    r = int.from_bytes(sig_bytes[:half], "big")
+                    s = int.from_bytes(sig_bytes[half:], "big")
+                    der_sig = utils.encode_dss_signature(r, s)
+
                 hash_algo = hashes.SHA256() if alg == "ES256" else (hashes.SHA384() if alg == "ES384" else hashes.SHA512())
-                pub_key.verify(sig_bytes, signing_input, ec.ECDSA(hash_algo))
-            except Exception:
-                return False, "INVALID_SIGNATURE: ES256 imzo tekshiruvidan o'tmadi", None
+                pub_key.verify(der_sig, signing_input, ec.ECDSA(hash_algo))
+            except Exception as e:
+                logger.debug(f"[SupabaseAuth] EC imzo verifikatsiyasida xatolik: {e}")
+                return False, f"INVALID_SIGNATURE: {alg} imzo tekshiruvidan o'tmadi", None
 
         elif alg == "HS256":
             if not self.supabase_jwt_secret:

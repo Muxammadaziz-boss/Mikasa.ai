@@ -27,8 +27,22 @@ function formatAuthError(err: any): string {
   if (msg.includes("User already registered") || msg.includes("already registered")) {
     return "Bu foydalanuvchi yoki email bilan allaqachon ro'yxatdan o'tilgan.";
   }
-  if (msg.includes("Password should be at least")) {
-    return "Parol kamida 6-8 ta belgidan iborat bo'lishi kerak.";
+  if (msg.includes("email_not_confirmed") || msg.toLowerCase().includes("email not confirmed")) {
+    return "Email manzilingiz hali tasdiqlanmagan. Iltimos, pochtangizga yuborilgan tasdiqlash havolasini bosing.";
+  }
+  if (
+    msg.includes("Email link is invalid or has expired") ||
+    msg.includes("otp_expired") ||
+    msg.includes("Token has expired") ||
+    msg.includes("token is expired")
+  ) {
+    return "Tasdiqlash havolasi yoki tokeni yaroqsiz yoxud muddati o'tgan. Iltimos, qaytadan so'rov yuboring.";
+  }
+  if (msg.includes("rate limit") || msg.includes("rate_limit") || msg.includes("over_email_send_rate_limit")) {
+    return "Email yuborish bo'yicha vaqtinchalik cheklov. Iltimos, birozdan keyin qayta urinib ko'ring.";
+  }
+  if (msg.includes("Password should be at least") || msg.includes("weak_password")) {
+    return "Parol kamida 8 ta belgidan iborat bo'lib, harf va raqam qatnashishi kerak.";
   }
   return msg || "Autentifikatsiya jarayonida xatolik yuz berdi";
 }

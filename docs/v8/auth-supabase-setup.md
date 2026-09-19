@@ -3,7 +3,8 @@
 ## 1. Overview
 Mikasa AI v8.0.0 uses **Supabase Auth** as the primary Identity Provider (IdP) for client registration, login, session persistence, and multi-tenant isolation.
 - **Client**: Connects directly to Supabase via `@supabase/supabase-js`. Passwords are never sent to, received by, or stored in the Python backend.
-- **Backend**: Verifies incoming requests via RFC 7519 compliant Supabase JWT Bearer tokens signed with HMAC-SHA256 (`HS256`).
+- **Backend**: Verifies incoming requests via RFC 7519 compliant Supabase JWT Bearer tokens using asymmetric JWKS public keys (`ES256` ECDSA with DER conversion, `RS256` RSA) or configured symmetric secret (`HS256`).
+- **Authorization**: Enforces strict multi-tenant isolation via `JWT.sub`. Any cross-tenant parameter or header tampering returns `403 Forbidden`.
 - **PostgreSQL Database**: Enforces Row Level Security (RLS) on all user-owned tables via PostgreSQL `auth.uid()`.
 
 ---
