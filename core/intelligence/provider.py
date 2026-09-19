@@ -56,14 +56,34 @@ class ProviderManager:
         available_providers = [p for p in self._providers if p.is_available()]
         
         if not available_providers:
-            logger.warning("Hech qanday AI provayder sozlanmagan (API kalitlar mavjud emas).")
+            logger.warning("Hech qanday AI provayder sozlanmagan (API kalitlar mavjud emas). Mahalliy offline rejim ishga tushadi.")
+            query_str = getattr(request, "message", None) or getattr(request, "query", "") or ""
+            query_lower = str(query_str).lower().strip()
+
+            if any(w in query_lower for w in ["salom", "qodir", "nima", "qila ol", "kim", "yordam", "imkon"]):
+                resp_text = (
+                    "Assalomu alaykum! Men Mikasa — sizning shaxsiy sun'iy intellekt yordamchingizman.\n\n"
+                    "Men quyidagi asosiy vazifalarni bajara olaman:\n"
+                    "• 💻 Kompyuterni boshqarish (dasturlarni ochish, oynalar va skrinshot)\n"
+                    "• 📊 Tizim holati (CPU, RAM va real vaqtdagi harorat monitoringi)\n"
+                    "• ⏰ Vazifalar va eslatmalarni rejalashtirish\n"
+                    "• 🎵 Musiqa va videolarni boshqarish\n\n"
+                    "💡 Kengaytirilgan chuqur muloqot va erkin suhbat uchun Sozlamalar bo'limidan Google Gemini API kalitini kiritishingiz mumkin."
+                )
+            else:
+                resp_text = (
+                    "Mikasa mahalliy yordamchi rejimida ishlamoqda. Buyruqlaringizni bajarishga tayyorman!\n\n"
+                    "Erkin tahlil va suhbatlar uchun Hisob sozlamalaridan Gemini API kalitini sozlashingiz mumkin."
+                )
+
             return AIResponse(
-                provider="none",
-                model="none",
-                type="error",
-                content="Sun'iy intellekt xizmati sozlanmagan. Iltimos, API kalitlarini kiriting.",
-                success=False,
-                error_code="AI_PROVIDER_NOT_CONFIGURED"
+                provider="local",
+                model="mikasa-offline-core",
+                type="answer",
+                content=resp_text,
+                success=True,
+                error_code=None,
+                metadata={"offline_mode": True}
             )
 
         last_error = ""

@@ -880,13 +880,27 @@ class BackendService {
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = async (event: any) => {
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           onError("Tovushli boshqaruv uchun mikrofon ruxsati kerak.");
+          this.notifyVoiceState("idle");
+        } else if (event.error === "network") {
+          // Attempt graceful fallback to local backend voice service
+          try {
+            const started = await this.startVoice();
+            if (started) {
+              this.notifyVoiceState("listening");
+              return;
+            }
+          } catch {}
+          onError("Ovozli xizmat internetga ulanmadi. Iltimos, buyruqni matn orqali yuboring.");
+          this.notifyVoiceState("idle");
         } else if (event.error !== "no-speech") {
           onError(`Ovozni tinglashda xatolik: ${event.error}`);
+          this.notifyVoiceState("idle");
+        } else {
+          this.notifyVoiceState("idle");
         }
-        this.notifyVoiceState("idle");
       };
 
       recognition.onend = () => {

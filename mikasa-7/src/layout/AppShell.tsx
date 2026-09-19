@@ -89,7 +89,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         }}
       >
         {/* ── LEFT: Stylized Logo + MIKASA AI ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "220px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
           <div
             style={{
               display: "flex",
@@ -182,10 +182,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            position: "absolute",
-            left: "50%",
-            transform: "translateX(-50%)",
+            justifyContent: "center",
+            gap: "4px",
+            flex: "0 1 auto",
+            margin: "0 8px",
+            minWidth: 0,
+            overflowX: "auto",
+            scrollbarWidth: "none",
           }}
         >
           {/* Bosh sahifa tab */}
@@ -193,15 +196,17 @@ export const AppShell: React.FC<AppShellProps> = ({
             onClick={() => onNavigate("/")}
             title="Bosh sahifa"
             style={{
-              padding: "7px 18px",
+              padding: "5px 13px",
               borderRadius: "20px",
               backgroundColor: isHome ? "rgba(30, 58, 138, 0.45)" : "transparent",
               border: isHome ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
               boxShadow: isHome ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
               color: isHome ? "#93C5FD" : "#94A3B8",
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontWeight: isHome ? 600 : 500,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -227,16 +232,18 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "7px",
-              padding: "7px 16px",
+              gap: "6px",
+              padding: "5px 12px",
               borderRadius: "20px",
               backgroundColor: currentPath === "/chat" ? "rgba(30, 58, 138, 0.45)" : "transparent",
               border: currentPath === "/chat" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
               boxShadow: currentPath === "/chat" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
               color: currentPath === "/chat" ? "#93C5FD" : "#94A3B8",
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontWeight: currentPath === "/chat" ? 600 : 500,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -252,7 +259,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               }
             }}
           >
-            <ChatIcon size={14} color="currentColor" />
+            <ChatIcon size={13} color="currentColor" />
             <span>Suxbatlashish</span>
           </button>
 
@@ -263,16 +270,18 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "7px",
-              padding: "7px 16px",
+              gap: "6px",
+              padding: "5px 12px",
               borderRadius: "20px",
               backgroundColor: currentPath === "/memory" ? "rgba(30, 58, 138, 0.45)" : "transparent",
               border: currentPath === "/memory" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
               boxShadow: currentPath === "/memory" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
               color: currentPath === "/memory" ? "#93C5FD" : "#94A3B8",
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontWeight: currentPath === "/memory" ? 600 : 500,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -288,7 +297,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               }
             }}
           >
-            <MemoryIcon size={14} color="currentColor" />
+            <MemoryIcon size={13} color="currentColor" />
             <span>Xotira</span>
           </button>
 
@@ -299,16 +308,18 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "7px",
-              padding: "7px 16px",
+              gap: "6px",
+              padding: "5px 12px",
               borderRadius: "20px",
               backgroundColor: currentPath === "/scheduler" ? "rgba(30, 58, 138, 0.45)" : "transparent",
               border: currentPath === "/scheduler" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
               boxShadow: currentPath === "/scheduler" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
               color: currentPath === "/scheduler" ? "#93C5FD" : "#94A3B8",
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontWeight: currentPath === "/scheduler" ? 600 : 500,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -324,7 +335,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               }
             }}
           >
-            <SchedulerIcon size={14} color="currentColor" />
+            <SchedulerIcon size={13} color="currentColor" />
             <span>Rejalashtirish</span>
           </button>
 
@@ -361,7 +372,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         </nav>
 
         {/* ── RIGHT: Theme + Language + Notification + Profile (NO MIC ICON!) ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "220px", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, justifyContent: "flex-end" }}>
           {/* Theme Mode Toggle (Moon icon in Image 4) */}
           <button
             onClick={() => setThemeMode((m) => (m === "dark" ? "light" : "dark"))}
@@ -459,8 +470,9 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "9px",
-              padding: "3px 10px 3px 4px",
+              gap: "7px",
+              padding: "3px 8px 3px 4px",
+              maxWidth: "145px",
               borderRadius: "24px",
               backgroundColor: currentPath === "/account" ? "rgba(56, 189, 248, 0.15)" : "rgba(255, 255, 255, 0.05)",
               border: currentPath === "/account"
@@ -479,8 +491,19 @@ export const AppShell: React.FC<AppShellProps> = ({
             }}
           >
             <Avatar initials={effectiveInitials} size={28} avatarStyle={currentAvatarStyle} avatarUrl={userAvatarUrl} />
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#FFFFFF" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15, minWidth: 0, overflow: "hidden" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                  maxWidth: "80px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "block",
+                }}
+              >
                 {userName}
               </span>
               <span style={{ fontSize: "10px", color: "#818CF8", fontWeight: 600 }}>

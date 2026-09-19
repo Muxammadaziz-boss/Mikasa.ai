@@ -58,9 +58,18 @@ class TestE2ELifecycle(unittest.TestCase):
 
     def setUp(self):
         self.original_config = _read_config()
+        self.original_user_name = "Muxammadaziz"
+        user_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "foydalanuvchi_ismi.txt")
+        if os.path.exists(user_file):
+            with open(user_file, "r", encoding="utf-8") as f:
+                self.original_user_name = f.read().strip() or "Muxammadaziz"
 
     def tearDown(self):
         _write_config(self.original_config)
+        user_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "foydalanuvchi_ismi.txt")
+        if os.path.exists(user_file):
+            with open(user_file, "w", encoding="utf-8") as f:
+                f.write(self.original_user_name)
 
     def test_complete_e2e_flow(self):
         """E2E Tsikl: Launch -> Home -> Chat -> Voice -> Commands -> Memory -> Scheduler -> Plugins -> Account -> Close"""

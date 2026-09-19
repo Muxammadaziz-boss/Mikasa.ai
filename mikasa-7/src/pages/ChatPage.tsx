@@ -14,14 +14,35 @@ import {
   CopyIcon,
   CheckIcon,
   RefreshIcon,
+  PlusIcon,
+  ImageIcon,
+  CollapseSidebarIcon,
+  ExpandSidebarIcon,
+  ChatIcon,
 } from "../components/icons/Icons";
 import { backendService, BackendStatus } from "../services/backendService";
 
-interface Message {
+export interface Message {
   id: string;
   sender: "user" | "mikasa";
   text: string;
   timestamp: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: Message[];
+}
+
+export interface ChatGalleryImage {
+  id: string;
+  url: string;
+  prompt?: string;
+  timestamp: string;
+  sessionId?: string;
 }
 
 interface ChatPageProps {
@@ -36,6 +57,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   userName = "Ustoz",
   onNavigateHome,
 }) => {
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    try {
+      const raw = localStorage.getItem("mikasa_chat_sessions");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    return localStorage.getItem("mikasa_active_session_id") || "session_default";
+  });
+
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [sidebarTab, setSidebarTab] = useState<"chats" | "images">("chats");
+  const [previewImage, setPreviewImage] = useState<ChatGalleryImage | null>(null);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -177,37 +217,179 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     return () => unsub();
   }, []);
 
-  // Initial load: fetch existing memory conversation history
+  // Initial load: restore sessions or sync from backend memory
   useEffect(() => {
-    const loadHistory = async () => {
+    const raw = localStorage.getItem("mikasa_chat_sessions");
+    if (!raw || JSON.parse(raw).length === 0) {
+      const loadHistory = async () => {
+        try {
+          const mem = await backendService.getMemory();
+          let initialMsgs: Message[] = [];
+          if (mem.ok && mem.conversations && mem.conversations.length > 0) {
+            mem.conversations.forEach((c, idx) => {
+              if (c.user) {
+                initialMsgs.push({
+                  id: `hist-u-${idx}`,
+                  sender: "user",
+                  text: c.user,
+                  timestamp: c.time || "",
+                });
+              }
+              if (c.agent) {
+                initialMsgs.push({
+                  id: `hist-a-${idx}`,
+                  sender: "mikasa",
+                  text: c.agent,
+                  timestamp: c.time || "",
+                });
+              }
+            });
+          }
+          const defaultSession: ChatSession = {
+            id: "session_default",
+            title: initialMsgs.length > 0 ? (initialMsgs[0].text.slice(0, 28) + (initialMsgs[0].text.length > 28 ? "..." : "")) : "Boshlang'ich suhbat",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messages: initialMsgs,
+          };
+          setSessions([defaultSession]);
+          setActiveSessionId("session_default");
+          setMessages(initialMsgs);
+          try {
+            localStorage.setItem("mikasa_chat_sessions", JSON.stringify([defaultSession]));
+            localStorage.setItem("mikasa_active_session_id", "session_default");
+          } catch {}
+        } catch {}
+      };
+      loadHistory();
+    } else {
       try {
-        const mem = await backendService.getMemory();
-        if (mem.ok && mem.conversations && mem.conversations.length > 0) {
-          const loaded: Message[] = [];
-          mem.conversations.forEach((c, idx) => {
-            if (c.user) {
-              loaded.push({
-                id: `hist-u-${idx}`,
-                sender: "user",
-                text: c.user,
-                timestamp: c.time || "",
-              });
-            }
-            if (c.agent) {
-              loaded.push({
-                id: `hist-a-${idx}`,
-                sender: "mikasa",
-                text: c.agent,
-                timestamp: c.time || "",
-              });
-            }
-          });
-          setMessages((prev) => (prev.length === 0 ? loaded : prev));
+        const parsed: ChatSession[] = JSON.parse(raw);
+        const savedActiveId = localStorage.getItem("mikasa_active_session_id") || parsed[0]?.id || "session_default";
+        const current = parsed.find((s) => s.id === savedActiveId) || parsed[0];
+        if (current) {
+          setActiveSessionId(current.id);
+          setMessages(current.messages || []);
         }
       } catch {}
-    };
-    loadHistory();
+    }
   }, []);
+
+  // Extract all gallery images from messages across all sessions
+  const allGalleryImages = React.useMemo(() => {
+    const list: ChatGalleryImage[] = [];
+    const seen = new Set<string>();
+
+    sessions.forEach((sess) => {
+      sess.messages.forEach((msg) => {
+        // Markdown image: ![alt](url)
+        const mdRegex = /!\[(.*?)\]\(((?:https?:\/\/|data:image\/|\/)[^\s\)]+)\)/g;
+        let m;
+        while ((m = mdRegex.exec(msg.text)) !== null) {
+          const url = m[2];
+          if (!seen.has(url)) {
+            seen.add(url);
+            list.push({
+              id: `${sess.id}_img_${list.length}`,
+              url,
+              prompt: m[1] || "AI tomonidan yaratilgan tasvir",
+              timestamp: msg.timestamp,
+              sessionId: sess.id,
+            });
+          }
+        }
+        // Direct image URLs
+        const directRegex = /(https?:\/\/[^\s"'<>]+\.(?:png|jpg|jpeg|webp|svg|gif))/gi;
+        while ((m = directRegex.exec(msg.text)) !== null) {
+          const url = m[1];
+          if (!seen.has(url)) {
+            seen.add(url);
+            list.push({
+              id: `${sess.id}_img_${list.length}`,
+              url,
+              prompt: "AI tasviri",
+              timestamp: msg.timestamp,
+              sessionId: sess.id,
+            });
+          }
+        }
+      });
+    });
+
+    return list;
+  }, [sessions]);
+
+  // Handle "+ Yangi suhbat" (New Chat)
+  const handleNewChat = () => {
+    const newId = "session_" + Date.now();
+    const newSession: ChatSession = {
+      id: newId,
+      title: "Yangi suhbat",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions((prev) => {
+      const next = [newSession, ...prev];
+      try {
+        localStorage.setItem("mikasa_chat_sessions", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setActiveSessionId(newId);
+    setMessages([]);
+    try {
+      localStorage.setItem("mikasa_active_session_id", newId);
+    } catch {}
+    setTimeout(() => textareaRef.current?.focus(), 80);
+  };
+
+  // Handle selecting chat session
+  const handleSelectSession = (id: string) => {
+    setActiveSessionId(id);
+    try {
+      localStorage.setItem("mikasa_active_session_id", id);
+    } catch {}
+    const target = sessions.find((s) => s.id === id);
+    setMessages(target?.messages || []);
+  };
+
+  // Handle deleting a chat session
+  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== id);
+      if (remaining.length === 0) {
+        const freshId = "session_" + Date.now();
+        const fresh: ChatSession = {
+          id: freshId,
+          title: "Yangi suhbat",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+        };
+        setActiveSessionId(freshId);
+        setMessages([]);
+        try {
+          localStorage.setItem("mikasa_chat_sessions", JSON.stringify([fresh]));
+          localStorage.setItem("mikasa_active_session_id", freshId);
+        } catch {}
+        return [fresh];
+      } else {
+        try {
+          localStorage.setItem("mikasa_chat_sessions", JSON.stringify(remaining));
+        } catch {}
+        if (activeSessionId === id) {
+          setActiveSessionId(remaining[0].id);
+          setMessages(remaining[0].messages || []);
+          try {
+            localStorage.setItem("mikasa_active_session_id", remaining[0].id);
+          } catch {}
+        }
+        return remaining;
+      }
+    });
+  };
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = () => {
@@ -237,7 +419,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessagesWithUser = [...messages, userMsg];
+    setMessages(newMessagesWithUser);
+
+    // Synchronize user message with session state & localStorage
+    setSessions((prev) => {
+      const target = prev.find((s) => s.id === activeSessionId);
+      const isGenericTitle = !target || target.title === "Yangi suhbat" || target.title === "Boshlang'ich suhbat";
+      const title = isGenericTitle ? (query.slice(0, 30) + (query.length > 30 ? "..." : "")) : target.title;
+      const updated = prev.map((s) =>
+        s.id === activeSessionId
+          ? { ...s, title, updatedAt: Date.now(), messages: newMessagesWithUser }
+          : s
+      );
+      try {
+        localStorage.setItem("mikasa_chat_sessions", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -252,7 +452,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         text: res.ok ? res.response : `**Javob qaytarishda xatolik**\n\n${res.error || "Backend so'rovni qayta ishlay olmadi."}\n\nQayta urinib ko'ring yoki boshqa savolni so'rang.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      setMessages((prev) => [...prev, botMsg]);
+      setMessages((prev) => {
+        const next = [...prev, botMsg];
+        setSessions((prevSessions) => {
+          const updated = prevSessions.map((s) =>
+            s.id === activeSessionId
+              ? { ...s, updatedAt: Date.now(), messages: next }
+              : s
+          );
+          try {
+            localStorage.setItem("mikasa_chat_sessions", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        return next;
+      });
     } catch (err: any) {
       const errorDetail = err.message || String(err);
       const errMsg: Message = {
@@ -261,7 +475,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         text: `**Javob olishda xatolik yuz berdi**\n\nSabab: ${errorDetail}\n\nBackend serveriga ulanishda muammo bo'lishi mumkin. Iltimos, qayta urinib ko'ring yoki backend holatini tekshiring.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      setMessages((prev) => [...prev, errMsg]);
+      setMessages((prev) => {
+        const next = [...prev, errMsg];
+        setSessions((prevSessions) => {
+          const updated = prevSessions.map((s) =>
+            s.id === activeSessionId
+              ? { ...s, updatedAt: Date.now(), messages: next }
+              : s
+          );
+          try {
+            localStorage.setItem("mikasa_chat_sessions", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        return next;
+      });
     } finally {
       setIsLoading(false);
       setTimeout(() => textareaRef.current?.focus(), 50);
@@ -270,7 +498,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
   const handleRegenerate = async () => {
     if (isLoading || messages.length === 0) return;
-    // Find last user query
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].sender === "user") {
         await handleSendMessage(messages[i].text);
@@ -289,6 +516,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
   const handleClearHistory = async () => {
     setMessages([]);
+    setSessions((prev) => {
+      const updated = prev.map((s) =>
+        s.id === activeSessionId ? { ...s, updatedAt: Date.now(), messages: [] } : s
+      );
+      try {
+        localStorage.setItem("mikasa_chat_sessions", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     await backendService.clearChat();
   };
 
@@ -334,6 +570,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     "Dasturlash bo'yicha maslahat ber",
   ];
 
+  const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+
   return (
     <div
       className="chat-page-container"
@@ -354,15 +592,46 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 24px",
+          padding: "12px 20px",
           borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
           backgroundColor: "rgba(8, 14, 28, 0.65)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           zIndex: 10,
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {/* Sidebar Toggle Button */}
+          <button
+            onClick={() => setSidebarOpen((o) => !o)}
+            title={sidebarOpen ? "Chap panelni yashirish" : "Chap panelni ko'rsatish"}
+            aria-label="Chap panelni yoqish/o'chirish"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "32px",
+              height: "32px",
+              borderRadius: "8px",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid var(--border)",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.color = "#FFFFFF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            {sidebarOpen ? <CollapseSidebarIcon size={16} /> : <ExpandSidebarIcon size={16} />}
+          </button>
+
           <button
             onClick={onNavigateHome}
             title="Bosh sahifaga qaytish"
@@ -397,6 +666,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               <span style={{ fontSize: "15px", fontWeight: 700, color: "#FFFFFF" }}>
                 AI Suhbat
               </span>
+              {activeSession && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    color: "#38BDF8",
+                    fontWeight: 600,
+                    maxWidth: "180px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                  title={activeSession.title}
+                >
+                  {activeSession.title}
+                </span>
+              )}
               <span
                 style={{
                   fontSize: "11px",
@@ -431,6 +720,38 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* "+ Yangi suhbat" button */}
+          <button
+            onClick={handleNewChat}
+            title="Yangi suhbat ochish"
+            aria-label="Yangi suhbat ochish"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 13px",
+              borderRadius: "8px",
+              background: "linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(99, 102, 241, 0.25))",
+              border: "1px solid rgba(56, 189, 248, 0.35)",
+              color: "#38BDF8",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(99, 102, 241, 0.4))";
+              e.currentTarget.style.color = "#FFFFFF";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(99, 102, 241, 0.25))";
+              e.currentTarget.style.color = "#38BDF8";
+            }}
+          >
+            <PlusIcon size={14} />
+            <span>Yangi suhbat</span>
+          </button>
+
           {messages.length > 0 && (
             <button
               onClick={handleRegenerate}
@@ -502,8 +823,351 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         </div>
       </div>
 
-      {/* 2. Messages Scroll Area */}
+      {/* 2. Main Content Split: Sidebar + Chat Column */}
       <div
+        style={{
+          display: "flex",
+          flex: 1,
+          height: "calc(100% - 57px)",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        {/* ── Collapsible Left Glass Sidebar ── */}
+        {sidebarOpen && (
+          <aside
+            style={{
+              width: "270px",
+              minWidth: "270px",
+              maxWidth: "270px",
+              height: "100%",
+              backgroundColor: "rgba(8, 14, 28, 0.75)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              borderRight: "1px solid rgba(255, 255, 255, 0.08)",
+              display: "flex",
+              flexDirection: "column",
+              padding: "14px 12px",
+              gap: "12px",
+              overflow: "hidden",
+              zIndex: 8,
+              flexShrink: 0,
+            }}
+          >
+            {/* Top: "+ Yangi suhbat" button */}
+            <button
+              onClick={handleNewChat}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: "12px",
+                background: "linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(99, 102, 241, 0.35))",
+                border: "1px solid rgba(56, 189, 248, 0.4)",
+                boxShadow: "0 4px 16px rgba(2, 132, 199, 0.2)",
+                color: "#FFFFFF",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.7)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+              }}
+            >
+              <PlusIcon size={16} />
+              <span>+ Yangi suhbat</span>
+            </button>
+
+            {/* Sub-Navigation Tabs: "Suhbatlar" vs "Barcha suratlar" */}
+            <div
+              style={{
+                display: "flex",
+                gap: "4px",
+                padding: "3px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+            >
+              <button
+                onClick={() => setSidebarTab("chats")}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "6px 8px",
+                  borderRadius: "8px",
+                  backgroundColor: sidebarTab === "chats" ? "rgba(56, 189, 248, 0.18)" : "transparent",
+                  border: sidebarTab === "chats" ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid transparent",
+                  color: sidebarTab === "chats" ? "#38BDF8" : "#94A3B8",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <ChatIcon size={13} />
+                <span>Suhbatlar</span>
+                <span style={{ fontSize: "10px", opacity: 0.75 }}>({sessions.length})</span>
+              </button>
+
+              <button
+                onClick={() => setSidebarTab("images")}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "6px 8px",
+                  borderRadius: "8px",
+                  backgroundColor: sidebarTab === "images" ? "rgba(236, 72, 153, 0.18)" : "transparent",
+                  border: sidebarTab === "images" ? "1px solid rgba(236, 72, 153, 0.35)" : "1px solid transparent",
+                  color: sidebarTab === "images" ? "#F472B6" : "#94A3B8",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <ImageIcon size={13} />
+                <span>Suratlar</span>
+                <span style={{ fontSize: "10px", opacity: 0.75 }}>({allGalleryImages.length})</span>
+              </button>
+            </div>
+
+            {/* Tab Body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                paddingRight: "2px",
+              }}
+            >
+              {sidebarTab === "chats" ? (
+                sessions.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "30px 10px", color: "#64748B", fontSize: "12px" }}>
+                    Suhbatlar arxivi bo'sh
+                  </div>
+                ) : (
+                  sessions.map((sess) => {
+                    const isActive = sess.id === activeSessionId;
+                    return (
+                      <div
+                        key={sess.id}
+                        onClick={() => handleSelectSession(sess.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "9px 12px",
+                          borderRadius: "10px",
+                          backgroundColor: isActive ? "rgba(56, 189, 248, 0.12)" : "rgba(255, 255, 255, 0.02)",
+                          border: isActive ? "1px solid rgba(56, 189, 248, 0.3)" : "1px solid rgba(255, 255, 255, 0.04)",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          gap: "8px",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.02)";
+                        }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0, flex: 1 }}>
+                          <span
+                            style={{
+                              fontSize: "12.5px",
+                              fontWeight: isActive ? 600 : 500,
+                              color: isActive ? "#FFFFFF" : "#CBD5E1",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {sess.title || "Yangi suhbat"}
+                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "10.5px", color: "#64748B" }}>
+                              {new Date(sess.updatedAt || sess.createdAt).toLocaleDateString("uz-UZ", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span style={{ fontSize: "10px", color: "#475569" }}>•</span>
+                            <span style={{ fontSize: "10.5px", color: "#64748B" }}>
+                              {sess.messages?.length || 0} xabar
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => handleDeleteSession(sess.id, e)}
+                          title="Suhbatni o'chirish"
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "#64748B",
+                            cursor: "pointer",
+                            padding: "4px",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: isActive ? 0.8 : 0.4,
+                            transition: "all 0.15s ease",
+                            flexShrink: 0,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#EF4444";
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+                            e.currentTarget.style.opacity = "1";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#64748B";
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.opacity = isActive ? "0.8" : "0.4";
+                          }}
+                        >
+                          <TrashIcon size={12} />
+                        </button>
+                      </div>
+                    );
+                  })
+                )
+              ) : (
+                /* Barcha suratlar Gallery */
+                allGalleryImages.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "40px 14px",
+                      color: "#94A3B8",
+                      fontSize: "12px",
+                      lineHeight: 1.6,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "12px",
+                        backgroundColor: "rgba(236, 72, 153, 0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#F472B6",
+                      }}
+                    >
+                      <ImageIcon size={22} />
+                    </div>
+                    <span>Hozircha suratlar yo'q.</span>
+                    <span style={{ fontSize: "11px", color: "#64748B" }}>
+                      Mikasaga "Toshkent shahri surati" yoki rasm chizish haqida buyruq bering.
+                    </span>
+                    <button
+                      onClick={() => handleSendMessage("Menga zamonaviy Toshkent shahri haqida chiroyli tasvir tavsifini yozib ber")}
+                      style={{
+                        marginTop: "6px",
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(236, 72, 153, 0.15)",
+                        border: "1px solid rgba(236, 72, 153, 0.3)",
+                        color: "#F472B6",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Rasm so'rash
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: "8px",
+                    }}
+                  >
+                    {allGalleryImages.map((img) => (
+                      <div
+                        key={img.id}
+                        onClick={() => setPreviewImage(img)}
+                        title={img.prompt}
+                        style={{
+                          position: "relative",
+                          aspectRatio: "1/1",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          cursor: "pointer",
+                          backgroundColor: "rgba(0, 0, 0, 0.4)",
+                          transition: "transform 0.15s ease, border-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.03)";
+                          e.currentTarget.style.borderColor = "rgba(236, 72, 153, 0.6)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                        }}
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.prompt || "Surat"}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* ── Main Chat Column ── */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            overflow: "hidden",
+            minWidth: 0,
+          }}
+        >
+          {/* 2. Messages Scroll Area */}
+          <div
         style={{
           flex: 1,
           overflowY: "auto",
@@ -1201,5 +1865,127 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         </div>
       </div>
     </div>
+  </div>
+
+  {/* 3. Image Lightbox Preview Modal */}
+  {previewImage && (
+    <div
+      onClick={() => setPreviewImage(null)}
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.85)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "92vw",
+          maxHeight: "90vh",
+          backgroundColor: "rgba(10, 16, 32, 0.95)",
+          borderRadius: "18px",
+          border: "1px solid rgba(255, 255, 255, 0.15)",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.15)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 20px",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          }}
+        >
+          <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#FFFFFF" }}>
+            {previewImage.prompt || "Tasvir"}
+          </span>
+          <button
+            onClick={() => setPreviewImage(null)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#94A3B8",
+              cursor: "pointer",
+              fontSize: "18px",
+              lineHeight: 1,
+              padding: "4px 8px",
+              borderRadius: "6px",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#FFFFFF")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#94A3B8")}
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            maxHeight: "68vh",
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={previewImage.url}
+            alt={previewImage.prompt}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "65vh",
+              objectFit: "contain",
+              borderRadius: "10px",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 20px",
+            borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+            gap: "12px",
+          }}
+        >
+          <span style={{ fontSize: "11px", color: "#64748B" }}>
+            {previewImage.timestamp}
+          </span>
+          <a
+            href={previewImage.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            download="mikasa-image.png"
+            style={{
+              padding: "7px 16px",
+              borderRadius: "8px",
+              backgroundColor: "rgba(56, 189, 248, 0.2)",
+              border: "1px solid rgba(56, 189, 248, 0.4)",
+              color: "#38BDF8",
+              fontSize: "12px",
+              fontWeight: 600,
+              textDecoration: "none",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Yuklab olish
+          </a>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
   );
 };

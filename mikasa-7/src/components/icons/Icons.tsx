@@ -512,3 +512,18 @@ export const GithubIcon: React.FC<{ size?: number; color?: string; className?: s
     />
   </svg>
 );
+
+export const PlusIcon: React.FC<IconProps> = ({ size = 16, color = "currentColor", className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+export const ImageIcon: React.FC<IconProps> = ({ size = 16, color = "currentColor", className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);

@@ -264,6 +264,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Orbit rotation & hover state
   const [isOrbitPaused, setIsOrbitPaused] = useState(false);
   const [hoveredIcon, setHoveredIcon] = useState<OrbitIconItem | null>(null);
+  const [hoveredCoords, setHoveredCoords] = useState<{ x: number; y: number } | null>(null);
 
   // Motivational Quote
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
@@ -273,6 +274,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const centerContainerRef = useRef<HTMLDivElement>(null);
 
   // Update clock every second
   useEffect(() => {
@@ -393,7 +395,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     });
 
-    const metricsInterval = setInterval(fetchMetrics, 2500);
+    const metricsInterval = setInterval(fetchMetrics, 2000);
     const tasksInterval = setInterval(fetchTasks, 10000);
 
     return () => {
@@ -739,6 +741,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Orb + Interactive Orbital Ring Container */}
           <div
+            ref={centerContainerRef}
             style={{
               position: "relative",
               width: "360px",
@@ -794,13 +797,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       top: `calc(50% + ${y}px - 21px)`,
                       pointerEvents: "auto",
                     }}
-                    onMouseEnter={() => {
+                    onMouseEnter={(e) => {
                       setIsOrbitPaused(true);
                       setHoveredIcon(item);
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const parent = centerContainerRef.current?.getBoundingClientRect();
+                      if (parent) {
+                        setHoveredCoords({
+                          x: rect.left - parent.left + rect.width / 2,
+                          y: rect.top - parent.top,
+                        });
+                      }
                     }}
                     onMouseLeave={() => {
                       setIsOrbitPaused(false);
                       setHoveredIcon(null);
+                      setHoveredCoords(null);
                     }}
                   >
                     {/* Counter-rotating icon wrapper so icon remains upright */}
@@ -810,6 +822,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        position: "relative",
                         animation: "orbit-counter-rotate 32s linear infinite",
                         animationPlayState: isOrbitPaused ? "paused" : "running",
                       }}
@@ -827,52 +840,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           height: "42px",
                           borderRadius: "50%",
                           backgroundColor: isHovered ? "rgba(18, 28, 52, 0.95)" : "rgba(12, 18, 36, 0.72)",
-                          border: isHovered ? `1.5px solid ${item.color}` : "1px solid rgba(255, 255, 255, 0.14)",
-                          boxShadow: isHovered ? `0 0 20px ${item.color}88, inset 0 0 10px ${item.color}44` : `0 4px 14px rgba(0, 0, 0, 0.4)`,
+                          border: isHovered ? `2px solid ${item.color}` : "1px solid rgba(255, 255, 255, 0.14)",
+                          boxShadow: isHovered ? `0 0 24px ${item.color}aa, inset 0 0 12px ${item.color}55` : `0 4px 14px rgba(0, 0, 0, 0.4)`,
                           color: isHovered ? "#FFFFFF" : item.color,
                           cursor: "pointer",
-                          transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, border-color 0.2s, box-shadow 0.2s",
-                          transform: isHovered ? "scale(1.2)" : "scale(1)",
+                          transition: "transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, border-color 0.2s, box-shadow 0.2s",
+                          transform: isHovered ? "scale(1.25)" : "scale(1)",
                         }}
                       >
                         {item.icon}
                       </button>
                     </div>
-
-                    {/* Hover tooltip popup with title & random command prompt */}
-                    {isHovered && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "52px",
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          zIndex: 60,
-                          minWidth: "220px",
-                          maxWidth: "280px",
-                          padding: "8px 12px",
-                          borderRadius: "12px",
-                          backgroundColor: "rgba(10, 16, 32, 0.92)",
-                          backdropFilter: "blur(20px)",
-                          WebkitBackdropFilter: "blur(20px)",
-                          border: `1px solid ${item.color}88`,
-                          boxShadow: `0 12px 28px rgba(0, 0, 0, 0.6), 0 0 16px ${item.color}33`,
-                          pointerEvents: "none",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: item.color, marginBottom: "3px" }}>
-                          {item.title}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#E2E8F0", lineHeight: 1.4 }}>
-                          "{item.prompt}"
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
+
+            {/* ── Hover Tooltip Popup (Rendered in static coordinates — 100% upright, with smooth hover scale) ── */}
+            {hoveredIcon && hoveredCoords && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${hoveredCoords.x}px`,
+                  top: `${hoveredCoords.y - 12}px`,
+                  transform: "translate(-50%, -100%) scale(1.08)",
+                  zIndex: 9999,
+                  minWidth: "230px",
+                  maxWidth: "300px",
+                  padding: "10px 15px",
+                  borderRadius: "14px",
+                  backgroundColor: "rgba(10, 16, 32, 0.96)",
+                  backdropFilter: "blur(24px)",
+                  WebkitBackdropFilter: "blur(24px)",
+                  border: `1.5px solid ${hoveredIcon.color}`,
+                  boxShadow: `0 16px 40px rgba(0, 0, 0, 0.8), 0 0 24px ${hoveredIcon.color}55`,
+                  pointerEvents: "none",
+                  textAlign: "center",
+                  whiteSpace: "normal",
+                  transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease",
+                }}
+              >
+                <div style={{ fontSize: "12.5px", fontWeight: 700, color: hoveredIcon.color, marginBottom: "4px" }}>
+                  {hoveredIcon.title}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#E2E8F0", lineHeight: 1.45 }}>
+                  "{hoveredIcon.prompt}"
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mic error message */}
@@ -1226,33 +1241,43 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             transition: "all 0.25s ease",
           }}
         >
-          {/* Audio Waveform icon button (Image 4) */}
+          {/* File Upload Button on the left (replacing mic) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: "none" }}
+            onChange={handleFileAttach}
+          />
           <button
             type="button"
-            onClick={handleVoiceToggle}
-            title={orbState === "listening" ? "Mikrofonni to'xtatish" : "Ovozli muloqot"}
+            onClick={() => fileInputRef.current?.click()}
+            title="Fayl yoki rasm yuklash"
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "2px",
-              height: "22px",
-              padding: "0 4px",
+              justifyContent: "center",
+              width: "30px",
+              height: "30px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "#38BDF8",
               cursor: "pointer",
-              color: orbState === "listening" ? "#F43F5E" : "#38BDF8",
+              transition: "all 0.18s ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(56, 189, 248, 0.22)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.5)";
+              e.currentTarget.style.transform = "scale(1.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            {[10, 18, 14, 20, 12].map((h, i) => (
-              <span
-                key={i}
-                style={{
-                  width: "2.5px",
-                  height: `${h}px`,
-                  borderRadius: "2px",
-                  backgroundColor: "currentColor",
-                  animation: orbState === "listening" ? `wave-bounce ${0.4 + i * 0.1}s ease-in-out infinite alternate` : "none",
-                }}
-              />
-            ))}
+            <AttachIcon size={16} color="currentColor" />
           </button>
 
           {/* Text Input */}
@@ -1273,29 +1298,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               padding: "4px 2px",
             }}
           />
-
-          {/* Attachment Paperclip Icon (Image 4) */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            style={{ display: "none" }}
-            onChange={handleFileAttach}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            title="Fayl biriktirish"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: "28px", height: "28px", borderRadius: "50%",
-              backgroundColor: "transparent", color: "#64748B", cursor: "pointer",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#CBD5E1"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#64748B"; }}
-          >
-            <AttachIcon size={16} color="currentColor" />
-          </button>
 
           {/* Circular Purple Send Button (Image 4) */}
           <button

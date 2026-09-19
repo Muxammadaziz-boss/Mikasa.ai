@@ -21,9 +21,9 @@
   "gui": {
     "theme": "oled",
     "color_scheme": "green",
-    "compact_mode": false,
+    "compact_mode": true,
     "window_size": "1100x800",
-    "compact_window_size": "960x700",
+    "compact_window_size": "1056x700+26+26",
     "font_family": "Segoe UI",
     "font_size": 12,
     "color": "green",
@@ -52,7 +52,7 @@
   },
   "user": {
     "name": "E2E Sinov Foydalanuvchisi",
-    "voice_type": "erkak",
+    "voice_type": "ayol",
     "avatar": "emerald",
     "role": "Dasturchi / Muhandis",
     "bio": "Mikasa AI shaxsiy sun'iy intellekt yordamchisi",
@@ -67,7 +67,7 @@
   "ai": {
     "model": "gemini",
     "timeout": 15,
-    "mode": "balanced",
+    "mode": "creative",
     "thinking_enabled": true
   },
   "notifications": {

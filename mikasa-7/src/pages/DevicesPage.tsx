@@ -295,22 +295,83 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
     switch (status.toLowerCase()) {
       case "online":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "3px 10px",
+              borderRadius: "20px",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              backgroundColor: "rgba(16, 185, 129, 0.15)",
+              color: "#34D399",
+              border: "1px solid rgba(16, 185, 129, 0.35)",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: "#34D399",
+                boxShadow: "0 0 8px #34D399",
+              }}
+            />
             Onlayn
           </span>
         );
       case "standby":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950/80 text-amber-400 border border-amber-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "3px 10px",
+              borderRadius: "20px",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              backgroundColor: "rgba(245, 158, 11, 0.15)",
+              color: "#FBBF24",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: "#FBBF24",
+              }}
+            />
             Kutish rejimi
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-900 text-neutral-400 border border-neutral-800">
-            <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "3px 10px",
+              borderRadius: "20px",
+              fontSize: "11.5px",
+              fontWeight: 500,
+              backgroundColor: "rgba(148, 163, 184, 0.12)",
+              color: "#94A3B8",
+              border: "1px solid rgba(148, 163, 184, 0.25)",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: "#64748B",
+              }}
+            />
             Oflayn
           </span>
         );
@@ -331,48 +392,144 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
   const selectedDevice = devices.find((d) => d.device_id === selectedDeviceId || d.id === selectedDeviceId);
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 shadow-lg shadow-emerald-950/40">
-              <LaptopIcon size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-neutral-100 tracking-tight">
-                Qurilmalar Boshqaruvi
-              </h1>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Multi-User Identity → Account → Multi-Device arxitekturasi
-              </p>
-            </div>
+    <div
+      style={{
+        flex: 1,
+        overflowY: "auto",
+        padding: "24px 32px",
+        width: "100%",
+        maxWidth: "1200px",
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: "24px",
+      }}
+    >
+      {/* ── 1. Header Toolbar ── */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          paddingBottom: "20px",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div
+            style={{
+              padding: "10px",
+              borderRadius: "14px",
+              backgroundColor: "rgba(56, 189, 248, 0.15)",
+              border: "1px solid rgba(56, 189, 248, 0.35)",
+              color: "#38BDF8",
+              boxShadow: "0 0 20px rgba(56, 189, 248, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <LaptopIcon size={24} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
+              Qurilmalar Boshqaruvi
+            </h1>
+            <p style={{ fontSize: "12px", color: "#94A3B8", margin: "3px 0 0 0" }}>
+              Universal hisob va kompyuterlarni masofaviy sinxronlash (Multi-Device)
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {onNavigateHome && (
             <button
               type="button"
               onClick={onNavigateHome}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-medium border border-neutral-700/60 transition-colors cursor-pointer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 14px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                color: "#CBD5E1",
+                fontSize: "12px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.color = "#FFFFFF";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+                e.currentTarget.style.color = "#CBD5E1";
+              }}
             >
               <span>← Bosh sahifa</span>
             </button>
           )}
+
           <button
             type="button"
             onClick={handleOpenPairingModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/50 border border-emerald-500/30 transition-all cursor-pointer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(99, 102, 241, 0.4))",
+              border: "1px solid rgba(56, 189, 248, 0.45)",
+              color: "#FFFFFF",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 4px 16px rgba(2, 132, 199, 0.25)",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.75)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.45)";
+            }}
           >
-            <span className="text-sm font-bold leading-none">+</span>
+            <span style={{ fontSize: "15px", fontWeight: "bold" }}>+</span>
             <span>Kompyuter qo'shish</span>
           </button>
+
           <button
             type="button"
             onClick={loadDevices}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-200 text-xs font-medium border border-neutral-700/60 transition-colors cursor-pointer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 14px",
+              borderRadius: "10px",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              color: "#CBD5E1",
+              fontSize: "12px",
+              fontWeight: 500,
+              cursor: loading ? "default" : "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+            }}
           >
             <RefreshIcon size={14} className={loading ? "animate-spin" : ""} />
             <span>Yangilash</span>
@@ -380,119 +537,245 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
         </div>
       </div>
 
-      {/* Notifications */}
+      {/* ── 2. Notifications ── */}
       {message && (
         <div
-          className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-between animate-in fade-in duration-150 ${
-            message.type === "success"
-              ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-300"
-              : "bg-red-950/40 border-red-800/80 text-red-300"
-          }`}
+          style={{
+            padding: "12px 18px",
+            borderRadius: "12px",
+            fontSize: "12.5px",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor:
+              message.type === "success" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+            border:
+              message.type === "success"
+                ? "1px solid rgba(16, 185, 129, 0.35)"
+                : "1px solid rgba(239, 68, 68, 0.35)",
+            color: message.type === "success" ? "#34D399" : "#F87171",
+          }}
         >
           <span>{message.text}</span>
           <button
             type="button"
             onClick={() => setMessage(null)}
-            className="text-neutral-400 hover:text-neutral-200 ml-4 cursor-pointer"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              fontSize: "16px",
+              lineHeight: 1,
+            }}
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 backdrop-blur-sm">
-          <div className="text-xs text-neutral-400 font-medium">Jami Kompyuterlar</div>
-          <div className="text-2xl font-bold text-neutral-100 mt-1">{devices.length}</div>
-          <div className="text-[11px] text-neutral-500 mt-1">Sizning hisobingizga ulangan</div>
+      {/* ── 3. Summary KPI Cards ── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            padding: "18px 22px",
+            borderRadius: "16px",
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
+          }}
+        >
+          <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 500 }}>Jami Kompyuterlar</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, color: "#FFFFFF", marginTop: "4px" }}>
+            {devices.length}
+          </div>
+          <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}>
+            Sizning hisobingizga ulangan
+          </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 backdrop-blur-sm">
-          <div className="text-xs text-neutral-400 font-medium">Onlayn Holatda</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">{onlineCount}</div>
-          <div className="text-[11px] text-neutral-500 mt-1">Aloqaga tayyor kompyuterlar</div>
+        <div
+          style={{
+            padding: "18px 22px",
+            borderRadius: "16px",
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
+          }}
+        >
+          <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 500 }}>Onlayn Holatda</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, color: "#34D399", marginTop: "4px" }}>
+            {onlineCount}
+          </div>
+          <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}>
+            Aloqaga tayyor kompyuterlar
+          </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 backdrop-blur-sm">
-          <div className="text-xs text-neutral-400 font-medium">Faol Tanlangan Kompyuter</div>
-          <div className="text-lg font-bold text-neutral-100 mt-1 truncate">
+        <div
+          style={{
+            padding: "18px 22px",
+            borderRadius: "16px",
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
+          }}
+        >
+          <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 500 }}>Faol Tanlangan Kompyuter</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#38BDF8", marginTop: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {selectedDevice ? selectedDevice.name : "Tanlanmagan"}
           </div>
-          <div className="text-[11px] text-neutral-500 mt-1 truncate">
+          <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {selectedDevice ? `ID: ${selectedDevice.device_id}` : "Buyruqlar uchun birorta kompyuter tanlang"}
           </div>
         </div>
       </div>
 
-      {/* Device List */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-neutral-200 uppercase tracking-wider">
+      {/* ── 4. Device List ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <h2 style={{ fontSize: "13px", fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.5px", margin: 0 }}>
           Kompyuterlar Ro'yxati ({devices.length})
         </h2>
 
         {loading && devices.length === 0 ? (
-          <div className="p-12 text-center text-neutral-500 text-sm">
+          <div style={{ padding: "48px", textAlign: "center", color: "#64748B", fontSize: "13px" }}>
             Kompyuterlar yuklanmoqda...
           </div>
         ) : devices.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl bg-neutral-900/40 border border-neutral-800/80 space-y-3">
-            <LaptopIcon size={36} className="mx-auto text-neutral-600" />
-            <h3 className="text-base font-medium text-neutral-300">Kompyuterlar topilmadi</h3>
-            <p className="text-xs text-neutral-500 max-w-md mx-auto">
+          <div
+            style={{
+              padding: "48px 24px",
+              textAlign: "center",
+              borderRadius: "18px",
+              backgroundColor: "rgba(15, 23, 42, 0.5)",
+              border: "1px dashed rgba(255, 255, 255, 0.12)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <div style={{ color: "#475569" }}>
+              <LaptopIcon size={42} />
+            </div>
+            <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#E2E8F0", margin: 0 }}>
+              Kompyuterlar topilmadi
+            </h3>
+            <p style={{ fontSize: "12.5px", color: "#94A3B8", maxWidth: "420px", margin: 0, lineHeight: 1.5 }}>
               Hisobingizga birorta ham kompyuter ulanmagan. Mikasa Desktop agenti orqali kompyuteringizni juftlang.
             </p>
             <button
               type="button"
               onClick={handleOpenPairingModal}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/50 border border-emerald-500/30 transition-all cursor-pointer mt-2"
+              style={{
+                marginTop: "8px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 18px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(99, 102, 241, 0.4))",
+                border: "1px solid rgba(56, 189, 248, 0.45)",
+                color: "#FFFFFF",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
             >
-              <span className="text-sm font-bold leading-none">+</span>
-              <span>Yangi Kompyuter Ulash</span>
+              <span>+ Yangi Kompyuter Ulash</span>
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+              gap: "16px",
+            }}
+          >
             {devices.map((dev) => {
               const isSelected = dev.device_id === selectedDeviceId || dev.id === selectedDeviceId;
               return (
                 <div
                   key={dev.id}
-                  className={`p-5 rounded-2xl border transition-all duration-200 backdrop-blur-sm relative flex flex-col justify-between ${
-                    isSelected
-                      ? "bg-neutral-900/90 border-emerald-500/50 shadow-xl shadow-emerald-950/20 ring-1 ring-emerald-500/20"
-                      : "bg-neutral-900/50 border-neutral-800/80 hover:border-neutral-700/80"
-                  }`}
+                  style={{
+                    padding: "20px",
+                    borderRadius: "16px",
+                    backgroundColor: isSelected ? "rgba(15, 23, 42, 0.85)" : "rgba(15, 23, 42, 0.55)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    border: isSelected ? "1px solid rgba(56, 189, 248, 0.5)" : "1px solid rgba(255, 255, 255, 0.08)",
+                    boxShadow: isSelected ? "0 12px 36px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.2)" : "0 8px 32px rgba(0, 0, 0, 0.35)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "16px",
+                    transition: "all 0.2s ease",
+                  }}
                 >
                   <div>
                     {/* Top Row: Title, Status, and Active Badge */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-neutral-100 truncate">
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {dev.name}
                           </h3>
                           {isSelected && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "2px 8px",
+                                borderRadius: "6px",
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                backgroundColor: "rgba(56, 189, 248, 0.2)",
+                                color: "#38BDF8",
+                                border: "1px solid rgba(56, 189, 248, 0.35)",
+                              }}
+                            >
                               <CheckIcon size={10} />
                               Faol
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-neutral-500 font-mono truncate">
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                          <span style={{ fontSize: "11px", color: "#64748B", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>
                             {dev.device_id}
                           </span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(dev.device_id)}
-                            className="text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
-                            title="Nusxa olish"
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#64748B",
+                              cursor: "pointer",
+                              padding: "2px",
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                            title="ID nusxalash"
                           >
                             <CopyIcon size={12} />
                           </button>
                           {copiedId === dev.device_id && (
-                            <span className="text-[10px] text-emerald-400">Nusxa olindi!</span>
+                            <span style={{ fontSize: "10px", color: "#34D399" }}>Nusxa olindi!</span>
                           )}
                         </div>
                       </div>
@@ -500,30 +783,40 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                       <div>{getStatusBadge(dev.status)}</div>
                     </div>
 
-                    {/* Metadata Specs */}
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-neutral-800/60 text-xs">
+                    {/* Metadata Specs Grid */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, 1fr)",
+                        gap: "10px",
+                        marginTop: "16px",
+                        paddingTop: "14px",
+                        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                        fontSize: "12px",
+                      }}
+                    >
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase">Xost nomi</span>
-                        <span className="text-neutral-300 font-medium truncate block">
+                        <span style={{ color: "#64748B", display: "block", fontSize: "10px", textTransform: "uppercase", fontWeight: 600 }}>Xost nomi</span>
+                        <span style={{ color: "#CBD5E1", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                           {dev.hostname || "Aniqlanmagan"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase">Platforma</span>
-                        <span className="text-neutral-300 font-medium capitalize block">
+                        <span style={{ color: "#64748B", display: "block", fontSize: "10px", textTransform: "uppercase", fontWeight: 600 }}>Platforma</span>
+                        <span style={{ color: "#CBD5E1", fontWeight: 500, textTransform: "capitalize", display: "block" }}>
                           {dev.platform || "Windows"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase">Agent Versiyasi</span>
-                        <span className="text-neutral-300 font-mono block">
+                        <span style={{ color: "#64748B", display: "block", fontSize: "10px", textTransform: "uppercase", fontWeight: 600 }}>Agent Versiyasi</span>
+                        <span style={{ color: "#93C5FD", fontFamily: "monospace", display: "block" }}>
                           v{dev.agent_version || "8.0.0"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase">Oxirgi faollik</span>
-                        <span className="text-neutral-300 flex items-center gap-1">
-                          <ClockIcon size={11} className="text-neutral-500" />
+                        <span style={{ color: "#64748B", display: "block", fontSize: "10px", textTransform: "uppercase", fontWeight: 600 }}>Oxirgi faollik</span>
+                        <span style={{ color: "#CBD5E1", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <ClockIcon size={11} color="#64748B" />
                           {formatTimestamp(dev.last_seen_at || dev.last_heartbeat_at)}
                         </span>
                       </div>
@@ -531,28 +824,76 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                   </div>
 
                   {/* Actions Footer */}
-                  <div className="flex items-center justify-between gap-2 mt-5 pt-3 border-t border-neutral-800/60">
-                    <div className="flex items-center gap-1.5">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "10px",
+                      marginTop: "14px",
+                      paddingTop: "14px",
+                      borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <button
                         type="button"
                         onClick={() => openRenameModal(dev)}
-                        className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium border border-neutral-700/60 transition-colors cursor-pointer"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          backgroundColor: "rgba(255, 255, 255, 0.05)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          color: "#CBD5E1",
+                          fontSize: "11.5px",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)")}
                       >
                         Nomlash
                       </button>
                       <button
                         type="button"
                         onClick={() => openRevokeModal(dev)}
-                        className="p-1.5 rounded-lg bg-neutral-800/40 hover:bg-red-950/50 text-neutral-400 hover:text-red-400 border border-neutral-700/40 hover:border-red-800/60 transition-colors cursor-pointer"
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "8px",
+                          backgroundColor: "rgba(239, 68, 68, 0.08)",
+                          border: "1px solid rgba(239, 68, 68, 0.25)",
+                          color: "#F87171",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.08)")}
                         title="Kompyuterni bekor qilish / o'chirish"
                       >
-                        <TrashIcon size={14} />
+                        <TrashIcon size={13} />
                       </button>
                     </div>
 
                     <div>
                       {isSelected ? (
-                        <span className="text-xs text-emerald-400 font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/40">
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            color: "#34D399",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "6px 14px",
+                            borderRadius: "8px",
+                            backgroundColor: "rgba(16, 185, 129, 0.12)",
+                            border: "1px solid rgba(16, 185, 129, 0.3)",
+                          }}
+                        >
                           <CheckIcon size={12} />
                           Tanlangan
                         </span>
@@ -560,7 +901,25 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                         <button
                           type="button"
                           onClick={() => handleSelectDevice(dev)}
-                          className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-950 transition-all cursor-pointer"
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: "8px",
+                            background: "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(99, 102, 241, 0.4))",
+                            border: "1px solid rgba(56, 189, 248, 0.4)",
+                            color: "#FFFFFF",
+                            fontSize: "11.5px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.7)";
+                            e.currentTarget.style.transform = "translateY(-1px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}
                         >
                           Faol Tanlash
                         </button>
@@ -574,21 +933,47 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
         )}
       </div>
 
-      {/* Rename Modal */}
+      {/* ── 5. Rename Modal ── */}
       {renameModalOpen && deviceToRename && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "rgba(11, 17, 33, 0.96)",
+              border: "1px solid rgba(56, 189, 248, 0.25)",
+              borderRadius: "18px",
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8)",
+              padding: "24px",
+              maxWidth: "460px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
             <div>
-              <h3 className="text-base font-semibold text-neutral-100">
+              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
                 Kompyuter nomini o'zgartirish
               </h3>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p style={{ fontSize: "12px", color: "#94A3B8", margin: "4px 0 0 0" }}>
                 Ushbu kompyuterni oson ajratib olish uchun qulay nom bering (masalan: "Gaming PC", "Ofis Noutbuk").
               </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-neutral-300 block">
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "#CBD5E1" }}>
                 Do'stona nom
               </label>
               <input
@@ -597,19 +982,36 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Kompyuter nomini kiriting"
                 maxLength={64}
-                className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 autoFocus
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  outline: "none",
+                }}
               />
               {renameError && (
-                <p className="text-xs text-red-400">{renameError}</p>
+                <p style={{ fontSize: "12px", color: "#F87171", margin: 0 }}>{renameError}</p>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", paddingTop: "8px" }}>
               <button
                 type="button"
                 onClick={() => setRenameModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  backgroundColor: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#CBD5E1",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
               >
                 Bekor qilish
               </button>
@@ -617,7 +1019,16 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                 type="button"
                 onClick={submitRename}
                 disabled={renameSubmitting}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium shadow-md shadow-emerald-950 transition-colors cursor-pointer"
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "10px",
+                  backgroundColor: "#0284C7",
+                  border: "1px solid rgba(56, 189, 248, 0.5)",
+                  color: "#FFFFFF",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
                 {renameSubmitting ? "Saqlanmoqda..." : "Saqlash"}
               </button>
@@ -626,38 +1037,94 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
         </div>
       )}
 
-      {/* Revoke Modal */}
+      {/* ── 6. Revoke Modal ── */}
       {revokeModalOpen && deviceToRevoke && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-red-950/60 border border-red-800/60 text-red-400 flex-shrink-0">
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "rgba(11, 17, 33, 0.96)",
+              border: "1px solid rgba(239, 68, 68, 0.35)",
+              borderRadius: "18px",
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8)",
+              padding: "24px",
+              maxWidth: "460px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <div
+                style={{
+                  padding: "8px",
+                  borderRadius: "12px",
+                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  color: "#EF4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
                 <AlertTriangleIcon size={20} />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-neutral-100">
+                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
                   Kompyuterni o'chirishni tasdiqlang
                 </h3>
-                <p className="text-xs text-neutral-400 mt-1">
-                  Haqiqatan ham <strong className="text-neutral-200">'{deviceToRevoke.name}'</strong> kompyuterini hisobingizdan o'chirmoqchimisiz?
+                <p style={{ fontSize: "12px", color: "#94A3B8", margin: "4px 0 0 0" }}>
+                  Haqiqatan ham <strong style={{ color: "#FFFFFF" }}>'{deviceToRevoke.name}'</strong> kompyuterini hisobingizdan o'chirmoqchimisiz?
                 </p>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 text-xs text-neutral-400 space-y-1">
-              <p className="font-semibold text-neutral-300">Xavfsizlik oqibatlari:</p>
-              <ul className="list-disc pl-4 space-y-0.5 text-neutral-400">
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: "12px",
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                fontSize: "11.5px",
+                color: "#94A3B8",
+                lineHeight: 1.6,
+              }}
+            >
+              <p style={{ fontWeight: 600, color: "#CBD5E1", margin: "0 0 4px 0" }}>Xavfsizlik oqibatlari:</p>
+              <ul style={{ margin: 0, paddingLeft: "18px" }}>
                 <li>Ushbu kompyuterdagi barcha faol masofaviy sessiyalar darhol to'xtatiladi.</li>
                 <li>Foydalanuvchi ruxsatlari profili bekor qilinadi.</li>
                 <li>Kompyuter qayta ulangunga qadar unga buyruq yuborib bo'lmaydi.</li>
               </ul>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", paddingTop: "8px" }}>
               <button
                 type="button"
                 onClick={() => setRevokeModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  backgroundColor: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#CBD5E1",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
               >
                 Bekor qilish
               </button>
@@ -665,7 +1132,16 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                 type="button"
                 onClick={submitRevoke}
                 disabled={revokeSubmitting}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md shadow-red-950 transition-colors cursor-pointer"
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "10px",
+                  backgroundColor: "#DC2626",
+                  border: "1px solid rgba(239, 68, 68, 0.5)",
+                  color: "#FFFFFF",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
                 {revokeSubmitting ? "O'chirilmoqda..." : "Ha, o'chirilsin"}
               </button>
@@ -674,44 +1150,104 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
         </div>
       )}
 
-      {/* Phase 42: 3-Step Device Pairing Modal */}
+      {/* ── 7. Phase 42: 3-Step Device Pairing Modal ── */}
       {pairingModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-neutral-900 border border-emerald-500/30 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl shadow-emerald-950/30 relative overflow-hidden">
-            {/* Cyberpunk top accent glow */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-emerald-500 to-teal-400" />
-
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "rgba(10, 16, 32, 0.96)",
+              border: "1px solid rgba(56, 189, 248, 0.35)",
+              borderRadius: "20px",
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(2, 132, 199, 0.2)",
+              padding: "28px",
+              maxWidth: "520px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400">
-                  <LaptopIcon size={20} />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingBottom: "16px",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    padding: "8px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    color: "#38BDF8",
+                  }}
+                >
+                  <LaptopIcon size={22} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-neutral-100 flex items-center gap-2">
+                  <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
                     Kompyuterni Juftlash & Ulash
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400">
+                    <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", backgroundColor: "rgba(56, 189, 248, 0.15)", color: "#38BDF8", fontFamily: "monospace" }}>
                       Phase 42
                     </span>
                   </h3>
-                  <p className="text-xs text-neutral-400">
+                  <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0 0" }}>
                     Ed25519 kriptografik kalitlar orqali xavfsiz enrollment
                   </p>
                 </div>
               </div>
 
               {/* Step indicator badges */}
-              <div className="flex items-center gap-1.5">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 {[1, 2, 3].map((step) => (
                   <div
                     key={step}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      pairingStep === step
-                        ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/40 scale-110"
-                        : pairingStep > step
-                        ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                        : "bg-neutral-800 text-neutral-500"
-                    }`}
+                    style={{
+                      width: "24px",
+                      height: "24px",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      backgroundColor:
+                        pairingStep === step
+                          ? "#38BDF8"
+                          : pairingStep > step
+                          ? "rgba(16, 185, 129, 0.2)"
+                          : "rgba(255, 255, 255, 0.06)",
+                      color:
+                        pairingStep === step
+                          ? "#0B0F19"
+                          : pairingStep > step
+                          ? "#34D399"
+                          : "#64748B",
+                      border:
+                        pairingStep > step
+                          ? "1px solid rgba(16, 185, 129, 0.4)"
+                          : "none",
+                    }}
                   >
                     {pairingStep > step ? "✓" : step}
                   </div>
@@ -719,14 +1255,26 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
               </div>
             </div>
 
-            {/* Error Message if any */}
+            {/* Error Message */}
             {pairingError && (
-              <div className="p-3 rounded-xl bg-red-950/50 border border-red-800/80 text-xs text-red-300 flex items-center justify-between">
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  fontSize: "12px",
+                  color: "#F87171",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <span>{pairingError}</span>
                 <button
                   type="button"
                   onClick={() => setPairingError(null)}
-                  className="text-red-400 hover:text-red-200"
+                  style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer" }}
                 >
                   ✕
                 </button>
@@ -735,63 +1283,113 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
 
             {/* STEP 1: Generate Pairing Code */}
             {pairingStep === 1 && (
-              <div className="space-y-4 text-center py-4">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 mx-auto flex items-center justify-center text-emerald-400">
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "16px", padding: "12px 0" }}>
+                <div
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "18px",
+                    backgroundColor: "rgba(56, 189, 248, 0.12)",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#38BDF8",
+                  }}
+                >
                   <LaptopIcon size={32} />
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-neutral-100">
+                <div>
+                  <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
                     Yangi Windows PC Agentini Ulash
                   </h4>
-                  <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                  <p style={{ fontSize: "12.5px", color: "#94A3B8", maxWidth: "380px", margin: "6px auto 0 auto", lineHeight: 1.5 }}>
                     Kompyuteringizni hisobingizga xavfsiz biriktirish uchun bir martalik 6-xonali juftlash kodi hosil qilinadi.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800/80 text-left text-xs text-neutral-400 space-y-1.5">
-                  <div className="font-semibold text-neutral-300">Xavfsizlik kafolati:</div>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(0, 0, 0, 0.45)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    textAlign: "left",
+                    fontSize: "12px",
+                    color: "#94A3B8",
+                    lineHeight: 1.6,
+                    width: "100%",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "#CBD5E1", marginBottom: "4px" }}>Xavfsizlik kafolati:</div>
                   <div>• Kod 5 daqiqa davomida amal qiladi va faqat bitta kompyuterga ishlatiladi.</div>
                   <div>• Kompyuteringiz Ed25519 kripto kalit yaratadi va uni Windows DPAPI da saqlaydi.</div>
                   <div>• Shaxsiy kalit hech qachon tarmoqqa yoki serverga yuborilmaydi.</div>
                 </div>
 
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={startPairingProcess}
-                    disabled={pairingLoading}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-950 transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {pairingLoading ? (
-                      <>
-                        <RefreshIcon size={16} className="animate-spin" />
-                        <span>Kod generatsiya qilinmoqda...</span>
-                      </>
-                    ) : (
-                      <span>Juftlash Kodini Olish</span>
-                    )}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={startPairingProcess}
+                  disabled={pairingLoading}
+                  style={{
+                    width: "100%",
+                    padding: "11px",
+                    borderRadius: "12px",
+                    background: "linear-gradient(135deg, rgba(2, 132, 199, 0.8), rgba(99, 102, 241, 0.8))",
+                    border: "1px solid rgba(56, 189, 248, 0.5)",
+                    color: "#FFFFFF",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 16px rgba(2, 132, 199, 0.3)",
+                  }}
+                >
+                  {pairingLoading ? (
+                    <>
+                      <RefreshIcon size={16} className="animate-spin" />
+                      <span>Kod generatsiya qilinmoqda...</span>
+                    </>
+                  ) : (
+                    <span>Juftlash Kodini Olish</span>
+                  )}
+                </button>
               </div>
             )}
 
-            {/* STEP 2: Display 6-digit Code & Countdown Timer */}
+            {/* STEP 2: Display 6-digit Code & Countdown */}
             {pairingStep === 2 && (
-              <div className="space-y-5">
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-neutral-400">
+              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ fontSize: "12.5px", color: "#94A3B8", margin: "0 0 14px 0" }}>
                     Windows PC Agentingizda quyidagi 6 xonali kodni kiriting:
                   </p>
 
                   {/* Big 6-digit Display */}
-                  <div className="flex items-center justify-center gap-2 pt-3 pb-1">
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
                     {pairingCode
                       ? pairingCode.split("").map((digit, idx) => (
                           <div
                             key={idx}
-                            className={`w-11 h-14 flex items-center justify-center text-3xl font-extrabold font-mono rounded-xl border bg-neutral-950 border-cyan-500/40 text-cyan-300 shadow-lg shadow-cyan-950/30 ${
-                              idx === 2 ? "mr-3" : ""
-                            }`}
+                            style={{
+                              width: "44px",
+                              height: "56px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "28px",
+                              fontWeight: 800,
+                              fontFamily: "monospace",
+                              borderRadius: "12px",
+                              backgroundColor: "rgba(0, 0, 0, 0.6)",
+                              border: "1.5px solid rgba(56, 189, 248, 0.5)",
+                              color: "#38BDF8",
+                              boxShadow: "0 8px 24px rgba(2, 132, 199, 0.25)",
+                              marginRight: idx === 2 ? "10px" : "0",
+                            }}
                           >
                             {digit}
                           </div>
@@ -800,12 +1398,21 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                   </div>
 
                   {/* Copy & Status Bar */}
-                  <div className="flex items-center justify-center gap-4 pt-1">
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginTop: "14px" }}>
                     {pairingCode && (
                       <button
                         type="button"
                         onClick={() => copyToClipboard(pairingCode)}
-                        className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12px",
+                          color: "#38BDF8",
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
                       >
                         <CopyIcon size={13} />
                         <span>{copiedId === pairingCode ? "Nusxa olindi!" : "Kodni nusxalash"}</span>
@@ -813,7 +1420,21 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                     )}
 
                     {/* Countdown */}
-                    <div className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-neutral-950 border border-neutral-800 text-amber-400">
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        fontFamily: "monospace",
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(245, 158, 11, 0.12)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        color: "#FBBF24",
+                      }}
+                    >
                       <ClockIcon size={13} />
                       <span>
                         {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:
@@ -824,28 +1445,59 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                 </div>
 
                 {/* Instructions card */}
-                <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800/80 text-xs space-y-2">
-                  <div className="text-neutral-300 font-medium">Windows kompyuterda ishga tushiring:</div>
-                  <div className="p-2 rounded bg-neutral-900 border border-neutral-800 font-mono text-xs text-emerald-400 select-all overflow-x-auto">
+                <div
+                  style={{
+                    padding: "14px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(0, 0, 0, 0.45)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    fontSize: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ color: "#CBD5E1", fontWeight: 600 }}>Windows kompyuterda ishga tushiring:</div>
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(0, 0, 0, 0.8)",
+                      border: "1px solid rgba(56, 189, 248, 0.25)",
+                      fontFamily: "monospace",
+                      fontSize: "12px",
+                      color: "#34D399",
+                      overflowX: "auto",
+                      userSelect: "all",
+                    }}
+                  >
                     mikasa-agent --pair {pairingCode || "******"}
                   </div>
-                  <p className="text-[11px] text-neutral-500">
+                  <p style={{ fontSize: "11px", color: "#64748B", margin: 0 }}>
                     Agent ushbu kodni yuboradi, server unga Ed25519 mualliflik sertifikatini biriktiradi.
                   </p>
                 </div>
 
-                {/* Waiting Indicator */}
-                <div className="flex items-center justify-center gap-2 py-1 text-xs text-neutral-400">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                {/* Waiting indicator */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "12px", color: "#94A3B8" }}>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#38BDF8" }} />
                   <span>Kompyuter agenti ulanishi kutilmoqda...</span>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-neutral-800">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
                   <button
                     type="button"
                     onClick={handleCancelPairing}
-                    className="px-4 py-2 rounded-xl text-xs text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "10px",
+                      background: "transparent",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      color: "#94A3B8",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
                   >
                     Bekor qilish
                   </button>
@@ -854,7 +1506,16 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                     <button
                       type="button"
                       onClick={startPairingProcess}
-                      className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "10px",
+                        backgroundColor: "#D97706",
+                        color: "#FFFFFF",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: "pointer",
+                      }}
                     >
                       Kodni yangilash
                     </button>
@@ -865,44 +1526,69 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
 
             {/* STEP 3: Paired Confirmation & Friendly Name */}
             {pairingStep === 3 && (
-              <div className="space-y-4">
-                <div className="text-center space-y-1">
-                  <div className="w-12 h-12 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 mx-auto flex items-center justify-center text-xl shadow-lg shadow-emerald-950">
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(16, 185, 129, 0.18)",
+                      border: "1px solid rgba(16, 185, 129, 0.4)",
+                      color: "#34D399",
+                      margin: "0 auto",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "22px",
+                    }}
+                  >
                     ✓
                   </div>
-                  <h4 className="text-base font-bold text-neutral-100 pt-1">
+                  <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: "8px 0 2px 0" }}>
                     Kompyuter Topildi & Ulandi!
                   </h4>
-                  <p className="text-xs text-neutral-400">
+                  <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>
                     Kriptografik Ed25519 kalit tekshirildi va qurilma ro'yxatdan o'tdi.
                   </p>
                 </div>
 
                 {/* Device summary badge */}
-                <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800/80 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">Xost nomi:</span>
-                    <span className="text-neutral-200 font-mono font-semibold">
+                <div
+                  style={{
+                    padding: "14px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(0, 0, 0, 0.45)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    fontSize: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Xost nomi:</span>
+                    <span style={{ color: "#E2E8F0", fontWeight: 600, fontFamily: "monospace" }}>
                       {pairedDevice?.hostname || "DESKTOP-PC"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">Platforma:</span>
-                    <span className="text-neutral-200">
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Platforma:</span>
+                    <span style={{ color: "#E2E8F0" }}>
                       {pairedDevice?.platform || "Windows"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">Qurilma ID:</span>
-                    <span className="text-neutral-300 font-mono text-[11px] truncate max-w-[200px]">
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>Qurilma ID:</span>
+                    <span style={{ color: "#38BDF8", fontFamily: "monospace", fontSize: "11px" }}>
                       {pairedDevice?.device_id || pairingId}
                     </span>
                   </div>
                 </div>
 
                 {/* Friendly name input */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-neutral-300 block">
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "#CBD5E1" }}>
                     Do'stona nom (Ixtiyoriy)
                   </label>
                   <input
@@ -911,20 +1597,40 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                     onChange={(e) => setCustomDeviceName(e.target.value)}
                     placeholder="Masalan: Uy kompyuterim, Ofis PC"
                     maxLength={64}
-                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      color: "#FFFFFF",
+                      fontSize: "13.5px",
+                      outline: "none",
+                    }}
                   />
-                  <p className="text-[11px] text-neutral-500">
+                  <p style={{ fontSize: "11px", color: "#64748B", margin: 0 }}>
                     Ushbu nom qurilmalar ro'yxatida va boshqaruv panelida ko'rinadi.
                   </p>
                 </div>
 
                 {/* Action button */}
-                <div className="pt-2">
+                <div style={{ paddingTop: "8px" }}>
                   <button
                     type="button"
                     onClick={handleFinishPairing}
                     disabled={completingPairing}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-950 transition-all cursor-pointer"
+                    style={{
+                      width: "100%",
+                      padding: "11px",
+                      borderRadius: "12px",
+                      backgroundColor: "#0284C7",
+                      border: "1px solid rgba(56, 189, 248, 0.5)",
+                      color: "#FFFFFF",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 16px rgba(2, 132, 199, 0.3)",
+                    }}
                   >
                     {completingPairing ? "Saqlanmoqda..." : "Ulashni Yakunlash ✓"}
                   </button>

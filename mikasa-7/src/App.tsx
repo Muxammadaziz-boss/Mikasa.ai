@@ -74,6 +74,7 @@ export function App() {
             try {
               localStorage.setItem("mikasa_user_name", res.user.username);
             } catch {}
+            backendService.updateAccount({ name: res.user.username }).catch(() => {});
           } else {
             setIsAuthenticated(false);
             setCurrentUser(null);
@@ -98,6 +99,10 @@ export function App() {
         setIsAuthenticated(true);
         setCurrentUser(user);
         setUserName(user.username);
+        try {
+          localStorage.setItem("mikasa_user_name", user.username);
+        } catch {}
+        backendService.updateAccount({ name: user.username }).catch(() => {});
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
@@ -115,6 +120,14 @@ export function App() {
     const unsub = backendService.onStatusChange((status) => {
       if (status.user && status.user.trim()) {
         const freshUser = status.user.trim();
+        // Never let test users or placeholder e2e name overwrite the user
+        if (freshUser.toLowerCase().includes("sinov") || freshUser.toLowerCase().includes("test")) {
+          return;
+        }
+        // If current user is authenticated, keep authenticated name
+        if (currentUser && currentUser.username) {
+          return;
+        }
         setUserName((prev) => (prev !== freshUser ? freshUser : prev));
         try {
           localStorage.setItem("mikasa_user_name", freshUser);
@@ -122,7 +135,7 @@ export function App() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [currentUser]);
 
   // Listen to account updates (avatar & name)
   useEffect(() => {
