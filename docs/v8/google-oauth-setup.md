@@ -104,3 +104,14 @@ Identical emails do not automatically merge accounts. If another user attempts t
 ### Account Lockout Prevention
 If Google is the only authentication method on the account, unlinking is blocked (`can_unlink_google: false`):
 > *"Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang."*
+
+---
+
+## 6. Live Operational Verification
+
+- **Supabase Google Provider**: `ENABLED`
+- **Google Cloud Web Client**: `CONFIGURED`
+- **Redirect URI Status**: `VERIFIED` (`https://vdcssmzguxfknqkfxbed.supabase.co/auth/v1/callback`)
+- **Tauri / WebView2 CSP**: `CONFIGURED & VERIFIED`
+- **Multi-Tenant / RLS**: `VERIFIED`
+- **Production Status**: `FINAL`

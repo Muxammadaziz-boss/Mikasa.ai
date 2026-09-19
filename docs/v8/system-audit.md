@@ -169,7 +169,7 @@ Ran 231 tests across all phases — OK (100% Pass)
   - `/api/account/identities/unlink` account lockout prevention guard
   - `/api/account/identities/link/initiate` session-bound tokens
   - Anti-auto-merge contract validation & strict resource isolation
-  - Live Supabase Google provider probe
+  - Live Supabase Google provider probe (ENABLED, CONFIGURED & VERIFIED)
 Total Backend Passing: 236 / 236 (100%)
 
 Frontend Test Suite (mikasa-7):

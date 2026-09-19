@@ -93,35 +93,41 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       try {
         const res = await backendService.checkPendingOAuthSession(oauthState || undefined);
         if (res.ok && res.session && !isCancelled) {
-          const { access_token, refresh_token } = res.session;
+          const { access_token, refresh_token, code } = res.session;
+          let sessionUser: any = null;
           if (access_token) {
             setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
             const { data } = await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || access_token,
             });
-            if (data?.user && !isCancelled) {
-              const u: MikasaAuthUser = {
-                id: data.user.id,
-                username:
-                  data.user.user_metadata?.full_name ||
-                  data.user.user_metadata?.name ||
-                  data.user.email?.split("@")[0] ||
-                  "User",
-                email: data.user.email || "",
-                is_active: true,
-                is_verified: true,
-                created_at: Date.now() / 1000,
-                avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || undefined,
-                provider: data.user.app_metadata?.provider || "google",
-              };
-              setOauthWaiting(false);
-              setOauthState(null);
-              setTimeout(() => {
-                onAuthSuccess(u);
-              }, 400);
-              return;
-            }
+            sessionUser = data?.user;
+          } else if (code) {
+            setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
+            const { data } = await supabase.auth.exchangeCodeForSession(code);
+            sessionUser = data?.user;
+          }
+          if (sessionUser && !isCancelled) {
+            const u: MikasaAuthUser = {
+              id: sessionUser.id,
+              username:
+                sessionUser.user_metadata?.full_name ||
+                sessionUser.user_metadata?.name ||
+                sessionUser.email?.split("@")[0] ||
+                "User",
+              email: sessionUser.email || "",
+              is_active: true,
+              is_verified: true,
+              created_at: Date.now() / 1000,
+              avatar_url: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || undefined,
+              provider: sessionUser.app_metadata?.provider || "google",
+            };
+            setOauthWaiting(false);
+            setOauthState(null);
+            setTimeout(() => {
+              onAuthSuccess(u);
+            }, 400);
+            return;
           }
         }
       } catch {

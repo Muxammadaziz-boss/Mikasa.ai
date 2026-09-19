@@ -3233,15 +3233,14 @@ async def handle_oauth_callback(request):
   </div>
   <script>
     (function() {
-      const hash = window.location.hash.substring(1);
-      const search = window.location.search.substring(1);
-      const params = new URLSearchParams(hash || search);
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
       
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-      const code = params.get('code');
-      const state = params.get('state') || '';
-      const error = params.get('error') || params.get('error_description');
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+      const code = searchParams.get('code') || hashParams.get('code');
+      const state = searchParams.get('state') || hashParams.get('state') || '';
+      const error = searchParams.get('error') || hashParams.get('error') || searchParams.get('error_description') || hashParams.get('error_description');
 
       const msgEl = document.getElementById('msg');
       const badgeEl = document.getElementById('badge');
@@ -3984,7 +3983,6 @@ def create_app():
 
 
 def run_server(host="127.0.0.1", port=18420):
-    global _main_loop
     logger.info(f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: http://{host}:{port}")
     get_modules()
     app = create_app()

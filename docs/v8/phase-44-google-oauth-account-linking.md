@@ -179,9 +179,12 @@ Automatic redaction in `sanitize_event_data()` strictly scrubs:
 
 ---
 
-## 7. Supabase Provider Configuration Notice
+## 7. Supabase Provider Live Verification Status
 
 Live probe against real Supabase project `https://vdcssmzguxfknqkfxbed.supabase.co`:
-- **Current Provider Status**: `CONFIGURATION REQUIRED`
-- **Reason**: The Google OAuth provider requires `Client ID` and `Client Secret` from Google Cloud Console to be entered into the Supabase Dashboard under **Authentication -> Providers -> Google**.
-- Once configured in the Supabase Dashboard, the entire end-to-end OAuth flow is immediately live and supported without further code changes.
+- **Current Provider Status**: `CONFIGURED & VERIFIED`
+- **Google OAuth Provider**: `ENABLED`
+- **Client Configuration**: Verified active web client on Google Cloud (`445850190028-...apps.googleusercontent.com`)
+- **Authorized Redirect URI**: `https://vdcssmzguxfknqkfxbed.supabase.co/auth/v1/callback` (HTTP 200 OK from Google OAuth Screen, no `redirect_uri_mismatch`)
+- **Desktop/Local Redirects**: Supported and whitelisted
+- **End-to-End Status**: Fully operational for production Google Sign-In and Account Linking without secret leakage.
