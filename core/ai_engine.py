@@ -14,9 +14,37 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ========== Sozlamalar ==========
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
+
+
+def get_gemini_api_key() -> str:
+    """Dinamik Google Gemini API kalitini olish"""
+    global GOOGLE_API_KEY
+    if GOOGLE_API_KEY and str(GOOGLE_API_KEY).strip():
+        return str(GOOGLE_API_KEY).strip()
+    key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+    if key:
+        GOOGLE_API_KEY = key
+        return key
+    try:
+        cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "config.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                k = (
+                    cfg.get("gemini_api_key")
+                    or cfg.get("google_api_key")
+                    or cfg.get("ai", {}).get("gemini_api_key")
+                    or cfg.get("ai", {}).get("api_key")
+                )
+                if k and str(k).strip():
+                    GOOGLE_API_KEY = str(k).strip()
+                    return GOOGLE_API_KEY
+    except Exception:
+        pass
+    return ""
 
 # ========== Suhbat xotirasi ==========
 suhbat_tarixi_gemini = []  # Gemini formati
@@ -197,7 +225,7 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
 """
     
     # 1-urinish: Google Gemini
-    if GOOGLE_API_KEY:
+    if get_gemini_api_key():
         javob = _gemini_yuborish(matn, enriched_prompt)
         if javob is not None:
             return javob
@@ -242,8 +270,13 @@ def _gemini_yuborish(matn, system_prompt=None):
                 "tools": [{"google_search": {}}]
             }
             
+            active_gemini_key = get_gemini_api_key()
+            if not active_gemini_key:
+                logging.warning("Gemini API kaliti topilmadi")
+                break
+
             response = requests.post(
-                f"{url}?key={GOOGLE_API_KEY}",
+                f"{url}?key={active_gemini_key}",
                 headers={"Content-Type": "application/json"},
                 json=request_body,
                 timeout=15
@@ -425,7 +458,7 @@ def _json_ajratish(matn):
 
 def ai_mavjudmi():
     """AI tizimi ishga tayyor ekanligini tekshirish"""
-    return bool(GOOGLE_API_KEY) or bool(OPENROUTER_API_KEY)
+    return bool(get_gemini_api_key()) or bool(OPENROUTER_API_KEY)
 
 
 def suhbat_tarixini_tozalash():

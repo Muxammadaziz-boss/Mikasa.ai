@@ -66,7 +66,9 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
       const res = await backendService.getDevices();
       if (res.ok && res.devices) {
         setDevices(res.devices);
-        setSelectedDeviceId(res.selected_device_id || null);
+        const currentDev = res.devices.find((d: any) => d.is_current);
+        const selId = res.selected_device_id || (currentDev ? currentDev.device_id : (res.devices.length > 0 ? res.devices[0].device_id : null));
+        setSelectedDeviceId(selId);
       }
     } catch (err: any) {
       showNotification("error", `Qurilmalarni yuklashda xatolik: ${err.message || err}`);
@@ -575,6 +577,58 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
         </div>
       )}
 
+      {/* ── Auto Local Device Recognition Banner ── */}
+      {devices.some((d) => d.is_current) && (
+        <div
+          style={{
+            padding: "14px 20px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "14px",
+            boxShadow: "0 4px 20px rgba(16, 185, 129, 0.12)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span
+              style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                backgroundColor: "#34D399",
+                boxShadow: "0 0 12px #34D399",
+                display: "inline-block",
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ fontSize: "12.5px", color: "#E2E8F0" }}>
+              <strong style={{ color: "#34D399" }}>Shu kompyuter avtomatik tanildi:</strong> Ushbu qurilma (
+              <span style={{ color: "#38BDF8", fontFamily: "monospace" }}>
+                {devices.find((d) => d.is_current)?.name || "Asosiy kompyuter"}
+              </span>
+              ) hisobingizga avtomatik biriktirildi va onlayn holatda. Terminaldan juftlash kodi kiritish shart emas!
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: "11px",
+              padding: "4px 12px",
+              borderRadius: "20px",
+              backgroundColor: "rgba(16, 185, 129, 0.2)",
+              color: "#34D399",
+              border: "1px solid rgba(16, 185, 129, 0.35)",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            🟢 Shu qurilma (Onlayn)
+          </span>
+        </div>
+      )}
+
       {/* ── 3. Summary KPI Cards ── */}
       <div
         style={{
@@ -730,10 +784,30 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ onNavigateHome }) => {
                     {/* Top Row: Title, Status, and Active Badge */}
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {dev.name}
                           </h3>
+                          {dev.is_current && (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                padding: "2px 8px",
+                                borderRadius: "6px",
+                                fontSize: "10.5px",
+                                fontWeight: 700,
+                                backgroundColor: "rgba(16, 185, 129, 0.2)",
+                                color: "#34D399",
+                                border: "1px solid rgba(16, 185, 129, 0.4)",
+                                boxShadow: "0 0 10px rgba(16, 185, 129, 0.25)",
+                              }}
+                            >
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#34D399", boxShadow: "0 0 6px #34D399" }} />
+                              Shu qurilma
+                            </span>
+                          )}
                           {isSelected && (
                             <span
                               style={{

@@ -51,7 +51,7 @@
     "backup_count": 5
   },
   "user": {
-    "name": "E2E Sinov Foydalanuvchisi",
+    "name": "Muhammadaziz",
     "voice_type": "ayol",
     "avatar": "emerald",
     "role": "Dasturchi / Muhandis",
@@ -68,7 +68,8 @@
     "model": "gemini",
     "timeout": 15,
     "mode": "creative",
-    "thinking_enabled": true
+    "thinking_enabled": true,
+    "gemini_api_key": "AIzaSyAC3uc-Emild6gjacFV2Jll7e3I83jvU6k"
   },
   "notifications": {
     "scheduler": true,

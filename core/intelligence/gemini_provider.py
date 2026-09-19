@@ -71,19 +71,49 @@ class GeminiProvider(AIProvider):
     ]
 
     def __init__(self, api_key: Optional[str] = None, models: Optional[List[str]] = None):
-        self._api_key = api_key or os.getenv("GOOGLE_API_KEY", "")
+        self._api_key = api_key or ""
         self._models = models or list(self.DEFAULT_MODELS)
+
+    @property
+    def api_key(self) -> str:
+        """Dinamik ravishda API kalitni olish (explicit key, GEMINI_API_KEY, GOOGLE_API_KEY yoki config.json)"""
+        if self._api_key and self._api_key.strip():
+            return self._api_key.strip()
+        env_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+        if env_key:
+            return env_key
+        try:
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "config.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    k = (
+                        cfg.get("gemini_api_key")
+                        or cfg.get("google_api_key")
+                        or cfg.get("ai", {}).get("gemini_api_key")
+                        or cfg.get("ai", {}).get("api_key")
+                    )
+                    if k and str(k).strip():
+                        return str(k).strip()
+        except Exception:
+            pass
+        return ""
+
+    def set_api_key(self, key: str):
+        """API kalitni xotirada darhol yangilash"""
+        self._api_key = (key or "").strip()
 
     @property
     def name(self) -> str:
         return "gemini"
 
     def is_available(self) -> bool:
-        return bool(self._api_key and self._api_key.strip())
+        return bool(self.api_key)
 
     def generate(self, request: AIRequest) -> AIResponse:
         """Gemini API orqali so'rov yuborish va normalizatsiya qilingan AIResponse qaytarish"""
-        if not self.is_available():
+        active_key = self.api_key
+        if not active_key:
             return AIResponse(
                 provider=self.name,
                 model="none",
@@ -127,7 +157,7 @@ class GeminiProvider(AIProvider):
 
             try:
                 response = requests.post(
-                    f"{url}?key={self._api_key}",
+                    f"{url}?key={active_key}",
                     headers={"Content-Type": "application/json"},
                     json=request_body,
                     timeout=15
@@ -142,7 +172,7 @@ class GeminiProvider(AIProvider):
                     if "tools" in request_body:
                         del request_body["tools"]
                         response = requests.post(
-                            f"{url}?key={self._api_key}",
+                            f"{url}?key={active_key}",
                             headers={"Content-Type": "application/json"},
                             json=request_body,
                             timeout=15

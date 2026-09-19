@@ -14,6 +14,9 @@ import threading
 from datetime import datetime
 from aiohttp import web
 from typing import Optional, Tuple, Any
+import requests
+import socket
+import time
 
 # Ishchi katalogni to'g'ri o'rnatish
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -543,6 +546,101 @@ async def handle_chat(request):
         "user": user,
         "mode": mode,
         "timestamp": datetime.now().isoformat()
+    })
+
+
+async def handle_ai_test_key(request):
+    """POST /api/ai/test-key - Google Gemini API kalitini jonli sinovdan o'tkazish"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    api_key = (body.get("api_key") or body.get("key") or "").strip()
+    if not api_key:
+        try:
+            from core.ai_engine import get_gemini_api_key
+            api_key = get_gemini_api_key()
+        except Exception:
+            api_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+
+    if not api_key:
+        return web.json_response({
+            "ok": False,
+            "valid": False,
+            "error": "API kaliti kiritilmagan. Iltimos, Google Gemini API kalitini kiriting."
+        })
+
+    # Jonli Google Gemini REST API so'rovi orqali tekshirish
+    test_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": "Salom"}]}],
+        "generationConfig": {"maxOutputTokens": 10}
+    }
+
+    loop = asyncio.get_running_loop()
+
+    def _ping():
+        try:
+            resp = requests.post(test_url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
+            return resp.status_code, resp.text
+        except Exception as ex:
+            return -1, str(ex)
+
+    status_code, text = await loop.run_in_executor(None, _ping)
+
+    if status_code == 200:
+        # Kalit to'g'ri va ishlaydi!
+        os.environ["GEMINI_API_KEY"] = api_key
+        os.environ["GOOGLE_API_KEY"] = api_key
+        try:
+            from core import ai_engine
+            ai_engine.GOOGLE_API_KEY = api_key
+        except Exception:
+            pass
+        try:
+            from core.intelligence import get_orchestrator
+            orch = get_orchestrator()
+            if orch and hasattr(orch, "provider_manager"):
+                for p in orch.provider_manager._providers:
+                    if hasattr(p, "set_api_key"):
+                        p.set_api_key(api_key)
+        except Exception:
+            pass
+
+        return web.json_response({
+            "ok": True,
+            "valid": True,
+            "message": "Google Gemini API kaliti muvaffaqiyatli tekshirildi va faollashtirildi!",
+            "model": "gemini-1.5-flash"
+        })
+
+    # Google qaytargan xatolikni tahlil qilish
+    error_reason = "API_KEY_INVALID"
+    err_message = "Google Gemini API kaliti yaroqsiz."
+    try:
+        err_json = json.loads(text)
+        if "error" in err_json:
+            g_err = err_json["error"]
+            err_message = g_err.get("message", err_message)
+            details = g_err.get("details", [])
+            if details and isinstance(details, list) and "reason" in details[0]:
+                error_reason = details[0]["reason"]
+            elif "status" in g_err:
+                error_reason = g_err["status"]
+    except Exception:
+        if status_code == -1:
+            err_message = f"Tarmoq xatosi: Google API serveriga ulanib bo'lmadi ({text[:100]})."
+        else:
+            err_message = f"HTTP {status_code}: {text[:150]}"
+
+    logger.warning(f"[API_TEST_KEY] Gemini API tekshiruvi muvaffaqiyatsiz: status={status_code}, reason={error_reason}, msg={err_message}")
+    return web.json_response({
+        "ok": False,
+        "valid": False,
+        "error_code": error_reason,
+        "error": f"API kaliti yaroqsiz ({error_reason}): {err_message}",
+        "status_code": status_code
     })
 
 
@@ -1893,15 +1991,38 @@ async def handle_account_update(request):
         cfg["ai"]["mode"] = str(body["ai_mode"])
     if "thinking_enabled" in body:
         cfg["ai"]["thinking_enabled"] = bool(body["thinking_enabled"])
-    if "gemini_api_key" in body and body["gemini_api_key"]:
+    if "gemini_api_key" in body and body["gemini_api_key"] is not None:
         key = str(body["gemini_api_key"]).strip()
         if key:
             cfg["ai"]["gemini_api_key"] = key
+            cfg["gemini_api_key"] = key
             os.environ["GEMINI_API_KEY"] = key
+            os.environ["GOOGLE_API_KEY"] = key
+            try:
+                from core import ai_engine
+                ai_engine.GOOGLE_API_KEY = key
+            except Exception:
+                pass
+            try:
+                from core.intelligence import get_orchestrator
+                orch = get_orchestrator()
+                if orch and hasattr(orch, "provider_manager"):
+                    for p in orch.provider_manager._providers:
+                        if hasattr(p, "set_api_key"):
+                            p.set_api_key(key)
+            except Exception:
+                pass
             try:
                 env_path = os.path.join(BASE_DIR, ".env")
-                with open(env_path, "a", encoding="utf-8") as f:
-                    f.write(f"\nGEMINI_API_KEY={key}\n")
+                lines = []
+                if os.path.exists(env_path):
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                lines = [l for l in lines if not l.startswith("GEMINI_API_KEY=") and not l.startswith("GOOGLE_API_KEY=")]
+                lines.append(f"GEMINI_API_KEY={key}\n")
+                lines.append(f"GOOGLE_API_KEY={key}\n")
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
             except Exception:
                 pass
 
@@ -2420,33 +2541,81 @@ async def handle_devices_list(request):
     """GET /api/devices and GET /api/account/devices - Foydalanuvchining ulangan kompyuterlari ro'yxati"""
     user_id = _get_request_user_id(request)
     from core.v8 import AccountDeviceManager
+    from core.v8.device import DeviceIdentityManager
     mgr = AccountDeviceManager.get_default_instance()
+    loc = DeviceIdentityManager.create_local_identity()
 
     devices = mgr.get_devices_for_user(user_id, include_revoked=False)
-    selected = mgr.get_selected_device(user_id)
 
-    # Agar ro'yxat bo'sh bo'lsa va default admin bo'lsa, lokal qurilmani kiritish
-    if not devices and user_id == "admin":
-        from core.v8 import DeviceIdentityManager
-        loc = DeviceIdentityManager.create_local_identity()
+    # 1. Agar ro'yxat bo'sh bo'lsa, lokal kompyuterni kiritish
+    if not devices:
+        host_label = loc.hostname or "Asosiy Kompyuter"
         dev = mgr.register_device(
-            user_id="admin",
+            user_id=user_id,
             device_id=loc.device_id,
-            name="Asosiy Kompyuter",
+            name=f"{host_label} (Joriy kompyuter)",
             hostname=loc.hostname,
             platform=loc.os_name.lower(),
             agent_version=loc.agent_version,
             status="online"
         )
         devices = [dev]
-        mgr.select_device("admin", dev.device_id)
-        selected = dev
+        mgr.select_device(user_id, dev.device_id)
+
+    # 2. Agar mavjud yagona qurilma eski dummy (dev-sess-1 va bo'sh xost) bo'lsa, uni joriy kompyuter bilan almashtirish/yangilash
+    if len(devices) == 1 and devices[0].device_id == "dev-sess-1" and not devices[0].hostname:
+        d0 = devices[0]
+        d0.name = f"{loc.hostname or 'Asosiy Kompyuter'} (Joriy kompyuter)"
+        d0.hostname = loc.hostname
+        d0.status = "online"
+        d0.last_seen_at = time.time()
+        mgr.save()
+
+    # 3. Joriy kompyuterni belgilash va yangilash
+    local_dev = None
+    for d in devices:
+        if d.device_id == loc.device_id or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower()):
+            local_dev = d
+            d.status = "online"
+            d.last_seen_at = time.time()
+            if not d.hostname:
+                d.hostname = loc.hostname
+            break
+
+    # Agar ro'yxatda faqat 1 ta qurilma bo'lsa va local_dev topilmagan bo'lsa, ushbu yagona qurilma joriy desktop qurilmasi deb hisoblanadi
+    if not local_dev and len(devices) == 1:
+        local_dev = devices[0]
+        local_dev.status = "online"
+        local_dev.last_seen_at = time.time()
+
+    selected = mgr.get_selected_device(user_id)
+    if not selected or selected.is_revoked:
+        sel_target = local_dev or devices[0]
+        mgr.select_device(user_id, sel_target.device_id)
+        selected = sel_target
+
+    # 4. Har bir qurilmaga is_current belgisini biriktirish
+    enriched_devices = []
+    for d in devices:
+        d_dict = d.to_dict()
+        is_curr = (
+            (local_dev and (d.id == local_dev.id or d.device_id == local_dev.device_id))
+            or d.device_id == loc.device_id
+            or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower())
+        )
+        d_dict["is_current"] = bool(is_curr)
+        if is_curr:
+            d_dict["status"] = "online"
+        enriched_devices.append(d_dict)
+
+    enriched_devices.sort(key=lambda x: 0 if x.get("is_current") else 1)
 
     return web.json_response({
         "ok": True,
         "user_id": user_id,
-        "devices": [d.to_dict() for d in devices],
-        "selected_device_id": selected.device_id if selected else None
+        "devices": enriched_devices,
+        "selected_device_id": selected.device_id if selected else (local_dev.device_id if local_dev else None),
+        "current_device_id": local_dev.device_id if local_dev else None
     })
 
 
@@ -3248,6 +3417,8 @@ def create_app():
     # AI Chat va Ovoz
     app.router.add_post("/api/chat", handle_chat)
     app.router.add_post("/api/chat/clear", handle_chat_clear)
+    app.router.add_post("/api/ai/test-key", handle_ai_test_key)
+    app.router.add_post("/api/account/test-api-key", handle_ai_test_key)
     app.router.add_post("/api/voice/start", handle_voice_start)
     app.router.add_post("/api/voice/stop", handle_voice_stop)
     app.router.add_post("/api/voice/speak", handle_voice_speak)

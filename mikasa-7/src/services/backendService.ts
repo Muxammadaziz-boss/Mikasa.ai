@@ -1487,6 +1487,21 @@ class BackendService {
     }
   }
 
+  public async testGeminiApiKey(
+    apiKey?: string
+  ): Promise<{ ok: boolean; valid?: boolean; message?: string; error?: string; error_code?: string; status_code?: number }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/ai/test-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKey || "" }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, valid: false, error: err.message || "Serverga ulanishda xatolik yuz berdi" };
+    }
+  }
+
   // ========== Agentic Multi-Step Intelligence ==========
   public async executeAgentGoal(
     goal: string
@@ -2421,6 +2436,7 @@ export interface UserDevice {
   last_heartbeat_at?: number | null;
   metadata?: Record<string, any>;
   is_selected?: boolean;
+  is_current?: boolean;
 }
 
 export interface DevicesListResponse {

@@ -114,6 +114,77 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [keyValidationStatus, setKeyValidationStatus] = useState<"untested" | "testing" | "valid" | "invalid">("untested");
+  const [keyValidationError, setKeyValidationError] = useState("");
+  const [rightToasts, setRightToasts] = useState<Array<{
+    id: string;
+    type: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  }>>([]);
+
+  const addRightToast = (type: "success" | "error" | "warning" | "info", title: string, message: string) => {
+    const id = Date.now().toString() + Math.random().toString().slice(2, 6);
+    setRightToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setRightToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 7000);
+  };
+
+  const removeRightToast = (id: string) => {
+    setRightToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleTestApiKey = async (rawKey?: string): Promise<boolean> => {
+    const keyToTest = (rawKey !== undefined ? rawKey : geminiApiKey).trim();
+    if (!keyToTest) {
+      setKeyValidationStatus("invalid");
+      setKeyValidationError("API kaliti kiritilmagan. Iltimos, Google Gemini API kalitini kiriting.");
+      addRightToast("warning", "API Kaliti Yo'q", "Iltimos, avval Google Gemini API kalitini kiriting.");
+      return false;
+    }
+
+    setIsTestingKey(true);
+    setKeyValidationStatus("testing");
+    setKeyValidationError("");
+    try {
+      const res = await backendService.testGeminiApiKey(keyToTest);
+      if (res.ok && res.valid) {
+        setKeyValidationStatus("valid");
+        setHasGeminiKey(true);
+        setKeyValidationError("");
+        addRightToast(
+          "success",
+          "API Kalit Tasdiqlandi",
+          "Google Gemini API kaliti muvaffaqiyatli tekshirildi va tizimda faollashtirildi!"
+        );
+        return true;
+      } else {
+        const errMsg = res.error || "Google Gemini API kaliti yaroqsiz yoki kvotasi tugagan.";
+        setKeyValidationStatus("invalid");
+        setKeyValidationError(errMsg);
+        addRightToast(
+          "error",
+          "API Kaliti Yaroqsiz",
+          errMsg
+        );
+        return false;
+      }
+    } catch (err: any) {
+      const errMsg = err.message || "Tarmoq xatosi yuz berdi.";
+      setKeyValidationStatus("invalid");
+      setKeyValidationError(errMsg);
+      addRightToast(
+        "error",
+        "Tekshirishda Xatolik",
+        `Google API serveriga ulanishda xatolik: ${errMsg}`
+      );
+      return false;
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
 
   // Notifications State
   const [notifScheduler, setNotifScheduler] = useState(true);
@@ -339,15 +410,29 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
     if (geminiApiKey.trim()) {
       payload.gemini_api_key = geminiApiKey.trim();
+      // Yangi kiritilgan yoki o'zgargan kalitni saqlashdan oldin tekshirish
+      if (keyValidationStatus !== "valid") {
+        const isValid = await handleTestApiKey(geminiApiKey.trim());
+        if (!isValid) {
+          setIsSaving(false);
+          return;
+        }
+      }
     }
 
     const res = await backendService.updateAccount(payload);
 
     if (res.ok) {
       setSaveSuccess(true);
-      if (geminiApiKey.trim()) setHasGeminiKey(true);
+      if (geminiApiKey.trim()) {
+        setHasGeminiKey(true);
+        setKeyValidationStatus("valid");
+      }
       onUserUpdated?.(trimmedName, avatar);
+      addRightToast("success", "Sozlamalar Saqlandi", "Profil, ovoz va tizim parametrlari muvaffaqiyatli saqlandi.");
       setTimeout(() => setSaveSuccess(false), 4000);
+    } else {
+      addRightToast("error", "Saqlashda Xatolik", res.message || "Sozlamalarni saqlab bo'lmadi.");
     }
     setIsSaving(false);
   };
@@ -480,6 +565,115 @@ export const AccountPage: React.FC<AccountPageProps> = ({
         position: "relative",
       }}
     >
+      {/* ── Floating Right-Side Notification Toasts (o'ng yon bildirishnomalar) ── */}
+      <div
+        style={{
+          position: "fixed",
+          top: 24,
+          right: 24,
+          zIndex: 999999,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          pointerEvents: "none",
+          maxWidth: 400,
+          width: "calc(100% - 48px)",
+        }}
+      >
+        {rightToasts.map((toast) => {
+          const isSuccess = toast.type === "success";
+          const isError = toast.type === "error";
+          const isWarning = toast.type === "warning";
+
+          const bg = isSuccess
+            ? "rgba(6, 78, 59, 0.95)"
+            : isError
+            ? "rgba(127, 29, 29, 0.95)"
+            : isWarning
+            ? "rgba(120, 53, 15, 0.95)"
+            : "rgba(15, 23, 42, 0.95)";
+          const border = isSuccess
+            ? "1px solid rgba(16, 185, 129, 0.6)"
+            : isError
+            ? "1px solid rgba(239, 68, 68, 0.6)"
+            : isWarning
+            ? "1px solid rgba(245, 158, 11, 0.6)"
+            : "1px solid rgba(56, 189, 248, 0.6)";
+          const accentColor = isSuccess ? "#34D399" : isError ? "#F87171" : isWarning ? "#FBBF24" : "#38BDF8";
+          const icon = isSuccess ? "✓" : isError ? "✕" : isWarning ? "⚠" : "ℹ";
+
+          return (
+            <div
+              key={toast.id}
+              style={{
+                pointerEvents: "auto",
+                padding: "16px 18px",
+                borderRadius: "14px",
+                backgroundColor: bg,
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                border: border,
+                boxShadow: "0 14px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 0, 0, 0.4)",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "12px",
+                color: "#FFFFFF",
+                transition: "all 0.25s ease",
+              }}
+            >
+              <div
+                style={{
+                  width: "26px",
+                  height: "26px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  color: accentColor,
+                  flexShrink: 0,
+                }}
+              >
+                {icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#FFFFFF", marginBottom: "3px" }}>
+                  {toast.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "rgba(255, 255, 255, 0.88)",
+                    lineHeight: 1.45,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {toast.message}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeRightToast(toast.id)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255, 255, 255, 0.6)",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  padding: "2px",
+                  lineHeight: 1,
+                  alignSelf: "flex-start",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Header Bar */}
       <div
         style={{
@@ -2265,45 +2459,108 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                 </div>
 
                 {/* API Key Configuration */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)", fontWeight: 500 }}>
                       Gemini API Kaliti (GEMINI_API_KEY)
                     </label>
                     <span
                       style={{
-                        fontSize: 11,
-                        color: hasGeminiKey ? "#34D399" : "#F59E0B",
+                        fontSize: 11.5,
+                        color:
+                          keyValidationStatus === "testing"
+                            ? "#38BDF8"
+                            : keyValidationStatus === "valid"
+                            ? "#34D399"
+                            : keyValidationStatus === "invalid"
+                            ? "#F87171"
+                            : hasGeminiKey
+                            ? "#34D399"
+                            : "#F59E0B",
                         display: "flex",
                         alignItems: "center",
-                        gap: 4,
+                        gap: 5,
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        backgroundColor:
+                          keyValidationStatus === "testing"
+                            ? "rgba(56, 189, 248, 0.12)"
+                            : keyValidationStatus === "valid"
+                            ? "rgba(16, 185, 129, 0.12)"
+                            : keyValidationStatus === "invalid"
+                            ? "rgba(239, 68, 68, 0.15)"
+                            : "rgba(255, 255, 255, 0.05)",
+                        border:
+                          keyValidationStatus === "valid"
+                            ? "1px solid rgba(16, 185, 129, 0.3)"
+                            : keyValidationStatus === "invalid"
+                            ? "1px solid rgba(239, 68, 68, 0.35)"
+                            : "1px solid transparent",
                       }}
                     >
                       <KeyIcon size={12} color="currentColor" />
-                      {hasGeminiKey ? "Kalit o'rnatilgan (Faol)" : "Kalit kiritilmagan"}
+                      {keyValidationStatus === "testing"
+                        ? "Sinovdan o'tkazilmoqda..."
+                        : keyValidationStatus === "valid"
+                        ? "✓ Kalit faol va tasdiqlangan"
+                        : keyValidationStatus === "invalid"
+                        ? "⚠ Yaroqsiz kalit"
+                        : hasGeminiKey
+                        ? "Kalit kiritilgan"
+                        : "Kalit kiritilmagan"}
                     </span>
                   </div>
 
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <input
                       type={showApiKey ? "text" : "password"}
                       value={geminiApiKey}
-                      onChange={(e) => setGeminiApiKey(e.target.value)}
+                      onChange={(e) => {
+                        setGeminiApiKey(e.target.value);
+                        if (keyValidationStatus !== "untested") {
+                          setKeyValidationStatus("untested");
+                          setKeyValidationError("");
+                        }
+                      }}
                       placeholder={hasGeminiKey ? "••••••••••••••••••••••••••••••••" : "AIzaSy..."}
                       style={{
-                        flex: 1,
+                        flex: "1 1 260px",
                         background: "rgba(0, 0, 0, 0.25)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border:
+                          keyValidationStatus === "invalid"
+                            ? "1px solid rgba(239, 68, 68, 0.6)"
+                            : keyValidationStatus === "valid"
+                            ? "1px solid rgba(16, 185, 129, 0.6)"
+                            : "1px solid rgba(255, 255, 255, 0.1)",
                         borderRadius: 8,
                         padding: "10px 14px",
                         color: "var(--text-primary, #F8FAFC)",
                         fontSize: 13.5,
                         fontFamily: "monospace",
                         outline: "none",
+                        transition: "border-color 0.2s ease",
                       }}
-                      onFocus={(e) => (e.target.style.borderColor = "var(--primary-glow, #10B981)")}
-                      onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.1)")}
+                      onFocus={(e) => {
+                        if (keyValidationStatus === "invalid") {
+                          e.target.style.borderColor = "#EF4444";
+                        } else if (keyValidationStatus === "valid") {
+                          e.target.style.borderColor = "#10B981";
+                        } else {
+                          e.target.style.borderColor = "var(--primary-glow, #10B981)";
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (keyValidationStatus === "invalid") {
+                          e.target.style.borderColor = "rgba(239, 68, 68, 0.6)";
+                        } else if (keyValidationStatus === "valid") {
+                          e.target.style.borderColor = "rgba(16, 185, 129, 0.6)";
+                        } else {
+                          e.target.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                        }
+                      }}
                     />
+
                     <button
                       type="button"
                       onClick={() => setShowApiKey(!showApiKey)}
@@ -2315,11 +2572,96 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                         color: "var(--text-secondary, #94A3B8)",
                         fontSize: 12,
                         cursor: "pointer",
+                        height: "42px",
                       }}
                     >
                       {showApiKey ? "Yashirish" : "Ko'rsatish"}
                     </button>
+
+                    <button
+                      type="button"
+                      disabled={isTestingKey || !geminiApiKey.trim()}
+                      onClick={() => handleTestApiKey(geminiApiKey)}
+                      style={{
+                        padding: "0 18px",
+                        background:
+                          keyValidationStatus === "valid"
+                            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3))"
+                            : keyValidationStatus === "invalid"
+                            ? "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.3))"
+                            : "linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(99, 102, 241, 0.25))",
+                        border:
+                          keyValidationStatus === "valid"
+                            ? "1px solid rgba(16, 185, 129, 0.5)"
+                            : keyValidationStatus === "invalid"
+                            ? "1px solid rgba(239, 68, 68, 0.5)"
+                            : "1px solid rgba(56, 189, 248, 0.45)",
+                        borderRadius: 8,
+                        color:
+                          keyValidationStatus === "valid"
+                            ? "#34D399"
+                            : keyValidationStatus === "invalid"
+                            ? "#FCA5A5"
+                            : "#38BDF8",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: isTestingKey || !geminiApiKey.trim() ? "not-allowed" : "pointer",
+                        opacity: isTestingKey || !geminiApiKey.trim() ? 0.6 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        height: "42px",
+                        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
+                      }}
+                    >
+                      {isTestingKey ? "Tekshirilmoqda..." : "🔍 Tekshirish"}
+                    </button>
                   </div>
+
+                  {/* Validation Error Alert */}
+                  {keyValidationStatus === "invalid" && keyValidationError && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        backgroundColor: "rgba(239, 68, 68, 0.15)",
+                        border: "1px solid rgba(239, 68, 68, 0.35)",
+                        color: "#FCA5A5",
+                        fontSize: 12.5,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <span style={{ fontSize: 15, flexShrink: 0 }}>❌</span>
+                      <div>
+                        <strong style={{ color: "#EF4444" }}>API Kaliti Yaroqsiz: </strong>
+                        <span>{keyValidationError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validation Success Alert */}
+                  {keyValidationStatus === "valid" && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                        border: "1px solid rgba(16, 185, 129, 0.35)",
+                        color: "#6EE7B7",
+                        fontSize: 12.5,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>✓</span>
+                      <span>Google Gemini API kaliti sinovdan o'tdi va to'liq faol!</span>
+                    </div>
+                  )}
+
                   <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
                     Kalit xavfsiz holda faqat ushbu kompyuterda lokal saqlanadi
                   </span>
