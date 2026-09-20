@@ -132,6 +132,17 @@ class RemoteEventType(str, Enum):
     REMOTE_CONFIRMATION_ACCEPTED = "REMOTE_CONFIRMATION_ACCEPTED"
     REMOTE_CONFIRMATION_EXPIRED = "REMOTE_CONFIRMATION_EXPIRED"
     REMOTE_PERMISSION_DENIED = "REMOTE_PERMISSION_DENIED"
+    # Phase 47 — Full Agent Access & User Consent Events
+    FULL_ACCESS_WARNING_SHOWN = "FULL_ACCESS_WARNING_SHOWN"
+    FULL_ACCESS_WARNING_ACKNOWLEDGED = "FULL_ACCESS_WARNING_ACKNOWLEDGED"
+    FULL_ACCESS_REAUTH_PASSED = "FULL_ACCESS_REAUTH_PASSED"
+    FULL_ACCESS_REAUTH_FAILED = "FULL_ACCESS_REAUTH_FAILED"
+    FULL_ACCESS_ENABLED = "FULL_ACCESS_ENABLED"
+    FULL_ACCESS_DISABLED = "FULL_ACCESS_DISABLED"
+    FULL_ACCESS_CROSS_TENANT_BLOCKED = "FULL_ACCESS_CROSS_TENANT_BLOCKED"
+    FULL_ACCESS_PERMISSION_OVERRIDE = "FULL_ACCESS_PERMISSION_OVERRIDE"
+    FULL_ACCESS_EMERGENCY_REVOKE = "FULL_ACCESS_EMERGENCY_REVOKE"
+    FULL_ACCESS_DEVICE_SCOPE_VIOLATION = "FULL_ACCESS_DEVICE_SCOPE_VIOLATION"
 
 
 def sanitize_sensitive_string(val: str) -> str:
@@ -163,7 +174,8 @@ def sanitize_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "raw_otp", "reset_token", "verification_token", "password_hash",
         "token_hash", "access_token", "refresh_token", "authorization_code",
         "client_secret", "google_token", "id_token", "authorization_header",
-        "session_secret"
+        "session_secret",
+        "reauth_proof", "confirmation_token", "warning_token"
     }
     for k, v in data.items():
         if k.lower() in sensitive_keys:

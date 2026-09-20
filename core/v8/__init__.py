@@ -97,9 +97,16 @@ from core.v8.events import (
     sanitize_sensitive_string,
     sanitize_event_data
 )
+from core.v8.agent_access import (
+    AccessLevel,
+    AgentAccessGrant,
+    AgentAccessManager,
+    FULL_ACCESS_SECURITY_WARNING_TEXT,
+    DEFAULT_POLICY_VERSION
+)
 
 __version__ = "8.0.0"
-PHASE = 42
+PHASE = 47
 
 __all__ = [
     "__version__",
@@ -182,4 +189,10 @@ __all__ = [
     "DeviceSession",
     "DeviceAuthManager",
     "DeviceAgentCrypto",
+    # Phase 47 — Full Agent Access & User Consent
+    "AccessLevel",
+    "AgentAccessGrant",
+    "AgentAccessManager",
+    "FULL_ACCESS_SECURITY_WARNING_TEXT",
+    "DEFAULT_POLICY_VERSION",
 ]
