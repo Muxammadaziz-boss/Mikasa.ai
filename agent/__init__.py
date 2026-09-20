@@ -17,6 +17,20 @@ from agent.heartbeat import AgentHeartbeat, AgentState
 from agent.startup import WindowsStartupManager
 from agent.lifecycle import AgentLifecycleManager, calculate_backoff
 from agent.windows_agent import WindowsAgent
+# Phase 46 — Real Remote Tool Execution
+from agent.tools import (
+    PathSecurityValidator,
+    AgentToolHandler,
+    AgentToolRegistry,
+    ALLOWED_APPS,
+    PROTECTED_PROCESSES,
+)
+from agent.executor import (
+    CommandStatus,
+    CommandResult,
+    RemoteCommandExecutor,
+    CommandPoller,
+)
 
 __all__ = [
     "AgentConfig",
@@ -36,4 +50,15 @@ __all__ = [
     "AgentLifecycleManager",
     "calculate_backoff",
     "WindowsAgent",
+    # Phase 46
+    "PathSecurityValidator",
+    "AgentToolHandler",
+    "AgentToolRegistry",
+    "ALLOWED_APPS",
+    "PROTECTED_PROCESSES",
+    "CommandStatus",
+    "CommandResult",
+    "RemoteCommandExecutor",
+    "CommandPoller",
 ]
+
