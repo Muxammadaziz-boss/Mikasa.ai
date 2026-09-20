@@ -3853,9 +3853,9 @@ async def handle_device_heartbeat(request):
 async def handle_command_submit(request):
     """POST /api/devices/{device_id}/commands - Yangi buyruq yuborish"""
     dev_id = request.match_info.get("device_id", "").strip()
-    user_id = resolve_auth_identity(request)
-    if not user_id:
-        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
     
     try:
         body = await request.json()
@@ -3902,9 +3902,9 @@ async def handle_command_confirm(request):
     dev_id = request.match_info.get("device_id", "").strip()
     cmd_id = request.match_info.get("command_id", "").strip()
     
-    user_id = resolve_auth_identity(request)
-    if not user_id:
-        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
         
     try:
         body = await request.json()
@@ -3928,9 +3928,9 @@ async def handle_command_cancel(request):
     dev_id = request.match_info.get("device_id", "").strip()
     cmd_id = request.match_info.get("command_id", "").strip()
     
-    user_id = resolve_auth_identity(request)
-    if not user_id:
-        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
         
     from core.v8.command_queue import CommandQueueManager
     cmd_mgr = CommandQueueManager.get_default_instance()
@@ -3938,7 +3938,7 @@ async def handle_command_cancel(request):
     success, msg = cmd_mgr.cancel_command(cmd_id, user_id)
     if success:
         return web.json_response({"ok": True, "message": msg})
-    return web.json_response({"ok": False, "error": "FORBIDDEN", "message": msg}, status=403)
+    return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": msg}, status=400)
 
 async def handle_command_pending(request):
     """GET /api/devices/{device_id}/commands/pending - Agent polls here"""
@@ -4029,9 +4029,9 @@ async def handle_command_history(request):
     """GET /api/devices/{device_id}/commands/history"""
     dev_id = request.match_info.get("device_id", "").strip()
     
-    user_id = resolve_auth_identity(request)
-    if not user_id:
-        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
         
     from core.v8.command_queue import CommandQueueManager
     cmd_mgr = CommandQueueManager.get_default_instance()
@@ -4041,6 +4041,184 @@ async def handle_command_history(request):
         "ok": True,
         "history": history
     })
+
+
+# ========== PHASE 47: FULL AGENT ACCESS & USER CONSENT API ==========
+
+async def handle_agent_access_get(request):
+    """GET /api/devices/{device_id}/agent-access - Agent access statusini olish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    status = mgr.get_access_status(user_id, dev_id)
+    return web.json_response({"ok": True, "access": status})
+
+
+async def handle_agent_access_warning(request):
+    """POST /api/devices/{device_id}/agent-access/warning - Warning boshlash"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    # Device ownership tekshirish
+    device_owner_id = None
+    try:
+        from core.v8.account_device import AccountDeviceManager
+        dev_mgr = AccountDeviceManager.get_default_instance()
+        dev = dev_mgr.get_device(dev_id, user_id=user_id)
+        if dev:
+            device_owner_id = dev.user_id
+    except Exception:
+        pass
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg, payload = mgr.initiate_activation(user_id, dev_id, device_owner_id)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "ACTIVATION_FAILED", "message": msg}, status=403)
+    return web.json_response({"ok": True, "message": msg, "warning": payload})
+
+
+async def handle_agent_access_acknowledge(request):
+    """POST /api/devices/{device_id}/agent-access/acknowledge - Warning tasdiqlash"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST"}, status=400)
+
+    warning_token = body.get("warning_token", "")
+    if not warning_token:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "warning_token required"}, status=400)
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg = mgr.acknowledge_warning(user_id, dev_id, warning_token)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "ACKNOWLEDGE_FAILED", "message": msg}, status=403)
+    return web.json_response({"ok": True, "message": msg})
+
+
+async def handle_agent_access_reauth(request):
+    """POST /api/devices/{device_id}/agent-access/reauth - Qayta autentifikatsiya"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST"}, status=400)
+
+    warning_token = body.get("warning_token", "")
+    reauth_proof = body.get("reauth_proof", "")
+
+    if not warning_token or not reauth_proof:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "warning_token and reauth_proof required"}, status=400)
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg, confirm_token = mgr.verify_reauthentication(user_id, dev_id, warning_token, reauth_proof)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "REAUTH_FAILED", "message": msg}, status=403)
+    return web.json_response({"ok": True, "message": msg, "confirmation_token": confirm_token})
+
+
+async def handle_agent_access_confirm(request):
+    """POST /api/devices/{device_id}/agent-access/confirm - Yakuniy tasdiqlash"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST"}, status=400)
+
+    confirmation_token = body.get("confirmation_token", "")
+    if not confirmation_token:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "confirmation_token required"}, status=400)
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg = mgr.confirm_activation(user_id, dev_id, confirmation_token)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "CONFIRM_FAILED", "message": msg}, status=403)
+    return web.json_response({"ok": True, "message": msg})
+
+
+async def handle_agent_access_disable(request):
+    """POST /api/devices/{device_id}/agent-access/disable - Full access o'chirish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg = mgr.disable_full_access(user_id, dev_id)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "DISABLE_FAILED", "message": msg}, status=400)
+    return web.json_response({"ok": True, "message": msg})
+
+
+async def handle_agent_access_revoke(request):
+    """POST /api/devices/{device_id}/agent-access/revoke - Favqulodda bekor qilish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg = mgr.emergency_revoke(user_id, dev_id)
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "REVOKE_FAILED", "message": msg}, status=400)
+    return web.json_response({"ok": True, "message": msg})
+
+
+async def handle_agent_access_override(request):
+    """POST /api/devices/{device_id}/agent-access/override - Alohida ruxsat o'zgartirish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST"}, status=400)
+
+    permission_id = body.get("permission_id", "")
+    enabled = body.get("enabled")
+
+    if not permission_id or enabled is None:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "permission_id and enabled required"}, status=400)
+
+    from core.v8.agent_access import AgentAccessManager
+    mgr = AgentAccessManager.get_default_instance()
+    ok, msg = mgr.set_permission_override(user_id, dev_id, permission_id, bool(enabled))
+
+    if not ok:
+        return web.json_response({"ok": False, "error": "OVERRIDE_FAILED", "message": msg}, status=400)
+    return web.json_response({"ok": True, "message": msg})
 
 
 # ========== 9. WEBSOCKET HANDLER ==========
@@ -4134,6 +4312,13 @@ async def cors_middleware(request, handler):
 # ========== Ilovani sozlash va marshrutlash ==========
 def create_app():
     app = web.Application(middlewares=[cors_middleware])
+
+    async def handle_health_liveness(request):
+        """GET /health — Railway liveness probe (no secrets, no user data)."""
+        return web.json_response({"status": "ok"}, status=200)
+
+    app.router.add_get("/health", handle_health_liveness)
+
     # Tizim va Bosh sahifa
     app.router.add_get("/api/status", handle_status)
     app.router.add_get("/api/health", handle_health)
@@ -4273,37 +4458,89 @@ def create_app():
     app.router.add_post("/api/devices/{device_id}/commands/{command_id}/result", handle_command_result)
     app.router.add_get("/api/devices/{device_id}/commands/history", handle_command_history)
 
+    # Phase 47: Full Agent Access & User Consent
+    app.router.add_get("/api/devices/{device_id}/agent-access", handle_agent_access_get)
+    app.router.add_post("/api/devices/{device_id}/agent-access/warning", handle_agent_access_warning)
+    app.router.add_post("/api/devices/{device_id}/agent-access/acknowledge", handle_agent_access_acknowledge)
+    app.router.add_post("/api/devices/{device_id}/agent-access/reauth", handle_agent_access_reauth)
+    app.router.add_post("/api/devices/{device_id}/agent-access/confirm", handle_agent_access_confirm)
+    app.router.add_post("/api/devices/{device_id}/agent-access/disable", handle_agent_access_disable)
+    app.router.add_post("/api/devices/{device_id}/agent-access/revoke", handle_agent_access_revoke)
+    app.router.add_post("/api/devices/{device_id}/agent-access/revoke-all", handle_agent_access_revoke)
+    app.router.add_post("/api/devices/{device_id}/agent-access/override", handle_agent_access_override)
+
+    # Phase 46: Universal Telegram Webhook Gateway (production)
+    try:
+        from core.v8.telegram_webhook import (
+            build_telegram_webhook_service,
+            register_telegram_routes,
+            setup_telegram_lifecycle,
+            cleanup_telegram_lifecycle,
+        )
+        _tg_webhook_svc = build_telegram_webhook_service()
+        register_telegram_routes(app, _tg_webhook_svc)
+        app.on_startup.append(setup_telegram_lifecycle)
+        app.on_cleanup.append(cleanup_telegram_lifecycle)
+    except Exception as e:
+        logger.warning(f"Telegram webhook gateway yuklanmadi: {e}")
+
     return app
 
 
-def run_server(host="127.0.0.1", port=18420):
-    logger.info(f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: http://{host}:{port}")
+def run_server(host=None, port=None):
+    resolved_host = host or os.environ.get("MIKASA_API_HOST", "127.0.0.1")
+    resolved_port = port
+    if resolved_port is None:
+        port_env = os.environ.get("PORT") or os.environ.get("MIKASA_API_PORT", "18420")
+        try:
+            resolved_port = int(port_env)
+        except ValueError:
+            resolved_port = 18420
+
+    logger.info(
+        f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: "
+        f"http://{resolved_host}:{resolved_port}"
+    )
     get_modules()
     app = create_app()
 
     async def _serve():
         global _main_loop
+        import signal
         _main_loop = asyncio.get_running_loop()
         runner = web.AppRunner(app)
         await runner.setup()
 
-        # Primary port (18420)
-        primary_site = web.TCPSite(runner, host, port)
+        primary_site = web.TCPSite(runner, resolved_host, resolved_port)
         await primary_site.start()
-        logger.info(f"Asosiy API server ishga tushdi: http://{host}:{port}")
+        logger.info(f"Asosiy API server ishga tushdi: http://{resolved_host}:{resolved_port}")
 
-        # Auxiliary port (1420) - Fallback for OAuth redirects if 1420 is free
-        if port != 1420:
+        # Auxiliary port (1420) - local OAuth fallback only
+        env_name = os.environ.get("ENVIRONMENT", "development").lower()
+        if env_name != "production" and resolved_port != 1420 and resolved_host in ("127.0.0.1", "localhost"):
             try:
-                aux_site = web.TCPSite(runner, host, 1420)
+                aux_site = web.TCPSite(runner, resolved_host, 1420)
                 await aux_site.start()
-                logger.info("Qo'shimcha OAuth tinglovchisi ishga tushdi: http://127.0.0.1:1420")
+                logger.info(f"Qo'shimcha OAuth tinglovchisi ishga tushdi: http://{resolved_host}:1420")
             except Exception as e:
-                logger.debug(f"Port 1420 band yoki ulanib bo'lmadi (dev server ishlamoqda): {e}")
+                logger.debug(f"Port 1420 band yoki ulanib bo'lmadi: {e}")
 
-        # Run indefinitely
-        while True:
-            await asyncio.sleep(3600)
+        stop_event = asyncio.Event()
+
+        def _request_shutdown():
+            logger.info("Graceful shutdown signal qabul qilindi (SIGTERM/SIGINT)")
+            stop_event.set()
+
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                _main_loop.add_signal_handler(sig, _request_shutdown)
+            except NotImplementedError:
+                signal.signal(sig, lambda s, f: _request_shutdown())
+
+        await stop_event.wait()
+        logger.info("Graceful shutdown boshlandi — active handlerlar tugashini kutmoqda...")
+        await runner.cleanup()
+        logger.info("API Server to'xtatildi")
 
     try:
         asyncio.run(_serve())
@@ -4312,10 +4549,10 @@ def run_server(host="127.0.0.1", port=18420):
 
 
 if __name__ == "__main__":
-    port = 18420
+    cli_port = None
     if len(sys.argv) > 1:
         try:
-            port = int(sys.argv[1])
+            cli_port = int(sys.argv[1])
         except ValueError:
             pass
-    run_server(port=port)
+    run_server(port=cli_port)

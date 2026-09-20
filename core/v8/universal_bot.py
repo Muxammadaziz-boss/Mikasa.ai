@@ -130,7 +130,27 @@ class UniversalTelegramBot:
         if text.startswith("/status"):
             return await self._handle_status(chat_id, tg_user_id)
 
-        # 9. /help
+        # 9. /session (Phase 40+ remote session inspection)
+        if text.startswith("/session"):
+            return await self._handle_session(chat_id, tg_user_id)
+
+        # 10. /logout (remote session only — not web Supabase session)
+        if text.startswith("/logout"):
+            return await self._handle_logout(chat_id, tg_user_id)
+
+        # 11. /access (Phase 47 - Agent Access Status)
+        if text.startswith("/access"):
+            return await self._handle_access(chat_id, tg_user_id)
+
+        # 12. /permissions (Phase 47 - List all permissions)
+        if text.startswith("/permissions"):
+            return await self._handle_permissions(chat_id, tg_user_id)
+
+        # 13. /revoke (Phase 47 - Emergency Revoke All)
+        if text.startswith("/revoke"):
+            return await self._handle_revoke(chat_id, tg_user_id)
+
+        # 14. /help
         if text.startswith("/help"):
             return await self._handle_help(chat_id, first_name)
 
@@ -347,7 +367,43 @@ class UniversalTelegramBot:
             return await self._send_reply(chat_id, text)
 
     async def _handle_status(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
-        """Handle /status for system health check."""
+        """Handle /status — selected device state for linked users, bot health otherwise."""
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        if link and link.is_active:
+            dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+            if not dev:
+                text = (
+                    "💻 *Qurilma holati:*\n\n"
+                    "Faol tanlangan kompyuter yo'q.\n"
+                    "Avval qurilmani tanlang: /devices → `/select <nom>`"
+                )
+                return await self._send_reply(chat_id, text)
+
+            status_upper = dev.status.lower()
+            if dev.is_revoked or status_upper == "revoked":
+                state_label = "🔴 REVOKED"
+            elif status_upper == "online":
+                state_label = "🟢 ONLINE"
+            elif status_upper in ("standby", "degraded"):
+                state_label = "🟡 DEGRADED"
+            else:
+                state_label = "⚪ OFFLINE"
+
+            last_seen = "Noma'lum"
+            if dev.last_seen_at:
+                last_seen = datetime.fromtimestamp(dev.last_seen_at).strftime("%Y-%m-%d %H:%M:%S")
+
+            text = (
+                "🖥️ *Tanlangan Qurilma Holati:*\n\n"
+                f"• Nomi: *{dev.name}*\n"
+                f"• Apparat ID: `{dev.device_id}`\n"
+                f"• Holat: *{state_label}*\n"
+                f"• Platforma: {dev.platform.capitalize()}\n"
+                f"• Oxirgi faollik: `{last_seen}`\n\n"
+                "Sessiya holati: /session"
+            )
+            return await self._send_reply(chat_id, text)
+
         active_links = self.identity_mgr.count_active_links()
         pending_reqs = self.identity_mgr.count_pending_requests()
         text = (
@@ -360,6 +416,159 @@ class UniversalTelegramBot:
         )
         return await self._send_reply(chat_id, text)
 
+    async def _handle_session(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Handle /session — remote control session presence (no secret/token exposure)."""
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        if not link or not link.is_active:
+            return await self._send_reply(
+                chat_id,
+                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: /link <kod>"
+            )
+
+        dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        if not dev:
+            return await self._send_reply(
+                chat_id,
+                "💻 *Faol qurilma tanlanmagan.*\n\nAvval kompyuteringizni tanlang: /devices"
+            )
+
+        from core.v8.auth_session import SessionManager
+        session_mgr = SessionManager.get_default_instance()
+        session = session_mgr.get_active_session(link.mikasa_user_id, dev.device_id)
+
+        if session and session.is_valid():
+            expires = datetime.fromtimestamp(session.expires_at).strftime("%Y-%m-%d %H:%M:%S")
+            text = (
+                "🔐 *Masofaviy Boshqaruv Sessiyasi:*\n\n"
+                f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
+                "• Holat: 🟢 *Faol*\n"
+                f"• Tugash vaqti: `{expires}`\n\n"
+                "Sessiyani yopish: /logout"
+            )
+        else:
+            text = (
+                "🔐 *Masofaviy Boshqaruv Sessiyasi:*\n\n"
+                f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
+                "• Holat: ⚪ *Faol emas*\n\n"
+                "Masofaviy boshqaruv Mikasa Desktop/Web ilovasi orqali boshlanadi."
+            )
+        return await self._send_reply(chat_id, text)
+
+    async def _handle_logout(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Handle /logout — close remote session only (not Supabase web auth)."""
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        if not link or not link.is_active:
+            return await self._send_reply(
+                chat_id,
+                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: /link <kod>"
+            )
+
+        dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        if not dev:
+            return await self._send_reply(
+                chat_id,
+                "💻 *Faol qurilma tanlanmagan.*\n\nAvval kompyuteringizni tanlang: /devices"
+            )
+
+        from core.v8.auth_session import SessionManager
+        session_mgr = SessionManager.get_default_instance()
+        closed = session_mgr.close_session(link.mikasa_user_id, dev.device_id)
+
+        if closed:
+            text = (
+                "🔓 *Masofaviy sessiya yopildi.*\n\n"
+                f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
+                "• Mikasa Web kirish sessiyasi saqlanib qoldi.\n\n"
+                "Holatni tekshirish: /session"
+            )
+        else:
+            text = (
+                "ℹ️ *Faol masofaviy sessiya topilmadi.*\n\n"
+                f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
+                "Hech qanday ochiq remote session yo'q."
+            )
+        return await self._send_reply(chat_id, text)
+
+    async def _handle_access(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Phase 47: Show agent access level for active device."""
+        link = self._get_link(tg_user_id)
+        if not link:
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan. /link buyrug'idan foydalaning.")
+
+        dev = self._get_active_device(link)
+        if not dev:
+            return await self._send_reply(chat_id, "❌ Faol qurilma topilmadi. /select bilan tanlang.")
+
+        from core.v8.agent_access import AgentAccessManager
+        access_mgr = AgentAccessManager.get_default_instance()
+        status = access_mgr.get_access_status(link.mikasa_user_id, dev.device_id)
+
+        level = status.get("access_level", "LIMITED")
+        level_icon = "🟢" if level == "FULL" else ("🟡" if level == "CUSTOM" else "🔴")
+        granted = status.get("permissions_granted", 0)
+        total = status.get("total_supported_permissions", 15)
+
+        text = (
+            f"🛡 *Agent Access Status*\n\n"
+            f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
+            f"• Daraja: {level_icon} *{level}*\n"
+            f"• Ruxsatlar: {granted}/{total}\n"
+            f"• Siyosat versiyasi: `{status.get('policy_version', '1.0.0')}`\n\n"
+            "Batafsil: /permissions\n"
+            "Bekor qilish: /revoke"
+        )
+        return await self._send_reply(chat_id, text)
+
+    async def _handle_permissions(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Phase 47: List all 15 permissions with status."""
+        link = self._get_link(tg_user_id)
+        if not link:
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan.")
+
+        dev = self._get_active_device(link)
+        if not dev:
+            return await self._send_reply(chat_id, "❌ Faol qurilma topilmadi. /select bilan tanlang.")
+
+        from core.v8.permission_center import PermissionStore, STANDARD_PERMISSIONS
+        store = PermissionStore.get_default_instance()
+        profile = store.get_profile(link.mikasa_user_id, dev.device_id)
+
+        lines = ["📋 *Ruxsatlar ro'yxati:*\n"]
+        for perm in STANDARD_PERMISSIONS:
+            granted = profile.is_granted(perm.id) if profile else perm.default_enabled
+            icon = "✅" if granted else "❌"
+            lines.append(f"  {icon} `{perm.id}` — {perm.label}")
+
+        lines.append(f"\n🛡 Access Level: *{profile.access_level if profile else 'LIMITED'}*")
+        return await self._send_reply(chat_id, "\n".join(lines))
+
+    async def _handle_revoke(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
+        """Phase 47: Emergency revoke all agent access."""
+        link = self._get_link(tg_user_id)
+        if not link:
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan.")
+
+        dev = self._get_active_device(link)
+        if not dev:
+            return await self._send_reply(chat_id, "❌ Faol qurilma topilmadi.")
+
+        from core.v8.agent_access import AgentAccessManager
+        access_mgr = AgentAccessManager.get_default_instance()
+        ok, msg = access_mgr.emergency_revoke(link.mikasa_user_id, dev.device_id)
+
+        if ok:
+            text = (
+                "🚨 *FAVQULODDA BEKOR QILISH BAJARILDI!*\n\n"
+                f"• Qurilma: *{dev.name}*\n"
+                "• Access level: LIMITED\n"
+                "• Barcha pending buyruqlar bekor qilindi\n"
+                "• Barcha confirmation tokenlar bekor qilindi\n\n"
+                "Holatni tekshirish: /access"
+            )
+        else:
+            text = f"⚠️ Bekor qilishda xatolik: {msg}"
+        return await self._send_reply(chat_id, text)
+
     async def _handle_help(self, chat_id: Union[int, str], first_name: Optional[str]) -> Dict[str, Any]:
         """Handle /help command catalog."""
         help_text = (
@@ -370,6 +579,11 @@ class UniversalTelegramBot:
             "• `/account` — Bog'langan hisob va qurilmalar tafsilotlari\n"
             "• `/devices` — Sizning barcha kompyuterlaringiz ro'yxati\n"
             "• `/select <nom>` — Masofaviy boshqaruv uchun faol kompyuterni tanlash\n"
+            "• `/session` — Masofaviy boshqaruv sessiyasi holati\n"
+            "• `/logout` — Masofaviy sessiyani yopish (Web kirish saqlanadi)\n"
+            "• `/access` — Agent vakolat darajasi (Phase 47)\n"
+            "• `/permissions` — Barcha ruxsatlar ro'yxati\n"
+            "• `/revoke` — 🚨 Favqulodda barcha vakolatlarni bekor qilish\n"
             "• `/status` — Bot va server holatini tekshirish\n"
             "• `/help` — Ushbu yordam menyusi\n\n"
             "💡 *Maslahat:* 6 xonali tasdiqlash kodini to'g'ridan-to'g'ri xabar sifatida ham yuborishingiz mumkin (masalan: `583921`)."

@@ -391,3 +391,56 @@ class CommandQueueManager:
         expired = [token for token, obj in self._confirmations.items() if not obj.is_valid(now)]
         for token in expired:
             del self._confirmations[token]
+
+    # ------------------------------------------
+    # Phase 47: Qurilma uchun pending buyruqlarni bekor qilish
+    # ------------------------------------------
+    def cancel_pending_for_device(self, device_id: str, reason: str = "emergency_revoke") -> int:
+        """
+        Berilgan qurilma uchun barcha pending/awaiting buyruqlarni bekor qilish.
+        Emergency revoke paytida ishlatiladi.
+        Returns: bekor qilingan buyruqlar soni
+        """
+        cancelled_count = 0
+        with self._lock:
+            queue = self._queues.get(device_id, [])
+            to_cancel = [
+                cmd for cmd in queue
+                if cmd.state in (CommandState.PENDING, CommandState.CONFIRMED, CommandState.AWAITING_CONFIRMATION)
+            ]
+
+            for cmd in to_cancel:
+                cmd.state = CommandState.CANCELLED
+                cmd.error = f"Cancelled: {reason}"
+                cmd.completed_at = time.time()
+                if cmd in queue:
+                    queue.remove(cmd)
+                self._move_to_history(cmd)
+                cancelled_count += 1
+
+            # Clear dangerous locks for this device
+            if device_id in self._dangerous_locks:
+                del self._dangerous_locks[device_id]
+
+        return cancelled_count
+
+    def invalidate_confirmations_for_device(self, device_id: str) -> int:
+        """
+        Berilgan qurilma uchun barcha confirmation tokenlarni bekor qilish.
+        Returns: bekor qilingan tokenlar soni
+        """
+        invalidated = 0
+        with self._lock:
+            to_remove = []
+            for token, conf_obj in self._confirmations.items():
+                # Confirmation object da device_id bo'lishi kerak
+                cmd_id = getattr(conf_obj, "command_id", None)
+                if cmd_id:
+                    cmd = self._commands.get(cmd_id)
+                    if cmd and cmd.device_id == device_id:
+                        to_remove.append(token)
+            for token in to_remove:
+                del self._confirmations[token]
+                invalidated += 1
+
+        return invalidated
