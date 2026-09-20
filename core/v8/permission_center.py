@@ -219,6 +219,9 @@ class UserPermissionProfile:
     capabilities: Dict[str, bool] = field(default_factory=dict)
     version: int = 1
     updated_at: float = field(default_factory=time.time)
+    # Phase 47 — Full Agent Access Integration
+    access_level: str = "LIMITED"
+    full_agent_access: Optional[Dict[str, Any]] = None
 
     def is_granted(self, permission_id: str) -> bool:
         """Ruxsat berilganligini tekshirish"""
@@ -232,9 +235,13 @@ class UserPermissionProfile:
         if clean_id.startswith("app.") and not self.capabilities.get("ADMIN_APP_CONTROL", True):
             return False
 
-        # To'g'ridan-to'g'ri ruxsat tekshiruvi
+        # To'g'ridan-to'g'ri ruxsat tekshiruvi (explicit set)
         if clean_id in self.permissions:
             return bool(self.permissions[clean_id])
+
+        # Phase 47: FULL access bo'lsa — barcha ruxsatlar berilgan
+        if self.access_level in ("FULL", "CUSTOM"):
+            return True
 
         # Agar ro'yxatda yo'q bo'lsa, standart sozlamani olish
         defn = PERMISSIONS_BY_ID.get(clean_id)
@@ -248,7 +255,9 @@ class UserPermissionProfile:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserPermissionProfile":
-        return cls(**data)
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
 
 
 class PermissionStore:
