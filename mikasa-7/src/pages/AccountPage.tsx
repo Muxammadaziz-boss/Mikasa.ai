@@ -26,6 +26,7 @@ import {
   GithubIcon,
 } from "../components/icons/Icons";
 import { Avatar } from "../components/Avatar";
+import { AgentAccessSecuritySection } from "../components/AgentAccessSecuritySection";
 import {
   backendService,
   AccountSettings,
@@ -45,6 +46,7 @@ interface AccountPageProps {
 type TabType =
   | "profile"
   | "linked-accounts"
+  | "security"
   | "appearance"
   | "voice"
   | "ai"
@@ -594,6 +596,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const tabs: Array<{ id: TabType; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }> = [
     { id: "profile", label: "Profil", icon: UserIcon },
     { id: "linked-accounts", label: "Ulangan hisoblar", icon: LinkIcon },
+    { id: "security", label: "Xavfsizlik & Agent", icon: ShieldIcon },
     { id: "appearance", label: "Tashqi ko'rinish", icon: PaletteIcon },
     { id: "voice", label: "Ovoz", icon: VolumeIcon },
     { id: "ai", label: "AI Modeli", icon: CpuIcon },
@@ -2300,6 +2303,23 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* TAB: XAVFSIZLIK & AGENT ACCESS */}
+            {activeTab === "security" && (
+              <div
+                style={{
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
+                  borderRadius: 14,
+                  padding: "24px 28px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 20,
+                }}
+              >
+                <AgentAccessSecuritySection />
               </div>
             )}
 

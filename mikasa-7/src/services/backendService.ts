@@ -2439,6 +2439,142 @@ class BackendService {
       }
     } catch {}
   }
+
+  // ========== Phase 47: Full Agent Access & User Consent ==========
+
+  public async getAgentAccess(
+    deviceId: string
+  ): Promise<{ ok: boolean; access?: AgentAccessStatus; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async requestAgentAccessWarning(
+    deviceId: string
+  ): Promise<{ ok: boolean; message?: string; warning?: SecurityWarningPayload; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/warning`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async acknowledgeAgentAccessWarning(
+    deviceId: string,
+    warningToken: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/acknowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ warning_token: warningToken }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async reauthenticateAgentAccess(
+    deviceId: string,
+    warningToken: string,
+    reauthProof: string
+  ): Promise<{ ok: boolean; message?: string; confirmation_token?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/reauth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ warning_token: warningToken, reauth_proof: reauthProof }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async confirmAgentAccess(
+    deviceId: string,
+    confirmationToken: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ confirmation_token: confirmationToken }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async disableAgentAccess(
+    deviceId: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/disable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async emergencyRevokeAgentAccess(
+    deviceId: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/revoke`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async overrideAgentPermission(
+    deviceId: string,
+    permissionId: string,
+    enabled: boolean
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/agent-access/override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ permission_id: permissionId, enabled }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getDevicesList(): Promise<{ ok: boolean; devices?: any[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/account/devices`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
 }
 
 export interface DevicePairingStartResponse {
@@ -2669,6 +2805,29 @@ export interface AuthMeResponse {
   user?: MikasaAuthUser;
   session?: MikasaAccountSession;
   error?: string;
+}
+
+// Phase 47: Full Agent Access & User Consent Interfaces
+export interface AgentAccessStatus {
+  user_id: string;
+  device_id: string;
+  access_level: "LIMITED" | "FULL" | "CUSTOM";
+  is_full_access: boolean;
+  policy_version: string;
+  enabled_at?: number | null;
+  reauthenticated_at?: number | null;
+  permissions_granted: number;
+  total_supported_permissions: number;
+  overrides: Record<string, boolean>;
+  revoked_at?: number | null;
+}
+
+export interface SecurityWarningPayload {
+  challenge_id: string;
+  warning_token: string;
+  warning_text: string;
+  policy_version: string;
+  expires_in: number;
 }
 
 export const backendService = new BackendService();
