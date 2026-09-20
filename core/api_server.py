@@ -3850,6 +3850,199 @@ async def handle_device_heartbeat(request):
     })
 
 
+async def handle_command_submit(request):
+    """POST /api/devices/{device_id}/commands - Yangi buyruq yuborish"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    user_id = resolve_auth_identity(request)
+    if not user_id:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+    
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "Invalid JSON"}, status=400)
+    
+    tool_id = body.get("tool_id")
+    params = body.get("params", {})
+    origin = body.get("origin", "system")
+    
+    if not tool_id:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "tool_id required"}, status=400)
+        
+    from core.v8.command_queue import CommandQueueManager
+    from core.v8.remote_tools import RemoteToolRegistry
+    
+    registry = RemoteToolRegistry.get_default_instance()
+    tool_def = registry.get_tool(tool_id)
+    if not tool_def:
+        return web.json_response({"ok": False, "error": "TOOL_NOT_FOUND"}, status=404)
+        
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    try:
+        cmd, token_obj = cmd_mgr.submit_command(
+            device_id=dev_id,
+            tool_id=tool_id,
+            params=params,
+            user_id=user_id,
+            origin=origin,
+            requires_confirmation=tool_def.requires_confirmation,
+            risk_level=tool_def.risk_level
+        )
+        return web.json_response({
+            "ok": True,
+            "command_id": cmd.command_id,
+            "state": cmd.state.value,
+            "confirmation_token": token_obj.token if token_obj else None
+        })
+    except Exception as e:
+        return web.json_response({"ok": False, "error": "INTERNAL_ERROR", "message": str(e)}, status=500)
+
+async def handle_command_confirm(request):
+    """POST /api/devices/{device_id}/commands/{command_id}/confirm"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    cmd_id = request.match_info.get("command_id", "").strip()
+    
+    user_id = resolve_auth_identity(request)
+    if not user_id:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+        
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+        
+    token = body.get("token")
+    if not token:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST", "message": "token required"}, status=400)
+        
+    from core.v8.command_queue import CommandQueueManager
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    
+    success, msg = cmd_mgr.confirm_command(cmd_id, token, user_id)
+    if success:
+        return web.json_response({"ok": True, "message": msg})
+    return web.json_response({"ok": False, "error": "FORBIDDEN", "message": msg}, status=403)
+
+async def handle_command_cancel(request):
+    """POST /api/devices/{device_id}/commands/{command_id}/cancel"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    cmd_id = request.match_info.get("command_id", "").strip()
+    
+    user_id = resolve_auth_identity(request)
+    if not user_id:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+        
+    from core.v8.command_queue import CommandQueueManager
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    
+    success, msg = cmd_mgr.cancel_command(cmd_id, user_id)
+    if success:
+        return web.json_response({"ok": True, "message": msg})
+    return web.json_response({"ok": False, "error": "FORBIDDEN", "message": msg}, status=403)
+
+async def handle_command_pending(request):
+    """GET /api/devices/{device_id}/commands/pending - Agent polls here"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    
+    auth_header = request.headers.get("Authorization", "").strip()
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+        
+    from core.v8.device_auth import DeviceAuthManager
+    from core.v8.device_enrollment import DeviceEnrollmentManager
+    
+    auth_mgr = DeviceAuthManager.get_default_instance()
+    enroll_mgr = DeviceEnrollmentManager.get_default_instance()
+    
+    cred = enroll_mgr.get_credential(dev_id)
+    if not cred or cred.is_revoked:
+        return web.json_response({"ok": False, "error": "DEVICE_REVOKED"}, status=403)
+        
+    sess = None
+    if token:
+        for s in auth_mgr._sessions.values():
+            if s.token == token and s.device_id == dev_id and s.is_valid:
+                sess = s
+                break
+                
+    if not sess:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+        
+    from core.v8.command_queue import CommandQueueManager
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    
+    commands = cmd_mgr.get_pending_commands(dev_id)
+    return web.json_response({
+        "ok": True,
+        "commands": commands
+    })
+
+async def handle_command_result(request):
+    """POST /api/devices/{device_id}/commands/{command_id}/result - Agent submits result"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    cmd_id = request.match_info.get("command_id", "").strip()
+    
+    auth_header = request.headers.get("Authorization", "").strip()
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+        
+    from core.v8.device_auth import DeviceAuthManager
+    from core.v8.device_enrollment import DeviceEnrollmentManager
+    
+    auth_mgr = DeviceAuthManager.get_default_instance()
+    enroll_mgr = DeviceEnrollmentManager.get_default_instance()
+    
+    cred = enroll_mgr.get_credential(dev_id)
+    if not cred or cred.is_revoked:
+        return web.json_response({"ok": False, "error": "DEVICE_REVOKED"}, status=403)
+        
+    sess = None
+    if token:
+        for s in auth_mgr._sessions.values():
+            if s.token == token and s.device_id == dev_id and s.is_valid:
+                sess = s
+                break
+                
+    if not sess:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+        
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "BAD_REQUEST"}, status=400)
+        
+    from core.v8.command_queue import CommandQueueManager
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    
+    success = cmd_mgr.record_result(cmd_id, body)
+    if success:
+        return web.json_response({"ok": True})
+    return web.json_response({"ok": False, "error": "NOT_FOUND"}, status=404)
+
+async def handle_command_history(request):
+    """GET /api/devices/{device_id}/commands/history"""
+    dev_id = request.match_info.get("device_id", "").strip()
+    
+    user_id = resolve_auth_identity(request)
+    if not user_id:
+        return web.json_response({"ok": False, "error": "UNAUTHORIZED"}, status=401)
+        
+    from core.v8.command_queue import CommandQueueManager
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    
+    history = cmd_mgr.get_device_history(dev_id)
+    return web.json_response({
+        "ok": True,
+        "history": history
+    })
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -4071,6 +4264,14 @@ def create_app():
     app.router.add_post("/api/devices/{device_id}/challenge", handle_device_auth_challenge)
     app.router.add_post("/api/devices/{device_id}/authenticate", handle_device_auth_authenticate)
     app.router.add_post("/api/devices/{device_id}/heartbeat", handle_device_heartbeat)
+
+    # Phase 46: Remote Command Queue
+    app.router.add_post("/api/devices/{device_id}/commands", handle_command_submit)
+    app.router.add_post("/api/devices/{device_id}/commands/{command_id}/confirm", handle_command_confirm)
+    app.router.add_post("/api/devices/{device_id}/commands/{command_id}/cancel", handle_command_cancel)
+    app.router.add_get("/api/devices/{device_id}/commands/pending", handle_command_pending)
+    app.router.add_post("/api/devices/{device_id}/commands/{command_id}/result", handle_command_result)
+    app.router.add_get("/api/devices/{device_id}/commands/history", handle_command_history)
 
     return app
 

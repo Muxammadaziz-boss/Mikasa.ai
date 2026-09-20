@@ -27,6 +27,12 @@ class RemoteToolDefinition:
     requires_confirmation: bool = False
     allowed_parameters: Dict[str, str] = field(default_factory=dict)
     executor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    # Phase 46 — Kengaytirilgan tool metadata
+    input_schema: Dict[str, Any] = field(default_factory=dict)
+    output_schema: Dict[str, Any] = field(default_factory=dict)
+    timeout: float = 10.0
+    category: str = "general"
+    max_result_size: int = 65536
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -36,7 +42,10 @@ class RemoteToolDefinition:
             "required_permission": self.required_permission,
             "risk_level": self.risk_level.value if isinstance(self.risk_level, RiskLevel) else str(self.risk_level),
             "requires_confirmation": self.requires_confirmation,
-            "allowed_parameters": self.allowed_parameters
+            "allowed_parameters": self.allowed_parameters,
+            "category": self.category,
+            "timeout": self.timeout,
+            "input_schema": self.input_schema,
         }
 
 
@@ -278,6 +287,52 @@ def execute_power_wake(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ================================================================
+# Phase 46 — YANGI ASBOB IJROCHILARI (file.write, file.delete)
+# ================================================================
+
+def execute_file_write(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Xavfsiz fayl yozish (Sandbox ichida, hajm chegarasi: 256KB, Path traversal to'silgan)"""
+    file_path = str(params.get("path", "")).strip()
+    content = str(params.get("content", ""))
+
+    if not file_path:
+        return {"success": False, "error": "INVALID_INPUT: Fayl yo'li ko'rsatilmagan"}
+    if ".." in file_path:
+        return {"success": False, "error": "PATH_TRAVERSAL: Taqiqlangan yo'l"}
+
+    # Hajm chegarasi: 256KB
+    max_size = 262144
+    if len(content.encode("utf-8", errors="replace")) > max_size:
+        return {"success": False, "error": f"FILE_TOO_LARGE: Fayl hajmi {max_size} baytdan oshmasligi kerak"}
+
+    # Sandbox ichida yozish (mock/xavfsiz)
+    return {
+        "success": True,
+        "path": file_path,
+        "bytes_written": len(content.encode("utf-8", errors="replace")),
+        "status": "written"
+    }
+
+
+def execute_file_delete(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Xavfsiz fayl o'chirish (Sandbox ichida, faqat bitta fayl, rekursiv emas)"""
+    file_path = str(params.get("path", "")).strip()
+
+    if not file_path:
+        return {"success": False, "error": "INVALID_INPUT: Fayl yo'li ko'rsatilmagan"}
+    if ".." in file_path:
+        return {"success": False, "error": "PATH_TRAVERSAL: Taqiqlangan yo'l"}
+
+    # Xavfsiz o'chirish (mock)
+    return {
+        "success": True,
+        "path": file_path,
+        "deleted": True,
+        "status": "deleted"
+    }
+
+
+# ================================================================
 # REMOTE TOOL REGISTRY
 # ================================================================
 
@@ -513,5 +568,36 @@ class RemoteToolRegistry:
             required_permission="power.wake",
             risk_level=RiskLevel.LOW,
             requires_confirmation=False,
+            category="power",
+            timeout=5.0,
             executor=execute_power_wake
         ))
+
+        # 14. file.write (Phase 46)
+        self.register(RemoteToolDefinition(
+            tool_id="file.write",
+            name="Fayl yozish",
+            description="Sandbox ichida xavfsiz fayl yozish",
+            required_permission="file.write",
+            risk_level=RiskLevel.HIGH,
+            requires_confirmation=True,
+            allowed_parameters={"path": "string", "content": "string"},
+            category="files",
+            timeout=15.0,
+            executor=execute_file_write
+        ))
+
+        # 15. file.delete (Phase 46)
+        self.register(RemoteToolDefinition(
+            tool_id="file.delete",
+            name="Fayl o'chirish",
+            description="Sandbox ichida bitta faylni o'chirish",
+            required_permission="file.delete",
+            risk_level=RiskLevel.HIGH,
+            requires_confirmation=True,
+            allowed_parameters={"path": "string"},
+            category="files",
+            timeout=10.0,
+            executor=execute_file_delete
+        ))
+
