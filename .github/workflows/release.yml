@@ -1,0 +1,90 @@
+name: Mikasa AI Windows Desktop Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build, Sign & Release Windows Desktop
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install cryptography aiohttp packaging psutil
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'mikasa-7/package.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: mikasa-7
+        run: npm ci
+
+      - name: Run Backend Tests
+        run: |
+          python -m unittest tests/test_v8_secure_updater.py
+
+      - name: Run Frontend Tests
+        working-directory: mikasa-7
+        run: npm test -- --passWithNoTests
+
+      - name: Build Frontend Application
+        working-directory: mikasa-7
+        run: npm run build
+
+      - name: Build Tauri Desktop Application
+        working-directory: mikasa-7
+        run: npm run build:desktop
+
+      - name: Package Release Artifacts
+        working-directory: mikasa-7
+        run: node scripts/package_release.cjs
+
+      - name: Cryptographically Sign Release Manifest (Ed25519)
+        env:
+          MIKASA_RELEASE_SIGNING_KEY: ${{ secrets.MIKASA_RELEASE_SIGNING_KEY }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $manifest = "release/$tag/version_manifest.json"
+          if (Test-Path $manifest) {
+              python packaging/sign_release.py --manifest $manifest
+          } else {
+              Write-Host "Warning: Manifest not found for tag $tag, checking release/v8.0.0/"
+              python packaging/sign_release.py --manifest release/v8.0.0/version_manifest.json
+          }
+
+      - name: Create GitHub Release & Upload Signed Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Mikasa AI ${{ github.ref_name }} (Windows Production Release)"
+          draft: false
+          prerelease: false
+          files: |
+            release/${{ github.ref_name }}/*.exe
+            release/${{ github.ref_name }}/*.msi
+            release/${{ github.ref_name }}/version_manifest.json
+            release/${{ github.ref_name }}/WebView2Loader.dll
+            release/${{ github.ref_name }}/run_portable.bat
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

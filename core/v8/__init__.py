@@ -104,13 +104,34 @@ from core.v8.agent_access import (
     FULL_ACCESS_SECURITY_WARNING_TEXT,
     DEFAULT_POLICY_VERSION
 )
+from core.v8.update_service import (
+    UpdateService,
+    UpdateCrypto,
+    SemVer,
+    UpdateState,
+    UpdateManifest,
+    UpdateArtifact,
+    UpdateStateManager,
+    get_update_service,
+    DEFAULT_TRUSTED_PUBLIC_KEY
+)
 
 __version__ = "8.0.0"
-PHASE = 47
+PHASE = 48
 
 __all__ = [
     "__version__",
     "PHASE",
+    # Phase 48 — Secure Auto Update & Release System
+    "UpdateService",
+    "UpdateCrypto",
+    "SemVer",
+    "UpdateState",
+    "UpdateManifest",
+    "UpdateArtifact",
+    "UpdateStateManager",
+    "get_update_service",
+    "DEFAULT_TRUSTED_PUBLIC_KEY",
     # Account & Auth (Phase 41 - Supabase Auth)
     "SupabaseAuthManager",
     "AccountAuthManager",

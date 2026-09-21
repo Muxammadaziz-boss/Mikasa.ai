@@ -4221,6 +4221,109 @@ async def handle_agent_access_override(request):
     return web.json_response({"ok": True, "message": msg})
 
 
+# ========== PHASE 48: SECURE AUTO UPDATE & RELEASE HANDLERS ==========
+async def handle_update_check(request: web.Request) -> web.Response:
+    """GET /api/updates/check - Check for available desktop updates"""
+    from core.v8.update_service import get_update_service
+    svc = get_update_service()
+
+    force_param = request.query.get("force", "false").lower() in ("true", "1", "yes")
+    channel_param = request.query.get("channel")
+    if channel_param:
+        svc.channel = channel_param.lower()
+
+    result = await svc.check_for_updates(force=force_param)
+    return web.json_response(result)
+
+
+async def handle_update_status(request: web.Request) -> web.Response:
+    """GET /api/updates/status - Current update engine status and state"""
+    from core.v8.update_service import get_update_service
+    svc = get_update_service()
+    state_data = svc.state_manager.get_data()
+    return web.json_response({
+        "ok": True,
+        "state": svc.state_manager.current_state.value,
+        "data": state_data,
+        "audits": svc.get_audit_events()[-10:]
+    })
+
+
+async def handle_update_download(request: web.Request) -> web.Response:
+    """POST /api/updates/download - Download and cryptographically verify update artifact"""
+    from core.v8.update_service import get_update_service, UpdateArtifact
+    svc = get_update_service()
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    artifact_data = body.get("artifact")
+    if not artifact_data:
+        if svc._last_manifest and svc._last_manifest.artifacts:
+            artifact = svc._last_manifest.artifacts[0]
+        else:
+            return web.json_response({
+                "ok": False,
+                "error": "No artifact specified and no active update manifest"
+            }, status=400)
+    else:
+        try:
+            artifact = UpdateArtifact.from_dict(artifact_data)
+        except Exception as e:
+            return web.json_response({"ok": False, "error": f"Invalid artifact payload: {e}"}, status=400)
+
+    success, staged_path, err = await svc.download_and_verify_artifact(artifact)
+    if not success:
+        return web.json_response({"ok": False, "error": err or "Verification failed"}, status=400)
+
+    return web.json_response({
+        "ok": True,
+        "staged_path": staged_path,
+        "artifact": artifact.name,
+        "state": svc.state_manager.current_state.value
+    })
+
+
+async def handle_update_apply(request: web.Request) -> web.Response:
+    """POST /api/updates/apply - Atomic staging and restart preparation"""
+    from core.v8.update_service import get_update_service, UpdateState
+    svc = get_update_service()
+
+    current_state = svc.state_manager.current_state
+    if current_state not in (UpdateState.STAGING, UpdateState.VERIFYING):
+        return web.json_response({
+            "ok": False,
+            "error": f"Cannot apply update in state: {current_state.value}. Must be STAGED."
+        }, status=400)
+
+    backup_path = svc.create_rollback_backup(sys.executable)
+    svc.state_manager.transition_to(UpdateState.INSTALLING, {
+        "ready_to_restart": True,
+        "backup_path": backup_path
+    })
+
+    return web.json_response({
+        "ok": True,
+        "message": "Update staged and verified. Ready for restart.",
+        "state": UpdateState.INSTALLING.value,
+        "backup_path": backup_path
+    })
+
+
+async def handle_update_rollback(request: web.Request) -> web.Response:
+    """POST /api/updates/rollback - Restore previous version from backup"""
+    from core.v8.update_service import get_update_service
+    svc = get_update_service()
+
+    ok = svc.rollback(sys.executable)
+    if not ok:
+        return web.json_response({"ok": False, "error": "Rollback failed or no backup available"}, status=500)
+
+    return web.json_response({"ok": True, "message": "Rollback completed successfully"})
+
+
 # ========== 9. WEBSOCKET HANDLER ==========
 async def handle_ws(request):
     """WS /api/ws - Jonli WebSocket aloqa"""
@@ -4477,6 +4580,13 @@ def create_app():
     app.router.add_post("/api/devices/{device_id}/agent-access/revoke", handle_agent_access_revoke)
     app.router.add_post("/api/devices/{device_id}/agent-access/revoke-all", handle_agent_access_revoke)
     app.router.add_post("/api/devices/{device_id}/agent-access/override", handle_agent_access_override)
+
+    # Phase 48: Secure Auto Update & Release System
+    app.router.add_get("/api/updates/check", handle_update_check)
+    app.router.add_get("/api/updates/status", handle_update_status)
+    app.router.add_post("/api/updates/download", handle_update_download)
+    app.router.add_post("/api/updates/apply", handle_update_apply)
+    app.router.add_post("/api/updates/rollback", handle_update_rollback)
 
     # Phase 46: Universal Telegram Webhook Gateway (production)
     try:

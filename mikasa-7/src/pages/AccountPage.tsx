@@ -27,6 +27,11 @@ import {
 } from "../components/icons/Icons";
 import { Avatar } from "../components/Avatar";
 import { AgentAccessSecuritySection } from "../components/AgentAccessSecuritySection";
+import { UpdateModal } from "../components/UpdateModal";
+import {
+  UpdateService,
+  UpdateCheckResponse,
+} from "../services/updateService";
 import {
   backendService,
   AccountSettings,
@@ -224,6 +229,30 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [unlinkingGoogle, setUnlinkingGoogle] = useState<boolean>(false);
   const [identitiesData, setIdentitiesData] = useState<any>(null);
   const [unlinkingTelegram, setUnlinkingTelegram] = useState<boolean>(false);
+
+  // Phase 48 Auto Update States
+  const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
+  const [updateCheckLoading, setUpdateCheckLoading] = useState<boolean>(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
+  const [updateNotice, setUpdateNotice] = useState<string | null>(null);
+
+  const handleCheckForUpdates = async () => {
+    setUpdateCheckLoading(true);
+    setUpdateNotice(null);
+    try {
+      const res = await UpdateService.checkForUpdates(true);
+      if (res.update_available) {
+        setUpdateInfo(res);
+        setUpdateModalOpen(true);
+      } else {
+        setUpdateNotice("Siz eng so'nggi versiyadan (v8.0.0) foydalanmoqdasiz. Yangilanishlar mavjud emas.");
+      }
+    } catch (e: any) {
+      setUpdateNotice(`Tekshirishda xatolik: ${e.message || String(e)}`);
+    } finally {
+      setUpdateCheckLoading(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -3323,6 +3352,64 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   </div>
                 </div>
 
+                {/* Phase 48: Auto Update & Release Section */}
+                <div
+                  style={{
+                    background: "rgba(16, 185, 129, 0.04)",
+                    border: "1px solid rgba(16, 185, 129, 0.2)",
+                    borderRadius: 12,
+                    padding: "16px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F8FAFC" }}>
+                        Xavfsiz Yangilanish Tizimi (Auto-Update)
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
+                        Kanal: <span style={{ color: "#10B981", fontWeight: 500 }}>Barqaror (Stable)</span> • Kriptografik tekshiruv: Ed25519 + SHA-256
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCheckForUpdates}
+                      disabled={updateCheckLoading}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "linear-gradient(135deg, #10B981, #059669)",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "8px 16px",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: updateCheckLoading ? "not-allowed" : "pointer",
+                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+                      }}
+                    >
+                      {updateCheckLoading ? "Tekshirilmoqda..." : "Yangilanishlarni Tekshirish"}
+                    </button>
+                  </div>
+
+                  {updateNotice && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: updateNotice.includes("xatolik") ? "#F87171" : "#34D399",
+                        background: updateNotice.includes("xatolik") ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      {updateNotice}
+                    </div>
+                  )}
+                </div>
+
                 <div
                   style={{
                     padding: "14px 18px",
@@ -3517,6 +3604,16 @@ export const AccountPage: React.FC<AccountPageProps> = ({
             </div>
           </div>
         )}
+
+        {/* Phase 48: Secure Auto-Update Modal */}
+        <UpdateModal
+          isOpen={updateModalOpen}
+          onClose={() => setUpdateModalOpen(false)}
+          updateInfo={updateInfo}
+          onUpdateComplete={() => {
+            setUpdateNotice("Dastur muvaffaqiyatli yangilandi!");
+          }}
+        />
       </div>
     </div>
   );
