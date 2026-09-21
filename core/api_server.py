@@ -4368,7 +4368,7 @@ _CORS_BYPASS_PREFIXES = ("/health", "/ready", "/api/ready", "/api/health", "/tel
 
 @web.middleware
 async def cors_middleware(request, handler):
-    path = request.path
+    path = str(getattr(request, "path", getattr(request, "rel_url", "/")))
     # Health checks and Telegram webhooks come from external platforms (Railway probes, Telegram servers)
     if any(path.startswith(prefix) for prefix in _CORS_BYPASS_PREFIXES):
         try:
