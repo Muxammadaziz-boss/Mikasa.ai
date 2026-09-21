@@ -4261,9 +4261,18 @@ async def handle_ws(request):
 
 # ========== CORS & Origin Security Middleware ==========
 ALLOWED_REMOTE_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
+_CORS_BYPASS_PREFIXES = ("/health", "/ready", "/api/ready", "/api/health", "/telegram/webhook")
 
 @web.middleware
 async def cors_middleware(request, handler):
+    path = request.path
+    # Health checks and Telegram webhooks come from external platforms (Railway probes, Telegram servers)
+    if any(path.startswith(prefix) for prefix in _CORS_BYPASS_PREFIXES):
+        try:
+            return await handler(request)
+        except web.HTTPException as ex:
+            return ex
+
     # Remote IP tekshiruvi: faqat lokal mijozlar qabul qilinadi
     if request.remote and request.remote not in ALLOWED_REMOTE_IPS:
         logger.warning(f"Xavfsizlik: Begona tarmoqdan so'rov rad etildi: {request.remote}")
