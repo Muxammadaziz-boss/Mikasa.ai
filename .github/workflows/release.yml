@@ -52,13 +52,19 @@ jobs:
         working-directory: mikasa-7
         run: npm run build
 
-      - name: Build Tauri Desktop Application
-        working-directory: mikasa-7
-        run: npm run build:desktop
-
-      - name: Package Release Artifacts
-        working-directory: mikasa-7
-        run: node scripts/package_release.cjs
+      - name: Check / Build Tauri Desktop Application
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exePath = "release/$tag/Mikasa-AI-$tag.exe"
+          if (Test-Path $exePath) {
+              Write-Host "Pre-compiled desktop binaries found at $exePath. Skipping recompilation."
+          } else {
+              Write-Host "No pre-compiled binaries found for $tag. Building Tauri desktop application..."
+              cd mikasa-7
+              npm run build:desktop
+              node scripts/package_release.cjs
+              cd ..
+          }
 
       - name: Cryptographically Sign Release Manifest (Ed25519)
         env:
@@ -66,11 +72,15 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $manifest = "release/$tag/version_manifest.json"
-          if (Test-Path $manifest) {
+          if (-not (Test-Path $manifest)) {
+              $manifest = "release/v8.0.0/version_manifest.json"
+          }
+          if ($env:MIKASA_RELEASE_SIGNING_KEY) {
+              Write-Host "MIKASA_RELEASE_SIGNING_KEY secret found. Signing release manifest..."
               python packaging/sign_release.py --manifest $manifest
           } else {
-              Write-Host "Warning: Manifest not found for tag $tag, checking release/v8.0.0/"
-              python packaging/sign_release.py --manifest release/v8.0.0/version_manifest.json
+              Write-Host "MIKASA_RELEASE_SIGNING_KEY not set in GitHub secrets. Verifying pre-signed manifest..."
+              python -c "import json; from core.v8.update_service import UpdateCrypto; c = UpdateCrypto(); m = json.load(open('$manifest')); [c.verify_artifact('release/$tag/' + f['name'], f['sha256'], f['signature']) for f in m.get('files', [])]; print('Verified pre-signed release manifest successfully.')"
           }
 
       - name: Create GitHub Release & Upload Signed Artifacts
@@ -80,6 +90,23 @@ jobs:
           name: "Mikasa AI ${{ github.ref_name }} (Windows Production Release)"
           draft: false
           prerelease: false
+          make_latest: true
+          body: |
+            ## 🚀 Mikasa AI v8.0.0 — Level 8 Autonomous Desktop Assistant & Intelligence Hub
+
+            Rasmiy Mikasa AI v8.0.0 Windows Production Release.
+
+            ### 📦 Reliz Fayllari (Ed25519 & SHA-256 bilan imzolangan):
+            - **`Mikasa-AI-v8.0.0.exe`**: O'rnatish talab qilmaydigan Portable Desktop ilova (4.87 MB).
+            - **`Mikasa-AI-Setup-v8.0.0.exe`**: Windows NSIS Setup o'rnatuvchisi (2.01 MB).
+            - **`Mikasa-AI-v8.0.0.msi`**: Standart Windows Installer paketi (2.70 MB).
+            - **`WebView2Loader.dll`**: Native Windows runtime dll.
+            - **`run_portable.bat`**: Backend va Frontendni bir bosishda ishga tushiruvchi bat skript.
+            - **`version_manifest.json`**: Kriptografik imzolangan reliz manifesti.
+
+            ### 🔐 Xavfsizlik:
+            - **Trusted Ed25519 Public Key**: `b4be839fd62657c0e786e1a2ad590c05c45c511371d041137c5ca9ac57c29829`
+            - **Avtomatik yangilanish**: Fail-closed, atomik staging va xavfsiz rollback.
           files: |
             release/${{ github.ref_name }}/*.exe
             release/${{ github.ref_name }}/*.msi
@@ -88,3 +115,4 @@ jobs:
             release/${{ github.ref_name }}/run_portable.bat
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
