@@ -2,14 +2,14 @@
   "app": "Mikasa AI",
   "version": "8.0.0",
   "version_name": "v8.0.0",
-  "release_date": "2026-09-21T15:17:54.437Z",
+  "release_date": "2026-09-21T15:21:40.327Z",
   "files": [
     {
       "name": "Mikasa-AI-v8.0.0.exe",
-      "size_bytes": 5103616,
+      "size_bytes": 5110272,
       "size_mb": 4.87,
-      "sha256": "c6c652ad44f46c438c1440d39b2aed3e719c083f6130ce0188546c34ffa379cb",
-      "signature": "0d9e90f4ae832baed3665020bedd8d866359ed900bb06cea98d1417004d45c8c679708b595f35db56e74d04f9191ebe2e95b7400aeec4adeaa0dcd2d4590ca0f"
+      "sha256": "f8264cce30a004f93d602c193c0bab8ee8cadb2007b915331591f09f158e73c9",
+      "signature": "0d908d84926eda6242d7465a174ce53e02589eff12d1af450a473fef35e2bc9eef13dfdf45ca1c591d701fe47318f7814a53083d3346ca210884c47621c40207"
     },
     {
       "name": "WebView2Loader.dll",
@@ -20,17 +20,17 @@
     },
     {
       "name": "Mikasa-AI-v8.0.0.msi",
-      "size_bytes": 2826240,
+      "size_bytes": 2830336,
       "size_mb": 2.7,
-      "sha256": "13f3af9ad461f35aa1395e2dedea62500a9a1820e7f81eafa713575e5227b229",
-      "signature": "963abac925fb86c11a76b7a1fb1b8f07803fff42b8aa13fbf9906592adef812c8f914528a17f27b5b4a2dd659aa0eee76e1adbeabc0ba6e44bb514990c4ae80e"
+      "sha256": "4d34c9ba60a676c560fbaba1c58193f4d6e0d065d951aaec26313d5919b8fff1",
+      "signature": "9b4412491b3fefa52185bc563ba8190fbddd449bfb913810e345483b8960852a4d507afd3ce71a6417eb55c82f08271d4a150c3dd7b00e3780419b78c3ba9203"
     },
     {
       "name": "Mikasa-AI-Setup-v8.0.0.exe",
-      "size_bytes": 2102747,
+      "size_bytes": 2109216,
       "size_mb": 2.01,
-      "sha256": "17d1f62ffe277bac733c647accac2abe11eb6ce735976a15b3b6b44a8f23fe99",
-      "signature": "687cc9e3dbcdb4613f987ec2a0f436f3843a7829a14e92cc77756eaecdfddc1f97c24d92bd1a6374f502c6fe7c9021ad5edcf4ba8bed0cceed96cf62477baa06"
+      "sha256": "dbebb87f1869e47ef0014d45f791b4cee533918fb69a16c7117403603d06ca7e",
+      "signature": "8b6a059b2b17dfc0193716850c4f67bcd68a992049acd515e56e53645f787108563ac2423528b50c439a4811bfc46eea9677544ad45e47b0311f7e788a5d2d01"
     }
   ],
   "backend": {
