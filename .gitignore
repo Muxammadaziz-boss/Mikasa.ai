@@ -39,11 +39,13 @@ data/*.json
 # Arxiv va vaqtinchalik
 *.rar
 *.zip
+!release/**/*.zip
 *.tmp
 *.mp3
 output/
 scratch/
 logos/
+packaging/portable_launcher/target/
 nul
 
 # IDE

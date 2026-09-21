@@ -73,20 +73,23 @@ Mikasa AI 8.0.0 versiyasi — loyiha tarixidagi eng yirik pog'ona bo'lib, avvalg
 
 | Fayl nomi | Tavsif | Hajmi | Yuklab olish |
 | :--- | :--- | :--- | :--- |
-| **`Mikasa-AI-v8.0.0.exe`** | O'rnatish talab qilmaydigan Portable Desktop ilova | **4.87 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0.exe) |
-| **`Mikasa-AI-Setup-v8.0.0.exe`** | Windows uchun NSIS qulay o'rnatuvchi paketi | **2.01 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-Setup-v8.0.0.exe) |
-| **`Mikasa-AI-v8.0.0.msi`** | Korporativ standart Windows MSI paketi | **2.70 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0.msi) |
-| **`run_portable.bat`** | Backend (18420-port) va Desktop ilovani bir bosishda ishga tushiruvchi skript | **1 KB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/run_portable.bat) |
-| **`WebView2Loader.dll`** | Windows native runtime kutubxonasi | **0.15 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/WebView2Loader.dll) |
-| **`version_manifest.json`** | Kriptografik imzolangan rasmiy versiya manifesti | **2 KB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/version_manifest.json) |
+| **`Mikasa-AI-Setup-v8.0.0.exe`** | ⭐ **Windows NSIS O'rnatuvchisi (Tavsiya etiladi)** | **2.01 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-Setup-v8.0.0.exe) |
+| **`Mikasa-AI-v8.0.0-Portable.zip`** | 📦 **To'liq Portativ Paket (Barcha DLL va skriptlar bilan)** | **2.71 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0-Portable.zip) |
+| **`Mikasa-AI-v8.0.0.exe`** | 🚀 **Mustaqil Portable Executable (Self-Contained)** | **5.36 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0.exe) |
+| **`Mikasa-AI-v8.0.0.msi`** | 🏢 **Standart Windows MSI Paketi** | **2.70 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0.msi) |
+| **`WebView2Loader.dll`** | ⚙️ **Windows Native Runtime Kutubxonasi** | **0.15 MB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/WebView2Loader.dll) |
+| **`run_portable.bat`** | ⚡ **Backend va Desktop bir bosishda ishga tushiruvchi** | **1 KB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/run_portable.bat) |
+| **`version_manifest.json`** | 🔐 **Kriptografik Imzolangan Rasmiy Manifest** | **2 KB** | [Yuklab olish](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/version_manifest.json) |
 
 ---
 
 ## 🚀 O'rnatish va Ishga Tushirish
 
 ### 1-usul: Tayyor Desktop Ilovani Ishlatish (Foydalanuvchilar uchun)
-1. [GitHub Releases Sahifasidan](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/tag/v8.0.0) `Mikasa-AI-v8.0.0.exe` yoki `Mikasa-AI-Setup-v8.0.0.exe` ni yuklab oling.
-2. Ilovani ikki marta bosib ishga tushiring — dastur darhol tayyor bo'ladi.
+1. **O'rnatuvchi orqali (Eng oson va tavsiya etilgan)**:  
+   [Mikasa-AI-Setup-v8.0.0.exe](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-Setup-v8.0.0.exe) ni yuklab oling va ishga tushiring. O'rnatuvchi barcha kerakli kutubxonalarni avtomatik sozlaydi va ish stoli yorlig'ini yaratadi.
+2. **Portativ rejimda (O'rnatmasdan)**:  
+   [Mikasa-AI-v8.0.0-Portable.zip](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0-Portable.zip) yoki mustaqil [Mikasa-AI-v8.0.0.exe](https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/download/v8.0.0/Mikasa-AI-v8.0.0.exe) ni yuklab olib, to'g'ridan-to'g'ri ishga tushiring.
 
 ### 2-usul: Dasturchilar uchun (Manba kodi orqali)
 ```bash
