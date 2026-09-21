@@ -1,10 +1,10 @@
-# MIKASA AI 7.x — TO'LIQ ARXITEKTURA AUDITI VA ISHLAB CHIQARISH TAHLILI
+# MIKASA AI 8.x — TO'LIQ ARXITEKTURA AUDITI VA ISHLAB CHIQARISH TAHLILI
 **Hujjat kodi:** `ARCHITECTURE_AUDIT.md`  
 **Loyiha:** `Muxammadaziz-boss/Mikasa.ai`  
-**Tarmoq:** `dev-v7.0.0`  
-**Versiya:** 7.1.0-dev  
-**Sana:** 2026-09-12  
-**Holat:** Phase 0 — Audit yakunlandi, Kod o'zgarishlaridan oldingi holat
+**Tarmoq:** `dev-v8.0.0`  
+**Versiya:** 8.0.0 (Production Release)  
+**Sana:** 2026-09-21  
+**Holat:** Phase 48 — Rasmiy Reliz Yakunlandi, 100% Sinovdan O'tgan Production Arxitekturasi
 
 ---
 
@@ -916,5 +916,33 @@ Tizim foydalanuvchi taqdim etgan tog' va ko'l manzarali kinemotografik fon muhit
 - Jami Python backend testlari (Phases 31–34): **129 ta test — 100% muvaffaqiyatli (0.374s)**.
 - Frontend unit va stress testlari (`npm test`): **15/15 test — 100% muvaffaqiyatli**.
 - Frontend Production Build (`npm run build`): **494ms da 100% xatosiz yig'ildi**.
+
+---
+
+## 18. PHASE 35–48: LEVEL 8 AUTONOMOUS ARCHITECTURE & RELEASE SYSTEM
+
+Mikasa AI v8.0.0 arxitekturasi yagona mahalliy yordamchini to'liq tarmoqlangan, xavfsiz va avtonom yangilanuvchi shaxsiy AI operatsion tizimiga aylantirdi.
+
+### 18.1. Kriptografik Xavfsizlik va Autentifikatsiya (Phases 40–44)
+1. **Supabase Auth & Multi-Tenant**: `auth.users.id` yagona identity, email/parol, email tasdiqlash, parol tiklash va RLS orqali foydalanuvchilar ma'lumotlarini to'liq izolyatsiya qilish.
+2. **PC Agent Enrollment & Pairing**: 6-xonali pairing kodi (5 min TTL), bruteforce himoyasi (max 5 urinish), Ed25519 ochiq/yopiq kalitlar juftligi va Windows DPAPI xavfsiz saqlash.
+3. **Replay Himoyasi**: 32-bayt bir martalik tasodifiy nonce asosidagi challenge-response protokoli.
+
+### 18.2. Masofaviy Boshqaruv va Gateway (Phases 38–39, 45–47)
+1. **Universal Telegram Gateway**: Telegram orqali masofadan buyruq yuborish, status olish, skrinshot so'rash va Wake-on-LAN (WoL) orqali kompyuterni uyg'otish.
+2. **Windows Agent & Real Tools**: `PathSecurityValidator` orqali sandboxlangan fayl tizimi boshqaruvi, audio balandligi, ilovalarni boshqarish va ekran tahlili.
+
+### 18.3. Xavfsiz Avto-Yangilanish Tizimi (Phase 48)
+1. **SemVer 2.0.0**: Versiyalarni qat'iy semantik taqqoslash (8.0.0 -> 8.1.0).
+2. **Ed25519 & SHA-256 Verifikatsiyasi**: Fail-closed prinsipida har bir yuklangan faylning kriptografik imzosi va xeshi tekshiriladi.
+3. **Atomik Staging va Avtomatik Rollback**: Nosozlik yuz berganda avtomatik avvalgi ishchi versiyaga qaytish.
+4. **Ishlab Chiqarish Paketlari (`release/v8.0.0/`)**: Portable (`.exe`), Setup (`.exe`), Windows MSI (`.msi`), DLL va imzolangan `version_manifest.json`.
+
+### 18.4. Yakuniy Test va Verifikatsiya
+- **Backend Testlari**: 242/242 PASS (100% muvaffaqiyatli).
+- **Secure Auto-Updater Testlari**: 31/31 PASS (100% muvaffaqiyatli).
+- **Frontend Testlari**: 15/15 PASS (100% muvaffaqiyatli).
+- **GitHub Release CI/CD**: Avtomatlashtirilgan GitHub Actions reliz pipeline muvaffaqiyatli ishga tushdi va v8.0.0 relizi e'lon qilindi.
+
 
 

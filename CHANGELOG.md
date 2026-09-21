@@ -4,6 +4,22 @@ Barcha o'zgarishlar va relizlar Semantic Versioning (SemVer) qoidalariga muvofiq
 
 ---
 
+## [8.0.0] — 2026-09-21 (Level 8 Autonomous Desktop & Release System)
+
+Mikasa AI 8.0.0 — loyihaning to'liq 48 bosqichli evolyutsiyasi natijasi bo'lib, ilovani yagona mustaqil dasturdan **ko'p qurilmali, masofadan xavfsiz boshqariladigan, Supabase Auth bilan himoyalangan va avtonom kriptografik auto-update tizimiga ega sun'iy intellekt platformasiga** aylantirdi.
+
+### 🌟 Yangi Imkoniyatlar va Arxitektura (Phases 35–48):
+- **Phase 35–37 — Masofaviy Boshqaruv Protokoli va Sessiyalar**: Asinxron buyruq konvertlari (`RemoteCommandEnvelope`), 32-bayt nonce orqali replay-hujumlardan himoya, sessiya muddatlari (TTL) va xavfsiz token boshqaruvi.
+- **Phase 38 — Masofaviy Ruxsatlar Markazi (Permission Engine)**: Xavfli va nozik buyruqlar (fayllarni o'chirish, tizimni o'chirish) uchun foydalanuvchi roziligini so'rash (approval flows) va xavfsizlik chegaralari.
+- **Phase 39 — Universal Telegram Gateway**: Telegram bot orqali kompyuter bilan to'g'ridan-to'g'ri bog'lanish, masofadan status olish, skrinshot so'rash va Wake-on-LAN (WoL) orqali kompyuterni uyg'otish.
+- **Phase 40 & 41 — Supabase Auth & Multi-Tenant Xavfsizlik**: `auth.users.id` yagona identifikator, email/parol, email tasdiqlash, parol tiklash va ma'lumotlar bazasi darajasida qat'iy Row Level Security (RLS) izolyatsiyasi.
+- **Phase 42–44 — Kriptografik PC Agent Enrollment**: 6-xonali qisqa muddatli pairing kodlari (5 min TTL), bruteforce cheklovi (maksimal 5 urinish), Ed25519 ochiq/yopiq kalitlar juftligi va Windows DPAPI xavfsiz shifrlash.
+- **Phase 45–47 — Windows Agent & Real Tizim Asboblari**: Mustaqil Windows Agent jarayoni, `PathSecurityValidator` orqali sandboxlangan fayl tizimi boshqaruvi, ekran tahlili, klaviatura/sichqoncha simulyatsiyasi va audio monitoring.
+- **Phase 48 — Secure Auto-Update & Crash-Safe Rollback Engine**: SemVer 2.0.0 versiya boshqaruvi, Ed25519 raqamli imzolari (`DEFAULT_TRUSTED_PUBLIC_KEY`) va SHA-256 xeshlari bilan har bir yangilanishni verifikatsiya qilish (fail-closed), atomik staging, avtomatik zaxira va nosozlikda tezkor rollback.
+- **Production Desktop Release**: `release/v8.0.0/` katalogida rasmiy reliz paketlari (`Mikasa-AI-v8.0.0.exe`, `Mikasa-AI-Setup-v8.0.0.exe`, `Mikasa-AI-v8.0.0.msi`, `run_portable.bat`, `version_manifest.json`).
+
+---
+
 ## [7.1.0] — 2026-09-13 (Production Native Desktop Release)
 
 Mikasa AI 7.1.0 — loyihaning to'liq 27 bosqichli Master Rejasi asosida tubdan yangilangan, Windows 10/11 uchun moslashgan ishlab chiqarish (production) darajasidagi sun'iy intellektli shaxsiy yordamchisi.

@@ -43,6 +43,7 @@ data/*.json
 *.mp3
 output/
 scratch/
+logos/
 nul
 
 # IDE

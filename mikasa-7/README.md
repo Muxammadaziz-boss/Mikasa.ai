@@ -1,41 +1,49 @@
-# Mikasa AI 7.0 — Desktop Foundation (Tauri + React + TypeScript)
+# Mikasa AI 8.0 — Desktop Foundation (Tauri 2.0 + React 19 + TypeScript)
 
-Mikasa AI 7.0 uchun zamonaviy, tezkor va xavfsiz desktop interfeysi.
+Mikasa AI 8.0 uchun zamonaviy, xavfsiz va yuqori tezlikdagi native desktop interfeysi.
 
-## 🚀 Texnologiyalar to'plami
+## 🚀 Texnologiyalar To'plami
 - **Desktop Shell**: [Tauri 2.x](https://tauri.app/) (Rust)
-- **Frontend**: React 19 + TypeScript + Vite 8
-- **Dizayn tizimi**: Pure CSS Tokens (Near-black, Glassmorphism, Neon Cyan/Azure Glow)
-- **Backend / AI yadrosi**: Python 3.12 (Mavjud Mikasa AI 6.0 yadrosi to'liq saqlangan holda)
+- **Frontend**: React 19 + TypeScript 6 + Vite 8
+- **Dizayn Tizimi**: Pure CSS Tokens (Near-black `#080C14`, Glassmorphism, Neon Cyan/Azure Glow)
+- **Autentifikatsiya**: Supabase Auth SDK (`@supabase/supabase-js`)
+- **Backend / AI Yadrosi**: Python 3.11 (`core/api_server.py`, `core/v8/`) REST + WebSocket (18420-port)
 
-## 📁 Papkalar tuzilmasi
+## 📁 Papkalar Tuzilmasi
 ```
 mikasa-7/
 ├── src-tauri/               # Tauri Rust konfiguratsiyasi va desktop oyna sozlamalari
 │   ├── Cargo.toml
 │   ├── tauri.conf.json      # Frameless oyna (1280x800, min 1024x700)
 │   └── src/
-│       ├── lib.rs
+│       ├── lib.rs           # Rust mahalliy oyna funksiyalari
 │       └── main.rs
 ├── src/
-│   ├── assets/              # Statik resurslar
+│   ├── assets/              # Statik resurslar va rasmlar
 │   ├── components/          # Qayta ishlatiluvchi desktop komponentlar
-│   │   ├── icons/Icons.tsx  # Desktop SVG ikonkalari
-│   │   ├── Avatar.tsx       # Foydalanuvchi profili
-│   │   ├── Button.tsx       # Birlamchi, ikkilamchi va glass tugmalar
-│   │   ├── IconButton.tsx   # Tooltip bilan ta'minlangan ikonka tugmalari
-│   │   ├── MikasaLogo.tsx   # Mikasa AI brend logosi
-│   │   ├── MikasaOrb.tsx    # 7 holatli interaktiv AI Orb (idle, listening, thinking, ...)
-│   │   ├── StatusIndicator.tsx # Tizim holati (Online/Offline)
-│   │   └── WindowControls.tsx  # Frameless oyna boshqaruv tugmalari (Minimize, Maximize, Close)
+│   │   ├── icons/Icons.tsx  # 26 ta SVG vektorli piktogrammalar
+│   │   ├── MikasaOrb.tsx    # 10 ta holatli interaktiv AI Orb
+│   │   ├── UpdateModal.tsx  # Phase 48: Avto-yangilanish holati va dialogi
+│   │   ├── DevicePairingModal.tsx # Phase 42: 6-xonali kod bilan qurilma ulash
+│   │   ├── WindowControls.tsx # Frameless oyna boshqaruv tugmalari
+│   │   └── CommandCenter.tsx # Ctrl+K global buyruqlar palitrasi
 │   ├── layout/              # Desktop Shell tartibi
 │   │   ├── TopBar.tsx       # Sarlavha paneli (Drag region va oyna tugmalari)
-│   │   ├── Sidebar.tsx      # Chap navigatsiya paneli (MIKASA va AGENT bo'limlari)
-│   │   ├── AccountRow.tsx   # Foydalanuvchi hisobi (Pastki qism, Sozlamalar integratsiyalashgan)
-│   │   └── AppShell.tsx     # Barcha qismlarni birlashtiruvchi desktop karkasi
-│   ├── pages/               # Sahifalar
-│   │   ├── LandingPlaceholder.tsx # Step 0 Bosh sahifa (AI Orb, Salomnoma, Voice CTA, Takliflar)
-│   │   └── RoutePlaceholder.tsx   # Ovoz, Suhbat, Buyruqlar, Xotira uchun vaqtinchalik marshrutlar
+│   │   ├── Sidebar.tsx      # Chap navigatsiya paneli
+│   │   └── AppShell.tsx     # Barcha qismlarni birlashtiruvchi karkas
+│   ├── pages/               # Asosiy sahifalar
+│   │   ├── LandingPage.tsx  # Bosh sahifa (Orb, Telemetriya, Tezkor harakatlar)
+│   │   ├── ChatPage.tsx     # Intellektual AI Suhbat
+│   │   ├── VoicePage.tsx    # Ovozli jonli muloqot
+│   │   ├── CommandsPage.tsx # 29+ Tizim asboblari
+│   │   ├── MemoryPage.tsx   # Shaxsiy bilimlar bazasi
+│   │   ├── SchedulerPage.tsx# Vazifalar va eslatmalar
+│   │   ├── PluginsPage.tsx  # Plaginlar katalogi
+│   │   └── AccountPage.tsx  # Supabase Auth, Qurilmalar va Auto-Update sozlamalari
+│   ├── services/            # Aloqa xizmatlari
+│   │   ├── backendService.ts# REST & WebSocket asinxron aloqasi
+│   │   ├── supabaseAuth.ts  # Supabase mijoz va sessiya boshqaruvi
+│   │   └── updateService.ts # Phase 48: Yangilanish tekshirish va o'rnatish
 │   ├── styles/
 │   │   ├── tokens.css       # Ranglar, shriftlar, radiuslar va shisha effektlari
 │   │   └── globals.css      # Asosiy desktop stillari va skrollbar
@@ -45,34 +53,28 @@ mikasa-7/
 └── vite.config.ts
 ```
 
-## 🛠 Ishga tushirish buyruqlari
+## 🛠 Ishga Tushirish Buyruqlari
 
-### 1. Frontend-ni brauzerda ishlab chiqish (Vite Dev Server)
+### 1. Frontend-ni ishlab chiqish (Vite Dev Server)
 ```bash
-cd mikasa-7
 npm install
 npm run dev
 ```
 
-### 2. Frontend-ni tekshirish va yig'ish (TypeScript + Vite)
+### 2. Frontend-ni tekshirish va test qilish
 ```bash
-cd mikasa-7
+npm test
 npm run build
 ```
 
-### 3. Tauri Desktop ilovasini ishga tushirish (Tauri Dev Mode)
+### 3. Tauri Desktop Ilovasini Ishga Tushirish (Native Dev)
 ```bash
-cd mikasa-7
-npm run tauri dev
+npm run desktop
 ```
 
-### 4. Ishlab chiqarish (Production) uchun o'rnatuvchi paket yaratish
+### 4. Ishlab Chiqarish (Release) uchun Yig'ish
 ```bash
-cd mikasa-7
-npm run tauri build
+npm run build:desktop
+node scripts/package_release.cjs
 ```
-
-## 🔗 Mikasa 6.0 Python yadrosi bilan bog'lanish
-- Mikasa 7.0 Tauri ilovasi mavjud Mikasa Python backendiga IPC (Tauri Command / Local HTTP / WebSocket) orqali ulanadi.
-- Mavjud `core/`, `tests/` va `main.py` fayllari o'zgarishsiz qolgan.
-
+*Natija `release/v8.0.0/` katalogida saqlanadi.*
