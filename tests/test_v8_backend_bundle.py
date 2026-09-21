@@ -26,6 +26,24 @@ def is_port_listening(port: int = 18420, host: str = "127.0.0.1") -> bool:
         return s.connect_ex((host, port)) == 0
 
 
+def ensure_backend_extracted():
+    """If running in fresh CI clone where backend/ was gitignored, unpack from portable zip."""
+    backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "mikasa_backend.exe"
+    zip_path = REPO_ROOT / "release" / "v8.0.0" / "Mikasa-AI-v8.0.0-Portable.zip"
+    if not backend_exe.exists() and zip_path.exists():
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            for member in zf.namelist():
+                if member.startswith("backend/"):
+                    zf.extract(member, REPO_ROOT / "release" / "v8.0.0")
+    tauri_backend_exe = REPO_ROOT / "mikasa-7" / "src-tauri" / "backend" / "mikasa_backend.exe"
+    if not tauri_backend_exe.exists() and backend_exe.exists():
+        tauri_backend_exe.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(backend_exe.parent, tauri_backend_exe.parent, dirs_exist_ok=True)
+
+
+ensure_backend_extracted()
+
+
 class TestBackendBundleStructure(unittest.TestCase):
     """Scenario A & J: Verify physical presence and structure of bundled backend."""
 
