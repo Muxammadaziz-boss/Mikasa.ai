@@ -1,0 +1,122 @@
+# ========== packaging/build_backend.py ==========
+# Mikasa AI v8.0.0 — Standalone Backend Production Bundler
+# Uses PyInstaller to bundle core/api_server.py into a self-contained
+# production runtime (backend/mikasa_backend.exe + libraries).
+# Excludes heavy ML/notebook dependencies (torch, matplotlib, jupyter)
+# to achieve ~30MB footprint and sub-second startup.
+
+import os
+import sys
+import shutil
+import subprocess
+import logging
+from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("build_backend")
+
+def build():
+    root_dir = Path(__file__).resolve().parent.parent
+    os.chdir(root_dir)
+
+    python_exe = sys.executable
+    logger.info(f"Using Python executable: {python_exe}")
+    logger.info(f"Project root: {root_dir}")
+
+    build_dir = root_dir / "build" / "pyinstaller_backend"
+    dist_dir = root_dir / "dist" / "backend_build"
+    backend_target_name = "mikasa_backend"
+
+    # Clean previous build artifacts
+    if build_dir.exists():
+        shutil.rmtree(build_dir, ignore_errors=True)
+    if dist_dir.exists():
+        shutil.rmtree(dist_dir, ignore_errors=True)
+
+    cmd = [
+        python_exe, "-m", "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--noconsole",
+        "--onedir",
+        f"--name={backend_target_name}",
+        f"--workpath={build_dir}",
+        f"--distpath={dist_dir}",
+        "--add-data=core;core",
+        "--hidden-import=aiohttp",
+        "--hidden-import=cryptography",
+        "--hidden-import=cryptography.hazmat.primitives.asymmetric.ed25519",
+        "--hidden-import=psutil",
+        "--hidden-import=requests",
+        "--hidden-import=core.v8.update_service",
+        "--hidden-import=core.v8.device_auth",
+        "--hidden-import=core.v8.account_device",
+        "--hidden-import=core.v8.permissions",
+        "--hidden-import=core.v8.remote",
+        "--hidden-import=core.v8.auth_session",
+        "--hidden-import=core.v8.events",
+        "--hidden-import=core.v8.tools",
+        "--hidden-import=core.v8.telegram_webhook",
+        "--exclude-module=torch",
+        "--exclude-module=torchaudio",
+        "--exclude-module=torchvision",
+        "--exclude-module=matplotlib",
+        "--exclude-module=scipy",
+        "--exclude-module=ipython",
+        "--exclude-module=ipykernel",
+        "--exclude-module=jupyter",
+        "--exclude-module=notebook",
+        "--exclude-module=tkinter",
+        "--exclude-module=customtkinter",
+        "--exclude-module=pytest",
+        "--exclude-module=flake8",
+        "--exclude-module=grpc",
+        "--exclude-module=grpcio",
+        "--exclude-module=tensorboard",
+        "core/api_server.py"
+    ]
+
+    logger.info("Starting PyInstaller backend compilation...")
+    result = subprocess.run(cmd, cwd=root_dir)
+    if result.returncode != 0:
+        logger.error(f"PyInstaller failed with code {result.returncode}")
+        sys.exit(result.returncode)
+
+    built_dir = dist_dir / backend_target_name
+    exe_file = built_dir / f"{backend_target_name}.exe"
+    if not exe_file.exists():
+        logger.error(f"Compiled executable not found at: {exe_file}")
+        sys.exit(1)
+
+    # Clean up unnecessary non-Windows speech recognition files
+    sr_dir = built_dir / "_internal" / "speech_recognition"
+    if sr_dir.exists():
+        for junk in ["flac-linux-x86", "flac-linux-x86_64", "flac-mac", "pocketsphinx-data"]:
+            junk_path = sr_dir / junk
+            if junk_path.is_dir():
+                shutil.rmtree(junk_path, ignore_errors=True)
+            elif junk_path.exists():
+                junk_path.unlink()
+
+    logger.info(f"✔ Successfully compiled backend: {exe_file}")
+
+    # Destination 1: mikasa-7/src-tauri/backend/ (for Tauri bundle.resources)
+    tauri_backend_dir = root_dir / "mikasa-7" / "src-tauri" / "backend"
+    if tauri_backend_dir.exists():
+        shutil.rmtree(tauri_backend_dir, ignore_errors=True)
+    shutil.copytree(built_dir, tauri_backend_dir)
+    logger.info(f"✔ Deployed backend to Tauri resources: {tauri_backend_dir}")
+
+    # Destination 2: release/v8.0.0/backend/ (for release distribution)
+    release_backend_dir = root_dir / "release" / "v8.0.0" / "backend"
+    if release_backend_dir.exists():
+        shutil.rmtree(release_backend_dir, ignore_errors=True)
+    shutil.copytree(built_dir, release_backend_dir)
+    logger.info(f"✔ Deployed backend to Release: {release_backend_dir}")
+
+    logger.info("==================================================")
+    logger.info("✨ Production Backend Bundling Complete!")
+    logger.info("==================================================")
+
+if __name__ == "__main__":
+    build()

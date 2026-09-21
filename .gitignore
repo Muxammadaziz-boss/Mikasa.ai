@@ -46,6 +46,12 @@ output/
 scratch/
 logos/
 packaging/portable_launcher/target/
+build/
+dist/
+*.spec
+mikasa-7/src-tauri/target/
+mikasa-7/src-tauri/backend/
+release/**/backend/
 nul
 
 # IDE

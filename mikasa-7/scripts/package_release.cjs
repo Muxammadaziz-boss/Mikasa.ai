@@ -93,6 +93,31 @@ const dllSource = path.join(tauriReleaseDir, "WebView2Loader.dll");
 const dllTarget = path.join(releaseVersionDir, "WebView2Loader.dll");
 copyFileWithLog(dllSource, dllTarget, "WebView2 Loader DLL");
 
+// 4.2 Copy Bundled Backend Runtime (if exists)
+const backendSrcCandidates = [
+  path.join(releaseVersionDir, "backend"),
+  path.join(projectRoot, "release", versionName, "backend"),
+  path.join(__dirname, "../src-tauri/backend"),
+  path.join(projectRoot, "dist/backend_build/mikasa_backend"),
+];
+let backendSourceDir = null;
+for (const cand of backendSrcCandidates) {
+  if (fs.existsSync(path.join(cand, "mikasa_backend.exe"))) {
+    backendSourceDir = cand;
+    break;
+  }
+}
+const backendTargetDir = path.join(releaseVersionDir, "backend");
+if (backendSourceDir && backendSourceDir !== backendTargetDir) {
+  if (!fs.existsSync(backendTargetDir)) {
+    fs.mkdirSync(backendTargetDir, { recursive: true });
+  }
+  fs.cpSync(backendSourceDir, backendTargetDir, { recursive: true });
+  console.log(`✔ Bundled Backend Runtime joylandi: ${path.basename(backendTargetDir)}`);
+} else if (fs.existsSync(path.join(backendTargetDir, "mikasa_backend.exe"))) {
+  console.log(`✔ Bundled Backend Runtime mavjud: ${path.basename(backendTargetDir)}`);
+}
+
 // 5. Copy MSI Installer if exists
 const msiDir = path.join(tauriBundleDir, "msi");
 if (fs.existsSync(msiDir)) {
@@ -138,7 +163,7 @@ echo   MIKASA AI ${versionName} - Launching Portable Desktop...
 echo ========================================================
 
 REM 1. Check if backend is already listening on port 18420
-powershell -NoProfile -Command "$conn = Test-NetConnection -ComputerName 127.0.0.1 -Port 18420 -WarningAction SilentlyContinue -InformationLevel Quiet; if (-not $conn) { Write-Host 'Starting Mikasa Backend Service (127.0.0.1:18420)...' -ForegroundColor Cyan; $workDir = if (Test-Path '.\\\\core\\\\api_server.py') { (Resolve-Path '.').Path } elseif (Test-Path '..\\\\..\\\\core\\\\api_server.py') { (Resolve-Path '..\\\\..').Path } else { (Resolve-Path '.').Path }; $cands = @('.\\\\python\\\\python.exe', '.\\\\runtime\\\\python.exe', (Join-Path $workDir '.venv\\\\Scripts\\\\python.exe'), '..\\\\..\\\\..\\\\.venv\\\\Scripts\\\\python.exe', 'python'); $chosen = 'python'; foreach ($c in $cands) { if ($c -eq 'python') { $chosen = 'python'; break } elseif (Test-Path $c) { $chosen = (Resolve-Path $c).Path; break } } Start-Process -FilePath $chosen -ArgumentList 'core\\\\api_server.py' -WorkingDirectory $workDir -WindowStyle Hidden; Start-Sleep -Seconds 2 }"
+powershell -NoProfile -Command "$conn = Test-NetConnection -ComputerName 127.0.0.1 -Port 18420 -WarningAction SilentlyContinue -InformationLevel Quiet; if (-not $conn) { Write-Host 'Starting Mikasa Backend Service (127.0.0.1:18420)...' -ForegroundColor Cyan; if (Test-Path '.\\\\backend\\\\mikasa_backend.exe') { Start-Process -FilePath '.\\\\backend\\\\mikasa_backend.exe' -WorkingDirectory '.\\\\backend' -WindowStyle Hidden; Start-Sleep -Milliseconds 1200 } else { $workDir = if (Test-Path '.\\\\core\\\\api_server.py') { (Resolve-Path '.').Path } elseif (Test-Path '..\\\\..\\\\core\\\\api_server.py') { (Resolve-Path '..\\\\..').Path } else { (Resolve-Path '.').Path }; $cands = @('.\\\\python\\\\python.exe', '.\\\\runtime\\\\python.exe', (Join-Path $workDir '.venv\\\\Scripts\\\\python.exe'), 'python'); $chosen = 'python'; foreach ($c in $cands) { if ($c -eq 'python') { $chosen = 'python'; break } elseif (Test-Path $c) { $chosen = (Resolve-Path $c).Path; break } } Start-Process -FilePath $chosen -ArgumentList 'core\\\\api_server.py' -WorkingDirectory $workDir -WindowStyle Hidden; Start-Sleep -Seconds 2 } }"
 
 REM 2. Start Desktop App
 start "" "Mikasa-AI-${versionName}.exe"
@@ -147,6 +172,65 @@ start "" "Mikasa-AI-${versionName}.exe"
 const batPath = path.join(releaseVersionDir, "run_portable.bat");
 fs.writeFileSync(batPath, launcherBatContent, "utf-8");
 console.log(`✔ Ishga tushirish fayli: run_portable.bat`);
+
+// 7.1 Build Complete Self-Contained Portable ZIP
+const zipTarget = path.join(releaseVersionDir, `Mikasa-AI-${versionName}-Portable.zip`);
+const tempZipStaging = path.join(releaseVersionDir, `Mikasa-AI-${versionName}-Portable`);
+try {
+  if (fs.existsSync(tempZipStaging)) {
+    fs.rmSync(tempZipStaging, { recursive: true, force: true });
+  }
+  fs.mkdirSync(tempZipStaging, { recursive: true });
+
+  if (fs.existsSync(exeTarget)) {
+    fs.copyFileSync(exeTarget, path.join(tempZipStaging, `Mikasa-AI-${versionName}.exe`));
+  }
+  if (fs.existsSync(dllTarget)) {
+    fs.copyFileSync(dllTarget, path.join(tempZipStaging, "WebView2Loader.dll"));
+  }
+  if (fs.existsSync(batPath)) {
+    fs.copyFileSync(batPath, path.join(tempZipStaging, "run_portable.bat"));
+  }
+  if (fs.existsSync(backendTargetDir)) {
+    fs.cpSync(backendTargetDir, path.join(tempZipStaging, "backend"), { recursive: true });
+  }
+
+  if (fs.existsSync(zipTarget)) {
+    fs.unlinkSync(zipTarget);
+  }
+  const pyCode = `import zipfile, os, sys
+src = sys.argv[1]
+dst = sys.argv[2]
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for root, _, files in os.walk(src):
+        for f in files:
+            p = os.path.join(root, f)
+            zf.write(p, os.path.relpath(p, src))
+`;
+  const pyScript = path.join(releaseVersionDir, "_make_zip.py");
+  fs.writeFileSync(pyScript, pyCode, "utf-8");
+  const pyExe = fs.existsSync("d:\\\\Ishchi stoli\\\\Mikasa\\\\.venv\\\\Scripts\\\\python.exe")
+    ? '"d:\\\\Ishchi stoli\\\\Mikasa\\\\.venv\\\\Scripts\\\\python.exe"'
+    : "python";
+  const { execSync } = require("child_process");
+  execSync(`${pyExe} "${pyScript}" "${tempZipStaging}" "${zipTarget}"`, { stdio: "inherit" });
+  if (fs.existsSync(pyScript)) fs.unlinkSync(pyScript);
+  fs.rmSync(tempZipStaging, { recursive: true, force: true });
+
+  if (fs.existsSync(zipTarget)) {
+    const stat = fs.statSync(zipTarget);
+    const hash = calculateSha256(zipTarget);
+    console.log(`✔ To'liq Portativ Paket: ${path.basename(zipTarget)} (${(stat.size / (1024 * 1024)).toFixed(2)} MB)`);
+    manifest.files.push({
+      name: path.basename(zipTarget),
+      size_bytes: stat.size,
+      size_mb: parseFloat((stat.size / (1024 * 1024)).toFixed(2)),
+      sha256: hash,
+    });
+  }
+} catch (err) {
+  console.warn(`⚠ Portable ZIP yaratishda ogohlantirish: ${err.message}`);
+}
 
 // 8. Write Manifest
 const manifestPath = path.join(releaseVersionDir, "version_manifest.json");

@@ -20,9 +20,35 @@ import time
 import urllib.parse
 
 # Ishchi katalogni to'g'ri o'rnatish
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    # PyInstaller muhiti (standalone bundled executable)
+    BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
+
+def get_data_dir() -> str:
+    """Xavfsiz ma'lumotlar papkasi yo'lini aniqlash (mahalliy data/ yoki %APPDATA%/MikasaAI/data)."""
+    if custom := os.environ.get("MIKASA_DATA_DIR"):
+        os.makedirs(custom, exist_ok=True)
+        return custom
+    local_data = os.path.join(BASE_DIR, "data")
+    try:
+        os.makedirs(local_data, exist_ok=True)
+        test_file = os.path.join(local_data, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        return local_data
+    except Exception:
+        pass
+    appdata = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    safe_data = os.path.join(appdata, "MikasaAI", "data")
+    os.makedirs(safe_data, exist_ok=True)
+    return safe_data
+
+DATA_DIR = get_data_dir()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -694,7 +720,7 @@ async def handle_ai_test_key(request):
 
         # Shuningdek data/config.json ga avtomatik saqlash
         try:
-            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "config.json")
+            cfg_path = os.path.join(DATA_DIR, "config.json")
             if os.path.exists(cfg_path):
                 with open(cfg_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
@@ -1807,9 +1833,9 @@ async def handle_tools_catalog(request):
 
 
 # ========== 7. HISOB VA SOZLAMALAR (ACCOUNT) HANDLERS ==========
-CONFIG_FILE = os.path.join(BASE_DIR, "data", "config.json")
-USER_NAME_FILE = os.path.join(BASE_DIR, "data", "foydalanuvchi_ismi.txt")
-VOICE_TYPE_FILE = os.path.join(BASE_DIR, "data", "ovoz_turi.txt")
+CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+USER_NAME_FILE = os.path.join(DATA_DIR, "foydalanuvchi_ismi.txt")
+VOICE_TYPE_FILE = os.path.join(DATA_DIR, "ovoz_turi.txt")
 
 def _read_config():
     if os.path.exists(CONFIG_FILE):
