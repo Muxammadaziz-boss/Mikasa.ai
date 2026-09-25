@@ -38,6 +38,7 @@ import {
   UserSession,
   MikasaAuthUser,
 } from "../services/backendService";
+import { supabase } from "../services/supabaseClient";
 
 interface AccountPageProps {
   onNavigateHome: () => void;
@@ -399,6 +400,39 @@ export const AccountPage: React.FC<AccountPageProps> = ({
       if (res.ok && res.url) {
         addRightToast("info", "Google Ulanmoqda", "Brauzeringizda ochilgan oynada Google hisobingizni tasdiqlang...");
         await backendService.openExternalUrl(res.url);
+        const linkState = res.state;
+        if (linkState) {
+          let attempts = 0;
+          const pollLink = async () => {
+            attempts += 1;
+            if (attempts > 100) return;
+            const pending = await backendService.checkPendingOAuthSession(linkState);
+            if (pending.fatal || pending.serverUnreachable) {
+              addRightToast("error", "Xatolik", pending.error || "Google hisobini ulash bekor qilindi");
+              return;
+            }
+            if (pending.ok && pending.session) {
+              const { access_token, refresh_token, code } = pending.session;
+              if (access_token) {
+                await supabase.auth.setSession({
+                  access_token,
+                  refresh_token: refresh_token || access_token,
+                });
+                backendService.setAuthToken(access_token);
+              } else if (code) {
+                const { data } = await supabase.auth.exchangeCodeForSession(code);
+                if (data?.session?.access_token) {
+                  backendService.setAuthToken(data.session.access_token);
+                }
+              }
+              addRightToast("success", "Muvaffaqiyatli", "Google hisobi muvaffaqiyatli ulandi!");
+              await refreshIdentities();
+              return;
+            }
+            setTimeout(pollLink, 1500);
+          };
+          setTimeout(pollLink, 1500);
+        }
       } else {
         addRightToast("error", "Xatolik", res.error || "Google bilan ulanishda xatolik yuz berdi");
       }

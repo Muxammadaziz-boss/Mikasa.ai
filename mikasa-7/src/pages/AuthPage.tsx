@@ -59,7 +59,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // Listen for OAuth redirect sessions
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") && session?.user) {
+        if (session.access_token) {
+          backendService.setAuthToken(session.access_token);
+        }
         const user: MikasaAuthUser = {
           id: session.user.id,
           username:
@@ -88,25 +91,69 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     if (!oauthWaiting) return;
     let timer: any = null;
     let isCancelled = false;
+    const startedAt = Date.now();
+    const MAX_WAIT_MS = 5 * 60 * 1000; // 5 daqiqa
 
     const poll = async () => {
+      if (isCancelled) return;
+      if (Date.now() - startedAt > MAX_WAIT_MS) {
+        setOauthWaiting(false);
+        setOauthState(null);
+        setSuccessMsg(null);
+        setErrorMsg("Google sessiyasi kutish vaqti tugadi. Iltimos, qaytadan urinib ko'ring.");
+        return;
+      }
+
       try {
         const res = await backendService.checkPendingOAuthSession(oauthState || undefined);
-        if (res.ok && res.session && !isCancelled) {
+        if (isCancelled) return;
+
+        if (res.fatal || res.serverUnreachable) {
+          setOauthWaiting(false);
+          setOauthState(null);
+          setSuccessMsg(null);
+          setErrorMsg(res.error || "Google orqali kirishda xatolik yuz berdi.");
+          return;
+        }
+
+        if (res.ok && res.session) {
           const { access_token, refresh_token, code } = res.session;
           let sessionUser: any = null;
+          let activeToken = access_token || "";
+
           if (access_token) {
             setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
-            const { data } = await supabase.auth.setSession({
+            const { data, error: sessErr } = await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || access_token,
             });
+            if (sessErr) {
+              setOauthWaiting(false);
+              setOauthState(null);
+              setSuccessMsg(null);
+              setErrorMsg("Google sessiyasi muddati tugagan yoki yaroqsiz. Qaytadan urinib ko'ring.");
+              return;
+            }
             sessionUser = data?.user;
+            activeToken = data?.session?.access_token || access_token;
           } else if (code) {
             setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
-            const { data } = await supabase.auth.exchangeCodeForSession(code);
+            const { data, error: codeErr } = await supabase.auth.exchangeCodeForSession(code);
+            if (codeErr) {
+              setOauthWaiting(false);
+              setOauthState(null);
+              setSuccessMsg(null);
+              setErrorMsg("Google avtorizatsiya kodini almashishda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+              return;
+            }
             sessionUser = data?.user;
+            activeToken = data?.session?.access_token || "";
           }
+
+          if (activeToken) {
+            backendService.setAuthToken(activeToken);
+          }
+
           if (sessionUser && !isCancelled) {
             const u: MikasaAuthUser = {
               id: sessionUser.id,

@@ -4,21 +4,67 @@
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
-function formatAuthError(err: any): string {
-  const msg = (err && (err.message || String(err))) || "";
+export function redactSensitiveTokens(input: string): string {
+  if (!input) return "";
+  return input
+    .replace(
+      /(access_token|refresh_token|provider_token|provider_refresh_token|id_token|code)\s*[=:]\s*([^\s&#"']+)/gi,
+      "$1=[REDACTED]"
+    )
+    .replace(/eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, "[REDACTED_JWT]");
+}
+
+export function scrubUrlOAuthTokens(win?: any): void {
+  const w = win ?? (typeof window !== "undefined" ? window : undefined);
+  if (!w || !w.location || !w.history || typeof w.history.replaceState !== "function") {
+    return;
+  }
+  try {
+    const hash = w.location.hash || "";
+    const search = w.location.search || "";
+    const sensitiveKeys = [
+      "access_token",
+      "refresh_token",
+      "provider_token",
+      "provider_refresh_token",
+      "id_token",
+      "code",
+      "error_description",
+    ];
+    const hasSensitiveHash = sensitiveKeys.some((k) => hash.includes(`${k}=`));
+    const hasSensitiveSearch = sensitiveKeys.some((k) => search.includes(`${k}=`));
+    if (!hasSensitiveHash && !hasSensitiveSearch) {
+      return;
+    }
+    const cleanParams = new URLSearchParams(search);
+    for (const k of sensitiveKeys) {
+      cleanParams.delete(k);
+    }
+    const qs = cleanParams.toString();
+    const cleanUrl = w.location.pathname + (qs ? `?${qs}` : "");
+    w.history.replaceState(null, w.document?.title || "", cleanUrl);
+  } catch {
+    // ignore history errors in restricted environments
+  }
+}
+
+export function formatAuthError(err: any): string {
+  const rawMsg = (err && (err.message || String(err))) || "";
+  const msg = redactSensitiveTokens(rawMsg);
   if (
     msg.includes("Failed to fetch") ||
     msg.includes("NetworkError") ||
     msg.includes("ENOTFOUND") ||
     msg.includes("ERR_NAME_NOT_RESOLVED") ||
+    msg.includes("ERR_CONNECTION_REFUSED") ||
     msg.includes("fetch failed")
   ) {
-    return "Supabase serveriga ulanib bo'lmadi. Internet aloqangiz yoki loyiha URL manzilini tekshiring.";
+    return "Autentifikatsiya serveriga ulanib bo'lmadi. Internet aloqangiz yoki server holatini tekshiring.";
   }
   if (msg.includes("provider is not enabled") || msg.includes("Unsupported provider")) {
     return "Google orqali kirish Supabase Dashboard'da yoqilmagan. Supabase -> Authentication -> Providers bo'limida Google'ni yoqing va Client ID/Secret'ni kiriting.";
   }
-  if (msg.includes("email_address_invalid") || msg.includes("Email address") && msg.includes("is invalid")) {
+  if (msg.includes("email_address_invalid") || (msg.includes("Email address") && msg.includes("is invalid"))) {
     return "Kiritilgan email manzili noto'g'ri yoki qabul qilinmadi. Iltimos, haqiqiy email kiriting (masalan: example@gmail.com).";
   }
   if (msg.includes("Invalid login credentials")) {
@@ -34,7 +80,8 @@ function formatAuthError(err: any): string {
     msg.includes("Email link is invalid or has expired") ||
     msg.includes("otp_expired") ||
     msg.includes("Token has expired") ||
-    msg.includes("token is expired")
+    msg.includes("token is expired") ||
+    msg.includes("JWT expired")
   ) {
     return "Tasdiqlash havolasi yoki tokeni yaroqsiz yoxud muddati o'tgan. Iltimos, qaytadan so'rov yuboring.";
   }
@@ -59,6 +106,7 @@ function formatAuthError(err: any): string {
     msg.includes("bad_oauth_state") ||
     msg.includes("state mismatch") ||
     msg.includes("state expired") ||
+    msg.includes("Noto'g'ri OAuth state") ||
     msg.includes("Sessiya topilmadi yoki muddati o'tgan")
   ) {
     return "Google sessiyasi muddati tugagan yoki tasdiqlanmadi. Qaytadan urinib ko'ring.";
@@ -478,27 +526,154 @@ export interface RemoteAuditItem {
   details?: Record<string, any>;
 }
 
-const DEFAULT_API_URL = "http://127.0.0.1:18420";
-const PRODUCTION_API_URL = "https://mikasa-v8-api-production.up.railway.app";
+export const DEFAULT_API_URL = "http://127.0.0.1:18420";
+export const PRODUCTION_API_URL = "https://mikasa-v8-api-production.up.railway.app";
 
-function resolveApiBase(): string {
-  const envUrl = (import.meta.env.VITE_API_URL || "").trim();
-  if (typeof window !== "undefined") {
-    const customUrl = localStorage.getItem("mikasa_backend_url");
-    if (customUrl) return customUrl.replace(/\/$/, "");
+const FORBIDDEN_FRONTEND_PORTS = new Set(["140", "1420", "1421", "5173"]);
+const OAUTH_STATE_REGEX = /^[A-Za-z0-9_\-.:]{1,256}$/;
 
-    const isTauri = Boolean((window as any).__TAURI__ || (window as any).__TAURI_METADATA__);
-    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+export function isLocalhostUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.trim());
+    const h = parsed.hostname.toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]" || h.endsWith(".localhost");
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes("localhost") || lower.includes("127.0.0.1");
+  }
+}
 
-    if (!isTauri && !isLocalHost) {
-      if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+export function isInvalidFrontendPortUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.trim());
+    const h = parsed.hostname.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") {
+      if (FORBIDDEN_FRONTEND_PORTS.has(parsed.port)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return /(?:localhost|127\.0\.0\.1):(140|1420|1421|5173)\b/i.test(url);
+  }
+}
+
+export function isTauriRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w) return false;
+  if (w.__TAURI_INTERNALS__ || w.__TAURI__ || w.__TAURI_METADATA__) {
+    return true;
+  }
+  const loc = w.location;
+  if (loc) {
+    const proto = String(loc.protocol || "").toLowerCase();
+    const host = String(loc.hostname || "").toLowerCase();
+    if (proto === "tauri:" || host === "tauri.localhost" || host.endsWith(".tauri.localhost")) {
+      return true;
+    }
+  }
+  const ua = String(w.navigator?.userAgent || "");
+  if (ua.includes("Tauri")) {
+    return true;
+  }
+  return false;
+}
+
+export function isLocalDevRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w || isTauriRuntime(w)) return false;
+  const host = String(w.location?.hostname || "").toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+}
+
+export function isProductionWebRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w) return false;
+  return !isTauriRuntime(w) && !isLocalDevRuntime(w);
+}
+
+export function resolveApiBase(win?: any, envOverride?: Record<string, any>): string {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  const env = envOverride ?? ((import.meta as any).env || {});
+  const envUrl = String(env.VITE_API_URL || "").trim();
+
+  if (w) {
+    let customUrl = "";
+    try {
+      customUrl = String(w.localStorage?.getItem("mikasa_backend_url") || "").trim();
+    } catch {}
+
+    const isProdWeb = isProductionWebRuntime(w);
+
+    if (isProdWeb) {
+      if (customUrl && !isLocalhostUrl(customUrl) && !isInvalidFrontendPortUrl(customUrl)) {
+        return customUrl.replace(/\/$/, "");
+      }
+      if (envUrl && !isLocalhostUrl(envUrl) && !isInvalidFrontendPortUrl(envUrl)) {
         return envUrl.replace(/\/$/, "");
       }
       return PRODUCTION_API_URL;
     }
+
+    if (customUrl && !isInvalidFrontendPortUrl(customUrl)) {
+      return customUrl.replace(/\/$/, "");
+    }
   }
 
-  return (envUrl || DEFAULT_API_URL).replace(/\/$/, "");
+  if (envUrl && !isInvalidFrontendPortUrl(envUrl)) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return DEFAULT_API_URL;
+}
+
+export function resolveOAuthCallbackBase(options?: {
+  win?: any;
+  envOverride?: Record<string, any>;
+  apiBaseOverride?: string;
+}): string {
+  const w = options?.win !== undefined ? options.win : typeof window !== "undefined" ? window : undefined;
+  const env = options?.envOverride ?? ((import.meta as any).env || {});
+  const explicitOAuthEnv = String(env.VITE_OAUTH_REDIRECT_URL || "")
+    .trim()
+    .replace(/\/api\/auth\/callback\/?$/i, "")
+    .replace(/\/$/, "");
+  const isProdWeb = isProductionWebRuntime(w);
+
+  if (isProdWeb) {
+    for (const candidate of [explicitOAuthEnv, options?.apiBaseOverride || "", String(env.VITE_API_URL || "").trim()]) {
+      const cleaned = candidate.trim().replace(/\/$/, "");
+      if (cleaned && !isLocalhostUrl(cleaned) && !isInvalidFrontendPortUrl(cleaned)) {
+        return cleaned;
+      }
+    }
+    return PRODUCTION_API_URL;
+  }
+
+  for (const candidate of [explicitOAuthEnv, options?.apiBaseOverride || "", resolveApiBase(w, env)]) {
+    const cleaned = candidate.trim().replace(/\/$/, "");
+    if (cleaned && !isInvalidFrontendPortUrl(cleaned)) {
+      return cleaned;
+    }
+  }
+  return DEFAULT_API_URL;
+}
+
+export function resolveOAuthRedirectUrl(
+  state: string,
+  options?: {
+    win?: any;
+    envOverride?: Record<string, any>;
+    apiBaseOverride?: string;
+  }
+): string {
+  const cleanState = String(state || "").trim();
+  if (!cleanState || !OAUTH_STATE_REGEX.test(cleanState)) {
+    throw new Error("Noto'g'ri OAuth state parametri");
+  }
+  const base = resolveOAuthCallbackBase(options);
+  return `${base}/api/auth/callback?state=${encodeURIComponent(cleanState)}`;
 }
 
 const API_BASE = resolveApiBase();
@@ -524,21 +699,46 @@ class BackendService {
   private authListeners: Set<(user: MikasaAuthUser | null) => void> = new Set();
   private clientVoiceStopFn: (() => void) | null = null;
   private authToken: string | null = null;
+  private activeOAuthState: string | null = null;
+  private activeOAuthCallbackBase: string | null = null;
+  private oauthPollFailures = 0;
 
   constructor() {
+    scrubUrlOAuthTokens();
     this.authToken = this.getAuthToken();
     if (isSupabaseConfigured) {
       supabase.auth.getSession().then(({ data: { session } }) => {
+        scrubUrlOAuthTokens();
         if (session?.access_token) {
           this.setAuthToken(session.access_token);
         }
       }).catch(() => {});
 
-      supabase.auth.onAuthStateChange((_event, session) => {
+      supabase.auth.onAuthStateChange((event, session) => {
+        scrubUrlOAuthTokens();
         if (session?.access_token) {
           this.setAuthToken(session.access_token);
-        } else if (_event === "SIGNED_OUT") {
+          if ((event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") && session.user) {
+            const user: MikasaAuthUser = {
+              id: session.user.id,
+              username:
+                session.user.user_metadata?.full_name ||
+                session.user.user_metadata?.name ||
+                session.user.user_metadata?.username ||
+                session.user.email?.split("@")[0] ||
+                "User",
+              email: session.user.email || "",
+              is_active: true,
+              is_verified: Boolean(session.user.email_confirmed_at),
+              created_at: Date.now() / 1000,
+              avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
+              provider: session.user.app_metadata?.provider || "google",
+            };
+            this.notifyAuthChange(user);
+          }
+        } else if (event === "SIGNED_OUT") {
           this.setAuthToken(null);
+          this.notifyAuthChange(null);
         }
       });
     }
@@ -2187,7 +2387,55 @@ class BackendService {
     }
   }
 
-  public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string }> {
+  private async verifyOAuthCallbackReachability(callbackBase: string): Promise<{ ok: boolean; error?: string }> {
+    if (typeof window === "undefined" || (globalThis as any).__MIKASA_SKIP_OAUTH_HEALTH_CHECK__) {
+      return { ok: true };
+    }
+    const pingHealth = async (base: string): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(`${base}/api/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) return true;
+      } catch {}
+      try {
+        const controller2 = new AbortController();
+        const timer2 = setTimeout(() => controller2.abort(), 2500);
+        const res2 = await fetch(`${base}/health`, { signal: controller2.signal });
+        clearTimeout(timer2);
+        return res2.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    if (await pingHealth(callbackBase)) {
+      return { ok: true };
+    }
+
+    if (isTauriRuntime() && isLocalhostUrl(callbackBase)) {
+      await this.restartBackend();
+      await new Promise((r) => setTimeout(r, 1200));
+      if (await pingHealth(callbackBase)) {
+        return { ok: true };
+      }
+    }
+
+    if (isLocalhostUrl(callbackBase)) {
+      return {
+        ok: false,
+        error: "Lokal OAuth callback serveri (127.0.0.1:18420) ishlamayapti. Iltimos, lokal backend ishga tushganini tekshiring.",
+      };
+    }
+
+    return {
+      ok: false,
+      error: "Autentifikatsiya serveriga ulanib bo'lmadi. Internet aloqangiz yoki production server holatini tekshiring.",
+    };
+  }
+
+  public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string; redirectTo?: string }> {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
@@ -2195,13 +2443,31 @@ class BackendService {
       };
     }
     try {
-      // In Desktop/Tauri or localhost environments, route redirect to the Python backend callback handler
       const state =
         customState ||
         (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID
           ? window.crypto.randomUUID()
           : Math.random().toString(36).substring(2) + Date.now().toString(36));
-      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
+
+      const callbackBase = resolveOAuthCallbackBase();
+      const redirectTo = resolveOAuthRedirectUrl(state, { apiBaseOverride: callbackBase });
+
+      if (isInvalidFrontendPortUrl(redirectTo)) {
+        return {
+          ok: false,
+          error: "Xavfsizlik xatosi: OAuth redirect manzili noto'g'ri lokal portga (140/1420) yo'naltirilgan.",
+        };
+      }
+
+      const reachability = await this.verifyOAuthCallbackReachability(callbackBase);
+      if (!reachability.ok) {
+        return { ok: false, error: reachability.error };
+      }
+
+      this.activeOAuthState = state;
+      this.activeOAuthCallbackBase = callbackBase;
+      this.oauthPollFailures = 0;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -2216,23 +2482,71 @@ class BackendService {
       if (error) {
         return { ok: false, error: formatAuthError(error) };
       }
-      return { ok: true, url: data.url, state };
+      if (data?.url && isInvalidFrontendPortUrl(data.url)) {
+        return {
+          ok: false,
+          error: "OAuth avtorizatsiya havolasida noto'g'ri localhost port aniqlandi.",
+        };
+      }
+      return { ok: true, url: data?.url, state, redirectTo };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
     }
   }
 
-  public async checkPendingOAuthSession(state?: string): Promise<{ ok: boolean; session?: { access_token?: string; refresh_token?: string; code?: string } }> {
+  public async checkPendingOAuthSession(state?: string): Promise<{
+    ok: boolean;
+    session?: { access_token?: string; refresh_token?: string; code?: string };
+    error?: string;
+    fatal?: boolean;
+    serverUnreachable?: boolean;
+  }> {
+    const targetState = (state || this.activeOAuthState || "").trim();
+    if (targetState && !OAUTH_STATE_REGEX.test(targetState)) {
+      return {
+        ok: false,
+        error: "Google sessiyasi state parametri yaroqsiz.",
+        fatal: true,
+      };
+    }
+    const callbackBase = this.activeOAuthCallbackBase || resolveOAuthCallbackBase();
     try {
-      const url = state
-        ? `${API_BASE}/api/auth/callback/session?state=${encodeURIComponent(state)}`
-        : `${API_BASE}/api/auth/callback/session`;
-      const res = await fetch(url);
+      const url = targetState
+        ? `${callbackBase}/api/auth/callback/session?state=${encodeURIComponent(targetState)}`
+        : `${callbackBase}/api/auth/callback/session`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      this.oauthPollFailures = 0;
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        if (data?.ok && data?.session) {
+          this.activeOAuthState = null;
+        }
+        return data;
+      }
+      if (res.status === 400) {
+        const errData = await res.json().catch(() => ({}));
+        const rawErr = errData?.oauth_error || errData?.error || "Google orqali kirishda xatolik yuz berdi";
+        this.activeOAuthState = null;
+        return {
+          ok: false,
+          error: formatAuthError(rawErr),
+          fatal: true,
+        };
       }
       return { ok: false };
     } catch {
+      this.oauthPollFailures += 1;
+      if (this.oauthPollFailures >= 5) {
+        return {
+          ok: false,
+          serverUnreachable: true,
+          error: "Autentifikatsiya serveri bilan aloqa uzildi. Server ishlayotganini tekshiring.",
+        };
+      }
       return { ok: false };
     }
   }
@@ -2294,7 +2608,7 @@ class BackendService {
     }
   }
 
-  public async linkGoogleAccount(customState?: string): Promise<{ ok: boolean; url?: string; state?: string; error?: string }> {
+  public async linkGoogleAccount(customState?: string): Promise<{ ok: boolean; url?: string; state?: string; redirectTo?: string; error?: string }> {
     if (!isSupabaseConfigured) {
       return { ok: false, error: "Supabase konfiguratsiyasi topilmadi" };
     }
@@ -2304,7 +2618,18 @@ class BackendService {
         (typeof window !== "undefined" && window.crypto?.randomUUID
           ? `link_${window.crypto.randomUUID()}`
           : `link_${Date.now()}`);
-      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
+      const callbackBase = resolveOAuthCallbackBase();
+      const redirectTo = resolveOAuthRedirectUrl(state, { apiBaseOverride: callbackBase });
+
+      const reachability = await this.verifyOAuthCallbackReachability(callbackBase);
+      if (!reachability.ok) {
+        return { ok: false, error: reachability.error };
+      }
+
+      this.activeOAuthState = state;
+      this.activeOAuthCallbackBase = callbackBase;
+      this.oauthPollFailures = 0;
+
       const { data, error } = await supabase.auth.linkIdentity({
         provider: "google",
         options: {
@@ -2319,7 +2644,7 @@ class BackendService {
       if (error) {
         return { ok: false, error: formatAuthError(error) };
       }
-      return { ok: true, url: data?.url, state };
+      return { ok: true, url: data?.url, state, redirectTo };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
     }

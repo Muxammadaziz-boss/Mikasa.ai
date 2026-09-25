@@ -3183,10 +3183,42 @@ async def handle_health(request):
 
 
 # ========== 8.2.1. OAUTH REDIRECT & SESSION RECEIVER ==========
+import re as _re
 import threading
 _pending_oauth_sessions: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _pending_oauth_lock = threading.Lock()
 OAUTH_SESSION_TTL_SECONDS = 300.0  # 5 daqiqa
+_OAUTH_STATE_RE = _re.compile(r"^[A-Za-z0-9_\-\.:]{1,256}$")
+_OAUTH_SECRET_KV_RE = _re.compile(
+    r"(?i)(access_token|refresh_token|provider_token|provider_refresh_token|id_token|code)\s*[=:]\s*([^\s&#\"']+)"
+)
+_OAUTH_JWT_RE = _re.compile(r"eyJ[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}\.[A-Za-z0-9_\-]{5,}")
+
+
+def _is_valid_oauth_state(state: str) -> bool:
+    """OAuth state parametrining xavfsiz formatda ekanligini tekshirish."""
+    if not state or not isinstance(state, str):
+        return False
+    return bool(_OAUTH_STATE_RE.match(state.strip()))
+
+
+def _redact_oauth_secrets(text: str) -> str:
+    """Log yoki xato xabarlarida token va maxfiy kodlar oshkor bo'lishini oldini olish."""
+    if not text or not isinstance(text, str):
+        return ""
+    cleaned = _OAUTH_SECRET_KV_RE.sub(r"\1=[REDACTED]", text)
+    cleaned = _OAUTH_JWT_RE.sub("[REDACTED_JWT]", cleaned)
+    return cleaned
+
+
+def _oauth_security_headers() -> Dict[str, str]:
+    """OAuth javoblari keshlanmasligi va Referer orqali token sizib chiqmasligi uchun sarlavhalar."""
+    return {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+    }
 
 
 def _clean_expired_oauth_sessions():
@@ -3205,6 +3237,7 @@ async def handle_oauth_callback(request):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
   <title>Mikasa AI — Kirish muvaffaqiyatli</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3271,17 +3304,38 @@ async def handle_oauth_callback(request):
       
       const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+      const expiresIn = hashParams.get('expires_in') || searchParams.get('expires_in');
       const code = searchParams.get('code') || hashParams.get('code');
       const state = searchParams.get('state') || hashParams.get('state') || '';
-      const error = searchParams.get('error') || hashParams.get('error') || searchParams.get('error_description') || hashParams.get('error_description');
+      const error = searchParams.get('error_description') || hashParams.get('error_description') || searchParams.get('error') || hashParams.get('error');
+
+      // Xavfsizlik: access_token, refresh_token va code ni brauzer manzil satridan darhol tozalash
+      try {
+        if (window.history && window.history.replaceState) {
+          var cleanUrl = window.location.pathname + (state ? '?state=' + encodeURIComponent(state) : '');
+          window.history.replaceState(null, document.title, cleanUrl);
+        }
+      } catch (e) {}
 
       const msgEl = document.getElementById('msg');
       const badgeEl = document.getElementById('badge');
 
       if (error) {
-        msgEl.textContent = "Xatolik: " + decodeURIComponent(error);
+        var safeErr = decodeURIComponent(error).replace(/(access_token|refresh_token|code)=[^&\\s]+/gi, '$1=[REDACTED]');
+        msgEl.textContent = "Xatolik: " + safeErr;
         badgeEl.textContent = "Muvaffaqiyatsiz";
         badgeEl.className = "status error";
+        if (state) {
+          fetch('/api/auth/callback/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              state: state,
+              error: safeErr,
+              timestamp: Date.now()
+            })
+          }).catch(function() {});
+        }
         return;
       }
 
@@ -3292,19 +3346,31 @@ async def handle_oauth_callback(request):
           body: JSON.stringify({
             access_token: accessToken,
             refresh_token: refreshToken,
+            expires_in: expiresIn ? Number(expiresIn) : undefined,
             code: code,
             state: state,
             timestamp: Date.now()
           })
-        }).then(function(res) { return res.json(); }).then(function(data) {
+        }).then(function(res) {
+          return res.json().then(function(data) {
+            return { ok: res.ok && data && data.ok, data: data };
+          });
+        }).then(function(result) {
+          if (!result.ok) {
+            msgEl.textContent = (result.data && result.data.error) || "Sessiyani saqlashda xatolik yuz berdi.";
+            badgeEl.textContent = "Xatolik";
+            badgeEl.className = "status error";
+            return;
+          }
           msgEl.innerHTML = "Tizimga muvaffaqiyatli kirdingiz!<br>Ushbu oynani yopib, Mikasa ilovasiga qaytishingiz mumkin.";
           badgeEl.textContent = "Tasdiqlandi ✓";
           setTimeout(function() {
             try { window.close(); } catch(e) {}
           }, 1500);
-        }).catch(function(err) {
-          msgEl.textContent = "Tizimga kirish tasdiqlandi. Mikasa ilovasiga qaytishingiz mumkin.";
-          badgeEl.textContent = "Tayyor ✓";
+        }).catch(function() {
+          msgEl.textContent = "Server bilan aloqa o'rnatishda xatolik yuz berdi. Qaytadan urinib ko'ring.";
+          badgeEl.textContent = "Xatolik";
+          badgeEl.className = "status error";
         });
       } else {
         msgEl.textContent = "Avtorizatsiya tokeni qabul qilinmadi.";
@@ -3315,27 +3381,74 @@ async def handle_oauth_callback(request):
   </script>
 </body>
 </html>"""
-    return web.Response(text=html_content, content_type="text/html")
+    return web.Response(
+        text=html_content,
+        content_type="text/html",
+        headers=_oauth_security_headers(),
+    )
 
 
 async def handle_oauth_session_save(request):
     """POST /api/auth/callback/session - Brauzerdan kelgan sessiya tokenlarini state bilan xavfsiz saqlash"""
     try:
         data = await request.json()
+        if not isinstance(data, dict):
+            raise ValueError("JSON obyekt bo'lishi kerak")
     except Exception:
-        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+        return web.json_response(
+            {"ok": False, "error": "Noto'g'ri JSON formati"},
+            status=400,
+            headers=_oauth_security_headers(),
+        )
 
-    state = str(data.get("state") or request.query.get("state") or "default").strip()
+    raw_state = str(data.get("state") or request.query.get("state") or "").strip()
+    if raw_state:
+        if not _is_valid_oauth_state(raw_state):
+            return web.json_response(
+                {"ok": False, "error": "Noto'g'ri OAuth state formati"},
+                status=400,
+                headers=_oauth_security_headers(),
+            )
+        state = raw_state
+    else:
+        state = "default"
+
+    access_token = str(data.get("access_token") or "").strip() or None
+    refresh_token = str(data.get("refresh_token") or "").strip() or None
+    code = str(data.get("code") or "").strip() or None
+    oauth_error = str(data.get("error") or "").strip() or None
+
+    if not access_token and not code and not oauth_error:
+        return web.json_response(
+            {"ok": False, "error": "Avtorizatsiya tokeni yoki kodi topilmadi"},
+            status=400,
+            headers=_oauth_security_headers(),
+        )
+
     _clean_expired_oauth_sessions()
 
     now = time.time()
     expires_at = now + OAUTH_SESSION_TTL_SECONDS
 
+    sanitized_session: Dict[str, Any] = {
+        "state": state,
+        "timestamp": data.get("timestamp") or int(now * 1000),
+    }
+    if access_token:
+        sanitized_session["access_token"] = access_token
+    if refresh_token:
+        sanitized_session["refresh_token"] = refresh_token
+    if code:
+        sanitized_session["code"] = code
+    if data.get("expires_in") is not None:
+        sanitized_session["expires_in"] = data.get("expires_in")
+    if oauth_error:
+        sanitized_session["error"] = _redact_oauth_secrets(oauth_error)
+
     with _pending_oauth_lock:
-        _pending_oauth_sessions[state] = (expires_at, data)
+        _pending_oauth_sessions[state] = (expires_at, sanitized_session)
 
     # Extract name from JWT if available to immediately sync user name
-    access_token = data.get("access_token")
     if access_token and "." in access_token:
         try:
             import base64
@@ -3365,24 +3478,38 @@ async def handle_oauth_session_save(request):
     audit = RemoteAuditLogger.get_instance()
     audit.log_event(RemoteAuditEvent(
         event_type=RemoteEventType.OAUTH_COMPLETED,
-        details={"state": state, "status": "completed"}
+        details={"state": state, "status": "error" if oauth_error else "completed"}
     ))
 
     # Xavfsizlik: raw tokenlarni websocketga tarqatmaslik! Faqat xavfsiz holat hodisasi
     safe_event = {
-        "ok": True,
-        "status": "completed",
+        "ok": not bool(oauth_error),
+        "status": "error" if oauth_error else "completed",
         "state": state,
         "timestamp": now
     }
     sync_broadcast("oauth_completed", safe_event, _main_loop)
-    return web.json_response({"ok": True, "status": "saved", "state": state})
+    return web.json_response(
+        {"ok": True, "status": "saved", "state": state},
+        headers=_oauth_security_headers(),
+    )
 
 
 async def handle_oauth_session_get(request):
     """GET /api/auth/callback/session - Desktop ilova uchun kutilayotgan sessiyani state orqali bir martalik olish"""
     _clean_expired_oauth_sessions()
     req_state = request.query.get("state", "").strip()
+
+    if req_state and not _is_valid_oauth_state(req_state):
+        return web.json_response(
+            {
+                "ok": False,
+                "session": None,
+                "error": "Noto'g'ri OAuth state parametri",
+            },
+            status=400,
+            headers=_oauth_security_headers(),
+        )
 
     now = time.time()
     sess_data = None
@@ -3395,20 +3522,36 @@ async def handle_oauth_session_get(request):
                 if exp > now:
                     sess_data = data
         else:
-            # Backward-compatibility for callers where state was omitted
-            valid_keys = [k for k, (exp, _) in _pending_oauth_sessions.items() if exp > now]
-            if valid_keys:
-                latest_key = max(valid_keys, key=lambda k: _pending_oauth_sessions[k][0])
-                _, sess_data = _pending_oauth_sessions.pop(latest_key)
+            # Backward-compatibility ONLY for explicit "default" state (never leak state-bound sessions!)
+            item = _pending_oauth_sessions.pop("default", None)
+            if item:
+                exp, data = item
+                if exp > now:
+                    sess_data = data
 
     if sess_data:
-        return web.json_response({"ok": True, "session": sess_data})
+        if sess_data.get("error"):
+            err_msg = _redact_oauth_secrets(str(sess_data.get("error")))
+            return web.json_response(
+                {
+                    "ok": False,
+                    "session": None,
+                    "oauth_error": err_msg,
+                    "error": f"Google orqali kirishda xatolik: {err_msg}",
+                },
+                status=400,
+                headers=_oauth_security_headers(),
+            )
+        return web.json_response(
+            {"ok": True, "session": sess_data},
+            headers=_oauth_security_headers(),
+        )
 
     return web.json_response({
         "ok": False,
         "session": None,
         "error": "Sessiya topilmadi yoki muddati o'tgan"
-    }, status=404)
+    }, status=404, headers=_oauth_security_headers())
 
 
 # ========== 8.2.2. PHASE 44: ACCOUNT IDENTITIES & LINKING API ==========
@@ -4408,6 +4551,8 @@ def is_production_or_remote_enabled() -> bool:
         return True
     if os.environ.get("MIKASA_ENV", "").lower() in ("production", "prod", "staging"):
         return True
+    if os.environ.get("MIKASA_API_HOST", "").strip() == "0.0.0.0":
+        return True
     for key in (
         "RAILWAY_ENVIRONMENT",
         "RAILWAY_PROJECT_ID",
@@ -4426,6 +4571,7 @@ async def cors_middleware(request, handler):
     path = str(getattr(request, "path", getattr(request, "rel_url", "/")))
     origin = request.headers.get("Origin", "")
     is_prod = is_production_or_remote_enabled()
+    is_oauth_route = path.startswith("/api/auth/callback")
 
     # Preflight OPTIONS so'rovlarini zudlik bilan qanoatlantirish
     if request.method == "OPTIONS":
@@ -4447,8 +4593,8 @@ async def cors_middleware(request, handler):
             return ex
 
     # Remote IP tekshiruvi: Faqat mahalliy desktop rejimida begona LAN murojaatlari cheklanadi.
-    # Bulutli / Production (Railway) rejimida internet mijozlari Bearer token va CORS orqali himoyalanadi.
-    if not is_prod and request.remote and request.remote not in ALLOWED_REMOTE_IPS:
+    # Bulutli / Production (Railway) rejimida va OAuth callback yo'llarida internet mijozlariga ruxsat beriladi.
+    if not is_prod and not is_oauth_route and request.remote and request.remote not in ALLOWED_REMOTE_IPS:
         logger.warning(f"Xavfsizlik: Lokal rejimda begona tarmoqdan so'rov rad etildi: {request.remote}")
         return web.HTTPForbidden(text="Xavfsizlik: Begona tarmoqdan murojaat taqiqlangan.")
 
@@ -4726,15 +4872,17 @@ def run_server(host=None, port=None):
         await primary_site.start()
         logger.info(f"Asosiy API server ishga tushdi: http://{resolved_host}:{resolved_port}")
 
-        # Auxiliary port (1420) - local OAuth fallback only
-        env_name = os.environ.get("ENVIRONMENT", "development").lower()
-        if env_name != "production" and resolved_port != 1420 and resolved_host in ("127.0.0.1", "localhost"):
-            try:
-                aux_site = web.TCPSite(runner, resolved_host, 1420)
-                await aux_site.start()
-                logger.info(f"Qo'shimcha OAuth tinglovchisi ishga tushdi: http://{resolved_host}:1420")
-            except Exception as e:
-                logger.debug(f"Port 1420 band yoki ulanib bo'lmadi: {e}")
+        # Auxiliary ports (1420, 140) - local desktop OAuth fallback only (never on cloud/Railway)
+        is_cloud = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"))
+        if not is_cloud and resolved_host in ("127.0.0.1", "localhost"):
+            for aux_port in (1420, 140):
+                if resolved_port != aux_port:
+                    try:
+                        aux_site = web.TCPSite(runner, resolved_host, aux_port)
+                        await aux_site.start()
+                        logger.info(f"Qo'shimcha OAuth tinglovchisi ishga tushdi: http://{resolved_host}:{aux_port}")
+                    except Exception as e:
+                        logger.debug(f"Port {aux_port} band yoki ulanib bo'lmadi: {e}")
 
         stop_event = asyncio.Event()
 

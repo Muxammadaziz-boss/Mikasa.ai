@@ -195,3 +195,97 @@ test('Phase 34: System Telemetry metrics schema contract', () => {
   assert.ok(sampleMetrics.ram_used_gb <= sampleMetrics.ram_total_gb);
   assert.ok(sampleMetrics.battery_percent >= 0 && sampleMetrics.battery_percent <= 100);
 });
+
+// 8. PHASE 48+ — GOOGLE OAUTH REDIRECT & SECURITY TESTS
+test('OAuth Redirect: Production Web never redirects to localhost:140 or localhost:1420', () => {
+  const DEFAULT_API_URL = 'http://127.0.0.1:18420';
+  const PRODUCTION_API_URL = 'https://mikasa-v8-api-production.up.railway.app';
+  const FORBIDDEN_PORTS = new Set(['140', '1420', '1421', '5173']);
+
+  const isLocalhostUrl = (url) => {
+    try {
+      const p = new URL(url);
+      const h = p.hostname.toLowerCase();
+      return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.localhost');
+    } catch {
+      return url.includes('localhost') || url.includes('127.0.0.1');
+    }
+  };
+
+  const isInvalidFrontendPortUrl = (url) => {
+    try {
+      const p = new URL(url);
+      return (p.hostname === 'localhost' || p.hostname === '127.0.0.1') && FORBIDDEN_PORTS.has(p.port);
+    } catch {
+      return false;
+    }
+  };
+
+  const isTauriRuntime = (w) => {
+    if (!w) return false;
+    if (w.__TAURI_INTERNALS__ || w.__TAURI__ || w.__TAURI_METADATA__) return true;
+    if (w.location?.protocol === 'tauri:' || w.location?.hostname === 'tauri.localhost') return true;
+    return false;
+  };
+
+  const isLocalDevRuntime = (w) => {
+    if (!w || isTauriRuntime(w)) return false;
+    return w.location?.hostname === 'localhost' || w.location?.hostname === '127.0.0.1';
+  };
+
+  const resolveOAuthRedirectUrl = (state, w, env = {}) => {
+    if (!state || !/^[A-Za-z0-9_\-.:]{1,256}$/.test(state)) {
+      throw new Error('Invalid state');
+    }
+    const isProdWeb = Boolean(w && !isTauriRuntime(w) && !isLocalDevRuntime(w));
+    let base = DEFAULT_API_URL;
+    if (isProdWeb) {
+      const candidate = (env.VITE_OAUTH_REDIRECT_URL || env.VITE_API_URL || '').trim();
+      base = (candidate && !isLocalhostUrl(candidate) && !isInvalidFrontendPortUrl(candidate))
+        ? candidate.replace(/\/$/, '')
+        : PRODUCTION_API_URL;
+    } else {
+      const candidate = (env.VITE_API_URL || DEFAULT_API_URL).trim();
+      base = isInvalidFrontendPortUrl(candidate) ? DEFAULT_API_URL : candidate.replace(/\/$/, '');
+    }
+    return `${base}/api/auth/callback?state=${encodeURIComponent(state)}`;
+  };
+
+  // Case 1: Production Web with accidental localhost:140 or 127.0.0.1:18420 in env
+  const prodWin = { location: { protocol: 'https:', hostname: 'mikasa-v8-api-production.up.railway.app' } };
+  const prodRedirect1 = resolveOAuthRedirectUrl('st_prod_1', prodWin, { VITE_API_URL: 'http://localhost:140' });
+  assert.equal(prodRedirect1, 'https://mikasa-v8-api-production.up.railway.app/api/auth/callback?state=st_prod_1');
+  assert.ok(!prodRedirect1.includes('localhost:140'));
+  assert.ok(!prodRedirect1.includes('localhost:1420'));
+
+  // Case 2: Tauri v2 Desktop (tauri.localhost + __TAURI_INTERNALS__)
+  const tauriWin = {
+    __TAURI_INTERNALS__: {},
+    location: { protocol: 'http:', hostname: 'tauri.localhost' },
+  };
+  const tauriRedirect = resolveOAuthRedirectUrl('st_tauri_2', tauriWin, { VITE_API_URL: 'http://127.0.0.1:18420' });
+  assert.equal(tauriRedirect, 'http://127.0.0.1:18420/api/auth/callback?state=st_tauri_2');
+
+  // Case 3: Local Dev blocks accidental port 140/1420
+  const devWin = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' } };
+  const devRedirect = resolveOAuthRedirectUrl('st_dev_3', devWin, { VITE_API_URL: 'http://localhost:140' });
+  assert.equal(devRedirect, 'http://127.0.0.1:18420/api/auth/callback?state=st_dev_3');
+
+  // Case 4: Invalid state rejected
+  assert.throws(() => resolveOAuthRedirectUrl('bad state <script>', prodWin), /Invalid state/);
+});
+
+test('OAuth Security: URL token scrubbing and error message token redaction', () => {
+  const redactSensitiveTokens = (input) =>
+    input
+      .replace(/(access_token|refresh_token|provider_token|id_token|code)\s*[=:]\s*([^\s&#"']+)/gi, '$1=[REDACTED]')
+      .replace(/eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, '[REDACTED_JWT]');
+
+  const leakedError = 'Redirect failed: http://localhost:140/#access_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig123&refresh_token=rf_secret_99';
+  const safeError = redactSensitiveTokens(leakedError);
+  assert.ok(!safeError.includes('eyJhbGciOiJIUzI1NiJ9'));
+  assert.ok(!safeError.includes('rf_secret_99'));
+  assert.ok(safeError.includes('access_token=[REDACTED]'));
+  assert.ok(safeError.includes('refresh_token=[REDACTED]'));
+});
+
