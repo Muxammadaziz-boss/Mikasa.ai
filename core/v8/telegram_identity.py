@@ -130,6 +130,14 @@ class UserTelegramLink:
     def is_active(self) -> bool:
         return self.status == "ACTIVE"
 
+    @property
+    def username(self) -> Optional[str]:
+        return self.metadata.get("username")
+
+    @property
+    def first_name(self) -> Optional[str]:
+        return self.metadata.get("first_name")
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
@@ -285,7 +293,8 @@ class TelegramIdentityManager:
         first_name: Optional[str] = None,
         username: Optional[str] = None,
         request_id: Optional[str] = None,
-        current_time: Optional[float] = None
+        current_time: Optional[float] = None,
+        auth_token: Optional[str] = None
     ) -> Tuple[bool, str, Optional[UserTelegramLink]]:
         """
         Verify candidate 6-digit OTP against pending request(s).
@@ -419,6 +428,7 @@ class TelegramIdentityManager:
         self._identities[tg_int] = ident
 
         self.save()
+        self.sync_link_to_supabase(link, auth_token=auth_token)
 
         self._audit.log(
             RemoteEventType.TELEGRAM_OTP_VERIFICATION_SUCCESS,
@@ -442,7 +452,8 @@ class TelegramIdentityManager:
         telegram_user_id: Any,
         first_name: Optional[str] = None,
         username: Optional[str] = None,
-        current_time: Optional[float] = None
+        current_time: Optional[float] = None,
+        auth_token: Optional[str] = None
     ) -> Tuple[bool, str, Optional[UserTelegramLink]]:
         """
         Verify deep-link token (e.g. from t.me/bot?start=<token>).
@@ -517,6 +528,7 @@ class TelegramIdentityManager:
         self._identities[tg_int] = ident
 
         self.save()
+        self.sync_link_to_supabase(link, auth_token=auth_token)
 
         self._audit.log(
             RemoteEventType.TELEGRAM_ACCOUNT_LINKED,
@@ -545,7 +557,8 @@ class TelegramIdentityManager:
     def unlink(
         self,
         mikasa_user_id: Optional[str] = None,
-        telegram_user_id: Optional[Any] = None
+        telegram_user_id: Optional[Any] = None,
+        auth_token: Optional[str] = None
     ) -> bool:
         """
         Revoke active link relationship and cancel pending pairing requests.
@@ -562,6 +575,7 @@ class TelegramIdentityManager:
             link = self._links_by_mikasa.get(str(mikasa_user_id))
 
         if link and link.is_active:
+            tg_to_delete = link.telegram_user_id
             link.status = "REVOKED"
             if link.telegram_user_id in self._links_by_tg:
                 del self._links_by_tg[link.telegram_user_id]
@@ -579,6 +593,7 @@ class TelegramIdentityManager:
                     r.status = "EXPIRED"
 
             self.save()
+            self.delete_link_from_supabase(tg_to_delete, auth_token=auth_token)
 
             self._audit.log(
                 RemoteEventType.TELEGRAM_ACCOUNT_UNLINKED,
@@ -706,3 +721,155 @@ class TelegramIdentityManager:
             logger.info(f"[TelegramIdentity] Yuklandi: {len(self._links_by_tg)} ta faol link, {len(self._identities)} ta identity.")
         except Exception as e:
             logger.error(f"[TelegramIdentity] Yuklashda xatolik: {e}")
+        finally:
+            self.load_from_supabase()
+
+    def _get_supabase_config(self) -> Tuple[str, str, str]:
+        """Supabase ulanish ma'lumotlarini olish: (url, anon_key, secret_key)."""
+        url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+        anon = (
+            os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+            or os.environ.get("SUPABASE_ANON_KEY", "")
+        ).strip()
+        secret = (
+            os.environ.get("SUPABASE_SECRET_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        ).strip()
+        return url, anon, secret
+
+    def sync_link_to_supabase(self, link: UserTelegramLink, auth_token: Optional[str] = None):
+        """Telegram bog'lanishini Supabase public.telegram_links jadvaliga sinxronlash."""
+        url, anon, secret = self._get_supabase_config()
+        if not url:
+            return
+
+        uid_str = str(link.mikasa_user_id).strip()
+        try:
+            uuid.UUID(uid_str)
+        except (ValueError, AttributeError):
+            logger.debug(f"[TelegramIdentity] mikasa_user_id '{uid_str}' UUID emas, Supabase sync o'tkazib yuborildi.")
+            return
+
+        bearer_token = secret or auth_token or anon
+        if not bearer_token:
+            return
+
+        api_key = anon or secret or bearer_token
+
+        payload = {
+            "user_id": uid_str,
+            "telegram_user_id": link.telegram_user_id,
+            "telegram_username": link.username or "",
+            "first_name": link.first_name or "",
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(link.last_verified_at))
+        }
+
+        endpoint = f"{url}/rest/v1/telegram_links?on_conflict=telegram_user_id"
+        headers = {
+            "apikey": api_key,
+            "Authorization": f"Bearer {bearer_token}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates"
+        }
+
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                endpoint,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status in (200, 201, 204):
+                    logger.info(f"[TelegramIdentity] Supabase public.telegram_links ga muvaffaqiyatli saqlandi: tg={link.telegram_user_id} -> user={uid_str}")
+        except Exception as e:
+            logger.warning(f"[TelegramIdentity] Supabase ga sinxronlashda xatolik: {e}")
+
+    def delete_link_from_supabase(self, telegram_user_id: int, auth_token: Optional[str] = None):
+        """Telegram bog'lanishini Supabase public.telegram_links jadvalidan o'chirish."""
+        url, anon, secret = self._get_supabase_config()
+        if not url:
+            return
+
+        bearer_token = secret or auth_token or anon
+        if not bearer_token:
+            return
+
+        api_key = anon or secret or bearer_token
+        endpoint = f"{url}/rest/v1/telegram_links?telegram_user_id=eq.{telegram_user_id}"
+        headers = {
+            "apikey": api_key,
+            "Authorization": f"Bearer {bearer_token}",
+        }
+
+        try:
+            import urllib.request
+            req = urllib.request.Request(endpoint, headers=headers, method="DELETE")
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status in (200, 204):
+                    logger.info(f"[TelegramIdentity] Supabase public.telegram_links dan o'chirildi: tg={telegram_user_id}")
+        except Exception as e:
+            logger.warning(f"[TelegramIdentity] Supabase dan o'chirishda xatolik: {e}")
+
+    def load_from_supabase(self):
+        """Server yuklanganda Supabase dan mavjud telegram_links ni tortib olish."""
+        url, anon, secret = self._get_supabase_config()
+        if not url:
+            return
+
+        bearer_token = secret or anon
+        if not bearer_token:
+            return
+
+        endpoint = f"{url}/rest/v1/telegram_links?select=*"
+        headers = {
+            "apikey": anon or secret,
+            "Authorization": f"Bearer {bearer_token}",
+        }
+
+        try:
+            import urllib.request
+            req = urllib.request.Request(endpoint, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    rows = json.loads(resp.read().decode("utf-8"))
+                    count = 0
+                    for row in rows:
+                        tg_id = int(row.get("telegram_user_id"))
+                        user_id = str(row.get("user_id"))
+                        username = row.get("telegram_username")
+                        first_name = row.get("first_name")
+
+                        meta = {}
+                        if username:
+                            meta["username"] = username
+                        if first_name:
+                            meta["first_name"] = first_name
+
+                        link = UserTelegramLink(
+                            mikasa_user_id=user_id,
+                            telegram_user_id=tg_id,
+                            linked_at=time.time(),
+                            last_verified_at=time.time(),
+                            status="ACTIVE",
+                            metadata=meta
+                        )
+                        self._links_by_tg[tg_id] = link
+                        self._links_by_mikasa[user_id] = link
+
+                        ident = TelegramIdentity(
+                            telegram_user_id=tg_id,
+                            first_name=first_name,
+                            username=username,
+                            created_at=time.time(),
+                            last_seen_at=time.time(),
+                            is_verified=True,
+                            is_linked=True
+                        )
+                        self._identities[tg_id] = ident
+                        count += 1
+                    if count > 0:
+                        logger.info(f"[TelegramIdentity] Supabase dan {count} ta telegram link yuklandi.")
+        except Exception as e:
+            logger.debug(f"[TelegramIdentity] Supabase dan yuklashda xatolik (offline yoki kalit cheklovi): {e}")

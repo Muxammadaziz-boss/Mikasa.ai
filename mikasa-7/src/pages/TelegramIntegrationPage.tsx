@@ -61,7 +61,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const loadStatus = useCallback(async () => {
     try {
       const [accRes, botRes] = await Promise.all([
-        backendService.getTelegramAccount("admin"),
+        backendService.getTelegramAccount(),
         backendService.getTelegramBotStatus(),
       ]);
       setAccountInfo(accRes);
@@ -99,6 +99,27 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
     return () => unsub();
   }, [loadStatus]);
 
+  // Fallback polling during WAITING_FOR_OTP to detect mobile Telegram verification even if WebSocket drops
+  useEffect(() => {
+    if (pairingState !== "WAITING_FOR_OTP" || !requestId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await backendService.getTelegramLinkStatus(requestId);
+        if (res.ok && (res.is_linked || res.status === "VERIFIED" || res.status === "CONNECTED")) {
+          clearInterval(pollInterval);
+          showToast("🎉 Telegram hisobingiz muvaffaqiyatli bog'landi!");
+          loadStatus();
+        } else if (res.status === "EXPIRED") {
+          clearInterval(pollInterval);
+          setPairingState("EXPIRED");
+        }
+      } catch {}
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [pairingState, requestId, loadStatus]);
+
   // Countdown timer effect
   useEffect(() => {
     if (pairingState === "WAITING_FOR_OTP" && expiresAt > 0) {
@@ -125,7 +146,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const handleStartLink = async () => {
     setPairingState("PAIRING");
     try {
-      const res = await backendService.startTelegramLink("admin");
+      const res = await backendService.startTelegramLink();
       if (res.ok && res.otp && res.request_id) {
         setRequestId(res.request_id);
         setOtpCode(res.otp);
@@ -157,7 +178,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const handleUnlink = async () => {
     if (!window.confirm("Haqiqatan ham Telegram hisobini Mikasadan uzmoqchimisiz?")) return;
     try {
-      const res = await backendService.unlinkTelegramAccount("admin");
+      const res = await backendService.unlinkTelegramAccount();
       if (res.ok) {
         showToast("Telegram hisobi muvaffaqiyatli uzildi");
         setPairingState("NOT_CONNECTED");

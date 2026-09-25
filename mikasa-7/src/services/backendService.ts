@@ -479,7 +479,29 @@ export interface RemoteAuditItem {
 }
 
 const DEFAULT_API_URL = "http://127.0.0.1:18420";
-const API_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+const PRODUCTION_API_URL = "https://mikasa-v8-api-production.up.railway.app";
+
+function resolveApiBase(): string {
+  const envUrl = (import.meta.env.VITE_API_URL || "").trim();
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("mikasa_backend_url");
+    if (customUrl) return customUrl.replace(/\/$/, "");
+
+    const isTauri = Boolean((window as any).__TAURI__ || (window as any).__TAURI_METADATA__);
+    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    if (!isTauri && !isLocalHost) {
+      if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+        return envUrl.replace(/\/$/, "");
+      }
+      return PRODUCTION_API_URL;
+    }
+  }
+
+  return (envUrl || DEFAULT_API_URL).replace(/\/$/, "");
+}
+
+const API_BASE = resolveApiBase();
 const WS_BASE = (import.meta.env.VITE_WS_URL || API_BASE.replace(/^http/, "ws")) + "/api/ws";
 
 class BackendService {
@@ -505,6 +527,21 @@ class BackendService {
 
   constructor() {
     this.authToken = this.getAuthToken();
+    if (isSupabaseConfigured) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.access_token) {
+          this.setAuthToken(session.access_token);
+        }
+      }).catch(() => {});
+
+      supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.access_token) {
+          this.setAuthToken(session.access_token);
+        } else if (_event === "SIGNED_OUT") {
+          this.setAuthToken(null);
+        }
+      });
+    }
     this.connectWs();
     this.startHealthPolling();
   }
@@ -1583,7 +1620,9 @@ class BackendService {
   // ========== Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi ==========
   public async getRemoteDevices(): Promise<{ ok: boolean; devices: RemoteDevice[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/devices`);
+      const res = await fetch(`${API_BASE}/api/remote/devices`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
@@ -1595,7 +1634,9 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/permissions?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/remote/permissions/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, device_id: deviceId, profile: {} as any, catalog: {}, error: String(err) };
@@ -1610,7 +1651,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ permissions, capabilities }),
       });
       return await res.json();
@@ -1623,7 +1664,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/pair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ action: "generate", device_id: deviceId }),
       });
       return await res.json();
@@ -1636,7 +1677,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/unpair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1649,7 +1690,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/session/lock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1662,7 +1703,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/session/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1673,7 +1714,9 @@ class BackendService {
 
   public async getRemoteAudit(): Promise<{ ok: boolean; total: number; events: RemoteAuditItem[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/audit`);
+      const res = await fetch(`${API_BASE}/api/remote/audit`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, total: 0, events: [], error: String(err) };
@@ -1682,12 +1725,16 @@ class BackendService {
 
   // ========== Phase 39: Universal Telegram Identity & OTP Linking API ==========
 
-  public async startTelegramLink(mikasaUserId: string = "admin"): Promise<TelegramLinkStartResponse> {
+  public async startTelegramLink(mikasaUserId?: string): Promise<TelegramLinkStartResponse> {
     try {
+      const bodyPayload: Record<string, any> = {};
+      if (mikasaUserId && mikasaUserId !== "admin") {
+        bodyPayload.mikasa_user_id = mikasaUserId;
+      }
       const res = await fetch(`${API_BASE}/api/telegram/link/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mikasa_user_id: mikasaUserId }),
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify(bodyPayload),
       });
       return await res.json();
     } catch (err: any) {
@@ -1705,7 +1752,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/telegram/link/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({
           otp,
           telegram_user_id: telegramUserId,
@@ -1722,13 +1769,17 @@ class BackendService {
 
   public async getTelegramLinkStatus(
     requestId?: string,
-    mikasaUserId: string = "admin"
+    mikasaUserId?: string
   ): Promise<TelegramLinkStatusResponse> {
     try {
       const params = new URLSearchParams();
       if (requestId) params.append("request_id", requestId);
-      if (mikasaUserId) params.append("mikasa_user_id", mikasaUserId);
-      const res = await fetch(`${API_BASE}/api/telegram/link/status?${params.toString()}`);
+      if (mikasaUserId && mikasaUserId !== "admin") params.append("mikasa_user_id", mikasaUserId);
+      const queryString = params.toString();
+      const url = queryString ? `${API_BASE}/api/telegram/link/status?${queryString}` : `${API_BASE}/api/telegram/link/status`;
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, status: "ERROR", is_linked: false, error: String(err) };
@@ -1736,14 +1787,17 @@ class BackendService {
   }
 
   public async unlinkTelegramAccount(
-    mikasaUserId: string = "admin",
+    mikasaUserId?: string,
     telegramUserId?: number
   ): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const bodyPayload: Record<string, any> = {};
+      if (mikasaUserId && mikasaUserId !== "admin") bodyPayload.mikasa_user_id = mikasaUserId;
+      if (telegramUserId) bodyPayload.telegram_user_id = telegramUserId;
       const res = await fetch(`${API_BASE}/api/telegram/unlink`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mikasa_user_id: mikasaUserId, telegram_user_id: telegramUserId }),
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify(bodyPayload),
       });
       return await res.json();
     } catch (err: any) {
@@ -1751,9 +1805,15 @@ class BackendService {
     }
   }
 
-  public async getTelegramAccount(mikasaUserId: string = "admin"): Promise<TelegramAccountResponse> {
+  public async getTelegramAccount(mikasaUserId?: string): Promise<TelegramAccountResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/telegram/account?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`);
+      let url = `${API_BASE}/api/telegram/account`;
+      if (mikasaUserId && mikasaUserId !== "admin") {
+        url += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
+      }
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, is_linked: false, error: String(err) };
@@ -1762,7 +1822,9 @@ class BackendService {
 
   public async getTelegramBotStatus(): Promise<TelegramBotStatusResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/telegram/status`);
+      const res = await fetch(`${API_BASE}/api/telegram/status`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return {
@@ -1783,7 +1845,9 @@ class BackendService {
   public async getDevices(userId?: string): Promise<DevicesListResponse> {
     try {
       const url = userId ? `${API_BASE}/api/devices?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/devices`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
@@ -1795,7 +1859,9 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1809,7 +1875,7 @@ class BackendService {
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ name }),
       });
       return await res.json();
@@ -1823,7 +1889,10 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url, { method: "DELETE" });
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1835,7 +1904,10 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1845,7 +1917,9 @@ class BackendService {
   public async getAccountSessions(userId?: string): Promise<AccountSessionsResponse> {
     try {
       const url = userId ? `${API_BASE}/api/account/sessions?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/account/sessions`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, sessions: [], total: 0, error: String(err) };
@@ -1857,10 +1931,75 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/account/sessions/logout-all?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/account/sessions/logout-all`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
+    }
+  }
+
+  // ========== Phase 46: Real Remote Command Execution API ==========
+  public async submitDeviceCommand(
+    deviceId: string,
+    toolId: string,
+    params: Record<string, any> = {},
+    origin: string = "web"
+  ): Promise<{ ok: boolean; command_id?: string; state?: string; confirmation_token?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ tool_id: toolId, params, origin }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async confirmDeviceCommand(
+    deviceId: string,
+    commandId: string,
+    token: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ token }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async cancelDeviceCommand(
+    deviceId: string,
+    commandId: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getDeviceCommandHistory(deviceId: string): Promise<{ ok: boolean; history: any[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/history`, {
+        headers: { ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, history: [], error: String(err) };
     }
   }
 
@@ -1880,6 +2019,21 @@ class BackendService {
     if (!this.authToken && typeof window !== "undefined") {
       try {
         this.authToken = localStorage.getItem("mikasa_session_token");
+        if (!this.authToken) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.access_token) {
+                  this.authToken = parsed.access_token;
+                  break;
+                }
+              }
+            }
+          }
+        }
       } catch {}
     }
     return this.authToken;
@@ -1890,6 +2044,7 @@ class BackendService {
     const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
+      headers["X-Mikasa-Session-Token"] = token;
     }
     return headers;
   }

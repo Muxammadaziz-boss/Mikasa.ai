@@ -2496,13 +2496,15 @@ async def handle_telegram_link_verify(request):
 
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
+    auth_token = get_auth_token_from_request(request)
 
     ok, msg, link = mgr.verify_otp(
         otp=otp,
         telegram_user_id=tg_id,
         first_name=first_name,
         username=username,
-        request_id=request_id
+        request_id=request_id,
+        auth_token=auth_token
     )
 
     if ok and link:
@@ -2589,8 +2591,9 @@ async def handle_telegram_unlink(request):
 
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
+    auth_token = get_auth_token_from_request(request)
 
-    unlinked = mgr.unlink(mikasa_user_id=mikasa_user_id, telegram_user_id=tg_id)
+    unlinked = mgr.unlink(mikasa_user_id=mikasa_user_id, telegram_user_id=tg_id, auth_token=auth_token)
     if unlinked:
         await broadcast_ws("TELEGRAM_DISCONNECTED", {
             "mikasa_user_id": mikasa_user_id
@@ -2695,6 +2698,10 @@ def resolve_auth_identity(
             return None, None, None, err_resp
 
         authenticated_user_id = user.id
+        # "me", "self", "current", "admin" yoki bo'sh parametrlarni autentifikatsiyalangan foydalanuvchiga xaritalash
+        if param_user_id and param_user_id.lower() in ("me", "self", "current", "admin", "null", "undefined"):
+            param_user_id = authenticated_user_id
+
         # Cross-tenant spoofing tekshiruvi:
         if param_user_id and param_user_id != authenticated_user_id:
             logger.warning(
@@ -4392,31 +4399,72 @@ async def handle_ws(request):
 ALLOWED_REMOTE_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
 _CORS_BYPASS_PREFIXES = ("/health", "/ready", "/api/ready", "/api/health", "/telegram/webhook")
 
+
+def is_production_or_remote_enabled() -> bool:
+    """Tekshirish: Server bulutda (Railway/production) yoki masofaviy API rejimida ishlayaptimi?"""
+    if os.environ.get("MIKASA_ALLOW_REMOTE_API", "").lower() in ("true", "1", "yes"):
+        return True
+    if os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod", "staging"):
+        return True
+    if os.environ.get("MIKASA_ENV", "").lower() in ("production", "prod", "staging"):
+        return True
+    for key in (
+        "RAILWAY_ENVIRONMENT",
+        "RAILWAY_PROJECT_ID",
+        "RAILWAY_SERVICE_ID",
+        "RAILWAY_PUBLIC_DOMAIN",
+        "RAILWAY_STATIC_URL",
+        "RAILWAY_GIT_COMMIT_SHA",
+    ):
+        if os.environ.get(key):
+            return True
+    return False
+
+
 @web.middleware
 async def cors_middleware(request, handler):
     path = str(getattr(request, "path", getattr(request, "rel_url", "/")))
-    # Health checks and Telegram webhooks come from external platforms (Railway probes, Telegram servers)
+    origin = request.headers.get("Origin", "")
+    is_prod = is_production_or_remote_enabled()
+
+    # Preflight OPTIONS so'rovlarini zudlik bilan qanoatlantirish
+    if request.method == "OPTIONS":
+        opt_resp = web.Response(status=204)
+        opt_resp.headers["Access-Control-Allow-Origin"] = origin or "*"
+        opt_resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        opt_resp.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
+            "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+        )
+        opt_resp.headers["Access-Control-Max-Age"] = "86400"
+        return opt_resp
+
+    # Health checks, readiness probes and Telegram webhooks come from external platforms (Railway probes, Telegram servers)
     if any(path.startswith(prefix) for prefix in _CORS_BYPASS_PREFIXES):
         try:
             return await handler(request)
         except web.HTTPException as ex:
             return ex
 
-    # Remote IP tekshiruvi: faqat lokal mijozlar qabul qilinadi
-    if request.remote and request.remote not in ALLOWED_REMOTE_IPS:
-        logger.warning(f"Xavfsizlik: Begona tarmoqdan so'rov rad etildi: {request.remote}")
+    # Remote IP tekshiruvi: Faqat mahalliy desktop rejimida begona LAN murojaatlari cheklanadi.
+    # Bulutli / Production (Railway) rejimida internet mijozlari Bearer token va CORS orqali himoyalanadi.
+    if not is_prod and request.remote and request.remote not in ALLOWED_REMOTE_IPS:
+        logger.warning(f"Xavfsizlik: Lokal rejimda begona tarmoqdan so'rov rad etildi: {request.remote}")
         return web.HTTPForbidden(text="Xavfsizlik: Begona tarmoqdan murojaat taqiqlangan.")
 
-    origin = request.headers.get("Origin", "")
-    is_allowed = False
+    is_allowed = True
     if origin:
         origin_clean = origin.strip().lower()
+        configured_raw = os.environ.get("MIKASA_ALLOWED_ORIGINS", "").strip()
         configured_origins = [
             o.strip().lower()
-            for o in os.environ.get("MIKASA_ALLOWED_ORIGINS", "").split(",")
+            for o in configured_raw.split(",")
             if o.strip()
         ]
-        is_allowed = (
+
+        if "*" in configured_origins or configured_raw == "*":
+            is_allowed = True
+        elif (
             origin_clean in ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
             or origin_clean in configured_origins
             or origin_clean == "http://localhost"
@@ -4427,23 +4475,41 @@ async def cors_middleware(request, handler):
             or origin_clean.startswith("https://localhost:")
             or origin_clean == "https://127.0.0.1"
             or origin_clean.startswith("https://127.0.0.1:")
-        )
+        ):
+            is_allowed = True
+        elif is_prod:
+            # Bulutli production rejimida ishonchli domenlar yoki barcha HTTPS/HTTP veb mijozlar
+            if (
+                origin_clean.endswith(".railway.app")
+                or origin_clean.endswith(".up.railway.app")
+                or origin_clean.endswith(".vercel.app")
+                or origin_clean.endswith(".netlify.app")
+                or origin_clean.endswith(".pages.dev")
+                or origin_clean.endswith(".github.io")
+                or not configured_origins
+            ):
+                is_allowed = True
+            else:
+                is_allowed = False
+        else:
+            is_allowed = False
+
         if not is_allowed:
             logger.warning(f"Xavfsizlik: Begona veb-sayt Origin rad etildi: {origin}")
             return web.HTTPForbidden(text="Xavfsizlik: Begona Origin orqali kirish taqiqlangan.")
 
-    if request.method == "OPTIONS":
-        response = web.Response()
-    else:
-        try:
-            response = await handler(request)
-        except web.HTTPException as ex:
-            response = ex
+    try:
+        response = await handler(request)
+    except web.HTTPException as ex:
+        response = ex
 
-    allowed_header_origin = origin if (origin and is_allowed) else "tauri://localhost"
+    allowed_header_origin = origin if (origin and is_allowed) else ("*" if is_prod else "tauri://localhost")
     response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id"
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
+        "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+    )
     return response
 
 
