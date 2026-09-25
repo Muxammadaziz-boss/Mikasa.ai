@@ -2392,22 +2392,25 @@ class BackendService {
       return { ok: true };
     }
     const pingHealth = async (base: string): Promise<boolean> => {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 2500);
-        const res = await fetch(`${base}/api/health`, { signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) return true;
-      } catch {}
-      try {
-        const controller2 = new AbortController();
-        const timer2 = setTimeout(() => controller2.abort(), 2500);
-        const res2 = await fetch(`${base}/health`, { signal: controller2.signal });
-        clearTimeout(timer2);
-        return res2.ok;
-      } catch {
-        return false;
+      if (isTauriRuntime() && isLocalhostUrl(base)) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const st = await invoke<{ running?: boolean; healthy?: boolean }>("backend_get_status");
+          if (st && (st.running || st.healthy)) {
+            return true;
+          }
+        } catch {}
       }
+      for (const ep of ["/api/status", "/api/health", "/health"]) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(`${base}${ep}`, { signal: controller.signal });
+          clearTimeout(timer);
+          if (res.ok) return true;
+        } catch {}
+      }
+      return false;
     };
 
     if (await pingHealth(callbackBase)) {

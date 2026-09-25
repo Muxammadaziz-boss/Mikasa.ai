@@ -4588,9 +4588,16 @@ async def cors_middleware(request, handler):
     # Health checks, readiness probes and Telegram webhooks come from external platforms (Railway probes, Telegram servers)
     if any(path.startswith(prefix) for prefix in _CORS_BYPASS_PREFIXES):
         try:
-            return await handler(request)
+            bypass_resp = await handler(request)
         except web.HTTPException as ex:
-            return ex
+            bypass_resp = ex
+        bypass_resp.headers["Access-Control-Allow-Origin"] = origin or "*"
+        bypass_resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        bypass_resp.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
+            "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+        )
+        return bypass_resp
 
     # Remote IP tekshiruvi: Faqat mahalliy desktop rejimida begona LAN murojaatlari cheklanadi.
     # Bulutli / Production (Railway) rejimida va OAuth callback yo'llarida internet mijozlariga ruxsat beriladi.
