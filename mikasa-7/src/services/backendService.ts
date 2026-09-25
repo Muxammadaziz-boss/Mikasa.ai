@@ -1925,15 +1925,28 @@ class BackendService {
 
   // ========== Phase 39: Universal Telegram Identity & OTP Linking API ==========
 
+  private async getFreshAuthHeaders(): Promise<Record<string, string>> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token) {
+          this.setAuthToken(data.session.access_token);
+        }
+      } catch {}
+    }
+    return this.getAuthHeaders();
+  }
+
   public async startTelegramLink(mikasaUserId?: string): Promise<TelegramLinkStartResponse> {
     try {
       const bodyPayload: Record<string, any> = {};
       if (mikasaUserId && mikasaUserId !== "admin") {
         bodyPayload.mikasa_user_id = mikasaUserId;
       }
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/link/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(bodyPayload),
       });
       return await res.json();
@@ -1950,9 +1963,10 @@ class BackendService {
     requestId?: string
   ): Promise<TelegramLinkVerifyResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/link/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           otp,
           telegram_user_id: telegramUserId,
@@ -1977,8 +1991,9 @@ class BackendService {
       if (mikasaUserId && mikasaUserId !== "admin") params.append("mikasa_user_id", mikasaUserId);
       const queryString = params.toString();
       const url = queryString ? `${API_BASE}/api/telegram/link/status?${queryString}` : `${API_BASE}/api/telegram/link/status`;
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -1994,9 +2009,10 @@ class BackendService {
       const bodyPayload: Record<string, any> = {};
       if (mikasaUserId && mikasaUserId !== "admin") bodyPayload.mikasa_user_id = mikasaUserId;
       if (telegramUserId) bodyPayload.telegram_user_id = telegramUserId;
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/unlink`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(bodyPayload),
       });
       return await res.json();
@@ -2011,8 +2027,9 @@ class BackendService {
       if (mikasaUserId && mikasaUserId !== "admin") {
         url += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
       }
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2030,7 +2047,7 @@ class BackendService {
       return {
         ok: false,
         configured: false,
-        bot_username: "MikasaUniversalBot",
+        bot_username: "Mikasa_ai_agent_bot",
         active_links_count: 0,
         pending_requests_count: 0,
         error: String(err),

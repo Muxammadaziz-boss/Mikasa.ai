@@ -2446,17 +2446,31 @@ async def handle_telegram_link_start(request):
     except Exception:
         body = {}
 
-    mikasa_user_id = user_id
+    body_uid = str(body.get("mikasa_user_id") or "").strip()
+    if user is not None or user_id != "admin":
+        if body_uid and body_uid not in (user_id, "admin"):
+            return web.json_response(
+                {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi hisobi uchun OTP yaratish taqiqlangan."},
+                status=403
+            )
+        mikasa_user_id = user_id
+    else:
+        mikasa_user_id = body_uid or user_id
+
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot")
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
+    auth_token = get_auth_token_from_request(request)
 
     req, otp, deep_link, err_msg = mgr.create_link_request(
         mikasa_user_id=mikasa_user_id,
-        bot_username=bot_username
+        bot_username=bot_username,
+        expected_telegram_user_id=body.get("expected_telegram_user_id"),
+        auth_token=auth_token
     )
     if err_msg or not req:
-        return web.json_response({"ok": False, "error": err_msg or "Kod yaratishda xatolik"}, status=400)
+        status_code = 429 if "RATE_LIMITED" in str(err_msg or "") else 400
+        return web.json_response({"ok": False, "error": err_msg or "Kod yaratishda xatolik"}, status=status_code)
 
     await broadcast_ws("PAIRING_CREATED", {
         "request_id": req.request_id,
@@ -2483,10 +2497,26 @@ async def handle_telegram_link_start(request):
 
 async def handle_telegram_link_verify(request):
     """POST /api/telegram/link/verify - OTP kodni tekshirish va hisobni bog'lash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
     try:
         body = await request.json()
     except Exception:
         return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    body_uid = str(body.get("mikasa_user_id") or "").strip()
+    expected_mikasa_user_id: Optional[str] = None
+    if user is not None or user_id != "admin":
+        if body_uid and body_uid not in (user_id, "admin"):
+            return web.json_response(
+                {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi nomidan OTP tasdiqlash taqiqlangan."},
+                status=403
+            )
+        expected_mikasa_user_id = user_id
+    elif body_uid and body_uid != "admin":
+        expected_mikasa_user_id = body_uid
 
     otp = body.get("otp", "")
     tg_id = body.get("telegram_user_id")
@@ -2504,7 +2534,8 @@ async def handle_telegram_link_verify(request):
         first_name=first_name,
         username=username,
         request_id=request_id,
-        auth_token=auth_token
+        auth_token=auth_token,
+        expected_mikasa_user_id=expected_mikasa_user_id
     )
 
     if ok and link:
@@ -2527,7 +2558,8 @@ async def handle_telegram_link_verify(request):
     await broadcast_ws("PAIRING_FAILED", {
         "error": msg
     })
-    return web.json_response({"ok": False, "error": msg}, status=400)
+    status_code = 403 if any(k in str(msg) for k in ("USER_MISMATCH", "TELEGRAM_USER_MISMATCH", "TELEGRAM_ALREADY_LINKED")) else 400
+    return web.json_response({"ok": False, "error": msg}, status=status_code)
 
 
 async def handle_telegram_link_status(request):
@@ -2538,38 +2570,51 @@ async def handle_telegram_link_status(request):
 
     mikasa_user_id = user_id
     request_id = request.query.get("request_id")
+    auth_token = get_auth_token_from_request(request)
 
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
 
-    link = mgr.get_link_by_mikasa_user(mikasa_user_id)
-    if link and link.is_active:
-        return web.json_response({
-            "ok": True,
-            "status": "CONNECTED",
-            "is_linked": True,
-            "telegram_user_id": link.telegram_user_id,
-            "link": link.to_dict()
-        })
-
     if request_id:
-        req = mgr.get_request(request_id)
+        req = mgr.get_request(request_id, auth_token=auth_token, refresh=True)
         if not req:
             return web.json_response({"ok": False, "error": "So'rov topilmadi"}, status=404)
+        if (user is not None or mikasa_user_id != "admin") and req.mikasa_user_id != mikasa_user_id:
+            return web.json_response(
+                {"ok": False, "error": "Ruxsat etilmadi: Ushbu bog'lanish so'rovi boshqa foydalanuvchiga tegishli."},
+                status=403
+            )
         ttl_left = max(0, int(req.expires_at - time.time()))
-        status_name = "EXPIRED" if req.is_expired() else req.status
+        status_name = "EXPIRED" if (req.status == "PENDING" and req.is_expired()) else req.status
+        is_verified = (req.status == "VERIFIED")
+        link = mgr.get_link_by_mikasa_user(req.mikasa_user_id, auth_token=auth_token, refresh=is_verified)
         return web.json_response({
             "ok": True,
-            "status": status_name,
-            "is_linked": req.status == "VERIFIED",
+            "status": "CONNECTED" if (is_verified or (link and link.is_active)) else status_name,
+            "request_status": status_name,
+            "is_linked": bool(is_verified or (link and link.is_active)),
+            "telegram_user_id": link.telegram_user_id if link else req.telegram_user_id,
+            "link": link.to_dict() if link else None,
             "attempt_count": req.attempt_count,
             "expires_at": req.expires_at,
             "ttl_seconds": ttl_left
         })
 
+    link = mgr.get_link_by_mikasa_user(mikasa_user_id, auth_token=auth_token, refresh=True)
+    if link and link.is_active:
+        return web.json_response({
+            "ok": True,
+            "status": "CONNECTED",
+            "request_status": "VERIFIED",
+            "is_linked": True,
+            "telegram_user_id": link.telegram_user_id,
+            "link": link.to_dict()
+        })
+
     return web.json_response({
         "ok": True,
         "status": "NOT_CONNECTED",
+        "request_status": "NOT_CONNECTED",
         "is_linked": False,
         "telegram_user_id": None
     })
@@ -2610,10 +2655,11 @@ async def handle_telegram_account(request):
         return err
 
     mikasa_user_id = user_id
+    auth_token = get_auth_token_from_request(request)
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
 
-    link = mgr.get_link_by_mikasa_user(mikasa_user_id)
+    link = mgr.get_link_by_mikasa_user(mikasa_user_id, auth_token=auth_token, refresh=True)
     ident = mgr.get_identity(link.telegram_user_id) if link else None
 
     return web.json_response({
@@ -2628,7 +2674,7 @@ async def handle_telegram_status(request):
     """GET /api/telegram/status - Telegram Bot tizim holati"""
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot")
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
 
     return web.json_response({
         "ok": True,

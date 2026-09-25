@@ -289,3 +289,22 @@ test('OAuth Security: URL token scrubbing and error message token redaction', ()
   assert.ok(safeError.includes('refresh_token=[REDACTED]'));
 });
 
+// 9. TELEGRAM OTP LINKING & BOT CONTRACT TESTS
+test('Telegram OTP Linking: Bot username, deep-link, and status polling contract', () => {
+  const DEFAULT_BOT_USERNAME = 'Mikasa_ai_agent_bot';
+  const resolveBotUsername = (apiUsername) => (apiUsername || DEFAULT_BOT_USERNAME).replace(/^@/, '');
+
+  assert.equal(resolveBotUsername(undefined), 'Mikasa_ai_agent_bot');
+  assert.equal(resolveBotUsername('@Mikasa_ai_agent_bot'), 'Mikasa_ai_agent_bot');
+  assert.notEqual(resolveBotUsername(undefined), 'MikasaUniversalBot');
+
+  const isStatusVerified = (res) =>
+    res?.linked === true || res?.status === 'VERIFIED' || res?.request_status === 'VERIFIED';
+  const isStatusExpired = (res) =>
+    res?.status === 'EXPIRED' || res?.request_status === 'EXPIRED';
+
+  assert.equal(isStatusVerified({ linked: false, status: 'PENDING', request_status: 'PENDING' }), false);
+  assert.equal(isStatusVerified({ linked: true, status: 'VERIFIED', request_status: 'VERIFIED' }), true);
+  assert.equal(isStatusVerified({ linked: false, request_status: 'VERIFIED' }), true);
+  assert.equal(isStatusExpired({ linked: false, status: 'EXPIRED' }), true);
+});

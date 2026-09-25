@@ -163,13 +163,20 @@ class AiohttpTelegramTransport(TelegramTransport):
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": parse_mode
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
         async with session.post(url, json=payload) as resp:
             data = await resp.json()
+            if not data.get("ok") and parse_mode and resp.status == 400 and "parse entities" in str(data.get("description", "")).lower():
+                logger.warning(f"[TelegramTransport] Markdown entity parse error, retrying plain text for chat={chat_id}")
+                fallback_payload = dict(payload)
+                fallback_payload.pop("parse_mode", None)
+                async with session.post(url, json=fallback_payload) as retry_resp:
+                    return await retry_resp.json()
             return data
 
     async def edit_message_text(
@@ -186,13 +193,19 @@ class AiohttpTelegramTransport(TelegramTransport):
             "chat_id": chat_id,
             "message_id": message_id,
             "text": text,
-            "parse_mode": parse_mode
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
         async with session.post(url, json=payload) as resp:
             data = await resp.json()
+            if not data.get("ok") and parse_mode and resp.status == 400 and "parse entities" in str(data.get("description", "")).lower():
+                fallback_payload = dict(payload)
+                fallback_payload.pop("parse_mode", None)
+                async with session.post(url, json=fallback_payload) as retry_resp:
+                    return await retry_resp.json()
             return data
 
     async def answer_callback_query(

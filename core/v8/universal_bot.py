@@ -22,19 +22,46 @@ class UniversalTelegramBot:
     Strictly isolated by canonical numeric Telegram user ID.
     """
 
-    OTP_REGEX = re.compile(r"^\s*(\d{6})\s*$")
+    OTP_REGEX = re.compile(r"^\s*`?(\d{3}[\s-]?\d{3})`?\s*$")
 
     def __init__(
         self,
         transport: Optional[TelegramTransport] = None,
         identity_manager: Optional[TelegramIdentityManager] = None,
         account_device_manager: Optional[AccountDeviceManager] = None,
-        bot_username: str = "MikasaUniversalBot"
+        bot_username: str = "Mikasa_ai_agent_bot"
     ):
         self.transport: TelegramTransport = transport or MockTelegramTransport()
         self.identity_mgr: TelegramIdentityManager = identity_manager or TelegramIdentityManager.get_default_instance()
         self.account_device_mgr: AccountDeviceManager = account_device_manager or AccountDeviceManager.get_default_instance()
-        self.bot_username: str = bot_username.lstrip("@").strip()
+        self.bot_username: str = (bot_username or "Mikasa_ai_agent_bot").lstrip("@").strip() or "Mikasa_ai_agent_bot"
+
+    def _get_link(self, tg_user_id: int):
+        link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
+        return link if (link and link.is_active) else None
+
+    def _get_active_device(self, link):
+        if not link:
+            return None
+        return self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+
+    @staticmethod
+    def _format_error_msg(msg: str) -> str:
+        """Wrap error code prefix (e.g. INVALID_OTP) in backticks so underscores never break Telegram Markdown."""
+        raw = str(msg or "").strip()
+        if ":" in raw:
+            code_part, desc_part = raw.split(":", 1)
+            return f"`{code_part.strip()}`: {desc_part.strip()}"
+        return f"`{raw}`" if "_" in raw else raw
+
+    @staticmethod
+    def _extract_cmd_arg(text: str, cmd: str) -> Optional[str]:
+        """Match /cmd or /cmd@BotUsername and return argument string (or None if not matching)."""
+        pattern = rf"^/{re.escape(cmd)}(?:@[A-Za-z0-9_]+)?(?:[\s:]+([\s\S]*)|$)"
+        m = re.match(pattern, text.strip(), flags=re.IGNORECASE)
+        if not m:
+            return None
+        return (m.group(1) or "").strip()
 
     async def process_update(self, update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -48,6 +75,10 @@ class UniversalTelegramBot:
         chat = message.get("chat", {})
         chat_id = chat.get("id")
         from_user = message.get("from", {})
+        if isinstance(from_user, dict) and from_user.get("is_bot") is True:
+            logger.warning("[UniversalBot] Rad etildi: bot hisobidan kelgan xabar")
+            return None
+
         raw_tg_id = from_user.get("id") or chat_id
 
         # Validate positive numeric Telegram User ID
@@ -91,67 +122,71 @@ class UniversalTelegramBot:
             return await self._send_reply(chat_id, "Iltimos, matnli buyruq yoki tasdiqlash kodini yuboring.")
 
         # 1. /start [token]
-        if text.startswith("/start"):
-            parts = text.split(maxsplit=1)
-            token = parts[1].strip() if len(parts) > 1 else ""
-            return await self._handle_start(chat_id, tg_user_id, first_name, username, token)
+        start_arg = self._extract_cmd_arg(text, "start")
+        if start_arg is not None:
+            return await self._handle_start(chat_id, tg_user_id, first_name, username, start_arg)
 
         # 2. /link [code]
-        if text.startswith("/link"):
-            parts = text.split(maxsplit=1)
-            code = parts[1].strip() if len(parts) > 1 else ""
-            return await self._handle_link(chat_id, tg_user_id, first_name, username, code)
+        link_arg = self._extract_cmd_arg(text, "link")
+        if link_arg is not None:
+            cleaned_code = link_arg.strip().strip("`").strip()
+            if cleaned_code.startswith("<") and cleaned_code.endswith(">"):
+                cleaned_code = cleaned_code[1:-1].strip()
+            if cleaned_code.lower() in ("kod", "code", "otp"):
+                cleaned_code = ""
+            else:
+                cleaned_code = TelegramIdentityManager.normalize_otp_input(cleaned_code)
+            return await self._handle_link(chat_id, tg_user_id, first_name, username, cleaned_code)
 
-        # 3. Raw 6-digit numeric OTP entry (e.g. 583921)
+        # 3. Raw 6-digit numeric OTP entry (e.g. 583921, 583 921, `583921`)
         match_otp = self.OTP_REGEX.match(text)
         if match_otp:
-            code = match_otp.group(1)
+            code = TelegramIdentityManager.normalize_otp_input(match_otp.group(1))
             return await self._handle_link(chat_id, tg_user_id, first_name, username, code)
 
         # 4. /unlink
-        if text.startswith("/unlink"):
+        if self._extract_cmd_arg(text, "unlink") is not None:
             return await self._handle_unlink(chat_id, tg_user_id)
 
         # 5. /account
-        if text.startswith("/account"):
+        if self._extract_cmd_arg(text, "account") is not None:
             return await self._handle_account(chat_id, tg_user_id, first_name, username)
 
         # 6. /devices (Phase 40)
-        if text.startswith("/devices"):
+        if self._extract_cmd_arg(text, "devices") is not None:
             return await self._handle_devices(chat_id, tg_user_id)
 
         # 7. /select <query> (Phase 40)
-        if text.startswith("/select"):
-            parts = text.split(maxsplit=1)
-            query = parts[1].strip() if len(parts) > 1 else ""
-            return await self._handle_select(chat_id, tg_user_id, query)
+        select_arg = self._extract_cmd_arg(text, "select")
+        if select_arg is not None:
+            return await self._handle_select(chat_id, tg_user_id, select_arg)
 
         # 8. /status
-        if text.startswith("/status"):
+        if self._extract_cmd_arg(text, "status") is not None:
             return await self._handle_status(chat_id, tg_user_id)
 
         # 9. /session (Phase 40+ remote session inspection)
-        if text.startswith("/session"):
+        if self._extract_cmd_arg(text, "session") is not None:
             return await self._handle_session(chat_id, tg_user_id)
 
         # 10. /logout (remote session only — not web Supabase session)
-        if text.startswith("/logout"):
+        if self._extract_cmd_arg(text, "logout") is not None:
             return await self._handle_logout(chat_id, tg_user_id)
 
         # 11. /access (Phase 47 - Agent Access Status)
-        if text.startswith("/access"):
+        if self._extract_cmd_arg(text, "access") is not None:
             return await self._handle_access(chat_id, tg_user_id)
 
         # 12. /permissions (Phase 47 - List all permissions)
-        if text.startswith("/permissions"):
+        if self._extract_cmd_arg(text, "permissions") is not None:
             return await self._handle_permissions(chat_id, tg_user_id)
 
         # 13. /revoke (Phase 47 - Emergency Revoke All)
-        if text.startswith("/revoke"):
+        if self._extract_cmd_arg(text, "revoke") is not None:
             return await self._handle_revoke(chat_id, tg_user_id)
 
         # 14. /help
-        if text.startswith("/help"):
+        if self._extract_cmd_arg(text, "help") is not None:
             return await self._handle_help(chat_id, first_name)
 
         # Fallback for unrecognized text
@@ -185,11 +220,12 @@ class UniversalTelegramBot:
                 )
                 return await self._send_reply(chat_id, text)
             else:
-                text = f"❌ *Bog'lanishda xatolik:*\n{msg}\n\nIltimos, yangi havola oling yoki 6 xonali koddan foydalaning."
+                safe_msg = self._format_error_msg(msg)
+                text = f"❌ *Bog'lanishda xatolik:*\n{safe_msg}\n\nIltimos, yangi havola oling yoki 6 xonali koddan foydalaning."
                 return await self._send_reply(chat_id, text)
 
         # Standard /start welcome message
-        name = first_name or "foydalanuvchi"
+        name = str(first_name or "foydalanuvchi").replace("_", "\\_").replace("*", "\\*").replace("`", "")
         welcome_text = (
             f"👋 *Assalomu alaykum, {name}!*\n\n"
             "Mikasa AI Universal Telegram Botiga xush kelibsiz.\n\n"
@@ -237,8 +273,9 @@ class UniversalTelegramBot:
             )
             return await self._send_reply(chat_id, reply_text)
         else:
+            safe_msg = self._format_error_msg(msg)
             reply_text = (
-                f"❌ *Bog'lanish muvaffaqiyatsiz:*\n{msg}\n\n"
+                f"❌ *Bog'lanish muvaffaqiyatsiz:*\n{safe_msg}\n\n"
                 "Iltimos, kodni tekshirib qayta kiriting yoki yangi kod generatsiya qiling."
             )
             return await self._send_reply(chat_id, reply_text)
@@ -250,7 +287,7 @@ class UniversalTelegramBot:
             reply_text = (
                 "🔓 *Hisob uzildi.*\n\n"
                 "Sizning Telegram hisobingiz Mikasa ilovasidan muvaffaqiyatli uzildi.\n"
-                "Qayta ulash uchun: /link <kod>"
+                "Qayta ulash uchun: `/link <kod>`"
             )
         else:
             reply_text = (
@@ -272,7 +309,7 @@ class UniversalTelegramBot:
 
         if link and link.is_active:
             linked_dt = datetime.fromtimestamp(link.linked_at).strftime("%Y-%m-%d %H:%M:%S")
-            uname = f"@{ident.username}" if (ident and ident.username) else (f"@{username}" if username else "Mavjud emas")
+            uname = f"`@{ident.username}`" if (ident and ident.username) else (f"`@{username}`" if username else "Mavjud emas")
             devices = self.account_device_mgr.get_devices_for_user(link.mikasa_user_id, include_revoked=False)
             selected = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
             selected_str = f"{selected.name} (`{selected.device_id}`)" if selected else "Tanlanmagan"
@@ -340,7 +377,7 @@ class UniversalTelegramBot:
         if not link or not link.is_active:
             text = (
                 "🔒 *Hisob bog'lanmagan.*\n\n"
-                "Qurilmani tanlash uchun avval hisobingizni bog'lang: /link <kod>"
+                "Qurilmani tanlash uchun avval hisobingizni bog'lang: `/link <kod>`"
             )
             return await self._send_reply(chat_id, text)
 
@@ -363,7 +400,8 @@ class UniversalTelegramBot:
             )
             return await self._send_reply(chat_id, text)
         else:
-            text = f"❌ *Xatolik:*\n{msg}\n\nQurilmalar ro'yxati: /devices"
+            safe_msg = self._format_error_msg(msg)
+            text = f"❌ *Xatolik:*\n{safe_msg}\n\nQurilmalar ro'yxati: /devices"
             return await self._send_reply(chat_id, text)
 
     async def _handle_status(self, chat_id: Union[int, str], tg_user_id: int) -> Dict[str, Any]:
@@ -422,7 +460,7 @@ class UniversalTelegramBot:
         if not link or not link.is_active:
             return await self._send_reply(
                 chat_id,
-                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: /link <kod>"
+                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: `/link <kod>`"
             )
 
         dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
@@ -460,7 +498,7 @@ class UniversalTelegramBot:
         if not link or not link.is_active:
             return await self._send_reply(
                 chat_id,
-                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: /link <kod>"
+                "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: `/link <kod>`"
             )
 
         dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)

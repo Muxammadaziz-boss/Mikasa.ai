@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+os.environ.setdefault("ENVIRONMENT", "production")
+os.environ.setdefault("MIKASA_API_HOST", "0.0.0.0")
+os.environ.setdefault("MIKASA_ALLOW_REMOTE_API", "true")
+
 from core.api_server import run_server  # noqa: E402
 
 

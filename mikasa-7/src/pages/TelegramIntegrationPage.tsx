@@ -106,13 +106,17 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
     const pollInterval = setInterval(async () => {
       try {
         const res = await backendService.getTelegramLinkStatus(requestId);
-        if (res.ok && (res.is_linked || res.status === "VERIFIED" || res.status === "CONNECTED")) {
+        const reqStatus = (res as any).request_status || res.status;
+        if (res.ok && (res.is_linked || reqStatus === "VERIFIED" || res.status === "CONNECTED")) {
           clearInterval(pollInterval);
           showToast("🎉 Telegram hisobingiz muvaffaqiyatli bog'landi!");
           loadStatus();
-        } else if (res.status === "EXPIRED") {
+        } else if (reqStatus === "EXPIRED") {
           clearInterval(pollInterval);
           setPairingState("EXPIRED");
+        } else if (reqStatus === "FAILED") {
+          clearInterval(pollInterval);
+          setPairingState("FAILED");
         }
       } catch {}
     }, 3000);
@@ -153,6 +157,19 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
         setDeepLink(res.deep_link || "");
         setExpiresAt(res.expires_at || Date.now() / 1000 + 300);
         setRemainingSeconds(res.ttl_seconds || 300);
+        if (res.bot_username) {
+          setBotStatus((prev) =>
+            prev
+              ? { ...prev, bot_username: res.bot_username! }
+              : {
+                  ok: true,
+                  configured: true,
+                  bot_username: res.bot_username!,
+                  active_links_count: 0,
+                  pending_requests_count: 1,
+                }
+          );
+        }
         setPairingState("WAITING_FOR_OTP");
         showToast("6 xonali tasdiqlash kodi tayyorlandi");
       } else {
@@ -386,7 +403,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
           >
             <div style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "4px" }}>Bot Nomi</div>
             <div style={{ fontSize: "15px", fontWeight: 600, color: "#38BDF8" }}>
-              @{botStatus?.bot_username || "MikasaUniversalBot"}
+              @{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}
             </div>
           </div>
           <div
@@ -669,7 +686,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               <ol style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#94A3B8", lineHeight: "1.8" }}>
                 <li>Yuqoridagi 6 xonali kodni nusxalang.</li>
                 <li>
-                  Telegramda <strong style={{ color: "#38BDF8" }}>@{botStatus?.bot_username || "MikasaUniversalBot"}</strong> botini oching.
+                  Telegramda <strong style={{ color: "#38BDF8" }}>@{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}</strong> botini oching.
                 </li>
                 <li>
                   Kodni shunchaki botga yuboring (masalan: <code style={{ color: "#10B981" }}>{otpCode}</code>) yoki{" "}
