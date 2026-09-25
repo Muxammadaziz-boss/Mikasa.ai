@@ -61,7 +61,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const loadStatus = useCallback(async () => {
     try {
       const [accRes, botRes] = await Promise.all([
-        backendService.getTelegramAccount("admin"),
+        backendService.getTelegramAccount(),
         backendService.getTelegramBotStatus(),
       ]);
       setAccountInfo(accRes);
@@ -99,6 +99,31 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
     return () => unsub();
   }, [loadStatus]);
 
+  // Fallback polling during WAITING_FOR_OTP to detect mobile Telegram verification even if WebSocket drops
+  useEffect(() => {
+    if (pairingState !== "WAITING_FOR_OTP" || !requestId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await backendService.getTelegramLinkStatus(requestId);
+        const reqStatus = (res as any).request_status || res.status;
+        if (res.ok && (res.is_linked || reqStatus === "VERIFIED" || res.status === "CONNECTED")) {
+          clearInterval(pollInterval);
+          showToast("🎉 Telegram hisobingiz muvaffaqiyatli bog'landi!");
+          loadStatus();
+        } else if (reqStatus === "EXPIRED") {
+          clearInterval(pollInterval);
+          setPairingState("EXPIRED");
+        } else if (reqStatus === "FAILED") {
+          clearInterval(pollInterval);
+          setPairingState("FAILED");
+        }
+      } catch {}
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [pairingState, requestId, loadStatus]);
+
   // Countdown timer effect
   useEffect(() => {
     if (pairingState === "WAITING_FOR_OTP" && expiresAt > 0) {
@@ -125,13 +150,26 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const handleStartLink = async () => {
     setPairingState("PAIRING");
     try {
-      const res = await backendService.startTelegramLink("admin");
+      const res = await backendService.startTelegramLink();
       if (res.ok && res.otp && res.request_id) {
         setRequestId(res.request_id);
         setOtpCode(res.otp);
         setDeepLink(res.deep_link || "");
         setExpiresAt(res.expires_at || Date.now() / 1000 + 300);
         setRemainingSeconds(res.ttl_seconds || 300);
+        if (res.bot_username) {
+          setBotStatus((prev) =>
+            prev
+              ? { ...prev, bot_username: res.bot_username! }
+              : {
+                  ok: true,
+                  configured: true,
+                  bot_username: res.bot_username!,
+                  active_links_count: 0,
+                  pending_requests_count: 1,
+                }
+          );
+        }
         setPairingState("WAITING_FOR_OTP");
         showToast("6 xonali tasdiqlash kodi tayyorlandi");
       } else {
@@ -157,7 +195,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const handleUnlink = async () => {
     if (!window.confirm("Haqiqatan ham Telegram hisobini Mikasadan uzmoqchimisiz?")) return;
     try {
-      const res = await backendService.unlinkTelegramAccount("admin");
+      const res = await backendService.unlinkTelegramAccount();
       if (res.ok) {
         showToast("Telegram hisobi muvaffaqiyatli uzildi");
         setPairingState("NOT_CONNECTED");
@@ -365,7 +403,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
           >
             <div style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "4px" }}>Bot Nomi</div>
             <div style={{ fontSize: "15px", fontWeight: 600, color: "#38BDF8" }}>
-              @{botStatus?.bot_username || "MikasaUniversalBot"}
+              @{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}
             </div>
           </div>
           <div
@@ -648,7 +686,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               <ol style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#94A3B8", lineHeight: "1.8" }}>
                 <li>Yuqoridagi 6 xonali kodni nusxalang.</li>
                 <li>
-                  Telegramda <strong style={{ color: "#38BDF8" }}>@{botStatus?.bot_username || "MikasaUniversalBot"}</strong> botini oching.
+                  Telegramda <strong style={{ color: "#38BDF8" }}>@{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}</strong> botini oching.
                 </li>
                 <li>
                   Kodni shunchaki botga yuboring (masalan: <code style={{ color: "#10B981" }}>{otpCode}</code>) yoki{" "}

@@ -43,12 +43,16 @@ Mikasa AI v8.0.0 integrates Google OAuth via **Supabase Auth**. Users can authen
 3. Toggle **Enable Google provider**.
 4. Paste the **Client ID** and **Client Secret** obtained from Google Cloud Console.
 5. In **Authentication** -> **URL Configuration**:
-   - **Site URL**: `http://localhost:1420` (or your production web host)
-   - **Redirect URLs**: Add:
+   - **Site URL**: `https://mikasa-v8-api-production.up.railway.app/api/auth/callback`
+   - **Redirect URLs**: Add all of the following:
+     - `https://mikasa-v8-api-production.up.railway.app/api/auth/callback`
+     - `https://mikasa-v8-api-production.up.railway.app/api/auth/callback**`
+     - `http://127.0.0.1:18420/api/auth/callback`
+     - `http://127.0.0.1:18420/api/auth/callback**`
+     - `http://localhost:18420/api/auth/callback`
+     - `http://localhost:18420/api/auth/callback**`
      - `tauri://localhost`
      - `https://tauri.localhost`
-     - `http://localhost:1420/*`
-     - `http://127.0.0.1:1420/*`
 6. Click **Save**.
 
 ---
@@ -56,13 +60,15 @@ Mikasa AI v8.0.0 integrates Google OAuth via **Supabase Auth**. Users can authen
 ## 4. Frontend Integration & Lifecycle
 
 ### Method Call
-`backendService.signInWithGoogle()` calls:
+`backendService.signInWithGoogle()` resolves the environment-aware callback base (`http://127.0.0.1:18420` for Desktop/Tauri & Local Dev, and `https://mikasa-v8-api-production.up.railway.app` for Production Web while blocking accidental `localhost:140` / `localhost:1420` redirects) and calls:
 ```typescript
-const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+const callbackBase = resolveOAuthCallbackBase();
+const redirectTo = resolveOAuthRedirectUrl(state, { apiBaseOverride: callbackBase });
 const { data, error } = await supabase.auth.signInWithOAuth({
   provider: "google",
   options: {
     redirectTo,
+    skipBrowserRedirect: true,
     queryParams: {
       access_type: "offline",
       prompt: "consent",

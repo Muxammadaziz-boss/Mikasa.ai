@@ -280,7 +280,7 @@ def build_telegram_webhook_service() -> Optional[TelegramWebhookService]:
         return None
 
     webhook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot").strip()
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
 
     transport = AiohttpTelegramTransport(bot_token)
     bot = UniversalTelegramBot(
@@ -360,7 +360,7 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
         transport = AiohttpTelegramTransport(bot_token)
         bot = UniversalTelegramBot(
             transport=transport,
-            bot_username=os.environ.get("TELEGRAM_BOT_USERNAME", "MikasaUniversalBot"),
+            bot_username=os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot",
         )
         polling = TelegramPollingRunner(bot, transport)
         app["telegram_polling_runner"] = polling

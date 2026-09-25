@@ -4,21 +4,67 @@
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
-function formatAuthError(err: any): string {
-  const msg = (err && (err.message || String(err))) || "";
+export function redactSensitiveTokens(input: string): string {
+  if (!input) return "";
+  return input
+    .replace(
+      /(access_token|refresh_token|provider_token|provider_refresh_token|id_token|code)\s*[=:]\s*([^\s&#"']+)/gi,
+      "$1=[REDACTED]"
+    )
+    .replace(/eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, "[REDACTED_JWT]");
+}
+
+export function scrubUrlOAuthTokens(win?: any): void {
+  const w = win ?? (typeof window !== "undefined" ? window : undefined);
+  if (!w || !w.location || !w.history || typeof w.history.replaceState !== "function") {
+    return;
+  }
+  try {
+    const hash = w.location.hash || "";
+    const search = w.location.search || "";
+    const sensitiveKeys = [
+      "access_token",
+      "refresh_token",
+      "provider_token",
+      "provider_refresh_token",
+      "id_token",
+      "code",
+      "error_description",
+    ];
+    const hasSensitiveHash = sensitiveKeys.some((k) => hash.includes(`${k}=`));
+    const hasSensitiveSearch = sensitiveKeys.some((k) => search.includes(`${k}=`));
+    if (!hasSensitiveHash && !hasSensitiveSearch) {
+      return;
+    }
+    const cleanParams = new URLSearchParams(search);
+    for (const k of sensitiveKeys) {
+      cleanParams.delete(k);
+    }
+    const qs = cleanParams.toString();
+    const cleanUrl = w.location.pathname + (qs ? `?${qs}` : "");
+    w.history.replaceState(null, w.document?.title || "", cleanUrl);
+  } catch {
+    // ignore history errors in restricted environments
+  }
+}
+
+export function formatAuthError(err: any): string {
+  const rawMsg = (err && (err.message || String(err))) || "";
+  const msg = redactSensitiveTokens(rawMsg);
   if (
     msg.includes("Failed to fetch") ||
     msg.includes("NetworkError") ||
     msg.includes("ENOTFOUND") ||
     msg.includes("ERR_NAME_NOT_RESOLVED") ||
+    msg.includes("ERR_CONNECTION_REFUSED") ||
     msg.includes("fetch failed")
   ) {
-    return "Supabase serveriga ulanib bo'lmadi. Internet aloqangiz yoki loyiha URL manzilini tekshiring.";
+    return "Autentifikatsiya serveriga ulanib bo'lmadi. Internet aloqangiz yoki server holatini tekshiring.";
   }
   if (msg.includes("provider is not enabled") || msg.includes("Unsupported provider")) {
     return "Google orqali kirish Supabase Dashboard'da yoqilmagan. Supabase -> Authentication -> Providers bo'limida Google'ni yoqing va Client ID/Secret'ni kiriting.";
   }
-  if (msg.includes("email_address_invalid") || msg.includes("Email address") && msg.includes("is invalid")) {
+  if (msg.includes("email_address_invalid") || (msg.includes("Email address") && msg.includes("is invalid"))) {
     return "Kiritilgan email manzili noto'g'ri yoki qabul qilinmadi. Iltimos, haqiqiy email kiriting (masalan: example@gmail.com).";
   }
   if (msg.includes("Invalid login credentials")) {
@@ -34,7 +80,8 @@ function formatAuthError(err: any): string {
     msg.includes("Email link is invalid or has expired") ||
     msg.includes("otp_expired") ||
     msg.includes("Token has expired") ||
-    msg.includes("token is expired")
+    msg.includes("token is expired") ||
+    msg.includes("JWT expired")
   ) {
     return "Tasdiqlash havolasi yoki tokeni yaroqsiz yoxud muddati o'tgan. Iltimos, qaytadan so'rov yuboring.";
   }
@@ -59,6 +106,7 @@ function formatAuthError(err: any): string {
     msg.includes("bad_oauth_state") ||
     msg.includes("state mismatch") ||
     msg.includes("state expired") ||
+    msg.includes("Noto'g'ri OAuth state") ||
     msg.includes("Sessiya topilmadi yoki muddati o'tgan")
   ) {
     return "Google sessiyasi muddati tugagan yoki tasdiqlanmadi. Qaytadan urinib ko'ring.";
@@ -478,8 +526,157 @@ export interface RemoteAuditItem {
   details?: Record<string, any>;
 }
 
-const DEFAULT_API_URL = "http://127.0.0.1:18420";
-const API_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+export const DEFAULT_API_URL = "http://127.0.0.1:18420";
+export const PRODUCTION_API_URL = "https://mikasa-v8-api-production.up.railway.app";
+
+const FORBIDDEN_FRONTEND_PORTS = new Set(["140", "1420", "1421", "5173"]);
+const OAUTH_STATE_REGEX = /^[A-Za-z0-9_\-.:]{1,256}$/;
+
+export function isLocalhostUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.trim());
+    const h = parsed.hostname.toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]" || h.endsWith(".localhost");
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes("localhost") || lower.includes("127.0.0.1");
+  }
+}
+
+export function isInvalidFrontendPortUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.trim());
+    const h = parsed.hostname.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]") {
+      if (FORBIDDEN_FRONTEND_PORTS.has(parsed.port)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return /(?:localhost|127\.0\.0\.1):(140|1420|1421|5173)\b/i.test(url);
+  }
+}
+
+export function isTauriRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w) return false;
+  if (w.__TAURI_INTERNALS__ || w.__TAURI__ || w.__TAURI_METADATA__) {
+    return true;
+  }
+  const loc = w.location;
+  if (loc) {
+    const proto = String(loc.protocol || "").toLowerCase();
+    const host = String(loc.hostname || "").toLowerCase();
+    if (proto === "tauri:" || host === "tauri.localhost" || host.endsWith(".tauri.localhost")) {
+      return true;
+    }
+  }
+  const ua = String(w.navigator?.userAgent || "");
+  if (ua.includes("Tauri")) {
+    return true;
+  }
+  return false;
+}
+
+export function isLocalDevRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w || isTauriRuntime(w)) return false;
+  const host = String(w.location?.hostname || "").toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+}
+
+export function isProductionWebRuntime(win?: any): boolean {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  if (!w) return false;
+  return !isTauriRuntime(w) && !isLocalDevRuntime(w);
+}
+
+export function resolveApiBase(win?: any, envOverride?: Record<string, any>): string {
+  const w = win !== undefined ? win : typeof window !== "undefined" ? window : undefined;
+  const env = envOverride ?? ((import.meta as any).env || {});
+  const envUrl = String(env.VITE_API_URL || "").trim();
+
+  if (w) {
+    let customUrl = "";
+    try {
+      customUrl = String(w.localStorage?.getItem("mikasa_backend_url") || "").trim();
+    } catch {}
+
+    const isProdWeb = isProductionWebRuntime(w);
+
+    if (isProdWeb) {
+      if (customUrl && !isLocalhostUrl(customUrl) && !isInvalidFrontendPortUrl(customUrl)) {
+        return customUrl.replace(/\/$/, "");
+      }
+      if (envUrl && !isLocalhostUrl(envUrl) && !isInvalidFrontendPortUrl(envUrl)) {
+        return envUrl.replace(/\/$/, "");
+      }
+      return PRODUCTION_API_URL;
+    }
+
+    if (customUrl && !isInvalidFrontendPortUrl(customUrl)) {
+      return customUrl.replace(/\/$/, "");
+    }
+  }
+
+  if (envUrl && !isInvalidFrontendPortUrl(envUrl)) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return DEFAULT_API_URL;
+}
+
+export function resolveOAuthCallbackBase(options?: {
+  win?: any;
+  envOverride?: Record<string, any>;
+  apiBaseOverride?: string;
+}): string {
+  const w = options?.win !== undefined ? options.win : typeof window !== "undefined" ? window : undefined;
+  const env = options?.envOverride ?? ((import.meta as any).env || {});
+  const explicitOAuthEnv = String(env.VITE_OAUTH_REDIRECT_URL || "")
+    .trim()
+    .replace(/\/api\/auth\/callback\/?$/i, "")
+    .replace(/\/$/, "");
+  const isProdWeb = isProductionWebRuntime(w);
+
+  if (isProdWeb) {
+    for (const candidate of [explicitOAuthEnv, options?.apiBaseOverride || "", String(env.VITE_API_URL || "").trim()]) {
+      const cleaned = candidate.trim().replace(/\/$/, "");
+      if (cleaned && !isLocalhostUrl(cleaned) && !isInvalidFrontendPortUrl(cleaned)) {
+        return cleaned;
+      }
+    }
+    return PRODUCTION_API_URL;
+  }
+
+  for (const candidate of [explicitOAuthEnv, options?.apiBaseOverride || "", resolveApiBase(w, env)]) {
+    const cleaned = candidate.trim().replace(/\/$/, "");
+    if (cleaned && !isInvalidFrontendPortUrl(cleaned)) {
+      return cleaned;
+    }
+  }
+  return DEFAULT_API_URL;
+}
+
+export function resolveOAuthRedirectUrl(
+  state: string,
+  options?: {
+    win?: any;
+    envOverride?: Record<string, any>;
+    apiBaseOverride?: string;
+  }
+): string {
+  const cleanState = String(state || "").trim();
+  if (!cleanState || !OAUTH_STATE_REGEX.test(cleanState)) {
+    throw new Error("Noto'g'ri OAuth state parametri");
+  }
+  const base = resolveOAuthCallbackBase(options);
+  return `${base}/api/auth/callback?state=${encodeURIComponent(cleanState)}`;
+}
+
+const API_BASE = resolveApiBase();
 const WS_BASE = (import.meta.env.VITE_WS_URL || API_BASE.replace(/^http/, "ws")) + "/api/ws";
 
 class BackendService {
@@ -502,9 +699,49 @@ class BackendService {
   private authListeners: Set<(user: MikasaAuthUser | null) => void> = new Set();
   private clientVoiceStopFn: (() => void) | null = null;
   private authToken: string | null = null;
+  private activeOAuthState: string | null = null;
+  private activeOAuthCallbackBase: string | null = null;
+  private oauthPollFailures = 0;
 
   constructor() {
+    scrubUrlOAuthTokens();
     this.authToken = this.getAuthToken();
+    if (isSupabaseConfigured) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        scrubUrlOAuthTokens();
+        if (session?.access_token) {
+          this.setAuthToken(session.access_token);
+        }
+      }).catch(() => {});
+
+      supabase.auth.onAuthStateChange((event, session) => {
+        scrubUrlOAuthTokens();
+        if (session?.access_token) {
+          this.setAuthToken(session.access_token);
+          if ((event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") && session.user) {
+            const user: MikasaAuthUser = {
+              id: session.user.id,
+              username:
+                session.user.user_metadata?.full_name ||
+                session.user.user_metadata?.name ||
+                session.user.user_metadata?.username ||
+                session.user.email?.split("@")[0] ||
+                "User",
+              email: session.user.email || "",
+              is_active: true,
+              is_verified: Boolean(session.user.email_confirmed_at),
+              created_at: Date.now() / 1000,
+              avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || undefined,
+              provider: session.user.app_metadata?.provider || "google",
+            };
+            this.notifyAuthChange(user);
+          }
+        } else if (event === "SIGNED_OUT") {
+          this.setAuthToken(null);
+          this.notifyAuthChange(null);
+        }
+      });
+    }
     this.connectWs();
     this.startHealthPolling();
   }
@@ -1583,7 +1820,9 @@ class BackendService {
   // ========== Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi ==========
   public async getRemoteDevices(): Promise<{ ok: boolean; devices: RemoteDevice[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/devices`);
+      const res = await fetch(`${API_BASE}/api/remote/devices`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
@@ -1595,7 +1834,9 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/permissions?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/remote/permissions/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, device_id: deviceId, profile: {} as any, catalog: {}, error: String(err) };
@@ -1610,7 +1851,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ permissions, capabilities }),
       });
       return await res.json();
@@ -1623,7 +1864,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/pair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ action: "generate", device_id: deviceId }),
       });
       return await res.json();
@@ -1636,7 +1877,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/unpair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1649,7 +1890,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/session/lock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1662,7 +1903,7 @@ class BackendService {
     try {
       const res = await fetch(`${API_BASE}/api/remote/session/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1673,7 +1914,9 @@ class BackendService {
 
   public async getRemoteAudit(): Promise<{ ok: boolean; total: number; events: RemoteAuditItem[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/audit`);
+      const res = await fetch(`${API_BASE}/api/remote/audit`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, total: 0, events: [], error: String(err) };
@@ -1682,12 +1925,29 @@ class BackendService {
 
   // ========== Phase 39: Universal Telegram Identity & OTP Linking API ==========
 
-  public async startTelegramLink(mikasaUserId: string = "admin"): Promise<TelegramLinkStartResponse> {
+  private async getFreshAuthHeaders(): Promise<Record<string, string>> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token) {
+          this.setAuthToken(data.session.access_token);
+        }
+      } catch {}
+    }
+    return this.getAuthHeaders();
+  }
+
+  public async startTelegramLink(mikasaUserId?: string): Promise<TelegramLinkStartResponse> {
     try {
+      const bodyPayload: Record<string, any> = {};
+      if (mikasaUserId && mikasaUserId !== "admin") {
+        bodyPayload.mikasa_user_id = mikasaUserId;
+      }
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/link/start`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mikasa_user_id: mikasaUserId }),
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(bodyPayload),
       });
       return await res.json();
     } catch (err: any) {
@@ -1703,9 +1963,10 @@ class BackendService {
     requestId?: string
   ): Promise<TelegramLinkVerifyResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/link/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           otp,
           telegram_user_id: telegramUserId,
@@ -1722,13 +1983,18 @@ class BackendService {
 
   public async getTelegramLinkStatus(
     requestId?: string,
-    mikasaUserId: string = "admin"
+    mikasaUserId?: string
   ): Promise<TelegramLinkStatusResponse> {
     try {
       const params = new URLSearchParams();
       if (requestId) params.append("request_id", requestId);
-      if (mikasaUserId) params.append("mikasa_user_id", mikasaUserId);
-      const res = await fetch(`${API_BASE}/api/telegram/link/status?${params.toString()}`);
+      if (mikasaUserId && mikasaUserId !== "admin") params.append("mikasa_user_id", mikasaUserId);
+      const queryString = params.toString();
+      const url = queryString ? `${API_BASE}/api/telegram/link/status?${queryString}` : `${API_BASE}/api/telegram/link/status`;
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(url, {
+        headers: { ...authHeaders },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, status: "ERROR", is_linked: false, error: String(err) };
@@ -1736,14 +2002,18 @@ class BackendService {
   }
 
   public async unlinkTelegramAccount(
-    mikasaUserId: string = "admin",
+    mikasaUserId?: string,
     telegramUserId?: number
   ): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const bodyPayload: Record<string, any> = {};
+      if (mikasaUserId && mikasaUserId !== "admin") bodyPayload.mikasa_user_id = mikasaUserId;
+      if (telegramUserId) bodyPayload.telegram_user_id = telegramUserId;
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/unlink`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mikasa_user_id: mikasaUserId, telegram_user_id: telegramUserId }),
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(bodyPayload),
       });
       return await res.json();
     } catch (err: any) {
@@ -1751,9 +2021,16 @@ class BackendService {
     }
   }
 
-  public async getTelegramAccount(mikasaUserId: string = "admin"): Promise<TelegramAccountResponse> {
+  public async getTelegramAccount(mikasaUserId?: string): Promise<TelegramAccountResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/telegram/account?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`);
+      let url = `${API_BASE}/api/telegram/account`;
+      if (mikasaUserId && mikasaUserId !== "admin") {
+        url += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
+      }
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(url, {
+        headers: { ...authHeaders },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, is_linked: false, error: String(err) };
@@ -1762,13 +2039,15 @@ class BackendService {
 
   public async getTelegramBotStatus(): Promise<TelegramBotStatusResponse> {
     try {
-      const res = await fetch(`${API_BASE}/api/telegram/status`);
+      const res = await fetch(`${API_BASE}/api/telegram/status`, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return {
         ok: false,
         configured: false,
-        bot_username: "MikasaUniversalBot",
+        bot_username: "Mikasa_ai_agent_bot",
         active_links_count: 0,
         pending_requests_count: 0,
         error: String(err),
@@ -1783,7 +2062,9 @@ class BackendService {
   public async getDevices(userId?: string): Promise<DevicesListResponse> {
     try {
       const url = userId ? `${API_BASE}/api/devices?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/devices`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
@@ -1795,7 +2076,9 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1809,7 +2092,7 @@ class BackendService {
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
         body: JSON.stringify({ name }),
       });
       return await res.json();
@@ -1823,7 +2106,10 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
-      const res = await fetch(url, { method: "DELETE" });
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1835,7 +2121,10 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
@@ -1845,7 +2134,9 @@ class BackendService {
   public async getAccountSessions(userId?: string): Promise<AccountSessionsResponse> {
     try {
       const url = userId ? `${API_BASE}/api/account/sessions?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/account/sessions`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, sessions: [], total: 0, error: String(err) };
@@ -1857,10 +2148,75 @@ class BackendService {
       const url = userId
         ? `${API_BASE}/api/account/sessions/logout-all?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/account/sessions/logout-all`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...this.getAuthHeaders() },
+      });
       return await res.json();
     } catch (err: any) {
       return { ok: false, error: String(err) };
+    }
+  }
+
+  // ========== Phase 46: Real Remote Command Execution API ==========
+  public async submitDeviceCommand(
+    deviceId: string,
+    toolId: string,
+    params: Record<string, any> = {},
+    origin: string = "web"
+  ): Promise<{ ok: boolean; command_id?: string; state?: string; confirmation_token?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ tool_id: toolId, params, origin }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async confirmDeviceCommand(
+    deviceId: string,
+    commandId: string,
+    token: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        body: JSON.stringify({ token }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async cancelDeviceCommand(
+    deviceId: string,
+    commandId: string
+  ): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async getDeviceCommandHistory(deviceId: string): Promise<{ ok: boolean; history: any[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/history`, {
+        headers: { ...this.getAuthHeaders() },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, history: [], error: String(err) };
     }
   }
 
@@ -1880,6 +2236,21 @@ class BackendService {
     if (!this.authToken && typeof window !== "undefined") {
       try {
         this.authToken = localStorage.getItem("mikasa_session_token");
+        if (!this.authToken) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.access_token) {
+                  this.authToken = parsed.access_token;
+                  break;
+                }
+              }
+            }
+          }
+        }
       } catch {}
     }
     return this.authToken;
@@ -1890,6 +2261,7 @@ class BackendService {
     const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
+      headers["X-Mikasa-Session-Token"] = token;
     }
     return headers;
   }
@@ -2032,7 +2404,61 @@ class BackendService {
     }
   }
 
-  public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string }> {
+  private async verifyOAuthCallbackReachability(callbackBase: string): Promise<{ ok: boolean; error?: string }> {
+    if (typeof window === "undefined" || (globalThis as any).__MIKASA_SKIP_OAUTH_HEALTH_CHECK__) {
+      return { ok: true };
+    }
+    const pingHealth = async (base: string): Promise<boolean> => {
+      if (isTauriRuntime() && isLocalhostUrl(base)) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const st = await invoke<{ running?: boolean; healthy?: boolean }>("backend_get_status");
+          if (st && (st.running || st.healthy)) {
+            return true;
+          }
+        } catch {}
+      }
+      for (const ep of ["/api/status", "/api/health", "/health"]) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(`${base}${ep}`, { signal: controller.signal });
+          clearTimeout(timer);
+          if (res.ok) return true;
+        } catch {}
+      }
+      return false;
+    };
+
+    if (await pingHealth(callbackBase)) {
+      return { ok: true };
+    }
+
+    if (isTauriRuntime() && isLocalhostUrl(callbackBase)) {
+      // Ilova yangi ochilganda backend ishga tushishi 3-5 soniya olishi mumkin:
+      await this.restartBackend();
+      for (let i = 0; i < 16; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (await pingHealth(callbackBase)) {
+          return { ok: true };
+        }
+      }
+    }
+
+    if (isLocalhostUrl(callbackBase)) {
+      return {
+        ok: false,
+        error: "Lokal OAuth callback serveri (127.0.0.1:18420) ishlamayapti. Iltimos, lokal backend ishga tushganini tekshiring.",
+      };
+    }
+
+    return {
+      ok: false,
+      error: "Autentifikatsiya serveriga ulanib bo'lmadi. Internet aloqangiz yoki production server holatini tekshiring.",
+    };
+  }
+
+  public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string; redirectTo?: string }> {
     if (!isSupabaseConfigured) {
       return {
         ok: false,
@@ -2040,13 +2466,31 @@ class BackendService {
       };
     }
     try {
-      // In Desktop/Tauri or localhost environments, route redirect to the Python backend callback handler
       const state =
         customState ||
         (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID
           ? window.crypto.randomUUID()
           : Math.random().toString(36).substring(2) + Date.now().toString(36));
-      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
+
+      const callbackBase = resolveOAuthCallbackBase();
+      const redirectTo = resolveOAuthRedirectUrl(state, { apiBaseOverride: callbackBase });
+
+      if (isInvalidFrontendPortUrl(redirectTo)) {
+        return {
+          ok: false,
+          error: "Xavfsizlik xatosi: OAuth redirect manzili noto'g'ri lokal portga (140/1420) yo'naltirilgan.",
+        };
+      }
+
+      const reachability = await this.verifyOAuthCallbackReachability(callbackBase);
+      if (!reachability.ok) {
+        return { ok: false, error: reachability.error };
+      }
+
+      this.activeOAuthState = state;
+      this.activeOAuthCallbackBase = callbackBase;
+      this.oauthPollFailures = 0;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -2061,23 +2505,71 @@ class BackendService {
       if (error) {
         return { ok: false, error: formatAuthError(error) };
       }
-      return { ok: true, url: data.url, state };
+      if (data?.url && isInvalidFrontendPortUrl(data.url)) {
+        return {
+          ok: false,
+          error: "OAuth avtorizatsiya havolasida noto'g'ri localhost port aniqlandi.",
+        };
+      }
+      return { ok: true, url: data?.url, state, redirectTo };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
     }
   }
 
-  public async checkPendingOAuthSession(state?: string): Promise<{ ok: boolean; session?: { access_token?: string; refresh_token?: string; code?: string } }> {
+  public async checkPendingOAuthSession(state?: string): Promise<{
+    ok: boolean;
+    session?: { access_token?: string; refresh_token?: string; code?: string };
+    error?: string;
+    fatal?: boolean;
+    serverUnreachable?: boolean;
+  }> {
+    const targetState = (state || this.activeOAuthState || "").trim();
+    if (targetState && !OAUTH_STATE_REGEX.test(targetState)) {
+      return {
+        ok: false,
+        error: "Google sessiyasi state parametri yaroqsiz.",
+        fatal: true,
+      };
+    }
+    const callbackBase = this.activeOAuthCallbackBase || resolveOAuthCallbackBase();
     try {
-      const url = state
-        ? `${API_BASE}/api/auth/callback/session?state=${encodeURIComponent(state)}`
-        : `${API_BASE}/api/auth/callback/session`;
-      const res = await fetch(url);
+      const url = targetState
+        ? `${callbackBase}/api/auth/callback/session?state=${encodeURIComponent(targetState)}`
+        : `${callbackBase}/api/auth/callback/session`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      this.oauthPollFailures = 0;
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        if (data?.ok && data?.session) {
+          this.activeOAuthState = null;
+        }
+        return data;
+      }
+      if (res.status === 400) {
+        const errData = await res.json().catch(() => ({}));
+        const rawErr = errData?.oauth_error || errData?.error || "Google orqali kirishda xatolik yuz berdi";
+        this.activeOAuthState = null;
+        return {
+          ok: false,
+          error: formatAuthError(rawErr),
+          fatal: true,
+        };
       }
       return { ok: false };
     } catch {
+      this.oauthPollFailures += 1;
+      if (this.oauthPollFailures >= 5) {
+        return {
+          ok: false,
+          serverUnreachable: true,
+          error: "Autentifikatsiya serveri bilan aloqa uzildi. Server ishlayotganini tekshiring.",
+        };
+      }
       return { ok: false };
     }
   }
@@ -2139,7 +2631,7 @@ class BackendService {
     }
   }
 
-  public async linkGoogleAccount(customState?: string): Promise<{ ok: boolean; url?: string; state?: string; error?: string }> {
+  public async linkGoogleAccount(customState?: string): Promise<{ ok: boolean; url?: string; state?: string; redirectTo?: string; error?: string }> {
     if (!isSupabaseConfigured) {
       return { ok: false, error: "Supabase konfiguratsiyasi topilmadi" };
     }
@@ -2149,7 +2641,18 @@ class BackendService {
         (typeof window !== "undefined" && window.crypto?.randomUUID
           ? `link_${window.crypto.randomUUID()}`
           : `link_${Date.now()}`);
-      const redirectTo = `${API_BASE}/api/auth/callback?state=${encodeURIComponent(state)}`;
+      const callbackBase = resolveOAuthCallbackBase();
+      const redirectTo = resolveOAuthRedirectUrl(state, { apiBaseOverride: callbackBase });
+
+      const reachability = await this.verifyOAuthCallbackReachability(callbackBase);
+      if (!reachability.ok) {
+        return { ok: false, error: reachability.error };
+      }
+
+      this.activeOAuthState = state;
+      this.activeOAuthCallbackBase = callbackBase;
+      this.oauthPollFailures = 0;
+
       const { data, error } = await supabase.auth.linkIdentity({
         provider: "google",
         options: {
@@ -2164,7 +2667,7 @@ class BackendService {
       if (error) {
         return { ok: false, error: formatAuthError(error) };
       }
-      return { ok: true, url: data?.url, state };
+      return { ok: true, url: data?.url, state, redirectTo };
     } catch (err: any) {
       return { ok: false, error: formatAuthError(err) };
     }
