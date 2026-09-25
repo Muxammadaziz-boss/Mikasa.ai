@@ -2415,10 +2415,13 @@ class BackendService {
     }
 
     if (isTauriRuntime() && isLocalhostUrl(callbackBase)) {
+      // Ilova yangi ochilganda backend ishga tushishi 3-5 soniya olishi mumkin:
       await this.restartBackend();
-      await new Promise((r) => setTimeout(r, 1200));
-      if (await pingHealth(callbackBase)) {
-        return { ok: true };
+      for (let i = 0; i < 16; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (await pingHealth(callbackBase)) {
+          return { ok: true };
+        }
       }
     }
 

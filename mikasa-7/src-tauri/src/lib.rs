@@ -115,6 +115,15 @@ fn find_bundled_backend_binary() -> Option<(PathBuf, PathBuf)> {
         candidates.push((p.join("MikasaAI").join("backend").join("mikasa_backend.exe"), p.join("MikasaAI").join("backend")));
     }
 
+    // 4. Loyiha reliz katalogi fallback (agar .exe alohida ko'chirilgan bo'lsa)
+    for root_str in &[
+        r"D:\Mikasa\yordamchi_8.0.0\release\v8.0.0\backend",
+        r"D:\Ishchi stoli\Mikasa\yordamchi_8.0.0\release\v8.0.0\backend",
+    ] {
+        let bdir = PathBuf::from(root_str);
+        candidates.push((bdir.join("mikasa_backend.exe"), bdir));
+    }
+
     for (exe, work_dir) in candidates {
         if exe.exists() {
             return Some((exe, work_dir));
@@ -288,6 +297,8 @@ pub fn ensure_backend_running(state: &SupervisorState) {
                     println!("[MIKASA] Xatolik: Backend jarayoni kutilmaganda to'xtadi: {:?}", status);
                     break;
                 }
+            } else {
+                break;
             }
         }
 
@@ -362,12 +373,22 @@ fn backend_get_status(state: tauri::State<SupervisorState>) -> serde_json::Value
     }
 
     let is_healthy = check_http_health("127.0.0.1:18420", "/api/health");
+    let is_spawning = state.is_spawning.lock().map(|s| *s).unwrap_or(false);
+
+    if !is_healthy && !is_spawning {
+        let state_clone = state.inner().clone();
+        std::thread::spawn(move || {
+            ensure_backend_running(&state_clone);
+        });
+    }
+
     let is_managed = state.is_managed.lock().map(|m| *m).unwrap_or(false);
     let pid = state.backend_pid.lock().ok().and_then(|p| *p);
 
     serde_json::json!({
         "running": is_healthy,
         "healthy": is_healthy,
+        "spawning": is_spawning || !is_healthy,
         "port": 18420,
         "pid": pid,
         "managed": is_managed
@@ -376,8 +397,16 @@ fn backend_get_status(state: tauri::State<SupervisorState>) -> serde_json::Value
 
 #[tauri::command]
 fn backend_restart(state: tauri::State<SupervisorState>) -> Result<bool, String> {
+    // Agar backend hozirgina ishga tushayotgan bo'lsa (spawning) yoki allaqachon sog'lom bo'lsa, uni o'ldirmaymiz
+    let currently_spawning = state.is_spawning.lock().map(|s| *s).unwrap_or(false);
+    if currently_spawning || check_http_health("127.0.0.1:18420", "/api/health") {
+        return Ok(true);
+    }
     stop_backend(&state);
-    std::thread::sleep(Duration::from_millis(500));
+    if let Ok(mut spawning) = state.is_spawning.lock() {
+        *spawning = false;
+    }
+    std::thread::sleep(Duration::from_millis(300));
     let state_clone = state.inner().clone();
     std::thread::spawn(move || {
         ensure_backend_running(&state_clone);
