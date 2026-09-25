@@ -6,10 +6,10 @@
   "files": [
     {
       "name": "Mikasa-AI-v8.0.0.exe",
-      "size_bytes": 5132800,
+      "size_bytes": 5134336,
       "size_mb": 4.9,
-      "sha256": "fb8f94c0ae1af1d1d5b63c26737bcdf66ee0041db7d0b36935ec9cdf226654b8",
-      "signature": "fa4fba04c0520c3c0cbf0d75819d7c1cd7fe2f16376415f02708bdcef602b61544fc620da582469f7b05885e2e24b9af6a9cca80b90e7add77b509211057ad02"
+      "sha256": "f03d392c304b99c56c0eab32b16dc5bbc54b57c680667b4cae97ef3e85aec89d",
+      "signature": "0a8187ef5000884259f112625ed14fb47de6504b173a3b6855b682bb813730de57af935d4829d30600afe7e154615fbd980c5b5fee00192f457e81ea1c190f00"
     },
     {
       "name": "WebView2Loader.dll",
@@ -34,10 +34,10 @@
     },
     {
       "name": "Mikasa-AI-v8.0.0-Portable.zip",
-      "size_bytes": 62044718,
-      "size_mb": 59.17,
-      "sha256": "1919075a59fd86137ce0e50c4d928a768c09c29963d769969bf8a5d2fdea27dc",
-      "signature": "60798134aa416a41a51b37edcbd34c79c82abdab18a10f61d7d84c2be06f6a8534680bdae03af96ad781e575e602670a4aef9888a534b0f23d61368e4c7f820b"
+      "size_bytes": 62053919,
+      "size_mb": 59.18,
+      "sha256": "e9ce106b28ef7818cda858c34730fe48afee150d06cc2ed27a0221142903935a",
+      "signature": "a31d1a3c6ccb17f689e0ff313820e7d641bb3aacdc268c13eef226a4758e9402fa99e51e9c0bda28d63910dec5e3c83388f70c32fb543d230ce0a540f4a97507"
     }
   ],
   "backend": {
