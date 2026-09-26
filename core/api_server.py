@@ -64,6 +64,7 @@ except Exception:
 
 # Backend modullari kesh singletonlari
 _main = None
+_main_load_attempted = False
 _ai_engine = None
 _agent_memory = None
 _agent_scheduler = None
@@ -74,14 +75,55 @@ _active_ws_clients = set()
 _voice_state = "idle"  # idle | listening | thinking | speaking
 _main_loop = None
 
+
+def load_runtime_dotenv() -> None:
+    """Runtime ishga tushganda .env va mikasa-7/.env fayllaridan konfiguratsiyani yuklash."""
+    try:
+        from dotenv import load_dotenv
+        root_env = os.path.join(BASE_DIR, ".env")
+        if os.path.isfile(root_env):
+            load_dotenv(root_env, override=False)
+        frontend_env = os.path.join(BASE_DIR, "mikasa-7", ".env")
+        if os.path.isfile(frontend_env):
+            load_dotenv(frontend_env, override=False)
+    except Exception:
+        pass
+
+    if not os.environ.get("SUPABASE_URL") and os.environ.get("VITE_SUPABASE_URL"):
+        os.environ["SUPABASE_URL"] = os.environ["VITE_SUPABASE_URL"]
+    if not os.environ.get("SUPABASE_PUBLISHABLE_KEY") and os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY"):
+        os.environ["SUPABASE_PUBLISHABLE_KEY"] = os.environ["VITE_SUPABASE_PUBLISHABLE_KEY"]
+
+
+def _is_headless_server_mode() -> bool:
+    """Railway / Linux / Cloud headless server rejimini aniqlash."""
+    if sys.platform != "win32":
+        return True
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"):
+        return True
+    if os.environ.get("MIKASA_HEADLESS_SERVER", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    if os.environ.get("MIKASA_ENV", "").strip().lower() == "production":
+        return True
+    return False
+
+
 def get_modules():
-    global _main, _ai_engine, _agent_memory, _agent_scheduler, _tool_registry, _command_dispatcher
-    if _main is None:
-        try:
-            import main as m
-            _main = m
-        except Exception as e:
-            logger.error(f"main.py yuklashda xatolik: {e}")
+    global _main, _main_load_attempted, _ai_engine, _agent_memory, _agent_scheduler, _tool_registry, _command_dispatcher
+    if _main is None and not _main_load_attempted:
+        _main_load_attempted = True
+        if _is_headless_server_mode():
+            logger.debug("Headless/Cloud server rejimi: lokal desktop main.py moduli o'tkazib yuborildi.")
+        else:
+            try:
+                import importlib.util
+                if importlib.util.find_spec("main") is not None:
+                    import main as m
+                    _main = m
+                else:
+                    logger.debug("main.py topilmadi — API server mustaqil rejimda ishlamoqda.")
+            except Exception as e:
+                logger.warning(f"main.py yuklashda xatolik (desktop modul o'tkazib yuborildi): {e}")
 
     if _ai_engine is None:
         try:
@@ -2495,6 +2537,56 @@ async def handle_telegram_link_start(request):
     })
 
 
+async def handle_telegram_link_sync(request):
+    """POST /api/telegram/link/sync - Lokal desktop yaratgan OTP so'rovini Railway xotirasiga sinxronlash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    request_id = str(body.get("request_id") or "").strip()
+    otp_hash = str(body.get("otp_hash") or "").strip()
+    link_token = str(body.get("link_token") or "").strip()
+    body_uid = str(body.get("mikasa_user_id") or "").strip() or user_id
+
+    if user is not None or user_id != "admin":
+        if body_uid and body_uid not in (user_id, "admin"):
+            return web.json_response(
+                {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi nomidan OTP sinxronlash taqiqlangan."},
+                status=403
+            )
+        mikasa_user_id = user_id
+    else:
+        mikasa_user_id = body_uid
+
+    if not request_id or not otp_hash:
+        return web.json_response({"ok": False, "error": "request_id va otp_hash majburiy"}, status=400)
+
+    from core.v8 import TelegramIdentityManager
+    mgr = TelegramIdentityManager.get_default_instance()
+    auth_token = get_auth_token_from_request(request)
+    req = mgr.register_synced_request(
+        request_id=request_id,
+        mikasa_user_id=mikasa_user_id,
+        otp_hash=otp_hash,
+        link_token=link_token,
+        created_at=float(body.get("created_at") or time.time()),
+        expires_at=float(body.get("expires_at") or (time.time() + mgr.DEFAULT_TTL)),
+        expected_telegram_user_id=body.get("expected_telegram_user_id"),
+        auth_token=auth_token,
+    )
+    return web.json_response({
+        "ok": True,
+        "request_id": req.request_id,
+        "mikasa_user_id": req.mikasa_user_id,
+        "expires_at": req.expires_at,
+    })
+
+
 async def handle_telegram_link_verify(request):
     """POST /api/telegram/link/verify - OTP kodni tekshirish va hisobni bog'lash"""
     user_id, user, session, err = resolve_auth_identity(request, required=True)
@@ -4802,6 +4894,7 @@ def create_app():
 
     # Phase 39: Universal Telegram Bot & Identity
     app.router.add_post("/api/telegram/link/start", handle_telegram_link_start)
+    app.router.add_post("/api/telegram/link/sync", handle_telegram_link_sync)
     app.router.add_post("/api/telegram/link/verify", handle_telegram_link_verify)
     app.router.add_get("/api/telegram/link/status", handle_telegram_link_status)
     app.router.add_post("/api/telegram/link/delete", handle_telegram_unlink)
@@ -4898,6 +4991,7 @@ def create_app():
 
 
 def run_server(host=None, port=None):
+    load_runtime_dotenv()
     resolved_host = host or os.environ.get("MIKASA_API_HOST", "127.0.0.1")
     resolved_port = port
     if resolved_port is None:

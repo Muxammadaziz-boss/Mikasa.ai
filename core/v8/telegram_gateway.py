@@ -144,11 +144,23 @@ class AiohttpTelegramTransport(TelegramTransport):
         self.bot_token = bot_token
         self.base_url = f"https://api.telegram.org/bot{bot_token}"
         self._session = None
+        self._session_loop = None
 
     async def _get_session(self):
+        import asyncio
         import aiohttp
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if (
+            self._session is None
+            or self._session.closed
+            or (current_loop is not None and self._session_loop is not None and self._session_loop is not current_loop)
+        ):
+            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
+            self._session_loop = current_loop
         return self._session
 
     async def send_message(
@@ -169,15 +181,62 @@ class AiohttpTelegramTransport(TelegramTransport):
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
-        async with session.post(url, json=payload) as resp:
-            data = await resp.json()
-            if not data.get("ok") and parse_mode and resp.status == 400 and "parse entities" in str(data.get("description", "")).lower():
-                logger.warning(f"[TelegramTransport] Markdown entity parse error, retrying plain text for chat={chat_id}")
-                fallback_payload = dict(payload)
-                fallback_payload.pop("parse_mode", None)
-                async with session.post(url, json=fallback_payload) as retry_resp:
-                    return await retry_resp.json()
-            return data
+        try:
+            async with session.post(url, json=payload) as resp:
+                status_code = getattr(resp, "status", 200)
+                try:
+                    data = await resp.json(content_type=None)
+                except TypeError:
+                    data = await resp.json()
+                except Exception:
+                    data = {"ok": False, "error_code": status_code, "description": "Invalid JSON response from Telegram"}
+
+                if not isinstance(data, dict):
+                    data = {"ok": False, "error_code": status_code, "description": "Malformed response"}
+
+                desc_lower = str(data.get("description", "")).lower()
+                if (
+                    not data.get("ok")
+                    and parse_mode
+                    and status_code == 400
+                    and ("parse entities" in desc_lower or "can't parse" in desc_lower)
+                ):
+                    logger.warning(f"[TelegramTransport] Markdown entity parse error, retrying plain text for chat_id={chat_id}")
+                    fallback_payload = dict(payload)
+                    fallback_payload.pop("parse_mode", None)
+                    async with session.post(url, json=fallback_payload) as retry_resp:
+                        retry_status = getattr(retry_resp, "status", 200)
+                        try:
+                            retry_data = await retry_resp.json(content_type=None)
+                        except TypeError:
+                            retry_data = await retry_resp.json()
+                        except Exception:
+                            retry_data = {"ok": False, "error_code": retry_status, "description": "Invalid JSON on retry"}
+                        if retry_data.get("ok"):
+                            logger.info(f"[TelegramTransport] sendMessage OK (plain retry, chat_id={chat_id}, status={retry_status})")
+                        else:
+                            safe_desc = sanitize_sensitive_string(str(retry_data.get("description", "unknown")))
+                            logger.error(
+                                f"[TelegramTransport] sendMessage FAILED on retry "
+                                f"(chat_id={chat_id}, status={retry_status}, error_code={retry_data.get('error_code')}, description={safe_desc})"
+                            )
+                        return retry_data
+
+                if data.get("ok"):
+                    logger.info(f"[TelegramTransport] sendMessage OK (chat_id={chat_id}, status={status_code})")
+                else:
+                    safe_desc = sanitize_sensitive_string(str(data.get("description", "unknown")))
+                    logger.error(
+                        f"[TelegramTransport] sendMessage FAILED "
+                        f"(chat_id={chat_id}, status={status_code}, error_code={data.get('error_code')}, description={safe_desc})"
+                    )
+                return data
+        except Exception as exc:
+            logger.error(
+                f"[TelegramTransport] sendMessage network error "
+                f"(chat_id={chat_id}, error={type(exc).__name__})"
+            )
+            return {"ok": False, "error_code": 500, "description": type(exc).__name__}
 
     async def edit_message_text(
         self,
@@ -199,14 +258,34 @@ class AiohttpTelegramTransport(TelegramTransport):
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
-        async with session.post(url, json=payload) as resp:
-            data = await resp.json()
-            if not data.get("ok") and parse_mode and resp.status == 400 and "parse entities" in str(data.get("description", "")).lower():
-                fallback_payload = dict(payload)
-                fallback_payload.pop("parse_mode", None)
-                async with session.post(url, json=fallback_payload) as retry_resp:
-                    return await retry_resp.json()
-            return data
+        try:
+            async with session.post(url, json=payload) as resp:
+                status_code = getattr(resp, "status", 200)
+                try:
+                    data = await resp.json(content_type=None)
+                except TypeError:
+                    data = await resp.json()
+                except Exception:
+                    data = {"ok": False, "error_code": status_code, "description": "Invalid JSON response"}
+
+                desc_lower = str(data.get("description", "")).lower()
+                if (
+                    not data.get("ok")
+                    and parse_mode
+                    and status_code == 400
+                    and ("parse entities" in desc_lower or "can't parse" in desc_lower)
+                ):
+                    fallback_payload = dict(payload)
+                    fallback_payload.pop("parse_mode", None)
+                    async with session.post(url, json=fallback_payload) as retry_resp:
+                        try:
+                            return await retry_resp.json(content_type=None)
+                        except TypeError:
+                            return await retry_resp.json()
+                return data
+        except Exception as exc:
+            logger.error(f"[TelegramTransport] editMessageText network error (chat_id={chat_id}, error={type(exc).__name__})")
+            return {"ok": False, "error_code": 500, "description": type(exc).__name__}
 
     async def answer_callback_query(
         self,
@@ -222,9 +301,16 @@ class AiohttpTelegramTransport(TelegramTransport):
         if show_alert:
             payload["show_alert"] = show_alert
 
-        async with session.post(url, json=payload) as resp:
-            data = await resp.json()
-            return bool(data.get("ok", False))
+        try:
+            async with session.post(url, json=payload) as resp:
+                try:
+                    data = await resp.json(content_type=None)
+                except TypeError:
+                    data = await resp.json()
+                return bool(data.get("ok", False))
+        except Exception as exc:
+            logger.error(f"[TelegramTransport] answerCallbackQuery network error: {type(exc).__name__}")
+            return False
 
     async def get_updates(
         self,
@@ -238,12 +324,17 @@ class AiohttpTelegramTransport(TelegramTransport):
             params["offset"] = offset
 
         async with session.get(url, params=params) as resp:
-            data = await resp.json()
+            try:
+                data = await resp.json(content_type=None)
+            except TypeError:
+                data = await resp.json()
             return data.get("result", [])
 
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
+        self._session = None
+        self._session_loop = None
 
 
 class TelegramRemoteGateway:

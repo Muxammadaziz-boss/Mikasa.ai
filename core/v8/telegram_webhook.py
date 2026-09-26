@@ -57,6 +57,14 @@ class UpdateIdempotencyStore:
         self._seen[uid] = now
         return True
 
+    def unclaim(self, update_id: Any) -> None:
+        """Release update_id if processing failed unexpectedly before completion."""
+        try:
+            uid = int(update_id)
+            self._seen.pop(uid, None)
+        except (TypeError, ValueError):
+            pass
+
 
 class TelegramWebhookService:
     """
@@ -101,6 +109,37 @@ class TelegramWebhookService:
             return False
         return True
 
+    @staticmethod
+    def _classify_update(update: Dict[str, Any]) -> Tuple[str, Any, Any, str]:
+        """Extract non-sensitive metadata (update_type, chat_id, tg_user_id, action_kind)."""
+        if "callback_query" in update and isinstance(update["callback_query"], dict):
+            cq = update["callback_query"]
+            from_u = cq.get("from", {}) if isinstance(cq.get("from"), dict) else {}
+            msg = cq.get("message", {}) if isinstance(cq.get("message"), dict) else {}
+            chat = msg.get("chat", {}) if isinstance(msg.get("chat"), dict) else {}
+            return "callback_query", chat.get("id"), from_u.get("id"), "callback"
+
+        update_type = "edited_message" if "edited_message" in update else ("message" if "message" in update else "other")
+        msg = update.get("message") or update.get("edited_message")
+        if not isinstance(msg, dict):
+            return update_type, None, None, "non_message"
+
+        chat = msg.get("chat", {}) if isinstance(msg.get("chat"), dict) else {}
+        from_u = msg.get("from", {}) if isinstance(msg.get("from"), dict) else {}
+        chat_id = chat.get("id")
+        tg_user_id = from_u.get("id") or chat_id
+        raw_text = str(msg.get("text", "")).strip()
+
+        if not raw_text:
+            return update_type, chat_id, tg_user_id, "empty_or_media"
+        if raw_text.startswith("/"):
+            cmd_head = raw_text.split()[0].split("@")[0].lower()
+            has_arg = len(raw_text.split()) > 1
+            return update_type, chat_id, tg_user_id, f"{cmd_head}_with_arg" if has_arg else cmd_head
+        if UniversalTelegramBot.OTP_REGEX.match(raw_text):
+            return update_type, chat_id, tg_user_id, "otp_code_input"
+        return update_type, chat_id, tg_user_id, "plain_text"
+
     async def handle_webhook(self, request: web.Request) -> web.Response:
         if not self._accepting_updates:
             return web.Response(status=503, text="Service shutting down")
@@ -108,7 +147,7 @@ class TelegramWebhookService:
         if not self._validate_secret(request):
             logger.warning(
                 "[TelegramWebhook] Rejected request: invalid webhook secret "
-                f"(path={request.path}, correlation={id(request)})"
+                f"( correlation={id(request)} )"
             )
             return web.Response(status=403, text="Forbidden")
 
@@ -133,15 +172,38 @@ class TelegramWebhookService:
             logger.info(f"[TelegramWebhook] Duplicate update ignored: update_id={update_id}")
             return web.Response(status=200, text="OK")
 
+        update_type, chat_id, tg_user_id, action_kind = self._classify_update(update)
+        logger.info(
+            f"[TelegramWebhook] Incoming update: update_id={update_id}, "
+            f"type={update_type}, chat_id={chat_id}, tg_user_id={tg_user_id}, action={action_kind}"
+        )
+
         task = asyncio.create_task(self._process_update_safe(update, update_id))
         self._active_handlers.add(task)
         task.add_done_callback(self._active_handlers.discard)
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=25.0)
+        except asyncio.TimeoutError:
+            logger.warning(f"[TelegramWebhook] Update processing still running after 25s (update_id={update_id})")
         return web.Response(status=200, text="OK")
 
     async def _process_update_safe(self, update: Dict[str, Any], update_id: Any) -> None:
         try:
-            await self.bot.process_update(update)
+            result = await self.bot.process_update(update)
+            if isinstance(result, dict):
+                if result.get("ok"):
+                    logger.info(f"[TelegramWebhook] Update processed & reply sent (update_id={update_id})")
+                else:
+                    safe_desc = sanitize_sensitive_string(str(result.get("description", "")))
+                    logger.error(
+                        f"[TelegramWebhook] Bot reply failed "
+                        f"(update_id={update_id}, error_code={result.get('error_code')}, description={safe_desc})"
+                    )
+            else:
+                logger.info(f"[TelegramWebhook] Update processed with no reply required (update_id={update_id})")
         except Exception as exc:
+            if update_id is not None:
+                self.idempotency.unclaim(update_id)
             logger.exception(
                 "[TelegramWebhook] Update processing failed "
                 f"(update_id={update_id}, error={type(exc).__name__})"
@@ -312,6 +374,7 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
         logger.info(f"[TelegramWebhook] Route registered: POST {route_pattern}")
 
     async def handle_ready(request: web.Request) -> web.Response:
+        import sys
         svc = app.get("telegram_webhook_service")
         use_webhook = _env_bool("TELEGRAM_USE_WEBHOOK", default=True)
         bot_configured = bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip())
@@ -321,6 +384,7 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
             "telegram_bot": "configured" if bot_configured else "missing",
             "webhook_mode": "enabled" if use_webhook else "polling",
             "webhook_service": "ready" if svc else ("not_required" if not use_webhook else "not_ready"),
+            "platform": sys.platform,
         }
 
         if backend_url:
@@ -332,9 +396,19 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
             or os.environ.get("SUPABASE_ANON_KEY")
             or ""
         )
+        supabase_secret = (
+            os.environ.get("SUPABASE_SECRET_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+            or ""
+        )
         checks["supabase"] = (
             "configured"
             if supabase_url and supabase_key and "placeholder" not in supabase_url
+            else "not_configured"
+        )
+        checks["supabase_service_role"] = (
+            "configured"
+            if supabase_secret and "placeholder" not in supabase_secret
             else "not_configured"
         )
 

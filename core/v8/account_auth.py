@@ -309,6 +309,11 @@ class SupabaseAuthManager:
         storage_path: Optional[str] = None
     ):
         self.account_device_mgr = account_device_mgr or AccountDeviceManager.get_default_instance()
+        self._explicit_url = supabase_url is not None
+        self._explicit_pub_key = (supabase_publishable_key is not None) or (supabase_anon_key is not None)
+        self._explicit_sec_key = supabase_secret_key is not None
+        self._explicit_jwt_secret = supabase_jwt_secret is not None
+
         raw_url = supabase_url or os.environ.get("SUPABASE_URL", "")
         self.supabase_url = raw_url.rstrip("/") if raw_url else ""
 
@@ -340,8 +345,30 @@ class SupabaseAuthManager:
         self._audit = RemoteAuditLogger.get_instance()
         self.storage_path = storage_path
 
+    def _sync_env_config(self) -> None:
+        """Refresh environment-sourced config if singleton was initialized before env load."""
+        if not self._explicit_url:
+            env_url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+            if env_url != self.supabase_url:
+                self.supabase_url = env_url
+                self.jwks_client.set_supabase_url(env_url)
+        if not self._explicit_pub_key:
+            self.supabase_publishable_key = (
+                os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+                or os.environ.get("SUPABASE_ANON_KEY", "")
+            )
+            self.supabase_anon_key = self.supabase_publishable_key
+        if not self._explicit_sec_key:
+            self.supabase_secret_key = (
+                os.environ.get("SUPABASE_SECRET_KEY")
+                or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+            )
+        if not self._explicit_jwt_secret:
+            self.supabase_jwt_secret = os.environ.get("SUPABASE_JWT_SECRET")
+
     def is_configured(self) -> bool:
         """Supabase xizmati haqiqiy API kalitlari bilan sozlanganligini tekshirish."""
+        self._sync_env_config()
         return bool(
             self.supabase_url
             and self.supabase_publishable_key
@@ -355,6 +382,7 @@ class SupabaseAuthManager:
         if inst is None:
             cls._default_instance = cls(*args, **kwargs)
             return cls._default_instance
+        inst._sync_env_config()
         return inst
 
     @classmethod
@@ -389,6 +417,7 @@ class SupabaseAuthManager:
            - Default/test secret orqali soxtalashtirish MUTLAQO TAQIQLANGAN.
         4. Muddati (exp), issuer (iss), audience (aud), sub (UUID) tekshiruvi.
         """
+        self._sync_env_config()
         if not token or not isinstance(token, str):
             return False, "MISSING_TOKEN: Token kiritilmadi", None
 

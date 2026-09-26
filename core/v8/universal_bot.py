@@ -68,6 +68,26 @@ class UniversalTelegramBot:
         Ingest and process a single Telegram update dictionary.
         Extracts user metadata, canonical numeric ID, and dispatches to handler.
         """
+        if "callback_query" in update and isinstance(update["callback_query"], dict):
+            cq = update["callback_query"]
+            cq_id = str(cq.get("id", ""))
+            if cq_id:
+                await self.transport.answer_callback_query(cq_id)
+            cq_msg = cq.get("message", {}) if isinstance(cq.get("message"), dict) else {}
+            cq_chat = cq_msg.get("chat", {}) if isinstance(cq_msg.get("chat"), dict) else {}
+            cq_from = cq.get("from", {}) if isinstance(cq.get("from"), dict) else {}
+            cq_data = str(cq.get("data", "")).strip()
+            is_valid_cq_id, cq_tg_id = TelegramIdentity.validate_user_id(cq_from.get("id") or cq_chat.get("id"))
+            if is_valid_cq_id and cq_tg_id and cq_data:
+                return await self.handle_message(
+                    chat_id=cq_chat.get("id") or cq_tg_id,
+                    tg_user_id=cq_tg_id,
+                    first_name=cq_from.get("first_name"),
+                    username=cq_from.get("username"),
+                    text=cq_data
+                )
+            return {"ok": True, "callback_answered": True}
+
         message = update.get("message") or update.get("edited_message")
         if not message:
             return None
@@ -124,6 +144,7 @@ class UniversalTelegramBot:
         # 1. /start [token]
         start_arg = self._extract_cmd_arg(text, "start")
         if start_arg is not None:
+            logger.info(f"[UniversalBot] Handling /start for tg_user_id={tg_user_id} (has_token={bool(start_arg)})")
             return await self._handle_start(chat_id, tg_user_id, first_name, username, start_arg)
 
         # 2. /link [code]
@@ -136,12 +157,14 @@ class UniversalTelegramBot:
                 cleaned_code = ""
             else:
                 cleaned_code = TelegramIdentityManager.normalize_otp_input(cleaned_code)
+            logger.info(f"[UniversalBot] Handling /link for tg_user_id={tg_user_id} (has_code={bool(cleaned_code)})")
             return await self._handle_link(chat_id, tg_user_id, first_name, username, cleaned_code)
 
         # 3. Raw 6-digit numeric OTP entry (e.g. 583921, 583 921, `583921`)
         match_otp = self.OTP_REGEX.match(text)
         if match_otp:
             code = TelegramIdentityManager.normalize_otp_input(match_otp.group(1))
+            logger.info(f"[UniversalBot] Handling raw 6-digit OTP input for tg_user_id={tg_user_id}")
             return await self._handle_link(chat_id, tg_user_id, first_name, username, code)
 
         # 4. /unlink
@@ -211,6 +234,7 @@ class UniversalTelegramBot:
                 first_name=first_name,
                 username=username
             )
+            logger.info(f"[UniversalBot] Deep-link verification for tg_user_id={tg_user_id}: ok={ok}")
             if ok and link:
                 text = (
                     "🎉 *Tabriklaymiz!*\n\n"
@@ -228,7 +252,8 @@ class UniversalTelegramBot:
         name = str(first_name or "foydalanuvchi").replace("_", "\\_").replace("*", "\\*").replace("`", "")
         welcome_text = (
             f"👋 *Assalomu alaykum, {name}!*\n\n"
-            "Mikasa AI Universal Telegram Botiga xush kelibsiz.\n\n"
+            "Mikasa AI Universal Telegram Botiga xush kelibsiz.\n"
+            f"🆔 Sizning Telegram ID: `{tg_user_id}`\n\n"
             "Ushbu bot orqali Mikasa profilingizni xavfsiz bog'lashingiz mumkin.\n\n"
             "📱 *Bog'lash uchun:*\n"
             "1. Mikasa ilovasida 'Telegram' bo'limiga o'ting.\n"
@@ -251,6 +276,7 @@ class UniversalTelegramBot:
         if not code:
             prompt_text = (
                 "ℹ️ *Tasdiqlash kodi talab qilinadi.*\n\n"
+                f"🆔 Sizning Telegram ID: `{tg_user_id}`\n"
                 "Iltimos, Mikasa ilovasida ko'rsatilgan 6 xonali tasdiqlash kodini kiriting:\n"
                 "Misol: `/link 583921` yoki shunchaki `583921`"
             )
@@ -262,6 +288,7 @@ class UniversalTelegramBot:
             first_name=first_name,
             username=username
         )
+        logger.info(f"[UniversalBot] OTP verification for tg_user_id={tg_user_id}: ok={ok}")
 
         if ok and link:
             reply_text = (

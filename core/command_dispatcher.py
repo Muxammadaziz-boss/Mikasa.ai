@@ -11,7 +11,12 @@ import platform
 import psutil
 import socket
 import shutil
-import winreg
+try:
+    import winreg  # type: ignore
+    WINREG_AVAILABLE = True
+except ImportError:
+    winreg = None  # type: ignore
+    WINREG_AVAILABLE = False
 from typing import Tuple, Optional, Dict, Any, Callable
 from urllib.parse import quote_plus
 
@@ -31,6 +36,8 @@ except ImportError:
 def get_system_gpus() -> list:
     """Tizimdagi barcha faol videokartalarni VRAM va drayver versiyalari bilan aniq olish"""
     gpus = []
+    if not WINREG_AVAILABLE or winreg is None:
+        return gpus
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
             count_gpu = winreg.QueryInfoKey(root_gpu)[0]
@@ -74,13 +81,14 @@ def get_system_specs_summary() -> str:
         os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
         node_name = platform.node()
         cpu_name = platform.processor() or "Standart protsessor"
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
-                reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
-                if reg_name:
-                    cpu_name = str(reg_name).strip()
-        except Exception:
-            pass
+        if WINREG_AVAILABLE and winreg is not None:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                    reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                    if reg_name:
+                        cpu_name = str(reg_name).strip()
+            except Exception:
+                pass
 
         gpu_items = get_system_gpus()
         gpus = [g["name"] + (f" ({g['vram_gb']} GB)" if g.get("vram_gb") else "") for g in gpu_items]
@@ -160,14 +168,15 @@ def get_system_specs_detailed() -> str:
             pass
 
         # 2. Protsessor (CPU)
-        cpu_name = platform.processor()
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
-                reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
-                if reg_name:
-                    cpu_name = reg_name.strip()
-        except Exception:
-            pass
+        cpu_name = platform.processor() or "Standart protsessor"
+        if WINREG_AVAILABLE and winreg is not None:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                    reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                    if reg_name:
+                        cpu_name = reg_name.strip()
+            except Exception:
+                pass
         cores_p = psutil.cpu_count(logical=False) or 1
         cores_l = psutil.cpu_count(logical=True) or 1
         cpu_usage = psutil.cpu_percent(interval=0.1)
@@ -182,24 +191,25 @@ def get_system_specs_detailed() -> str:
         lines.append(f"• Protsessor (CPU): {cpu_name}{freq_str} ({cores_p} fiz / {cores_l} mantiqiy yadro, {cpu_usage}% band)")
 
         # 3. Videokarta (GPU)
-        try:
-            gpus = []
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
-                num_subkeys = winreg.QueryInfoKey(root_gpu)[0]
-                for i in range(num_subkeys):
-                    sub = winreg.EnumKey(root_gpu, i)
-                    if sub.isdigit():
-                        try:
-                            with winreg.OpenKey(root_gpu, sub) as k:
-                                desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
-                                if desc and desc not in gpus:
-                                    gpus.append(desc)
-                        except Exception:
-                            pass
-            if gpus:
-                lines.append(f"• Videokarta (GPU): {', '.join(gpus)}")
-        except Exception:
-            pass
+        if WINREG_AVAILABLE and winreg is not None:
+            try:
+                gpus = []
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}') as root_gpu:
+                    num_subkeys = winreg.QueryInfoKey(root_gpu)[0]
+                    for i in range(num_subkeys):
+                        sub = winreg.EnumKey(root_gpu, i)
+                        if sub.isdigit():
+                            try:
+                                with winreg.OpenKey(root_gpu, sub) as k:
+                                    desc, _ = winreg.QueryValueEx(k, 'DriverDesc')
+                                    if desc and desc not in gpus:
+                                        gpus.append(desc)
+                            except Exception:
+                                pass
+                if gpus:
+                    lines.append(f"• Videokarta (GPU): {', '.join(gpus)}")
+            except Exception:
+                pass
 
         # 4. Tezkor xotira (RAM)
         mem = psutil.virtual_memory()
@@ -424,13 +434,14 @@ class CommandDispatcher:
         )
         if is_cpu_query:
             cpu_name = platform.processor() or "Standart protsessor"
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
-                    reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
-                    if reg_name:
-                        cpu_name = str(reg_name).strip()
-            except Exception:
-                pass
+            if WINREG_AVAILABLE and winreg is not None:
+                try:
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+                        reg_name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+                        if reg_name:
+                            cpu_name = str(reg_name).strip()
+                except Exception:
+                    pass
             cores_p = psutil.cpu_count(logical=False) or 1
             cores_l = psutil.cpu_count(logical=True) or 1
             cpu_usage = psutil.cpu_percent(interval=0.1)
@@ -588,7 +599,7 @@ class CommandDispatcher:
                 installed, _, path, title = find_installed_app("telegram")
                 if installed:
                     try:
-                        if path and os.path.exists(path):
+                        if path and os.path.exists(path) and hasattr(os, "startfile"):
                             os.startfile(path)
                         else:
                             os.system("start tg:")
@@ -601,7 +612,7 @@ class CommandDispatcher:
             # Chrome
             if re.match(r"^(chromeni\s+och|chrome\s+och|brauzerni\s+och|google\s+chromeni\s+och|chrome)$", clean_text):
                 installed, _, path, title = find_installed_app("chrome")
-                if installed and path and os.path.exists(path):
+                if installed and path and os.path.exists(path) and hasattr(os, "startfile"):
                     try:
                         os.startfile(path)
                         return True, "✅ Google Chrome ochilmoqda."
@@ -613,7 +624,7 @@ class CommandDispatcher:
             # VS Code
             if re.match(r"^(code|vscode|vs\s*code|kodni\s+och|visual\s+studioni\s+och|vs\s*codeni\s+och)$", clean_text):
                 installed, _, path, title = find_installed_app("code")
-                if installed and path and os.path.exists(path):
+                if installed and path and os.path.exists(path) and hasattr(os, "startfile"):
                     try:
                         os.startfile(path)
                         return True, "✅ VS Code ochilmoqda."
@@ -628,7 +639,7 @@ class CommandDispatcher:
             # Discord
             if re.match(r"^(discord|discordni\s+och|diskordni\s+och)$", clean_text):
                 installed, _, path, title = find_installed_app("discord")
-                if installed and path and os.path.exists(path):
+                if installed and path and os.path.exists(path) and hasattr(os, "startfile"):
                     try:
                         os.startfile(path)
                         return True, "✅ Discord ochilmoqda."

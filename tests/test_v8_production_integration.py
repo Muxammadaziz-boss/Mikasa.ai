@@ -652,7 +652,349 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
         self.assertIn("TELEGRAM_USER_MISMATCH", msg_wrong_tg)
 
 
+class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
+    """
+    10-point regression suite verifying:
+    1. Linux import safety when 'winreg' is unavailable
+    2. Headless/Railway mode skipping 'main.py' without logging 'No module named main'
+    3. Webhook update parsing & awaiting bot handler completion before HTTP 200
+    4. Telegram sendMessage error logging & Markdown plain-text fallback without leaking bot token
+    5. Invalid, expired, and reused OTP rejection
+    6. Valid OTP linking mikasa_user_id <-> telegram_user_id (including transient JWT Supabase sync)
+    7. Cross-user OTP verification rejection
+    8. Missing/invalid JWT returning 401 on protected endpoints
+    9. Frontend backendService.ts sending Authorization: Bearer header
+    10. Linked state persistence across manager restart & /ready endpoint diagnostics
+    """
+
+    def setUp(self):
+        self._orig_env = dict(os.environ)
+        super().setUp()
+
+    async def get_application(self):
+        import tempfile
+        self._temp_dir = tempfile.mkdtemp(prefix="mikasa_railway_diag_")
+        self._storage_path = os.path.join(self._temp_dir, "tg_links_diag.json")
+        os.environ["ENVIRONMENT"] = "production"
+        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
+        os.environ["TELEGRAM_BOT_TOKEN"] = "123456789:AAFakeSecretTokenForTestingOnly999"
+        os.environ["TELEGRAM_WEBHOOK_SECRET"] = "railway_webhook_secret_xyz"
+        os.environ["TELEGRAM_BOT_USERNAME"] = "Mikasa_ai_agent_bot"
+        os.environ.pop("SUPABASE_URL", None)
+        os.environ.pop("SUPABASE_PUBLISHABLE_KEY", None)
+        os.environ.pop("SUPABASE_ANON_KEY", None)
+        os.environ.pop("SUPABASE_SECRET_KEY", None)
+        os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
+        TelegramIdentityManager._default_instance = TelegramIdentityManager(storage_path=self._storage_path)
+        return create_app()
+
+    def tearDown(self):
+        import shutil
+        TelegramIdentityManager._default_instance = None
+        if hasattr(self, "_temp_dir"):
+            shutil.rmtree(self._temp_dir, ignore_errors=True)
+        super().tearDown()
+        os.environ.clear()
+        os.environ.update(self._orig_env)
+
+    def test_01_linux_mode_command_dispatcher_imports_without_winreg(self):
+        """1. Linux rejimida (winreg yo'q bo'lganda) command_dispatcher va backend xatosiz import bo'lishi."""
+        import importlib
+        import core.command_dispatcher as cd_mod
+
+        orig_winreg = sys.modules.get("winreg")
+        try:
+            sys.modules["winreg"] = None  # Simulate Linux where import winreg raises ModuleNotFoundError
+            reloaded = importlib.reload(cd_mod)
+            self.assertFalse(reloaded.WINREG_AVAILABLE)
+            self.assertIsNone(reloaded.winreg)
+            dispatcher = reloaded.CommandDispatcher()
+            gpus = reloaded.get_system_gpus()
+            self.assertIsInstance(gpus, list)
+            specs = reloaded.get_system_specs_summary()
+            self.assertIsInstance(specs, str)
+            self.assertIsNotNone(dispatcher)
+        finally:
+            if orig_winreg is not None:
+                sys.modules["winreg"] = orig_winreg
+            else:
+                sys.modules.pop("winreg", None)
+            importlib.reload(cd_mod)
+
+    def test_02_headless_server_mode_skips_main_without_error_log(self):
+        """2. main moduli bo'lmaganda server qulamasligi va 'No module named main' xatosi logga chiqmasligi."""
+        import core.api_server as api_srv
+
+        orig_main = api_srv._main
+        orig_attempted = api_srv._main_load_attempted
+        try:
+            api_srv._main = None
+            api_srv._main_load_attempted = False
+            os.environ["RAILWAY_ENVIRONMENT"] = "production"
+
+            with patch.object(api_srv.logger, "error") as mock_err:
+                res = api_srv.get_modules()
+                self.assertEqual(len(res), 6)
+                for call in mock_err.call_args_list:
+                    logged_msg = str(call.args[0]) if call.args else ""
+                    self.assertNotIn("No module named 'main'", logged_msg)
+                    self.assertNotIn("No module named 'winreg'", logged_msg)
+        finally:
+            api_srv._main = orig_main
+            api_srv._main_load_attempted = orig_attempted
+
+    @unittest_run_loop
+    async def test_03_webhook_update_invokes_bot_handler_synchronously_before_200(self):
+        """3. Telegram webhook update kelganda handler chaqirilishi va javob yuborilishi."""
+        from unittest.mock import AsyncMock
+        from core.v8.telegram_gateway import MockTelegramTransport
+        from core.v8.universal_bot import UniversalTelegramBot
+        from core.v8.telegram_webhook import TelegramWebhookService
+
+        mgr = TelegramIdentityManager.get_default_instance()
+        req, otp, _, _ = mgr.create_link_request("user_webhook_sync")
+
+        transport = MockTelegramTransport()
+        bot = UniversalTelegramBot(transport=transport, identity_manager=mgr)
+        svc = TelegramWebhookService(
+            bot=bot,
+            webhook_secret="railway_webhook_secret_xyz",
+            transport=transport,
+        )
+
+        mock_request = MagicMock()
+        mock_request.match_info = {"secret": "railway_webhook_secret_xyz"}
+        mock_request.content_type = "application/json"
+        mock_request.headers = {
+            "Content-Type": "application/json",
+            "X-Telegram-Bot-Api-Secret-Token": "railway_webhook_secret_xyz",
+        }
+        mock_request.content_length = 250
+        update_payload = {
+            "update_id": 880011,
+            "message": {
+                "message_id": 701,
+                "chat": {"id": 44556677},
+                "from": {"id": 44556677, "first_name": "Jasur", "username": "jasur_dev"},
+                "text": f"/link {otp}",
+            },
+        }
+        mock_request.read = AsyncMock(return_value=json.dumps(update_payload).encode("utf-8"))
+
+        resp = await svc.handle_webhook(mock_request)
+        self.assertEqual(resp.status, 200)
+        # Because handle_webhook awaits the shielded task, send_message has ALREADY completed when 200 returns
+        self.assertEqual(len(transport.sent_messages), 1)
+        self.assertIn("muvaffaqiyatli bog'landi", transport.sent_messages[0]["text"])
+        self.assertEqual(len(svc._active_handlers), 0)
+        self.assertIsNotNone(mgr.get_link_by_mikasa_user("user_webhook_sync"))
+
+    @unittest_run_loop
+    async def test_04_aiohttp_transport_send_message_logs_errors_and_redacts_token(self):
+        """4. sendMessage chaqiruvi xato holatlari loglanishi, Markdown fallback ishlashi va token sizmasligi."""
+        from core.v8.telegram_gateway import AiohttpTelegramTransport
+
+        secret_bot_token = "999888777:AAUltraSecretBotTokenDoNotLeak"
+        transport = AiohttpTelegramTransport(bot_token=secret_bot_token)
+
+        calls = []
+
+        class FakeResp:
+            def __init__(self, status, payload):
+                self.status = status
+                self._payload = payload
+
+            async def json(self, content_type=None):
+                return self._payload
+
+            async def text(self):
+                return json.dumps(self._payload)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        class FakeSession:
+            closed = False
+
+            def post(self, url, json=None):
+                calls.append((url, dict(json or {})))
+                if len(calls) == 1:
+                    return FakeResp(
+                        400,
+                        {
+                            "ok": False,
+                            "error_code": 400,
+                            "description": f"Bad Request: can't parse entities with token {secret_bot_token}",
+                        },
+                    )
+                return FakeResp(200, {"ok": True, "result": {"message_id": 123}})
+
+            async def close(self):
+                self.closed = True
+
+        transport._session = FakeSession()
+        transport._session_loop = asyncio.get_running_loop()
+
+        with patch("core.v8.telegram_gateway.logger") as mock_logger:
+            result = await transport.send_message(chat_id=12345, text="Hello *broken_markdown")
+            self.assertTrue(result.get("ok"))
+            # First attempt had parse_mode=Markdown, second retried without parse_mode
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0][1].get("parse_mode"), "Markdown")
+            self.assertNotIn("parse_mode", calls[1][1])
+            # Verify token never appeared in warning/error logs
+            for call in mock_logger.warning.call_args_list + mock_logger.error.call_args_list:
+                log_str = " ".join(str(a) for a in call.args)
+                self.assertNotIn(secret_bot_token, log_str)
+
+    def test_05_invalid_expired_and_reused_otp_rejected(self):
+        """5. Noto'g'ri, muddati o'tgan va ikkinchi marta ishlatilgan OTP rad etilishi."""
+        mgr = TelegramIdentityManager.get_default_instance()
+        req, otp, _, err = mgr.create_link_request("user_otp_edge")
+        self.assertIsNone(err)
+
+        # Invalid OTP
+        ok_bad, msg_bad, _ = mgr.verify_otp("000000", telegram_user_id=70001)
+        self.assertFalse(ok_bad)
+        self.assertIn("INVALID_OTP", msg_bad)
+
+        # Expired OTP
+        req_exp, otp_exp, _, _ = mgr.create_link_request("user_otp_exp", ttl=1)
+        req_exp.expires_at = time.time() - 5
+        ok_exp, msg_exp, _ = mgr.verify_otp(otp_exp, telegram_user_id=70002)
+        self.assertFalse(ok_exp)
+        self.assertTrue("EXPIRED" in msg_exp or "INVALID_OTP" in msg_exp)
+
+        # Valid OTP first use succeeds, second use (reuse) fails
+        ok_first, _, _ = mgr.verify_otp(otp, telegram_user_id=70003)
+        self.assertTrue(ok_first)
+        ok_reuse, msg_reuse, _ = mgr.verify_otp(otp, telegram_user_id=70004)
+        self.assertFalse(ok_reuse)
+
+    def test_06_valid_otp_links_mikasa_and_telegram_user_with_transient_jwt_sync(self):
+        """6. To'g'ri OTP mikasa_user_id va telegram_user_id ni bog'lashi (transient JWT bilan Supabase sync)."""
+        os.environ["SUPABASE_URL"] = "https://vdcssmzguxfknqkfxbed.supabase.co"
+        os.environ["SUPABASE_PUBLISHABLE_KEY"] = "sb_pub_key"
+        # Intentionally NO SUPABASE_SECRET_KEY to verify transient user JWT fallback!
+        os.environ.pop("SUPABASE_SECRET_KEY", None)
+        os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
+
+        captured_Auth_headers = []
+
+        def fake_urlopen(http_req, timeout=5.0):
+            auth_hdr = http_req.get_header("Authorization") or http_req.headers.get("Authorization")
+            captured_Auth_headers.append((http_req.full_url, auth_hdr))
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.status = 201
+            mock_resp.read.return_value = b"[]"
+            return mock_resp
+
+        user_uuid = "33333333-3333-4333-8333-333333333333"
+        user_jwt = "eyJhbGciOiJIUzI1NiJ9.user_jwt_payload.sig"
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            mgr = TelegramIdentityManager(storage_path=self._storage_path, auto_load_supabase=False)
+            req, otp, _, err = mgr.create_link_request(user_uuid, auth_token=user_jwt)
+            self.assertIsNone(err)
+            # Ensure transient token is never serialized to disk
+            self.assertNotIn("_transient_auth_token", req.to_dict())
+            with open(self._storage_path, "r", encoding="utf-8") as f:
+                self.assertNotIn(user_jwt, f.read())
+
+            # Webhook verifies OTP without passing auth_token directly (uses req._transient_auth_token)
+            ok, msg, linked = mgr.verify_otp(otp, telegram_user_id=888999, username="mikasa_fan")
+            self.assertTrue(ok, msg)
+            self.assertIsNotNone(linked)
+            self.assertEqual(linked.mikasa_user_id, user_uuid)
+            self.assertEqual(linked.telegram_user_id, 888999)
+            # Verify Supabase calls used Bearer <user_jwt>
+            self.assertTrue(any(h == f"Bearer {user_jwt}" for _, h in captured_Auth_headers))
+
+    @unittest_run_loop
+    async def test_07_cross_user_otp_verification_blocked(self):
+        """7. Boshqa user OTP'ni tasdiqlay olmasligi."""
+        mgr = TelegramIdentityManager.get_default_instance()
+        req_owner, otp_owner, _, _ = mgr.create_link_request("owner_user_id")
+
+        ok, msg, _ = mgr.verify_otp(
+            otp=otp_owner,
+            telegram_user_id=990011,
+            expected_mikasa_user_id="attacker_user_id",
+        )
+        self.assertFalse(ok)
+        self.assertIn("USER_MISMATCH", msg)
+
+    @unittest_run_loop
+    async def test_08_missing_or_invalid_token_returns_401(self):
+        """8. Token yo'q yoki noto'g'ri bo'lsa 401 qaytishi."""
+        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        for method, path in [
+            ("POST", "/api/telegram/link/start"),
+            ("POST", "/api/telegram/link/verify"),
+            ("GET", "/api/telegram/link/status"),
+            ("GET", "/api/telegram/account"),
+            ("POST", "/api/telegram/unlink"),
+        ]:
+            resp_no_tok = await self.client.request(method, path)
+            self.assertEqual(resp_no_tok.status, 401, f"Expected 401 on {method} {path} without token")
+
+            resp_bad_tok = await self.client.request(
+                method,
+                path,
+                headers={"Authorization": "Bearer invalid_expired_or_forged_jwt"},
+            )
+            self.assertEqual(resp_bad_tok.status, 401, f"Expected 401 on {method} {path} with invalid token")
+
+    def test_09_frontend_sends_authorization_bearer_header(self):
+        """9. Frontend Authorization: Bearer yuborishi."""
+        bs_path = os.path.join(BASE_DIR, "mikasa-7", "src", "services", "backendService.ts")
+        with open(bs_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("Authorization", content)
+        self.assertIn("Bearer ${token}", content)
+        self.assertIn("this.getAuthHeaders()", content)
+        for endpoint in [
+            "/api/telegram/link/start",
+            "/api/telegram/link/verify",
+            "/api/telegram/link/status",
+            "/api/telegram/account",
+            "/api/telegram/unlink",
+        ]:
+            self.assertIn(endpoint, content)
+
+    @unittest_run_loop
+    async def test_10_linked_state_persists_across_reload_and_ready_check(self):
+        """10. Bog'langan holat qayta yuklanganda saqlanishi va /ready diagnostikasi."""
+        mgr1 = TelegramIdentityManager(storage_path=self._storage_path)
+        req, otp, _, _ = mgr1.create_link_request("persistent_user_99")
+        ok, _, _ = mgr1.verify_otp(otp, telegram_user_id=55443322, username="persist_uz")
+        self.assertTrue(ok)
+
+        # Reload a brand-new manager instance from the same storage path
+        mgr2 = TelegramIdentityManager(storage_path=self._storage_path)
+        loaded_link = mgr2.get_link_by_mikasa_user("persistent_user_99")
+        self.assertIsNotNone(loaded_link)
+        self.assertEqual(loaded_link.telegram_user_id, 55443322)
+        self.assertEqual(loaded_link.metadata.get("username"), "persist_uz")
+
+        # Verify /ready endpoint returns 200 and includes platform/supabase/telegram checks
+        ready_resp = await self.client.request("GET", "/ready")
+        self.assertEqual(ready_resp.status, 200)
+        ready_data = await ready_resp.json()
+        self.assertEqual(ready_data.get("status"), "ready")
+        self.assertIn("checks", ready_data)
+        self.assertIn("telegram_bot", ready_data["checks"])
+        self.assertIn("platform", ready_data["checks"])
+        self.assertIn("supabase", ready_data["checks"])
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

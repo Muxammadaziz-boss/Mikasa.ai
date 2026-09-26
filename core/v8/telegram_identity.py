@@ -92,6 +92,7 @@ class TelegramLinkRequest:
     used_at: Optional[float] = None
     link_token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
     expected_telegram_user_id: Optional[int] = None
+    _transient_auth_token: Optional[str] = field(default=None, repr=False, compare=False)
 
     def is_valid(self, current_time: Optional[float] = None) -> bool:
         now = current_time if current_time is not None else time.time()
@@ -102,7 +103,9 @@ class TelegramLinkRequest:
         return now >= self.expires_at
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d.pop("_transient_auth_token", None)
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TelegramLinkRequest":
@@ -299,7 +302,8 @@ class TelegramIdentityManager:
             status="PENDING",
             attempt_count=0,
             link_token=link_token,
-            expected_telegram_user_id=expected_tg_int
+            expected_telegram_user_id=expected_tg_int,
+            _transient_auth_token=auth_token
         )
 
         self._requests[req.request_id] = req
@@ -307,6 +311,7 @@ class TelegramIdentityManager:
 
         self.save()
         self.sync_request_to_supabase(req, auth_token=auth_token)
+        self._sync_request_to_cloud_api(req, auth_token=auth_token)
 
         self._audit.log(
             RemoteEventType.TELEGRAM_LINK_REQUEST_CREATED,
@@ -319,11 +324,81 @@ class TelegramIdentityManager:
         logger.info(f"[TelegramIdentity] Yangi bog'lanish so'rovi yaratildi: req={req.request_id}, user={uid}, ttl={req_ttl}s")
         return req, plaintext_otp, deep_link, None
 
+    def register_synced_request(
+        self,
+        req_data: Dict[str, Any],
+        auth_token: Optional[str] = None
+    ) -> Optional[TelegramLinkRequest]:
+        """
+        Register or update a hashed TelegramLinkRequest received from a Desktop/Web client
+        so the cloud webhook server can verify the OTP even before or without service_role key.
+        """
+        if not isinstance(req_data, dict):
+            return None
+        req_id = str(req_data.get("request_id") or "").strip()
+        uid = str(req_data.get("mikasa_user_id") or "").strip()
+        otp_hash = str(req_data.get("otp_hash") or "").strip()
+        salt = str(req_data.get("salt") or "").strip()
+        if not req_id or not uid or not otp_hash or not salt:
+            return None
+
+        req = TelegramLinkRequest.from_dict(req_data)
+        if auth_token:
+            req._transient_auth_token = auth_token
+
+        for old_req in list(self._requests.values()):
+            if old_req.mikasa_user_id == uid and old_req.request_id != req.request_id and old_req.status == "PENDING":
+                old_req.status = "EXPIRED"
+                old_req._transient_auth_token = None
+
+        self._requests[req.request_id] = req
+        if req.link_token:
+            self._requests_by_token[req.link_token] = req
+        self.save()
+        return req
+
+    def _sync_request_to_cloud_api(self, req_obj: TelegramLinkRequest, auth_token: Optional[str] = None):
+        """
+        If running on a local desktop instance and MIKASA_CLOUD_API_URL is configured (or default Railway URL
+        when not running on Railway itself), push the hashed request to /api/telegram/link/sync.
+        """
+        if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("ENVIRONMENT", "").lower() == "production":
+            return
+        cloud_url = (
+            os.environ.get("MIKASA_CLOUD_API_URL")
+            or os.environ.get("MIKASA_BACKEND_URL")
+            or ""
+        ).strip().rstrip("/")
+        if not cloud_url or "127.0.0.1" in cloud_url or "localhost" in cloud_url:
+            return
+        if not auth_token:
+            return
+
+        endpoint = f"{cloud_url}/api/telegram/link/sync"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+        }
+        try:
+            import urllib.request
+            http_req = urllib.request.Request(
+                endpoint,
+                data=json.dumps({"request": req_obj.to_dict()}).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(http_req, timeout=3.0) as resp:
+                if resp.status in (200, 201):
+                    logger.info(f"[TelegramIdentity] Cloud API ga request sinxronlandi: req={req_obj.request_id}")
+        except Exception as e:
+            logger.debug(f"[TelegramIdentity] Cloud API sync o'tkazib yuborildi: {e}")
+
     def get_request(self, request_id: str, auth_token: Optional[str] = None, refresh: bool = False) -> Optional[TelegramLinkRequest]:
         req_id = str(request_id).strip()
         req = self._requests.get(req_id)
         if refresh or (req is None and (self._auto_supabase or auth_token)) or (req is not None and req.status == "PENDING" and (self._auto_supabase or auth_token)):
-            self.load_requests_from_supabase(auth_token=auth_token, request_id=req_id)
+            effective_token = auth_token or (getattr(req, "_transient_auth_token", None) if req else None)
+            self.load_requests_from_supabase(auth_token=effective_token, request_id=req_id)
             req = self._requests.get(req_id)
         return req
 
@@ -425,6 +500,8 @@ class TelegramIdentityManager:
         if not req:
             return False, "INVALID_OR_EXPIRED_CODE: Bog'lanish kodi topilmadi yoki muddati tugagan", None
 
+        effective_auth_token = auth_token or getattr(req, "_transient_auth_token", None)
+
         # Cross-user ownership enforcement (API caller vs request owner)
         if expected_uid and req.mikasa_user_id != expected_uid:
             self._audit.log(
@@ -451,7 +528,8 @@ class TelegramIdentityManager:
         if req.is_expired(now):
             req.status = "EXPIRED"
             self.save()
-            self.sync_request_to_supabase(req, auth_token=auth_token)
+            self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+            req._transient_auth_token = None
             self._audit.log(
                 RemoteEventType.TELEGRAM_LINK_EXPIRED,
                 request_id=req.request_id,
@@ -472,7 +550,8 @@ class TelegramIdentityManager:
         if req.attempt_count >= self.MAX_ATTEMPTS:
             req.status = "FAILED"
             self.save()
-            self.sync_request_to_supabase(req, auth_token=auth_token)
+            self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+            req._transient_auth_token = None
             return False, "MAX_ATTEMPTS_EXCEEDED: Maksimal 5 ta xato urinish qayd etildi", None
 
         # Constant-time comparison
@@ -483,7 +562,9 @@ class TelegramIdentityManager:
             if req.attempt_count >= self.MAX_ATTEMPTS:
                 req.status = "FAILED"
             self.save()
-            self.sync_request_to_supabase(req, auth_token=auth_token)
+            self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+            if req.status == "FAILED":
+                req._transient_auth_token = None
             self._audit.log(
                 RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
                 request_id=req.request_id,
@@ -557,8 +638,9 @@ class TelegramIdentityManager:
         self._identities[tg_int] = ident
 
         self.save()
-        self.sync_request_to_supabase(req, auth_token=auth_token)
-        self.sync_link_to_supabase(link, auth_token=auth_token)
+        self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+        self.sync_link_to_supabase(link, auth_token=effective_auth_token)
+        req._transient_auth_token = None
 
         self._audit.log(
             RemoteEventType.TELEGRAM_OTP_VERIFICATION_SUCCESS,
@@ -603,6 +685,8 @@ class TelegramIdentityManager:
         if not req:
             return False, "INVALID_LINK_TOKEN: Havola yaroqsiz yoki topilmadi", None
 
+        effective_auth_token = auth_token or getattr(req, "_transient_auth_token", None)
+
         expected_uid = str(expected_mikasa_user_id).strip() if expected_mikasa_user_id else None
         if expected_uid and req.mikasa_user_id != expected_uid:
             return False, "USER_MISMATCH: Ushbu havola boshqa foydalanuvchi hisobiga tegishli", None
@@ -613,7 +697,8 @@ class TelegramIdentityManager:
         if req.is_expired(now):
             req.status = "EXPIRED"
             self.save()
-            self.sync_request_to_supabase(req, auth_token=auth_token)
+            self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+            req._transient_auth_token = None
             self._audit.log(
                 RemoteEventType.TELEGRAM_LINK_EXPIRED,
                 request_id=req.request_id,
@@ -679,8 +764,9 @@ class TelegramIdentityManager:
         self._identities[tg_int] = ident
 
         self.save()
-        self.sync_request_to_supabase(req, auth_token=auth_token)
-        self.sync_link_to_supabase(link, auth_token=auth_token)
+        self.sync_request_to_supabase(req, auth_token=effective_auth_token)
+        self.sync_link_to_supabase(link, auth_token=effective_auth_token)
+        req._transient_auth_token = None
 
         self._audit.log(
             RemoteEventType.TELEGRAM_ACCOUNT_LINKED,
