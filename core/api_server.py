@@ -80,12 +80,25 @@ def load_runtime_dotenv() -> None:
     """Runtime ishga tushganda .env va mikasa-7/.env fayllaridan konfiguratsiyani yuklash."""
     try:
         from dotenv import load_dotenv
-        root_env = os.path.join(BASE_DIR, ".env")
-        if os.path.isfile(root_env):
-            load_dotenv(root_env, override=False)
-        frontend_env = os.path.join(BASE_DIR, "mikasa-7", ".env")
-        if os.path.isfile(frontend_env):
-            load_dotenv(frontend_env, override=False)
+        search_roots = [BASE_DIR, os.getcwd()]
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+            curr = exe_dir
+            for _ in range(5):
+                if curr and curr not in search_roots:
+                    search_roots.append(curr)
+                parent = os.path.dirname(curr)
+                if not parent or parent == curr:
+                    break
+                curr = parent
+
+        for root in search_roots:
+            root_env = os.path.join(root, ".env")
+            if os.path.isfile(root_env):
+                load_dotenv(root_env, override=False)
+            frontend_env = os.path.join(root, "mikasa-7", ".env")
+            if os.path.isfile(frontend_env):
+                load_dotenv(frontend_env, override=False)
     except Exception:
         pass
 
