@@ -3017,6 +3017,7 @@ def resolve_auth_identity(
                 "ok": False,
                 "error": "Avtorizatsiyadan o'tilmagan: Token yaroqsiz yoki muddati o'tgan"
             }, status=401)
+            err_resp["_auth_error"] = True
             return None, None, None, err_resp
 
         authenticated_user_id = user.id
@@ -3040,6 +3041,7 @@ def resolve_auth_identity(
                 "ok": False,
                 "error": "Cross-tenant access denied: Ruxsatsiz hisob murojaati"
             }, status=403)
+            err_resp["_auth_error"] = True
             return None, None, None, err_resp
 
         if not _is_production_mode():
@@ -3067,6 +3069,7 @@ def resolve_auth_identity(
             "ok": False,
             "error": "Avtorizatsiyadan o'tilmagan: Bearer token talab qilinadi"
         }, status=401)
+        err_resp["_auth_error"] = True
         return None, None, None, err_resp
 
     # Supabase sozlanmagan offline / localhost test rejimi (faqat desktop uchun)
@@ -5584,7 +5587,7 @@ async def auth_enforcement_middleware(request, handler):
 
     # 4. Production rejimda — autentifikatsiyani tekshirish
     user_id, user, session, err_resp = resolve_auth_identity(request, required=True)
-    if err_resp:
+    if err_resp is not None:
         return err_resp
 
     # Autentifikatsiya muvaffaqiyatli — request davom etsin
