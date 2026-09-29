@@ -1,5 +1,5 @@
 # ========== openrouter_provider.py ==========
-# Mikasa AI 7.x — OpenRouter AI Provider Implementation
+# Misa AI 7.x — OpenRouter AI Provider Implementation
 # Universal OpenAI-compatible Fallback Provider with Response Normalization
 
 import os
@@ -107,8 +107,8 @@ class OpenRouterProvider(AIProvider):
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://mikasa-ai.uz",
-            "X-Title": "Mikasa AI Desktop",
+            "HTTP-Referer": "https://misa-ai.uz",
+            "X-Title": "Misa AI Desktop",
         }
         body = {
             "model": self._model,

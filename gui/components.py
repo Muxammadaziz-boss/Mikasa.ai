@@ -1,5 +1,5 @@
 # ========== components.py ==========
-# Mikasa AI — Professional UI Components Library
+# Misa AI — Professional UI Components Library
 # 80% minimal solid surfaces / 20% glass/accent surfaces
 # Unified Button System, Card Architecture, Vector Icons, and AppleSiriOrb
 
@@ -18,7 +18,7 @@ from gui.icons import VectorIconEngine, get_vector_icon
 
 class Surface(ctk.CTkFrame):
     """
-    Mikasa AI Semantic Surface Base Frame.
+    Misa AI Semantic Surface Base Frame.
     
     Barcha darajadagi konteyner va sirtlar uchun poydevor klass.
     Avtomatik ravishda Surfaces tokenlaridan rang, hoshiya va radiuslarni oladi.
@@ -96,7 +96,7 @@ class Surface(ctk.CTkFrame):
 
 class Card(Surface):
     """
-    Mikasa AI 80% Solid Surface Card.
+    Misa AI 80% Solid Surface Card.
     
     Standard container for general UI: forms, lists, tables, data rows, and settings.
     Solid, distraction-free container with subtle hairline border (Colors.BORDER).
@@ -200,7 +200,7 @@ class Card(Surface):
 
 class ElevatedCard(Card):
     """
-    Mikasa AI Solid Elevated Surface Card.
+    Misa AI Solid Elevated Surface Card.
     
     Qatlamli, balandroq sirtlar uchun: yon panellar, asbob kartalari,
     dropdown ro'yxatlar va ikkinchi darajali guruhlar.
@@ -210,7 +210,7 @@ class ElevatedCard(Card):
 
 class GlassCard(Card):
     """
-    Mikasa AI 20% Glass-like Opaque Surface Card.
+    Misa AI 20% Glass-like Opaque Surface Card.
     
     NOTE ON ARCHITECTURE & RENDERING:
     CustomTkinter desktop widgets do not support real-time dynamic GPU backdrop blur
@@ -231,7 +231,7 @@ class GlassCard(Card):
 
 class HeroCard(Card):
     """
-    Mikasa AI Hero Accent Surface Card.
+    Misa AI Hero Accent Surface Card.
     
     Prominent accent banner va yuqori darajadagi e'tibor panellari uchun sirt.
     Accent border (Colors.GLASS_HERO_BORDER / Colors.BORDER_HERO) bilan ajratiladi.
@@ -241,7 +241,7 @@ class HeroCard(Card):
 
 class OverlayCard(Card):
     """
-    Mikasa AI Overlay Surface Card.
+    Misa AI Overlay Surface Card.
     
     Modal dialoglar, qalqib chiquvchi oynalar va toast bildirishnomalar uchun sirt.
     """
@@ -382,7 +382,7 @@ class PageHero(HeroCard):
 
 class Button(ctk.CTkButton):
     """
-    Mikasa AI Unified Button Component.
+    Misa AI Unified Button Component.
     Variants: 'primary', 'secondary', 'ghost', 'danger', 'glass'
     Heights: Default (42px), Compact (36px)
     Corners: Semantic (12px) or Pill (999)
@@ -643,12 +643,12 @@ class CircleIconButton(GlassButton):
 
 
 # ==========================================
-# 3. MIKASA AI ORB (Core Intelligence Visual Component)
+# 3. MISA AI ORB (Core Intelligence Visual Component)
 # ==========================================
-from gui.orb import MikasaOrb
+from gui.orb import MisaOrb
 
 # Orqaga muvofiqlik (backward compatibility) uchun alias
-AppleSiriOrb = MikasaOrb
+AppleSiriOrb = MisaOrb
 
 
 
@@ -919,7 +919,7 @@ class AgentStepIndicator(ctk.CTkFrame):
 # ==========================================
 
 class NavItem(ctk.CTkFrame):
-    """Mikasa Command Center Sidebar Nav Item"""
+    """Misa Command Center Sidebar Nav Item"""
 
     def __init__(
         self,
@@ -1032,7 +1032,7 @@ class NavItem(ctk.CTkFrame):
 
 class UserAvatar(ctk.CTkFrame):
     """
-    Mikasa AI Reusable Circular User Avatar.
+    Misa AI Reusable Circular User Avatar.
     Supports:
     - User initials fallback (e.g. 'MA' for 'Muxammadaziz')
     - Custom image file path (with circular cropping)
@@ -1217,7 +1217,7 @@ class UserAvatar(ctk.CTkFrame):
 
 class AssistantAvatar(ctk.CTkFrame):
     """
-    Mikasa AI Distinct Assistant Vector Avatar.
+    Misa AI Distinct Assistant Vector Avatar.
     Circular badge featuring the canonical sparkles vector icon.
     Visually distinct from human user avatars.
     """
@@ -1300,7 +1300,7 @@ class AssistantAvatar(ctk.CTkFrame):
 
 class AccountRow(ctk.CTkFrame):
     """
-    Mikasa AI Desktop Sidebar Account Row.
+    Misa AI Desktop Sidebar Account Row.
     Displays user avatar, display name, 'Hisob' label, and subtle chevron.
     Interactions:
     - Default: transparent surface
@@ -1624,7 +1624,7 @@ class EmptyState(ctk.CTkFrame):
 
 class LoadingSkeleton(ctk.CTkFrame):
     """
-    Mikasa AI Ultra-Lightweight Loading Skeleton.
+    Misa AI Ultra-Lightweight Loading Skeleton.
     Shows calm placeholder cards/bars while heavy content loads lazily.
     Zero fake-blur, zero CPU lag, safe timer cancellation.
     """
@@ -2152,7 +2152,7 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
 
 class WindowControls(ctk.CTkFrame):
     """
-    Mikasa AI Desktop Native Window Controls.
+    Misa AI Desktop Native Window Controls.
     Yuqori o'ng burchakdagi ixcham desktop boshqaruv paneli:
     Minimize (Kichraytirish), Maximize/Restore (Kattalashtirish/Tiklash), Close (Yopish).
     """

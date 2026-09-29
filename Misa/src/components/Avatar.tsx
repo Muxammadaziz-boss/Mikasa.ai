@@ -2,38 +2,59 @@ import React from "react";
 
 export interface AvatarProps {
   initials?: string;
-  size?: number;
+  name?: string;
+  size?: number | "sm" | "md" | "lg";
   className?: string;
   avatarStyle?: string;
+  styleId?: string;
   avatarUrl?: string;
 }
 
 const AVATAR_GRADIENTS: Record<string, string> = {
+  violet: "linear-gradient(135deg, #9303C5 0%, #C04CFD 100%)",
+  cosmic: "linear-gradient(135deg, #9303C5 0%, #C04CFD 100%)",
   emerald: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
   blue: "linear-gradient(135deg, #0284C7 0%, #1D4ED8 100%)",
   purple: "linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)",
   cyan: "linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)",
   gold: "linear-gradient(135deg, #D97706 0%, #F59E0B 100%)",
+  amber: "linear-gradient(135deg, #D97706 0%, #F59E0B 100%)",
   rose: "linear-gradient(135deg, #E11D48 0%, #F43F5E 100%)",
+  slate: "linear-gradient(135deg, #334155 0%, #475569 100%)",
 };
 
 export const Avatar: React.FC<AvatarProps> = ({
-  initials = "U",
+  initials,
+  name,
   size = 32,
   className = "",
-  avatarStyle = "emerald",
+  avatarStyle = "violet",
+  styleId,
   avatarUrl,
 }) => {
   const [imageError, setImageError] = React.useState(false);
-  const gradient = AVATAR_GRADIENTS[avatarStyle] || AVATAR_GRADIENTS.emerald;
+  const resolvedStyle = styleId || avatarStyle || "violet";
+  const gradient = AVATAR_GRADIENTS[resolvedStyle] || AVATAR_GRADIENTS.violet;
+  const resolvedInitials =
+    initials ||
+    (name
+      ? name
+          .trim()
+          .split(/\s+/)
+          .map((p) => p[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()
+      : "U");
+  const resolvedSize = typeof size === "number" ? size : size === "sm" ? 28 : size === "lg" ? 64 : 36;
 
   if (avatarUrl && !imageError) {
     return (
       <div
         className={`user-avatar ${className}`}
         style={{
-          width: `${size}px`,
-          height: `${size}px`,
+          width: `${resolvedSize}px`,
+          height: `${resolvedSize}px`,
           borderRadius: "50%",
           overflow: "hidden",
           border: "1.5px solid rgba(255, 255, 255, 0.2)",
@@ -44,7 +65,7 @@ export const Avatar: React.FC<AvatarProps> = ({
       >
         <img
           src={avatarUrl}
-          alt={initials}
+          alt={resolvedInitials}
           onError={() => setImageError(true)}
           style={{
             width: "100%",
@@ -61,8 +82,8 @@ export const Avatar: React.FC<AvatarProps> = ({
     <div
       className={`user-avatar ${className}`}
       style={{
-        width: `${size}px`,
-        height: `${size}px`,
+        width: `${resolvedSize}px`,
+        height: `${resolvedSize}px`,
         borderRadius: "50%",
         display: "flex",
         alignItems: "center",
@@ -70,14 +91,14 @@ export const Avatar: React.FC<AvatarProps> = ({
         background: gradient,
         color: "#FFFFFF",
         fontWeight: 600,
-        fontSize: `${Math.round(size * 0.4)}px`,
+        fontSize: `${Math.round(resolvedSize * 0.4)}px`,
         letterSpacing: "0.02em",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
         userSelect: "none",
         flexShrink: 0,
       }}
     >
-      {initials}
+      {resolvedInitials}
     </div>
   );
 };

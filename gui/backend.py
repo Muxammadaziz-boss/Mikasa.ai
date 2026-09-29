@@ -1,5 +1,5 @@
 # ========== backend.py ==========
-# Mikasa AI — Backend Bridge
+# Misa AI — Backend Bridge
 # Yangi GUI ni mavjud main.py funksiyalari bilan bog'laydi
 
 import threading
@@ -19,7 +19,7 @@ class BackendBridge:
     """
     Yangi GUI ←→ main.py orasidagi ko'prik.
 
-    MikasaApp yaratilganda BackendBridge ham yaratiladi.
+    MisaApp yaratilganda BackendBridge ham yaratiladi.
     GUI dagi harakatlar (mic tugma, matn kiritish) → main.py funksiyalariga yo'naltiriladi.
     main.py dagi natijalar → GUI sahifalariga qaytariladi.
     """
@@ -568,7 +568,7 @@ class BackendBridge:
                 self.app.set_status("info", "Taklif keldi")
 
                 # Silliq Toast bildirishnomasini ko'rsatish
-                show_toast(self.app, suggestion, title="Mikasa AI Taklifi", duration=5000)
+                show_toast(self.app, suggestion, title="Misa AI Taklifi", duration=5000)
 
             except Exception as e:
                 logger.debug(f"Proactive suggestion display error: {e}")

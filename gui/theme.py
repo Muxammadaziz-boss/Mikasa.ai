@@ -1,5 +1,5 @@
 # ========== theme.py ==========
-# Mikasa AI — Premium Futuristic Design System Tokens
+# Misa AI — Premium Futuristic Design System Tokens
 # 80% minimal solid surfaces / 20% glass/accent surfaces
 # Strict 8-point spacing, semantic radii, and typography hierarchy
 
@@ -217,7 +217,7 @@ class Colors:
 
 class Surfaces:
     """
-    Mikasa AI 7-Tier Semantic Surface Architecture
+    Misa AI 7-Tier Semantic Surface Architecture
     
     1. BASE: Window root canvas, deepest background container (BG_DARKEST)
     2. SURFACE: Page canvas, scroll frame background (BG_DARK / BG_SURFACE)

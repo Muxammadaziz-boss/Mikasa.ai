@@ -1,5 +1,5 @@
 # ========== gui/orb.py ==========
-# Mikasa AI 7.0 — MikasaOrb Reusable Core Component
+# Misa AI 7.0 — MisaOrb Reusable Core Component
 # Premium, futuristic, softly glowing 3D AI Orb with subtle breathing aura
 
 import math
@@ -11,9 +11,9 @@ from gui.theme import Colors
 logger = logging.getLogger(__name__)
 
 
-class MikasaOrb(ctk.CTkFrame):
+class MisaOrb(ctk.CTkFrame):
     """
-    MikasaOrb — Mikasa AI ning markaziy vizual intellekt yadrosi.
+    MisaOrb — Misa AI ning markaziy vizual intellekt yadrosi.
     
     Qo'llab-quvvatlanadigan holatlar (States):
       - 'loading':   Sokin nafas oluvchi elektr ko'k/sian/siyohrang 3D aura (startap uchun)
@@ -134,7 +134,7 @@ class MikasaOrb(ctk.CTkFrame):
         st = self._state
 
         if st == "loading":
-            # Mikasa 7.0 Loading Core: Sokin nafas oluvchi, chuqur elektr ko'k, sian va siyohrang yadro
+            # Misa 7.0 Loading Core: Sokin nafas oluvchi, chuqur elektr ko'k, sian va siyohrang yadro
             breath = math.sin(t * 0.08) * 6
             glow_intensity = int(170 + math.sin(t * 0.08) * 25)
 

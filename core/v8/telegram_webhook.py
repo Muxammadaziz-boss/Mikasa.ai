@@ -378,7 +378,7 @@ def build_telegram_webhook_service() -> Optional[TelegramWebhookService]:
         return None
 
     webhook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Misa_ai_agent_bot").strip() or "Misa_ai_agent_bot"
 
     transport = AiohttpTelegramTransport(bot_token)
     bot = UniversalTelegramBot(
@@ -414,7 +414,7 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
         svc = app.get("telegram_webhook_service")
         use_webhook = _env_bool("TELEGRAM_USE_WEBHOOK", default=True)
         bot_configured = bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip())
-        backend_url = os.environ.get("MIKASA_BACKEND_URL", "").strip() or os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+        backend_url = os.environ.get("MISA_BACKEND_URL", "").strip() or os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 
         checks: Dict[str, Any] = {
             "telegram_bot": "configured" if bot_configured else "missing",
@@ -485,7 +485,7 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
         transport = AiohttpTelegramTransport(bot_token)
         bot = UniversalTelegramBot(
             transport=transport,
-            bot_username=os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot",
+            bot_username=os.environ.get("TELEGRAM_BOT_USERNAME", "Misa_ai_agent_bot").strip() or "Misa_ai_agent_bot",
         )
         polling = TelegramPollingRunner(bot, transport)
         app["telegram_polling_runner"] = polling
@@ -494,8 +494,8 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
     if svc and use_webhook:
         public_url = (
             os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
-            or os.environ.get("MIKASA_PUBLIC_URL", "").strip()
-            or os.environ.get("MIKASA_BACKEND_URL", "").strip()
+            or os.environ.get("MISA_PUBLIC_URL", "").strip()
+            or os.environ.get("MISA_BACKEND_URL", "").strip()
             or os.environ.get("TELEGRAM_WEBHOOK_URL", "").strip()
         )
         if public_url and not public_url.startswith("http"):
@@ -508,7 +508,7 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
                 app["telegram_webhook_info"] = info
         else:
             logger.warning(
-                "[TelegramWebhook] RAILWAY_PUBLIC_DOMAIN / MIKASA_PUBLIC_URL not set — "
+                "[TelegramWebhook] RAILWAY_PUBLIC_DOMAIN / MISA_PUBLIC_URL not set — "
                 "skipping automatic setWebhook (register manually after deploy)"
             )
 

@@ -1,7 +1,7 @@
 # ========== core/v8/account_device.py ==========
 # Phase 40 — Universal Account & Multi-Device Management 2.0
 # Multi-User Identity -> Account -> Multi-Device Architecture
-# TelegramIdentity -> MikasaUser -> Device -> UserPermissionProfile -> RemoteAuthSession
+# TelegramIdentity -> MisaUser -> Device -> UserPermissionProfile -> RemoteAuthSession
 
 import os
 import time
@@ -18,11 +18,11 @@ logger = logging.getLogger("core.v8.account_device")
 
 
 @dataclass
-class MikasaUser:
+class MisaUser:
     """
-    Mikasa foydalanuvchi hisobi / public.profiles.
+    Misa foydalanuvchi hisobi / public.profiles.
     Supabase auth.users.id bilan 1:1 bog'langan.
-    Parol Mikasa tizimida hech qachon saqlanmaydi (Supabase Auth boshqaradi).
+    Parol Misa tizimida hech qachon saqlanmaydi (Supabase Auth boshqaradi).
     """
     id: str  # auth.users.id (UUID)
     username: str
@@ -46,7 +46,7 @@ class MikasaUser:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MikasaUser":
+    def from_dict(cls, data: Dict[str, Any]) -> "MisaUser":
         valid_fields = {
             "id", "username", "email", "display_name", "avatar_url",
             "created_at", "updated_at", "status",
@@ -56,7 +56,7 @@ class MikasaUser:
         return cls(**filtered)
 
 
-MikasaProfile = MikasaUser
+MisaProfile = MisaUser
 
 
 @dataclass
@@ -65,7 +65,7 @@ class Device:
     Foydalanuvchiga tegishli apparat kompyuter qurilmasi.
     Apparat identifikatori (device_id) va foydalanuvchi qulayligi uchun berilgan nom (name) ajratilgan.
     """
-    mikasa_user_id: str
+    misa_user_id: str
     device_id: str
     name: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -92,7 +92,7 @@ class Device:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Device":
         valid_fields = {
-            "id", "mikasa_user_id", "device_id", "name", "hostname",
+            "id", "misa_user_id", "device_id", "name", "hostname",
             "platform", "agent_version", "status", "created_at",
             "last_seen_at", "last_heartbeat_at", "metadata"
         }
@@ -117,7 +117,7 @@ class Device:
     ) -> "Device":
         """Phase 35 DeviceIdentity dan Device yaratish"""
         return cls(
-            mikasa_user_id=str(user_id),
+            misa_user_id=str(user_id),
             device_id=ident.device_id,
             name=name or ident.hostname or "Kompyuter",
             hostname=ident.hostname,
@@ -133,7 +133,7 @@ class UserDeviceLink:
     """
     Foydalanuvchi hisobi va qurilma o'rtasidagi doimiy egalik bog'lanishi.
     """
-    mikasa_user_id: str
+    misa_user_id: str
     device_id: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     linked_at: float = field(default_factory=time.time)
@@ -149,7 +149,7 @@ class UserDeviceLink:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserDeviceLink":
-        valid_fields = {"id", "mikasa_user_id", "device_id", "linked_at", "status", "metadata"}
+        valid_fields = {"id", "misa_user_id", "device_id", "linked_at", "status", "metadata"}
         filtered = {k: v for k, v in data.items() if k in valid_fields}
         return cls(**filtered)
 
@@ -182,7 +182,7 @@ class UserDeviceContext:
 class AccountDeviceManager:
     """
     Ko'p foydalanuvchili hisoblar va ko'p qurilmalar arxitekturasi boshqaruvchisi.
-    TelegramIdentity -> MikasaUser -> Device zanjiri va qat'iy foydalanuvchi izolatsiyasini ta'minlaydi.
+    TelegramIdentity -> MisaUser -> Device zanjiri va qat'iy foydalanuvchi izolatsiyasini ta'minlaydi.
     """
 
     _default_instance: Optional["AccountDeviceManager"] = None
@@ -198,7 +198,7 @@ class AccountDeviceManager:
             "data",
             "v8_accounts_devices.json"
         )
-        self._users: Dict[str, MikasaUser] = {}  # user_id -> MikasaUser
+        self._users: Dict[str, MisaUser] = {}  # user_id -> MisaUser
         self._devices: Dict[str, Device] = {}  # device.id (UUID) -> Device
         self._devices_by_hw_id: Dict[str, str] = {}  # hw_device_id -> device.id (UUID)
         self._user_devices: Dict[str, List[str]] = {}  # user_id -> List[device.id]
@@ -227,7 +227,7 @@ class AccountDeviceManager:
     # 1. USER ACCOUNT MANAGEMENT
     # ========================================================
 
-    def register_or_get_user(self, user_id: str, username: Optional[str] = None) -> MikasaUser:
+    def register_or_get_user(self, user_id: str, username: Optional[str] = None) -> MisaUser:
         """Foydalanuvchi hisobini ro'yxatga olish yoki mavjudini qaytarish"""
         uid = str(user_id).strip()
         if not uid:
@@ -242,7 +242,7 @@ class AccountDeviceManager:
             return user
 
         uname = username or uid
-        user = MikasaUser(
+        user = MisaUser(
             id=uid,
             username=uname,
             created_at=time.time(),
@@ -260,15 +260,15 @@ class AccountDeviceManager:
         logger.info(f"[AccountDeviceManager] Yangi hisob ro'yxatga olindi: id={uid}, username={uname}")
         return user
 
-    def get_user(self, user_id: str) -> Optional[MikasaUser]:
+    def get_user(self, user_id: str) -> Optional[MisaUser]:
         """Foydalanuvchini id orqali olish"""
         return self._users.get(str(user_id).strip())
 
-    def list_users(self) -> List[MikasaUser]:
+    def list_users(self) -> List[MisaUser]:
         """Barcha foydalanuvchilar ro'yxati"""
         return list(self._users.values())
 
-    def get_user_by_username(self, username: str) -> Optional[MikasaUser]:
+    def get_user_by_username(self, username: str) -> Optional[MisaUser]:
         """Foydalanuvchini username (case-insensitive) orqali olish"""
         uname = str(username).strip().lower()
         if not uname:
@@ -278,7 +278,7 @@ class AccountDeviceManager:
                 return user
         return None
 
-    def get_user_by_email(self, email: str) -> Optional[MikasaUser]:
+    def get_user_by_email(self, email: str) -> Optional[MisaUser]:
         """Foydalanuvchini email (case-insensitive canonical) orqali olish"""
         em = str(email).strip().lower()
         if not em:
@@ -299,12 +299,12 @@ class AccountDeviceManager:
         is_verified: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
         **kwargs
-    ) -> MikasaUser:
-        """Yangi Mikasa foydalanuvchi hisobi/profilini yaratish (auth.users.id bilan bog'langan)"""
+    ) -> MisaUser:
+        """Yangi Misa foydalanuvchi hisobi/profilini yaratish (auth.users.id bilan bog'langan)"""
         uid = str(user_id or uuid.uuid4()).strip()
         uname = str(username).strip()
         disp_name = str(display_name or uname).strip()
-        user = MikasaUser(
+        user = MisaUser(
             id=uid,
             username=uname,
             email=str(email).strip().lower(),
@@ -329,8 +329,8 @@ class AccountDeviceManager:
         avatar_url: Optional[str] = None,
         is_verified: bool = False,
         metadata: Optional[Dict[str, Any]] = None
-    ) -> MikasaUser:
-        """Supabase auth.users JWT ma'lumotlaridan Mikasa profilini yaratish yoki yangilash"""
+    ) -> MisaUser:
+        """Supabase auth.users JWT ma'lumotlaridan Misa profilini yaratish yoki yangilash"""
         uid = str(user_id).strip()
         user = self._users.get(uid)
         uname = (username or (user.username if user else "") or (email.split("@")[0] if email else uid)).strip()
@@ -350,7 +350,7 @@ class AccountDeviceManager:
                 user.metadata.update(metadata)
             self._users[uid] = user
         else:
-            user = MikasaUser(
+            user = MisaUser(
                 id=uid,
                 username=uname,
                 email=str(email).strip().lower(),
@@ -367,7 +367,7 @@ class AccountDeviceManager:
         self.save()
         return user
 
-    def update_user(self, user: MikasaUser):
+    def update_user(self, user: MisaUser):
         """Foydalanuvchi ma'lumotlarini saqlash"""
         user.updated_at = time.time()
         self._users[user.id] = user
@@ -428,12 +428,12 @@ class AccountDeviceManager:
             existing_device = self._devices.get(existing_uuid)
             if existing_device:
                 # Boshqa foydalanuvchiga tegishli va bekor qilinmagan bo'lsa - xatolik
-                if existing_device.mikasa_user_id != uid and not existing_device.is_revoked:
+                if existing_device.misa_user_id != uid and not existing_device.is_revoked:
                     raise ValueError(
-                        f"Qurilma '{hw_id}' allaqachon boshqa hisobga ({existing_device.mikasa_user_id}) biriktirilgan"
+                        f"Qurilma '{hw_id}' allaqachon boshqa hisobga ({existing_device.misa_user_id}) biriktirilgan"
                     )
                 # Shu foydalanuvchiga tegishli bo'lsa - yangilash
-                if existing_device.mikasa_user_id == uid:
+                if existing_device.misa_user_id == uid:
                     if name:
                         existing_device.name = dev_name
                     if hostname:
@@ -448,7 +448,7 @@ class AccountDeviceManager:
 
         # Yangi qurilma yaratish
         device = Device(
-            mikasa_user_id=uid,
+            misa_user_id=uid,
             device_id=hw_id,
             name=dev_name,
             hostname=hostname,
@@ -469,7 +469,7 @@ class AccountDeviceManager:
 
         # Egalik bog'lanishini (UserDeviceLink) yaratish
         link = UserDeviceLink(
-            mikasa_user_id=uid,
+            misa_user_id=uid,
             device_id=hw_id,
             linked_at=time.time(),
             status="ACTIVE"
@@ -531,7 +531,7 @@ class AccountDeviceManager:
         if not dev:
             return None
 
-        if user_id is not None and dev.mikasa_user_id != str(user_id).strip():
+        if user_id is not None and dev.misa_user_id != str(user_id).strip():
             # Begona foydalanuvchiga tegishli bo'lsa, topilmadi sifatida yashirish
             return None
 
@@ -575,7 +575,7 @@ class AccountDeviceManager:
 
         self._audit.log(
             RemoteEventType.DEVICE_RENAMED,
-            user_id=dev.mikasa_user_id,
+            user_id=dev.misa_user_id,
             device_id=dev.device_id,
             details={"old_name": old_name, "new_name": clean_name}
         )
@@ -613,7 +613,7 @@ class AccountDeviceManager:
 
         # 2. Bog'lanish holatini REVOKED qilish
         for link in self._links.values():
-            if link.mikasa_user_id == dev.mikasa_user_id and link.device_id == dev.device_id:
+            if link.misa_user_id == dev.misa_user_id and link.device_id == dev.device_id:
                 link.status = "REVOKED"
 
         # 3. Kaskadli sessiya tozalash
@@ -626,8 +626,8 @@ class AccountDeviceManager:
                 sm = None
 
         if sm and hasattr(sm, "terminate_device_sessions"):
-            sm.terminate_device_sessions(dev.device_id, user_id=dev.mikasa_user_id)
-            sm.terminate_device_sessions(dev.id, user_id=dev.mikasa_user_id)
+            sm.terminate_device_sessions(dev.device_id, user_id=dev.misa_user_id)
+            sm.terminate_device_sessions(dev.id, user_id=dev.misa_user_id)
 
         # 4. Kaskadli ruxsatlarni tozalash
         ps = perm_store or self._perm_store
@@ -639,11 +639,11 @@ class AccountDeviceManager:
                 ps = None
 
         if ps and hasattr(ps, "revoke_device_permissions"):
-            ps.revoke_device_permissions(dev.mikasa_user_id, dev.device_id)
-            ps.revoke_device_permissions(dev.mikasa_user_id, dev.id)
+            ps.revoke_device_permissions(dev.misa_user_id, dev.device_id)
+            ps.revoke_device_permissions(dev.misa_user_id, dev.id)
 
         # 5. Faol tanlov kontekstini tozalash
-        uid = dev.mikasa_user_id
+        uid = dev.misa_user_id
         if uid in self._contexts:
             ctx = self._contexts[uid]
             if ctx.device_id in (dev.device_id, dev.id):
@@ -653,8 +653,8 @@ class AccountDeviceManager:
         try:
             from core.v8.device_enrollment import DeviceEnrollmentManager
             dem = DeviceEnrollmentManager.get_default_instance()
-            dem.revoke_credential(dev.device_id, user_id=dev.mikasa_user_id)
-            dem.revoke_credential(dev.id, user_id=dev.mikasa_user_id)
+            dem.revoke_credential(dev.device_id, user_id=dev.misa_user_id)
+            dem.revoke_credential(dev.id, user_id=dev.misa_user_id)
         except Exception as e:
             logger.debug(f"[AccountDeviceManager] Credential bekor qilishda ogohlantirish: {e}")
 
@@ -669,8 +669,8 @@ class AccountDeviceManager:
         try:
             from core.v8.device_pairing import DevicePairingManager
             dpm = DevicePairingManager.get_default_instance()
-            dpm.revoke_sessions_for_device(dev.device_id, user_id=dev.mikasa_user_id)
-            dpm.revoke_sessions_for_device(dev.id, user_id=dev.mikasa_user_id)
+            dpm.revoke_sessions_for_device(dev.device_id, user_id=dev.misa_user_id)
+            dpm.revoke_sessions_for_device(dev.id, user_id=dev.misa_user_id)
         except Exception as e:
             logger.debug(f"[AccountDeviceManager] Pairing sessiyalarni bekor qilishda ogohlantirish: {e}")
 
@@ -678,7 +678,7 @@ class AccountDeviceManager:
 
         self._audit.log(
             RemoteEventType.DEVICE_REVOKED,
-            user_id=dev.mikasa_user_id,
+            user_id=dev.misa_user_id,
             device_id=dev.device_id,
             details={"device_name": dev.name, "uuid": dev.id}
         )
@@ -842,7 +842,7 @@ class AccountDeviceManager:
         tg_link = None
         tg_ident = None
         if tg_identity_mgr:
-            tg_link = tg_identity_mgr.get_link_by_mikasa_user(uid)
+            tg_link = tg_identity_mgr.get_link_by_misa_user(uid)
             if tg_link:
                 tg_ident = tg_identity_mgr.get_identity(tg_link.telegram_user_id)
 
@@ -900,7 +900,7 @@ class AccountDeviceManager:
                 data = json.load(f)
 
             users_raw = data.get("users", {})
-            self._users = {k: MikasaUser.from_dict(v) for k, v in users_raw.items()}
+            self._users = {k: MisaUser.from_dict(v) for k, v in users_raw.items()}
 
             devices_raw = data.get("devices", {})
             self._devices = {k: Device.from_dict(v) for k, v in devices_raw.items()}

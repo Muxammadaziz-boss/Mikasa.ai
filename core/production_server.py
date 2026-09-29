@@ -1,5 +1,5 @@
 # ========== core/production_server.py ==========
-# Railway / production entrypoint — Mikasa Backend API + Universal Telegram Gateway
+# Railway / production entrypoint — Misa Backend API + Universal Telegram Gateway
 # Binds 0.0.0.0:$PORT per platform requirements.
 
 import os
@@ -14,15 +14,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 os.environ.setdefault("ENVIRONMENT", "production")
-os.environ.setdefault("MIKASA_API_HOST", "0.0.0.0")
-os.environ.setdefault("MIKASA_ALLOW_REMOTE_API", "true")
+os.environ.setdefault("MISA_API_HOST", "0.0.0.0")
+os.environ.setdefault("MISA_ALLOW_REMOTE_API", "true")
 
 from core.api_server import run_server  # noqa: E402
 
 
 if __name__ == "__main__":
-    host = os.environ.get("MIKASA_API_HOST", "0.0.0.0")
-    port_raw = os.environ.get("PORT") or os.environ.get("MIKASA_API_PORT", "18420")
+    host = os.environ.get("MISA_API_HOST", "0.0.0.0")
+    port_raw = os.environ.get("PORT") or os.environ.get("MISA_API_PORT", "18420")
     try:
         port = int(port_raw)
     except ValueError:

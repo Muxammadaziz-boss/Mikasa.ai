@@ -1,5 +1,5 @@
 # ========== gui/pages/landing.py ==========
-# Mikasa AI 7.0 — Landing / AI Home Sahifasi
+# Misa AI 7.0 — Landing / AI Home Sahifasi
 # Assistentning markaziy kirish nuqtasi: Orb + Salomlashuv + Voice/Chat CTA + Kompozitor
 
 import os
@@ -8,7 +8,7 @@ from tkinter import filedialog
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
 from gui.icons import get_vector_icon
-from gui.orb import MikasaOrb
+from gui.orb import MisaOrb
 from gui.components import CircleIconButton
 
 
@@ -92,11 +92,11 @@ class QuickActionCard(ctk.CTkFrame):
 
 class LandingPage(ctk.CTkFrame):
     """
-    Mikasa AI 7.0 Landing / AI Home Page.
+    Misa AI 7.0 Landing / AI Home Page.
     
     Arxitektura:
       - Dashboard emas: telemetriya, grafiklar va statistika yo'q.
-      - Markazlashgan AI Orb (MikasaOrb).
+      - Markazlashgan AI Orb (MisaOrb).
       - Foydalanuvchining haqiqiy ismi bilan salomlashuv.
       - Real backend holati (Online/Offline).
       - Primary Action: "Tinglashni boshlash" (Voice).
@@ -131,9 +131,9 @@ class LandingPage(ctk.CTkFrame):
         )
         self.top_sparkle.pack(pady=(0, 4))
 
-        # 2. Markaziy Mikasa AI Orb (150x150)
+        # 2. Markaziy Misa AI Orb (150x150)
         self.orb_size = 150
-        self.orb = MikasaOrb(
+        self.orb = MisaOrb(
             self.center_column,
             size=self.orb_size,
             state="idle",

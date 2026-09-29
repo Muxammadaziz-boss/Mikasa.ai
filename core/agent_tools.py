@@ -185,7 +185,7 @@ def _web_search(query: str, platform: str = "google") -> dict:
             "https://api.duckduckgo.com/",
             params={"q": query, "format": "json", "no_html": 1, "skip_disambig": 1},
             timeout=10,
-            headers={"User-Agent": "MikasaAI/3.1"},
+            headers={"User-Agent": "MisaAI/3.1"},
         )
         data = resp.json()
 
@@ -2574,7 +2574,7 @@ def _notification(
 
             escaped_title = title.replace("'", "''").replace("\n", " ")
             escaped_msg = message.replace("'", "''").replace("\n", " ")
-            ps = f"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $template.GetElementsByTagName('text')[0].AppendChild($template.CreateTextNode('{escaped_title}')); $template.GetElementsByTagName('text')[1].AppendChild($template.CreateTextNode('{escaped_msg}')); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Mikasa AI').Show([Windows.UI.Notifications.ToastNotification]::new($template))"
+            ps = f"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $template.GetElementsByTagName('text')[0].AppendChild($template.CreateTextNode('{escaped_title}')); $template.GetElementsByTagName('text')[1].AppendChild($template.CreateTextNode('{escaped_msg}')); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Misa AI').Show([Windows.UI.Notifications.ToastNotification]::new($template))"
             subprocess.run(["powershell", "-Command", ps], capture_output=True)
             return {"message": f"Eslatma yuborildi: {title}"}
     except Exception as e:

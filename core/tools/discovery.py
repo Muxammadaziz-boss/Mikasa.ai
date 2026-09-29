@@ -1,5 +1,5 @@
 # ========== discovery.py ==========
-# Mikasa AI 7.x — Capability Registry & Discovery Engine
+# Misa AI 7.x — Capability Registry & Discovery Engine
 # Indexing Tools by Semantic Capabilities, Aliases & Heuristics
 
 import re

@@ -1,5 +1,5 @@
 # ========== test_plan_optimizer.py ==========
-# Mikasa AI 7.x — Unit Tests for Plan Optimizer 2.0 (PlanOptimizer)
+# Misa AI 7.x — Unit Tests for Plan Optimizer 2.0 (PlanOptimizer)
 
 import unittest
 from unittest.mock import MagicMock
@@ -20,9 +20,9 @@ class TestPlanOptimizer(unittest.TestCase):
 
     def test_duplicate_step_removal(self):
         """Bir xil parametrli takroriy qadamlar optimallashtiriladi va qisqartiriladi"""
-        s1 = PlanStep(step_id="s1", order=1, intent="search", tool="search", parameters={"query": "Mikasa AI"})
+        s1 = PlanStep(step_id="s1", order=1, intent="search", tool="search", parameters={"query": "Misa AI"})
         s2 = PlanStep(step_id="s2", order=2, intent="calc", tool="calculator", parameters={"expression": "10 * 10"})
-        s3 = PlanStep(step_id="s3", order=3, intent="search", tool="search", parameters={"query": "Mikasa AI"}, dependencies=["s2"])
+        s3 = PlanStep(step_id="s3", order=3, intent="search", tool="search", parameters={"query": "Misa AI"}, dependencies=["s2"])
 
         plan = AgentPlan(
             plan_id="p-dup",

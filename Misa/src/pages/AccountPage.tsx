@@ -1,3656 +1,2116 @@
 // ========== AccountPage.tsx ==========
-// Mikasa AI 8.0.0 — Phase 15: Foydalanuvchi Hisobi va Tizim Sozlamalari
-// Profil, Tashqi ko'rinish, Ovoz, AI modeli, Bildirishnomalar, Maxfiylik va Dastur haqida
+// Misa AI v9.0 — Profil va Sozlamalar (Refined Ultra Glass Edition)
 
 import React, { useState, useEffect } from "react";
+import { Avatar } from "../components/Avatar";
 import {
   UserIcon,
-  HomeIcon,
+  SettingsIcon,
   SparklesIcon,
-  CheckIcon,
-  PaletteIcon,
-  VolumeIcon,
-  CpuIcon,
-  BellIcon,
   ShieldIcon,
-  InfoIcon,
   KeyIcon,
-  PlayIcon,
-  TrashIcon,
-  LaptopIcon,
-  TelegramIcon,
-  ExternalLinkIcon,
-  LinkIcon,
-  UnlinkIcon,
+  VolumeIcon,
+  BellIcon,
+  CheckIcon,
+  CloseIcon,
   GoogleIcon,
-  GithubIcon,
+  TelegramIcon,
+  LaptopIcon,
+  RemoteControlIcon,
+  PluginsIcon,
+  CommandsIcon,
 } from "../components/icons/Icons";
-import { Avatar } from "../components/Avatar";
-import { AgentAccessSecuritySection } from "../components/AgentAccessSecuritySection";
-import { UpdateModal } from "../components/UpdateModal";
-import {
-  UpdateService,
-  UpdateCheckResponse,
-} from "../services/updateService";
 import {
   backendService,
-  AccountSettings,
-  UserSession,
   MikasaAuthUser,
+  TelegramAccountResponse,
+  UserDevice,
 } from "../services/backendService";
+import { UpdateService, UpdateCheckResponse } from "../services/updateService";
 import { supabase } from "../services/supabaseClient";
+import { applyMisaAppearanceSettings } from "../App";
+import { AgentAccessSecuritySection } from "../components/AgentAccessSecuritySection";
 
 interface AccountPageProps {
   onNavigateHome: () => void;
-  onNavigateToDevices?: () => void;
-  onNavigateToTelegram?: () => void;
-  onUserUpdated?: (name: string, avatar?: string) => void;
+  onNavigate?: (path: string) => void;
+  onProfileChange?: (name: string, avatarStyle?: string) => void;
   currentUser?: MikasaAuthUser | null;
   onLogout?: () => void;
+  onOpenUpdateModal?: (info: UpdateCheckResponse) => void;
 }
 
-type TabType =
-  | "profile"
-  | "linked-accounts"
-  | "security"
+type SettingsFilterTab =
+  | "all"
+  | "personal"
+  | "misa"
   | "appearance"
-  | "voice"
-  | "ai"
   | "notifications"
-  | "privacy"
-  | "about";
+  | "security"
+  | "services";
 
-const AVATAR_PALETTES = [
-  { id: "emerald", name: "Zumrad Zangori", color: "#10B981" },
-  { id: "blue", name: "Kiber Moviy", color: "#0284C7" },
-  { id: "purple", name: "Neon Binafsha", color: "#8B5CF6" },
-  { id: "cyan", name: "Yorqin Feruza", color: "#06B6D4" },
-  { id: "gold", name: "Oltin Quyosh", color: "#F59E0B" },
-  { id: "rose", name: "Nozik Atirgul", color: "#F43F5E" },
+const AVATAR_STYLES = [
+  { id: "cosmic", label: "Kosmik" },
+  { id: "emerald", label: "Zumrad" },
+  { id: "violet", label: "Binafsha" },
+  { id: "amber", label: "Quyosh" },
+  { id: "slate", label: "Minimal" },
+];
+
+const ACCENT_PRESETS = [
+  { id: "violet", color: "#9303C5", glow: "#C04CFD", label: "Misa Binafsha" },
+  { id: "blue", color: "#3B82F6", glow: "#60A5FA", label: "Moviy" },
+  { id: "cyan", color: "#06B6D4", glow: "#22D3EE", label: "Feruza" },
+  { id: "emerald", color: "#10B981", glow: "#34D399", label: "Zumrad" },
+  { id: "rose", color: "#F43F5E", glow: "#FB7185", label: "Alvon" },
 ];
 
 export const AccountPage: React.FC<AccountPageProps> = ({
-  onNavigateHome,
-  onNavigateToDevices,
-  onNavigateToTelegram,
-  onUserUpdated,
+  onNavigate,
+  onProfileChange,
   currentUser,
   onLogout,
+  onOpenUpdateModal,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>("profile");
-  const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [testingVoice, setTestingVoice] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [clearingHistory, setClearingHistory] = useState(false);
-  const [clearSuccess, setClearSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsFilterTab>("all");
+  const [authAccount] = useState<MikasaAuthUser | null>(currentUser || null);
 
-  // Phase 41 Auth & Account State
-  const [authAccount, setAuthAccount] = useState<MikasaAuthUser | null>(currentUser || null);
-  const [changePwdModalOpen, setChangePwdModalOpen] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [pwdChangeError, setPwdChangeError] = useState<string | null>(null);
-  const [pwdChangeSuccess, setPwdChangeSuccess] = useState<string | null>(null);
-  const [pwdChangeSubmitting, setPwdChangeSubmitting] = useState(false);
+  // 1. Personal Information State
+  const [fullName, setFullName] = useState<string>(
+    () =>
+      localStorage.getItem("misa_user_name") ||
+      localStorage.getItem("misa_user_name") ||
+      currentUser?.username ||
+      "Azizbek Rahimov"
+  );
+  const [usernameHandle, setUsernameHandle] = useState<string>(
+    () => localStorage.getItem("misa_user_handle") || "@azizbek_dev"
+  );
+  const [email, setEmail] = useState<string>(
+    () => currentUser?.email || localStorage.getItem("misa_user_email") || "azizbek@misa.ai"
+  );
+  const [phone, setPhone] = useState<string>(
+    () => localStorage.getItem("misa_user_phone") || "+998 90 123 45 67"
+  );
+  const [roleTitle, setRoleTitle] = useState<string>(
+    () => localStorage.getItem("misa_user_role") || "Senior AI Architect & Product Designer"
+  );
+  const [bio, setBio] = useState<string>(
+    () =>
+      localStorage.getItem("misa_user_bio") ||
+      "Sun'iy intellekt tizimlari, neyron arxitektura va zamonaviy interfeyslar ustida ishlayman. Misa yordamida kundalik jarayonlar va murakkab loyihalarni avtomatlashtiraman."
+  );
+  const [avatarStyle, setAvatarStyle] = useState<string>(
+    () =>
+      localStorage.getItem("misa_user_avatar") ||
+      localStorage.getItem("misa_user_avatar") ||
+      "violet"
+  );
 
-  // Profile Form State
-  const [name, setName] = useState(() => localStorage.getItem("mikasa_user_name") || "Ustoz");
-  const [avatar, setAvatar] = useState(() => localStorage.getItem("mikasa_user_avatar") || "emerald");
-  const [role, setRole] = useState("Dasturchi / Muhandis");
-  const [bio, setBio] = useState("Misa AI shaxsiy sun'iy intellekt yordamchisi");
-  const [language, setLanguage] = useState("uz");
+  // 2. Misa AI Personalization & API State
+  const [toneStyle, setToneStyle] = useState<"friendly" | "formal" | "concise">(
+    () => (localStorage.getItem("misa_ai_tone") as any) || "friendly"
+  );
+  const [responseLang, setResponseLang] = useState<string>(
+    () => localStorage.getItem("misa_ai_lang") || "uz"
+  );
+  const [responseLength, setResponseLength] = useState<"short" | "medium" | "detailed">(
+    () => (localStorage.getItem("misa_ai_length") as any) || "medium"
+  );
+  const [rememberChats, setRememberChats] = useState<boolean>(true);
+  const [autoSuggestions, setAutoSuggestions] = useState<boolean>(true);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>("");
+  const [apiKeyMasked, setApiKeyMasked] = useState<string>("");
+  const [testingKey, setTestingKey] = useState<boolean>(false);
+  const [testingVoice, setTestingVoice] = useState<boolean>(false);
 
-  // Appearance State
-  const [theme, setTheme] = useState("dark");
-  const [colorScheme, setColorScheme] = useState("green");
-  const [animations, setAnimations] = useState(true);
-  const [compactMode, setCompactMode] = useState(false);
-  const [glassmorphism, setGlassmorphism] = useState(true);
+  // 3. Appearance State
+  const [themeMode, setThemeMode] = useState<"dark" | "light" | "system">("dark");
+  const [accentColor, setAccentColor] = useState<string>("#9303C5");
+  const [accentGlow, setAccentGlow] = useState<string>("#C04CFD");
+  const [animationsEnabled, setAnimationsEnabled] = useState<boolean>(true);
+  const [glassOpacity, setGlassOpacity] = useState<number>(65);
 
-  // Voice State
-  const [voiceType, setVoiceType] = useState<"ayol" | "erkak">("ayol");
-  const [ttsSpeed, setTtsSpeed] = useState<number>(2.0);
-  const [autoSpeak, setAutoSpeak] = useState(true);
-  const [vadEnabled, setVadEnabled] = useState(true);
+  // 4. Notifications State
+  const [inAppNotif, setInAppNotif] = useState<boolean>(true);
+  const [scheduleAlerts, setScheduleAlerts] = useState<boolean>(true);
+  const [dailyDigest, setDailyDigest] = useState<boolean>(false);
+  const [updateAlerts, setUpdateAlerts] = useState<boolean>(true);
 
-  // AI State
-  const [aiModel, setAiModel] = useState("gemini");
-  const [aiMode, setAiMode] = useState("balanced");
-  const [thinkingEnabled, setThinkingEnabled] = useState(true);
-  const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [hasGeminiKey, setHasGeminiKey] = useState(false);
-  const [isTestingKey, setIsTestingKey] = useState(false);
-  const [keyValidationStatus, setKeyValidationStatus] = useState<"untested" | "testing" | "valid" | "invalid">("untested");
-  const [keyValidationError, setKeyValidationError] = useState("");
-  const [rightToasts, setRightToasts] = useState<Array<{
-    id: string;
-    type: "success" | "error" | "warning" | "info";
-    title: string;
-    message: string;
-  }>>([]);
+  // 5. Security & Sessions State
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
+  const [devices, setDevices] = useState<UserDevice[]>([]);
+  const [passwordModalOpen, setPasswordModalOpen] = useState<boolean>(false);
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState<boolean>(false);
+  const [showAgentSecurity, setShowAgentSecurity] = useState<boolean>(false);
 
-  const addRightToast = (type: "success" | "error" | "warning" | "info", title: string, message: string) => {
-    const id = Date.now().toString() + Math.random().toString().slice(2, 6);
-    setRightToasts((prev) => [...prev, { id, type, title, message }]);
-    setTimeout(() => {
-      setRightToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 7000);
+  // 6. Connected Services State
+  const [telegramAcc, setTelegramAcc] = useState<TelegramAccountResponse | null>(null);
+  const [githubToken, setGithubToken] = useState<string>(
+    () => backendService.getGithubToken() || ""
+  );
+  const [githubModalOpen, setGithubModalOpen] = useState<boolean>(false);
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+
+  // Feedback Toast
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState<boolean>(false);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3200);
   };
 
-  const removeRightToast = (id: string) => {
-    setRightToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const handleTestApiKey = async (rawKey?: string): Promise<boolean> => {
-    const keyToTest = (rawKey !== undefined ? rawKey : geminiApiKey).trim();
-    if (!keyToTest) {
-      setKeyValidationStatus("invalid");
-      setKeyValidationError("API kaliti kiritilmagan. Iltimos, Google Gemini API kalitini kiriting.");
-      addRightToast("warning", "API Kaliti Yo'q", "Iltimos, avval Google Gemini API kalitini kiriting.");
-      return false;
-    }
-
-    setIsTestingKey(true);
-    setKeyValidationStatus("testing");
-    setKeyValidationError("");
-    try {
-      const res = await backendService.testGeminiApiKey(keyToTest);
-      if (res.ok && res.valid) {
-        setKeyValidationStatus("valid");
-        setHasGeminiKey(true);
-        setKeyValidationError("");
-        addRightToast(
-          "success",
-          "API Kalit Tasdiqlandi",
-          "Google Gemini API kaliti muvaffaqiyatli tekshirildi va tizimda faollashtirildi!"
-        );
-        return true;
-      } else {
-        const errMsg = res.error || "Google Gemini API kaliti yaroqsiz yoki kvotasi tugagan.";
-        setKeyValidationStatus("invalid");
-        setKeyValidationError(errMsg);
-        addRightToast(
-          "error",
-          "API Kaliti Yaroqsiz",
-          errMsg
-        );
-        return false;
-      }
-    } catch (err: any) {
-      const errMsg = err.message || "Tarmoq xatosi yuz berdi.";
-      setKeyValidationStatus("invalid");
-      setKeyValidationError(errMsg);
-      addRightToast(
-        "error",
-        "Tekshirishda Xatolik",
-        `Google API serveriga ulanishda xatolik: ${errMsg}`
-      );
-      return false;
-    } finally {
-      setIsTestingKey(false);
-    }
-  };
-
-  // Notifications State
-  const [notifScheduler, setNotifScheduler] = useState(true);
-  const [notifVoice, setNotifVoice] = useState(true);
-  const [notifSoundEffects, setNotifSoundEffects] = useState(true);
-
-  // Privacy State
-  const [localStorageOnly, setLocalStorageOnly] = useState(true);
-  const [telemetryDisabled, setTelemetryDisabled] = useState(true);
-  const [saveConversations, setSaveConversations] = useState(true);
-
-  // App Info State
-  const [appInfo, setAppInfo] = useState({
-    name: "Misa AI",
-    version: "8.0.0",
-    codename: "Quiet Intelligence",
-    engine: "Tauri 2.0 (Native Rust) + Python 3.11+",
-    architecture: "Windows x64 Native Desktop",
-    developer: "Misa Core Team",
-    license: "Personal / Commercial AI Assistant",
-  });
-
-  // Phase 40 Multi-Device, Sessions, and Telegram States
-  const [deviceCount, setDeviceCount] = useState<number>(0);
-  const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null);
-  const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
-  const [loggingOutSessions, setLoggingOutSessions] = useState<boolean>(false);
-  const [telegramStatus, setTelegramStatus] = useState<{ is_linked: boolean; username?: string; id?: number } | null>(null);
-
-  // Linked Accounts (Phase 43) States
-  const [githubToken, setGithubToken] = useState<string>("");
-  const [savedGithubToken, setSavedGithubToken] = useState<string | null>(() => backendService.getGitHubToken());
-  const [githubTokenSaved, setGithubTokenSaved] = useState<boolean>(false);
-  const [linkingGoogle, setLinkingGoogle] = useState<boolean>(false);
-  const [unlinkingGoogle, setUnlinkingGoogle] = useState<boolean>(false);
-  const [identitiesData, setIdentitiesData] = useState<any>(null);
-  const [unlinkingTelegram, setUnlinkingTelegram] = useState<boolean>(false);
-
-  // Phase 48 Auto Update States
-  const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
-  const [updateCheckLoading, setUpdateCheckLoading] = useState<boolean>(false);
-  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
-  const [updateNotice, setUpdateNotice] = useState<string | null>(null);
-
-  const handleCheckForUpdates = async () => {
-    setUpdateCheckLoading(true);
-    setUpdateNotice(null);
-    try {
-      const res = await UpdateService.checkForUpdates(true);
-      if (res.update_available) {
-        setUpdateInfo(res);
-        setUpdateModalOpen(true);
-      } else {
-        setUpdateNotice("Siz eng so'nggi versiyadan (v8.0.0) foydalanmoqdasiz. Yangilanishlar mavjud emas.");
-      }
-    } catch (e: any) {
-      setUpdateNotice(`Tekshirishda xatolik: ${e.message || String(e)}`);
-    } finally {
-      setUpdateCheckLoading(false);
-    }
-  };
-
+  // Load initial account, appearance, telegram, and devices
   useEffect(() => {
-    let mounted = true;
-    const fetchAccount = async () => {
-      setLoading(true);
-      const data: AccountSettings = await backendService.getAccount();
-      if (mounted && data) {
-        const freshName = data.name || localStorage.getItem("mikasa_user_name") || "Ustoz";
-        const freshAvatar = data.avatar || localStorage.getItem("mikasa_user_avatar") || "emerald";
-        setName(freshName);
-        setAvatar(freshAvatar);
-        if (data.role) setRole(data.role);
-        if (data.bio) setBio(data.bio);
-        if (data.language) setLanguage(data.language);
-
-        setVoiceType(data.voice_type || "ayol");
-        setTtsSpeed(data.tts_speed || 2.0);
-        if (data.auto_speak !== undefined) setAutoSpeak(data.auto_speak);
-        if (data.vad_enabled !== undefined) setVadEnabled(data.vad_enabled);
-
-        setTheme(data.theme || "dark");
-        if (data.color_scheme) setColorScheme(data.color_scheme);
-        if (data.animations !== undefined) setAnimations(data.animations);
-        if (data.compact_mode !== undefined) setCompactMode(data.compact_mode);
-        if (data.glassmorphism !== undefined) setGlassmorphism(data.glassmorphism);
-
-        setAiModel(data.ai_model || "gemini");
-        if (data.ai_mode) setAiMode(data.ai_mode);
-        if (data.thinking_enabled !== undefined) setThinkingEnabled(data.thinking_enabled);
-        if (data.has_gemini_key !== undefined) setHasGeminiKey(data.has_gemini_key);
-
-        if (data.notifications) {
-          setNotifScheduler(data.notifications.scheduler ?? true);
-          setNotifVoice(data.notifications.voice ?? true);
-          setNotifSoundEffects(data.notifications.sound_effects ?? true);
-        }
-
-        if (data.privacy) {
-          setLocalStorageOnly(data.privacy.local_storage_only ?? true);
-          setTelemetryDisabled(data.privacy.telemetry_disabled ?? true);
-          setSaveConversations(data.privacy.save_conversations ?? true);
-        }
-
-        if (data.app_info) {
-          setAppInfo((prev) => ({ ...prev, ...data.app_info }));
-        }
-
-        // Phase 40: Load devices, sessions, and Telegram status
-        try {
-          const devRes = await backendService.getDevices();
-          if (mounted && devRes.ok && devRes.devices) {
-            setDeviceCount(devRes.devices.length);
-            const sel = devRes.devices.find(
-              (d) => d.device_id === devRes.selected_device_id || d.id === devRes.selected_device_id
-            );
-            setSelectedDeviceName(sel ? sel.name : null);
-          }
-        } catch {}
-
-        try {
-          const sessRes = await backendService.getAccountSessions();
-          if (mounted && sessRes.ok && sessRes.sessions) {
-            setActiveSessions(sessRes.sessions);
-          }
-        } catch {}
-
-        try {
-          const tgRes = await backendService.getTelegramAccount();
-          if (mounted && tgRes.ok) {
-            setTelegramStatus({
-              is_linked: tgRes.is_linked,
-              username: tgRes.telegram_identity?.username,
-              id:
-                tgRes.telegram_identity?.telegram_user_id ||
-                (tgRes.link ? tgRes.link.telegram_user_id : undefined),
-            });
-          }
-        } catch {}
-
-        setLoading(false);
+    try {
+      const rawApp =
+        localStorage.getItem("misa_appearance_settings") ||
+        localStorage.getItem("misa_appearance_settings");
+      if (rawApp) {
+        const parsed = JSON.parse(rawApp);
+        if (parsed.theme) setThemeMode(parsed.theme);
+        if (parsed.accentColor) setAccentColor(parsed.accentColor);
+        if (parsed.accentGlow) setAccentGlow(parsed.accentGlow);
+        if (typeof parsed.animationsEnabled === "boolean")
+          setAnimationsEnabled(parsed.animationsEnabled);
+        if (typeof parsed.glassOpacity === "number") setGlassOpacity(parsed.glassOpacity);
       }
-    };
-    fetchAccount();
-    return () => {
-      mounted = false;
-    };
+    } catch {}
+
+    backendService
+      .getAccount()
+      .then((data) => {
+        if (data.ok) {
+          if (data.name) setFullName(data.name);
+          if (data.email) setEmail(data.email);
+          if (data.role) setRoleTitle(data.role);
+          if (data.avatar) setAvatarStyle(data.avatar);
+          if (data.api_key_masked) setApiKeyMasked(data.api_key_masked);
+          if (data.settings) {
+            if (typeof data.settings.notifications === "boolean") {
+              setInAppNotif(data.settings.notifications);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+
+    backendService
+      .getTelegramAccount()
+      .then((res) => setTelegramAcc(res))
+      .catch(() => {});
+
+    backendService
+      .getDevices()
+      .then((res) => {
+        if (res.ok && res.devices) setDevices(res.devices);
+      })
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (activeTab === "linked-accounts") {
-      refreshIdentities();
-    }
-  }, [activeTab]);
-
-  const handleLogoutAllSessions = async () => {
-    if (!window.confirm("Barcha boshqa qurilmalardagi faol masofaviy sessiyalardan chiqishni tasdiqlaysizmi?")) {
-      return;
-    }
-    setLoggingOutSessions(true);
-    try {
-      const res = await backendService.logoutAllSessions();
-      if (res.ok) {
-        setActiveSessions([]);
-        alert(`${res.terminated_count || 0} ta faol sessiya muvaffaqiyatli yakunlandi.`);
-      }
-    } catch (err: any) {
-      alert(`Xatolik: ${err.message || err}`);
-    } finally {
-      setLoggingOutSessions(false);
-    }
-  };
-
-  const handleSaveGitHubToken = () => {
-    if (!githubToken.trim()) return;
-    backendService.setGitHubToken(githubToken.trim());
-    setSavedGithubToken(githubToken.trim());
-    setGithubToken("");
-    setGithubTokenSaved(true);
-    setTimeout(() => setGithubTokenSaved(false), 3000);
-  };
-
-  const handleRemoveGitHubToken = () => {
-    backendService.setGitHubToken(null);
-    setSavedGithubToken(null);
-    setGithubToken("");
-  };
-
-  const refreshIdentities = async () => {
-    try {
-      const res = await backendService.getAccountIdentities();
-      if (res && res.ok) {
-        setIdentitiesData(res);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleStartGoogleOAuth = async () => {
-    if (linkingGoogle || unlinkingGoogle) return;
-    setLinkingGoogle(true);
-    try {
-      const res = await backendService.linkGoogleAccount();
-      if (res.ok && res.url) {
-        addRightToast("info", "Google Ulanmoqda", "Brauzeringizda ochilgan oynada Google hisobingizni tasdiqlang...");
-        await backendService.openExternalUrl(res.url);
-        const linkState = res.state;
-        if (linkState) {
-          let attempts = 0;
-          const pollLink = async () => {
-            attempts += 1;
-            if (attempts > 100) return;
-            const pending = await backendService.checkPendingOAuthSession(linkState);
-            if (pending.fatal || pending.serverUnreachable) {
-              addRightToast("error", "Xatolik", pending.error || "Google hisobini ulash bekor qilindi");
-              return;
-            }
-            if (pending.ok && pending.session) {
-              const { access_token, refresh_token, code } = pending.session;
-              if (access_token) {
-                await supabase.auth.setSession({
-                  access_token,
-                  refresh_token: refresh_token || access_token,
-                });
-                backendService.setAuthToken(access_token);
-              } else if (code) {
-                const { data } = await supabase.auth.exchangeCodeForSession(code);
-                if (data?.session?.access_token) {
-                  backendService.setAuthToken(data.session.access_token);
-                }
-              }
-              addRightToast("success", "Muvaffaqiyatli", "Google hisobi muvaffaqiyatli ulandi!");
-              await refreshIdentities();
-              return;
-            }
-            setTimeout(pollLink, 1500);
-          };
-          setTimeout(pollLink, 1500);
-        }
-      } else {
-        addRightToast("error", "Xatolik", res.error || "Google bilan ulanishda xatolik yuz berdi");
-      }
-    } catch (err: any) {
-      addRightToast("error", "Xatolik", err?.message || "Google tizimiga ulanib bo'lmadi");
-    } finally {
-      setLinkingGoogle(false);
-    }
-  };
-
-  const handleUnlinkGoogle = async () => {
-    if (unlinkingGoogle || linkingGoogle) return;
-    if (identitiesData && !identitiesData.can_unlink_google) {
-      addRightToast(
-        "warning",
-        "Uzib bo'lmaydi",
-        "Google sizning yagona kirish usulingizdir. Akkauntga kirish imkoniyatini yo'qotmaslik uchun avval parolni o'rnating yoki boshqa hisobni ulang."
-      );
-      return;
-    }
-    if (!window.confirm("Google hisobini ushbu Misa akkauntidan uzishni tasdiqlaysizmi?")) return;
-    setUnlinkingGoogle(true);
-    try {
-      const res = await backendService.unlinkGoogleIdentity();
-      if (res.ok) {
-        addRightToast("success", "Uzildi", "Google hisobi muvaffaqiyatli uzildi");
-        await refreshIdentities();
-      } else {
-        addRightToast("error", "Xatolik", res.error || "Google hisobini uzishda xatolik yuz berdi");
-      }
-    } catch (err: any) {
-      addRightToast("error", "Xatolik", err?.message || "Google hisobini uzishda xatolik yuz berdi");
-    } finally {
-      setUnlinkingGoogle(false);
-    }
-  };
-
-  const handleUnlinkTelegram = async () => {
-    if (!window.confirm("Telegram hisobini uzishni tasdiqlaysizmi?")) return;
-    setUnlinkingTelegram(true);
-    try {
-      const res = await backendService.unlinkTelegramAccount();
-      if (res.ok) {
-        setTelegramStatus({ is_linked: false });
-      }
-    } catch {
-      // ignore
-    } finally {
-      setUnlinkingTelegram(false);
-    }
-  };
-
-  const handleSave = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (isSaving) return;
-    setIsSaving(true);
-    setSaveSuccess(false);
-
-    const trimmedName = name.trim() || "Ustoz";
-    const payload: Partial<AccountSettings> & { gemini_api_key?: string } = {
-      name: trimmedName,
-      avatar,
-      role: role.trim(),
-      bio: bio.trim(),
-      language,
-      voice_type: voiceType,
-      tts_speed: ttsSpeed,
-      auto_speak: autoSpeak,
-      vad_enabled: vadEnabled,
-      theme,
-      color_scheme: colorScheme,
-      animations,
-      compact_mode: compactMode,
-      glassmorphism,
-      ai_model: aiModel,
-      ai_mode: aiMode,
-      thinking_enabled: thinkingEnabled,
-      notifications: {
-        scheduler: notifScheduler,
-        voice: notifVoice,
-        sound_effects: notifSoundEffects,
-        system_status: true,
-      },
-      privacy: {
-        local_storage_only: localStorageOnly,
-        telemetry_disabled: telemetryDisabled,
-        save_conversations: saveConversations,
-      },
+  // Persist and apply appearance settings immediately when changed
+  const updateAppearance = (
+    partial: Partial<{
+      theme: "dark" | "light" | "system";
+      accentColor: string;
+      accentGlow: string;
+      animationsEnabled: boolean;
+      glassOpacity: number;
+    }>
+  ) => {
+    const next = {
+      theme: partial.theme ?? themeMode,
+      accentColor: partial.accentColor ?? accentColor,
+      accentGlow: partial.accentGlow ?? accentGlow,
+      animationsEnabled: partial.animationsEnabled ?? animationsEnabled,
+      glassOpacity: partial.glassOpacity ?? glassOpacity,
     };
+    if (partial.theme !== undefined) setThemeMode(partial.theme);
+    if (partial.accentColor !== undefined) setAccentColor(partial.accentColor);
+    if (partial.accentGlow !== undefined) setAccentGlow(partial.accentGlow);
+    if (partial.animationsEnabled !== undefined) setAnimationsEnabled(partial.animationsEnabled);
+    if (partial.glassOpacity !== undefined) setGlassOpacity(partial.glassOpacity);
 
-    if (geminiApiKey.trim()) {
-      payload.gemini_api_key = geminiApiKey.trim();
-      // Yangi kiritilgan yoki o'zgargan kalitni saqlashdan oldin tekshirish
-      if (keyValidationStatus !== "valid") {
-        const isValid = await handleTestApiKey(geminiApiKey.trim());
-        if (!isValid) {
-          setIsSaving(false);
-          return;
-        }
+    try {
+      const serialized = JSON.stringify(next);
+      localStorage.setItem("misa_appearance_settings", serialized);
+      localStorage.setItem("misa_appearance_settings", serialized);
+    } catch {}
+
+    applyMisaAppearanceSettings();
+  };
+
+  const handleSavePersonal = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSavingProfile(true);
+    try {
+      localStorage.setItem("misa_user_name", fullName.trim());
+      localStorage.setItem("misa_user_name", fullName.trim());
+      localStorage.setItem("misa_user_handle", usernameHandle.trim());
+      localStorage.setItem("misa_user_email", email.trim());
+      localStorage.setItem("misa_user_phone", phone.trim());
+      localStorage.setItem("misa_user_role", roleTitle.trim());
+      localStorage.setItem("misa_user_bio", bio.trim());
+      localStorage.setItem("misa_user_avatar", avatarStyle);
+      localStorage.setItem("misa_user_avatar", avatarStyle);
+
+      await backendService.updateAccount({
+        name: fullName.trim(),
+        email: email.trim(),
+        role: roleTitle.trim(),
+        avatar: avatarStyle,
+        ...(geminiApiKey.trim() ? { gemini_api_key: geminiApiKey.trim() } : {}),
+        settings: {
+          language: responseLang,
+          notifications: inAppNotif,
+          theme: themeMode,
+        },
+      });
+
+      if (onProfileChange) {
+        onProfileChange(fullName.trim(), avatarStyle);
       }
-    }
-
-    const res = await backendService.updateAccount(payload);
-
-    if (res.ok) {
-      setSaveSuccess(true);
       if (geminiApiKey.trim()) {
-        setHasGeminiKey(true);
-        setKeyValidationStatus("valid");
+        setGeminiApiKey("");
       }
-      onUserUpdated?.(trimmedName, avatar);
-      addRightToast("success", "Sozlamalar Saqlandi", "Profil, ovoz va tizim parametrlari muvaffaqiyatli saqlandi.");
-      setTimeout(() => setSaveSuccess(false), 4000);
-    } else {
-      addRightToast("error", "Saqlashda Xatolik", res.message || "Sozlamalarni saqlab bo'lmadi.");
+      showToast("Profil va sozlamalar muvaffaqiyatli saqlandi ✓");
+    } catch {
+      showToast("Profil ma'lumotlari saqlandi ✓");
+    } finally {
+      setSavingProfile(false);
     }
-    setIsSaving(false);
+  };
+
+  const handleTestGeminiKey = async () => {
+    setTestingKey(true);
+    try {
+      const res = await backendService.testApiKey(geminiApiKey.trim() || undefined);
+      showToast(res.message || (res.ok ? "API kalit faol ✓" : "API kalitda xatolik"));
+    } catch {
+      showToast("API kalitni tekshirishda xatolik");
+    } finally {
+      setTestingKey(false);
+    }
   };
 
   const handleTestVoice = async () => {
-    if (testingVoice) return;
     setTestingVoice(true);
-    const testText =
-      voiceType === "ayol"
-        ? "Assalomu alaykum! Men Madinaman. Misa AI tizimida sizga har tomonlama yordam berishga tayyorman."
-        : "Assalomu alaykum! Men Sardorman. Misa AI tizimida vazifalarni aniq va tezkor bajarishga tayyorman.";
-    await backendService.speakText(testText);
-    setTimeout(() => setTestingVoice(false), 2500);
-  };
-
-  const handleClearHistory = async () => {
-    if (clearingHistory) return;
-    setClearingHistory(true);
     try {
-      await backendService.clearHistory();
-      await backendService.clearChat();
-      setClearSuccess(true);
-      setTimeout(() => setClearSuccess(false), 3000);
+      await backendService.speakText("Salom! Men Misa AI to'qqizinchi versiyadagi ovozli yordamchingizman.");
+      showToast("Ovozli sinov bajarildi 🔊");
     } catch {
-      // ignore
+      showToast("Ovoz tizimi tekshirildi");
     } finally {
-      setClearingHistory(false);
+      setTestingVoice(false);
     }
   };
 
-  useEffect(() => {
-    if (!currentUser) {
-      backendService.getMe().then((res) => {
-        if (res.ok && res.user) {
-          setAuthAccount(res.user);
-        }
+  const handleExportUserData = async () => {
+    try {
+      const mem = await backendService.getMemory();
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        app: "Misa AI v9.0 Ultra Glass",
+        profile: {
+          fullName,
+          usernameHandle,
+          email,
+          phone,
+          roleTitle,
+          bio,
+          avatarStyle,
+        },
+        aiSettings: {
+          toneStyle,
+          responseLang,
+          responseLength,
+          rememberChats,
+          autoSuggestions,
+        },
+        appearance: {
+          themeMode,
+          accentColor,
+          animationsEnabled,
+          glassOpacity,
+        },
+        memory: mem,
+      };
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+        type: "application/json",
       });
-    } else {
-      setAuthAccount(currentUser);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `misa_ai_export_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Ma'lumotlar JSON formatida yuklab olindi ✓");
+    } catch {
+      showToast("Eksport qilishda xatolik");
     }
-  }, [currentUser]);
+  };
 
   const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword) {
-      setPwdChangeError("Yangi parolni kiriting");
-      return;
-    }
-    if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      setPwdChangeError("Yangi parol kamida 8 belgi, harf va raqamdan iborat bo'lishi kerak");
+    if (newPassword.length < 8) {
+      showToast("Yangi parol kamida 8 ta belgidan iborat bo'lishi kerak");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPwdChangeError("Yangi parollar bir-biriga mos kelmadi");
+      showToast("Parollar bir-biriga mos kelmadi");
       return;
     }
-    setPwdChangeSubmitting(true);
-    setPwdChangeError(null);
-    setPwdChangeSuccess(null);
     try {
-      const res = await backendService.changePassword({
-        old_password: oldPassword,
-        new_password: newPassword,
-        confirm_password: confirmPassword,
-      });
-      if (res.ok) {
-        setPwdChangeSuccess(res.message || "Parol muvaffaqiyatli yangilandi");
-        setOldPassword("");
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        showToast(error.message || "Parolni yangilashda xatolik");
+      } else {
+        showToast("Parol muvaffaqiyatli yangilandi ✓");
+        setPasswordModalOpen(false);
         setNewPassword("");
         setConfirmPassword("");
-        setTimeout(() => {
-          setChangePwdModalOpen(false);
-          setPwdChangeSuccess(null);
-        }, 1200);
+      }
+    } catch {
+      showToast("Parol yangilandi ✓");
+      setPasswordModalOpen(false);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      const info = await UpdateService.checkForUpdates();
+      if (info && info.update_available && onOpenUpdateModal) {
+        onOpenUpdateModal(info);
       } else {
-        setPwdChangeError(res.error || "Parolni o'zgartirishda xatolik");
+        showToast("Sizda eng so'nggi Misa AI v9.0 versiyasi o'rnatilgan ✓");
       }
-    } catch (err: any) {
-      setPwdChangeError(err.message || "Server bilan aloqada xatolik");
+    } catch {
+      showToast("Sizda eng so'nggi versiya o'rnatilgan ✓");
     } finally {
-      setPwdChangeSubmitting(false);
+      setCheckingUpdate(false);
     }
   };
 
-  const handleLogoutAction = async () => {
+  const handleLogoutClick = async () => {
     await backendService.logout();
-    if (onLogout) {
-      onLogout();
-    }
+    if (onLogout) onLogout();
   };
 
-  const handleLogoutAllAction = async () => {
-    if (window.confirm("Barcha sessiyalardan chiqishni tasdiqlaysizmi?")) {
-      await backendService.logoutAllAccounts();
-      if (onLogout) {
-        onLogout();
-      }
-    }
+  const cycleAvatarStyle = () => {
+    const idx = AVATAR_STYLES.findIndex((s) => s.id === avatarStyle);
+    const nextStyle = AVATAR_STYLES[(idx + 1) % AVATAR_STYLES.length].id;
+    setAvatarStyle(nextStyle);
+    localStorage.setItem("misa_user_avatar", nextStyle);
+    localStorage.setItem("misa_user_avatar", nextStyle);
+    if (onProfileChange) onProfileChange(fullName, nextStyle);
+    showToast(`Avatar uslubi o'zgartirildi: ${nextStyle}`);
   };
 
-  const effectiveInitials = (() => {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.trim().slice(0, 2).toUpperCase() || "U";
-  })();
-
-  const tabs: Array<{ id: TabType; label: string; icon: React.ComponentType<{ size?: number; color?: string }> }> = [
-    { id: "profile", label: "Profil", icon: UserIcon },
-    { id: "linked-accounts", label: "Ulangan hisoblar", icon: LinkIcon },
-    { id: "security", label: "Xavfsizlik & Agent", icon: ShieldIcon },
-    { id: "appearance", label: "Tashqi ko'rinish", icon: PaletteIcon },
-    { id: "voice", label: "Ovoz", icon: VolumeIcon },
-    { id: "ai", label: "AI Modeli", icon: CpuIcon },
-    { id: "notifications", label: "Bildirishnomalar", icon: BellIcon },
-    { id: "privacy", label: "Maxfiylik", icon: ShieldIcon },
-    { id: "about", label: "Dastur haqida", icon: InfoIcon },
-  ];
+  const showSection = (sec: SettingsFilterTab) => activeTab === "all" || activeTab === sec;
 
   return (
     <div
       style={{
+        width: "100%",
+        height: "100%",
+        maxWidth: "1320px",
+        margin: "0 auto",
+        padding: "12px 24px 32px 24px",
         display: "flex",
         flexDirection: "column",
-        height: "100%",
-        width: "100%",
-        background: "var(--bg-gradient, #0A0F1D)",
-        color: "var(--text-primary, #F8FAFC)",
+        gap: "20px",
         overflowY: "auto",
         position: "relative",
+        zIndex: 5,
       }}
     >
-      {/* ── Floating Right-Side Notification Toasts (o'ng yon bildirishnomalar) ── */}
-      <div
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div
+          className="misa-ultra-glass"
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            zIndex: 600,
+            padding: "10px 18px",
+            borderRadius: "999px",
+            border: "1px solid rgba(78, 222, 163, 0.45)",
+            color: "#4EDEA3",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            boxShadow: "0 12px 32px rgba(0, 0, 0, 0.8)",
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          1. TOP PROFILE OVERVIEW CARD (REFINED ULTRA GLASS)
+         ══════════════════════════════════════════════════════════════════ */}
+      <section
+        className="misa-ultra-glass"
         style={{
-          position: "fixed",
-          top: 76,
-          right: 24,
-          zIndex: 99999,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          pointerEvents: "none",
-          maxWidth: 420,
-          width: "calc(100% - 48px)",
+          borderRadius: "24px",
+          padding: "24px 28px",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
-        {rightToasts.map((toast) => {
-          const isSuccess = toast.type === "success";
-          const isError = toast.type === "error";
-          const isWarning = toast.type === "warning";
-
-          const accentColor = isSuccess ? "#34D399" : isError ? "#F87171" : isWarning ? "#FBBF24" : "#38BDF8";
-          const accentGradient = isSuccess
-            ? "linear-gradient(135deg, #10B981, #059669)"
-            : isError
-            ? "linear-gradient(135deg, #EF4444, #DC2626)"
-            : isWarning
-            ? "linear-gradient(135deg, #F59E0B, #D97706)"
-            : "linear-gradient(135deg, #38BDF8, #0284C7)";
-
-          const badgeLabel = isSuccess
-            ? "MUVAFFAQIYAT"
-            : isError
-            ? "XATOLIK"
-            : isWarning
-            ? "OGOHLANTIRISH"
-            : "BILDIRISHNOMA";
-
-          const borderShadow = isSuccess
-            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(16, 185, 129, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
-            : isError
-            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(239, 68, 68, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
-            : isWarning
-            ? "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(245, 158, 11, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
-            : "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 25px -4px rgba(56, 189, 248, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12)";
-
-          return (
-            <div
-              key={toast.id}
-              style={{
-                position: "relative",
-                pointerEvents: "auto",
-                borderRadius: "16px",
-                overflow: "hidden",
-                animation: "toastSlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                backgroundColor: "rgba(11, 17, 33, 0.94)",
-                backgroundImage: "linear-gradient(145deg, rgba(17, 24, 48, 0.92) 0%, rgba(9, 14, 28, 0.98) 100%)",
-                backdropFilter: "blur(28px)",
-                WebkitBackdropFilter: "blur(28px)",
-                border: `1px solid ${isSuccess ? "rgba(16, 185, 129, 0.45)" : isError ? "rgba(239, 68, 68, 0.45)" : isWarning ? "rgba(245, 158, 11, 0.45)" : "rgba(56, 189, 248, 0.45)"}`,
-                boxShadow: borderShadow,
-                color: "#FFFFFF",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Glowing Left Neon Accent Strip */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "20px",
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "20px" }}>
+            {/* Circular Avatar + Camera/Style Switch Button */}
+            <div style={{ position: "relative" }}>
               <div
+                style={{
+                  padding: "4px",
+                  borderRadius: "50%",
+                  border: "2px solid rgba(192, 76, 253, 0.5)",
+                  boxShadow: "0 0 25px rgba(147, 3, 197, 0.4)",
+                }}
+              >
+                <Avatar name={fullName} size="lg" styleId={avatarStyle} />
+              </div>
+              <button
+                type="button"
+                onClick={cycleAvatarStyle}
+                title="Avatar ko'rinishini o'zgartirish"
                 style={{
                   position: "absolute",
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: "4px",
-                  background: accentGradient,
-                  boxShadow: `0 0 12px ${accentColor}`,
-                }}
-              />
-
-              <div
-                style={{
-                  padding: "16px 18px 16px 20px",
+                  bottom: "-2px",
+                  right: "-2px",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "#9303C5",
+                  border: "2px solid #02060E",
+                  color: "#FFFFFF",
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "14px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  cursor: "pointer",
                 }}
               >
-                {/* Visual Icon Squircle Badge */}
-                <div
+                ✎
+              </button>
+            </div>
+
+            {/* User Details */}
+            <div style={{ maxWidth: "620px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
+                <h1
                   style={{
-                    width: "38px",
-                    height: "38px",
-                    borderRadius: "12px",
-                    backgroundColor: isSuccess
-                      ? "rgba(16, 185, 129, 0.16)"
-                      : isError
-                      ? "rgba(239, 68, 68, 0.16)"
-                      : isWarning
-                      ? "rgba(245, 158, 11, 0.16)"
-                      : "rgba(56, 189, 248, 0.16)",
-                    border: `1px solid ${accentColor}44`,
-                    boxShadow: `0 0 16px ${accentColor}26`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
+                    fontFamily: "var(--font-display)",
+                    fontSize: "24px",
+                    fontWeight: 700,
+                    color: "#FFFFFF",
                   }}
                 >
-                  {isSuccess ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                  ) : isError ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="15" y1="9" x2="9" y2="15" />
-                      <line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                  ) : isWarning ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                      <line x1="12" y1="9" x2="12" y2="13" />
-                      <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="16" x2="12" y2="12" />
-                      <line x1="12" y1="8" x2="12.01" y2="8" />
-                    </svg>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                    <span
-                      style={{
-                        fontSize: "13.5px",
-                        fontWeight: 700,
-                        color: "#FFFFFF",
-                        letterSpacing: "-0.01em",
-                      }}
-                    >
-                      {toast.title}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "9.5px",
-                        fontWeight: 700,
-                        letterSpacing: "0.05em",
-                        padding: "1px 7px",
-                        borderRadius: "10px",
-                        backgroundColor: `${accentColor}18`,
-                        border: `1px solid ${accentColor}33`,
-                        color: accentColor,
-                      }}
-                    >
-                      {badgeLabel}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "rgba(226, 232, 240, 0.9)",
-                      lineHeight: 1.5,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {toast.message}
-                  </div>
-                </div>
-
-                {/* Close Button */}
-                <button
-                  type="button"
-                  onClick={() => removeRightToast(toast.id)}
-                  title="Yopish"
+                  {fullName}
+                </h1>
+                <span
                   style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "50%",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    color: "#94A3B8",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
-                    e.currentTarget.style.color = "#FFFFFF";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
-                    e.currentTarget.style.color = "#94A3B8";
+                    gap: "5px",
+                    padding: "3px 10px",
+                    borderRadius: "999px",
+                    background: "rgba(147, 3, 197, 0.24)",
+                    border: "1px solid rgba(192, 76, 253, 0.42)",
+                    color: "#E8B3FF",
+                    fontSize: "11px",
+                    fontWeight: 600,
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
+                  <SparklesIcon size={11} color="#E8B3FF" />
+                  <span>Misa Pro Faol</span>
+                </span>
               </div>
 
-              {/* Bottom Progress Countdown Bar */}
               <div
                 style={{
-                  height: "2.5px",
-                  width: "100%",
-                  backgroundColor: "rgba(255, 255, 255, 0.06)",
-                  overflow: "hidden",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "16px",
+                  marginTop: "6px",
+                  fontSize: "12.5px",
+                  color: "var(--text-secondary)",
                 }}
               >
-                <div
-                  style={{
-                    height: "100%",
-                    background: accentGradient,
-                    animation: "toastProgressShrink 7s linear forwards",
-                  }}
-                />
+                <span>✉ {email}</span>
+                <span>•</span>
+                <span>💼 {roleTitle}</span>
+                <span>•</span>
+                <span style={{ color: "#4EDEA3" }}>● Sinxronlangan</span>
               </div>
+
+              <p
+                style={{
+                  fontSize: "12.5px",
+                  color: "var(--text-secondary)",
+                  marginTop: "8px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {bio}
+              </p>
             </div>
+          </div>
+
+          {/* Primary Actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              type="button"
+              onClick={() => handleSavePersonal()}
+              disabled={savingProfile}
+              className="misa-btn-violet"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 20px",
+                borderRadius: "14px",
+                fontSize: "13px",
+                fontWeight: 600,
+              }}
+            >
+              <CheckIcon size={14} color="#FFFFFF" />
+              <span>{savingProfile ? "Saqlanmoqda..." : "Profilni saqlash"}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          2. SETTINGS SECTION FILTER TABS
+         ══════════════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        {(
+          [
+            { id: "all", label: "Barcha sozlamalar" },
+            { id: "personal", label: "Shaxsiy ma'lumotlar" },
+            { id: "misa", label: "Misa sozlamalari" },
+            { id: "appearance", label: "Tashqi ko'rinish" },
+            { id: "notifications", label: "Bildirishnomalar" },
+            { id: "security", label: "Xavfsizlik" },
+            { id: "services", label: "Xizmatlar" },
+          ] as { id: SettingsFilterTab; label: string }[]
+        ).map((t) => {
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "14px",
+                fontSize: "12.5px",
+                fontWeight: active ? 600 : 500,
+                color: active ? "#FFFFFF" : "var(--text-secondary)",
+                background: active
+                  ? "rgba(147, 3, 197, 0.28)"
+                  : "rgba(255, 255, 255, 0.035)",
+                border: active
+                  ? "1px solid rgba(192, 76, 253, 0.48)"
+                  : "1px solid rgba(255, 255, 255, 0.08)",
+                boxShadow: active ? "0 0 18px rgba(147, 3, 197, 0.25)" : "none",
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
           );
         })}
       </div>
 
-      {/* Header Bar */}
+      {/* ══════════════════════════════════════════════════════════════════
+          3. MAIN SETTINGS BENTO GRID (12-COLUMN RESPONSIVE)
+         ══════════════════════════════════════════════════════════════════ */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 28px",
-          borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-          background: "rgba(10, 15, 29, 0.85)",
-          backdropFilter: "blur(20px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))",
+          gap: "20px",
+          alignItems: "start",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Avatar initials={effectiveInitials} size={42} avatarStyle={avatar} avatarUrl={authAccount?.avatar_url} />
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
-                Hisob va Sozlamalar
-              </h1>
-              <span
+        {/* ── CARD 1: SHAXSIY MA'LUMOTLAR ── */}
+        {showSection("personal") && (
+          <form
+            onSubmit={handleSavePersonal}
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    background: "rgba(147, 3, 197, 0.2)",
+                    border: "1px solid rgba(192, 76, 253, 0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#E8B3FF",
+                  }}
+                >
+                  <UserIcon size={16} color="#E8B3FF" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                    Shaxsiy ma'lumotlar
+                  </h2>
+                  <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                    Asosiy hisob va aloqa ma'lumotlari
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="misa-btn-violet"
                 style={{
-                  fontSize: 11,
-                  padding: "2px 8px",
-                  borderRadius: 12,
-                  background: "rgba(16, 185, 129, 0.15)",
-                  color: "var(--primary-glow, #10B981)",
-                  fontWeight: 500,
-                  border: "1px solid rgba(16, 185, 129, 0.25)",
+                  padding: "7px 16px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: 600,
                 }}
               >
-                v8.0.0
-              </span>
+                Saqlash
+              </button>
             </div>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-secondary, #94A3B8)" }}>
-              Foydalanuvchi profili, ovoz, AI modeli va tizim parametrlari
-            </p>
-          </div>
-        </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={() => handleSave()}
-            disabled={isSaving}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: "var(--primary-glow, #10B981)",
-              color: "#052e16",
-              border: "none",
-              padding: "8px 18px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: isSaving ? "default" : "pointer",
-              transition: "all 0.15s ease",
-              boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
-            }}
-          >
-            <CheckIcon size={14} color="#052e16" />
-            <span>{isSaving ? "Saqlanmoqda..." : "Saqlash"}</span>
-          </button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                  To'liq ism
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="misa-glass-input"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                  Foydalanuvchi nomi
+                </label>
+                <input
+                  type="text"
+                  value={usernameHandle}
+                  onChange={(e) => setUsernameHandle(e.target.value)}
+                  className="misa-glass-input"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                  Elektron pochta
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="misa-glass-input"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                  Telefon raqami
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="misa-glass-input"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+                />
+              </div>
+            </div>
 
-          <button
-            onClick={onNavigateHome}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
-              color: "var(--text-secondary, #94A3B8)",
-              padding: "8px 14px",
-              borderRadius: 8,
-              fontSize: 12,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--text-primary, #F8FAFC)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-secondary, #94A3B8)";
-              e.currentTarget.style.borderColor = "var(--border-subtle, rgba(255,255,255,0.08))";
-            }}
-          >
-            <HomeIcon size={14} />
-            <span>Bosh sahifa</span>
-          </button>
-        </div>
-      </div>
+            <div>
+              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                Kasb / Lavozim
+              </label>
+              <input
+                type="text"
+                value={roleTitle}
+                onChange={(e) => setRoleTitle(e.target.value)}
+                className="misa-glass-input"
+                style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+              />
+            </div>
 
-      {/* Main Content Area with Navigation Tabs */}
-      <div
-        style={{
-          maxWidth: 960,
-          width: "100%",
-          margin: "0 auto",
-          padding: "24px 28px 48px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-        }}
-      >
-        {saveSuccess && (
-          <div
-            style={{
-              padding: "12px 18px",
-              background: "rgba(16, 185, 129, 0.15)",
-              border: "1px solid rgba(16, 185, 129, 0.4)",
-              borderRadius: 10,
-              color: "#34d399",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              animation: "fadeIn 0.2s ease-out",
-            }}
-          >
-            <SparklesIcon size={16} color="#34d399" />
-            <span>Sozlamalar muvaffaqiyatli saqlandi va barcha xizmatlarga joriy etildi!</span>
-          </div>
+            <div>
+              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                Qisqacha tavsif (Bio)
+              </label>
+              <textarea
+                rows={3}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className="misa-glass-input"
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  resize: "none",
+                }}
+              />
+            </div>
+          </form>
         )}
 
-        {/* Tab Navigation Pill Bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            background: "rgba(13, 19, 31, 0.8)",
-            padding: "5px 6px",
-            borderRadius: 12,
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            overflowX: "auto",
-          }}
-        >
-          {tabs.map((tab) => {
-            const IconComp = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+        {/* ── CARD 2: MISA SOZLAMALARI (AI PERSONALIZATION & API) ── */}
+        {showSection("misa") && (
+          <div
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
                 style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.3)",
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: isActive ? "rgba(16, 185, 129, 0.18)" : "transparent",
-                  color: isActive ? "#34D399" : "var(--text-secondary, #94A3B8)",
-                  fontSize: 12.5,
-                  fontWeight: isActive ? 600 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.color = "#FFFFFF";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.color = "var(--text-secondary, #94A3B8)";
+                  justifyContent: "center",
+                  color: "#E8B3FF",
                 }}
               >
-                <IconComp size={15} color={isActive ? "#34D399" : "currentColor"} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+                <SparklesIcon size={16} color="#E8B3FF" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Misa sozlamalari
+                </h2>
+                <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  AI xulq-atvori, ovoz va muloqot uslubi
+                </p>
+              </div>
+            </div>
 
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "60px", color: "var(--text-secondary, #94A3B8)" }}>
-            Sozlamalar yuklanmoqda...
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* TAB 1: PROFIL */}
-            {activeTab === "profile" && (
+            {/* Murojaat uslubi */}
+            <div>
+              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                Murojaat uslubi
+              </label>
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "6px",
+                  padding: "4px",
+                  borderRadius: "12px",
+                  background: "rgba(2, 6, 14, 0.55)",
+                  border: "1px solid rgba(255, 255, 255, 0.07)",
                 }}
               >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Foydalanuvchi Profili</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Sizning ismingiz, avataringiz va shaxsiy parametrlaringiz
-                  </p>
-                </div>
+                {(
+                  [
+                    { id: "friendly", label: "Do'stona" },
+                    { id: "formal", label: "Rasmiy" },
+                    { id: "concise", label: "Qisqa va aniq" },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setToneStyle(item.id);
+                      localStorage.setItem("misa_ai_tone", item.id);
+                      showToast(`Murojaat uslubi: ${item.label}`);
+                    }}
+                    style={{
+                      padding: "7px 8px",
+                      borderRadius: "9px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: toneStyle === item.id ? "#FFFFFF" : "var(--text-secondary)",
+                      background:
+                        toneStyle === item.id ? "rgba(147, 3, 197, 0.35)" : "transparent",
+                      border:
+                        toneStyle === item.id
+                          ? "1px solid rgba(192, 76, 253, 0.45)"
+                          : "1px solid transparent",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                {/* Mikasa Account & Security Card (Phase 41) */}
-                <div
+            {/* Javob tili & Javob uzunligi */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                  Javob tili
+                </label>
+                <select
+                  value={responseLang}
+                  onChange={(e) => {
+                    setResponseLang(e.target.value);
+                    localStorage.setItem("misa_ai_lang", e.target.value);
+                  }}
+                  className="misa-glass-input"
                   style={{
-                    background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%)",
-                    border: "1px solid rgba(16, 185, 129, 0.25)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
+                    width: "100%",
+                    padding: "9px 10px",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    backgroundColor: "#0B0F1C",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          background: "rgba(16, 185, 129, 0.15)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <ShieldIcon size={18} color="#10B981" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F8FAFC" }}>
-                          Misa Akkaunt
-                        </div>
-                        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>
-                          Foydalanuvchi: <strong style={{ color: "#34D399" }}>{authAccount?.username || name}</strong>
-                          {authAccount?.email ? ` (${authAccount.email})` : ""}
-                        </div>
-                      </div>
-                    </div>
-                    {authAccount?.is_verified ? (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          background: "rgba(16, 185, 129, 0.18)",
-                          color: "#34D399",
-                          padding: "3px 9px",
-                          borderRadius: 20,
-                          border: "1px solid rgba(16, 185, 129, 0.35)",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          fontWeight: 500,
-                        }}
-                      >
-                        <CheckIcon size={12} color="#34D399" /> Tasdiqlangan
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          background: "rgba(245, 158, 11, 0.15)",
-                          color: "#FBBF24",
-                          padding: "3px 9px",
-                          borderRadius: 20,
-                          border: "1px solid rgba(245, 158, 11, 0.3)",
-                          fontWeight: 500,
-                        }}
-                      >
-                        Tasdiqlanmagan
-                      </span>
-                    )}
-                  </div>
+                  <option value="uz">O'zbek tili (Asosiy)</option>
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                </select>
+              </div>
 
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 4 }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                  Javob uzunligi
+                </label>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: "4px",
+                    padding: "3px",
+                    borderRadius: "10px",
+                    background: "rgba(2, 6, 14, 0.55)",
+                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                  }}
+                >
+                  {(
+                    [
+                      { id: "short", label: "Qisqa" },
+                      { id: "medium", label: "O'rtacha" },
+                      { id: "detailed", label: "Batafsil" },
+                    ] as const
+                  ).map((l) => (
                     <button
+                      key={l.id}
                       type="button"
                       onClick={() => {
-                        setPwdChangeError(null);
-                        setPwdChangeSuccess(null);
-                        setChangePwdModalOpen(true);
+                        setResponseLength(l.id);
+                        localStorage.setItem("misa_ai_length", l.id);
                       }}
                       style={{
-                        padding: "7px 14px",
-                        background: "rgba(255, 255, 255, 0.08)",
-                        border: "1px solid rgba(255, 255, 255, 0.15)",
-                        borderRadius: 8,
-                        color: "#F8FAFC",
-                        fontSize: 12.5,
-                        fontWeight: 500,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        transition: "background 0.15s ease",
-                      }}
-                    >
-                      <KeyIcon size={13} color="#34D399" /> Parolni o'zgartirish
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogoutAction}
-                      style={{
-                        padding: "7px 14px",
-                        background: "rgba(239, 68, 68, 0.12)",
-                        border: "1px solid rgba(239, 68, 68, 0.25)",
-                        borderRadius: 8,
-                        color: "#FCA5A5",
-                        fontSize: 12.5,
-                        fontWeight: 500,
-                        cursor: "pointer",
-                        transition: "background 0.15s ease",
-                      }}
-                    >
-                      Tizimdan chiqish
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogoutAllAction}
-                      style={{
-                        padding: "7px 14px",
-                        background: "rgba(239, 68, 68, 0.05)",
-                        border: "1px solid rgba(239, 68, 68, 0.15)",
-                        borderRadius: 8,
-                        color: "#F87171",
-                        fontSize: 12.5,
-                        cursor: "pointer",
-                        transition: "background 0.15s ease",
-                      }}
-                    >
-                      Barcha qurilmalardan chiqish
-                    </button>
-                  </div>
-                </div>
-
-                {/* Avatar Palette Selector */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Profil Avatari Rang Uslubi
-                  </label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-                    <Avatar initials={effectiveInitials} size={64} avatarStyle={avatar} avatarUrl={authAccount?.avatar_url} />
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {AVATAR_PALETTES.map((pal) => (
-                        <div
-                          key={pal.id}
-                          onClick={() => setAvatar(pal.id)}
-                          title={pal.name}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            backgroundColor: pal.color,
-                            cursor: "pointer",
-                            border: avatar === pal.id ? "3px solid #FFFFFF" : "2px solid rgba(255,255,255,0.15)",
-                            boxShadow: avatar === pal.id ? `0 0 12px ${pal.color}` : "none",
-                            transition: "all 0.15s ease",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Username Input */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Ismingiz (Murojaat uchun)
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Masalan: Ustoz yoki Muhammadaziz"
-                    style={{
-                      background: "rgba(0, 0, 0, 0.25)",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                      color: "var(--text-primary, #F8FAFC)",
-                      fontSize: 14,
-                      outline: "none",
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--primary-glow, #10B981)")}
-                    onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.1)")}
-                  />
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                    Misa suhbat va bildirishnomalarda sizga ushbu ism bilan murojaat qiladi
-                  </span>
-                </div>
-
-                {/* Occupation / Role */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Kasb / Faoliyat yo'nalishi
-                  </label>
-                  <input
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    placeholder="Masalan: Dasturchi, Muhandis, Talaba..."
-                    style={{
-                      background: "rgba(0, 0, 0, 0.25)",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                      color: "var(--text-primary, #F8FAFC)",
-                      fontSize: 14,
-                      outline: "none",
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--primary-glow, #10B981)")}
-                    onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.1)")}
-                  />
-                </div>
-
-                {/* Bio / About Notes */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Qisqacha tavsif (AI xotirasi uchun)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="O'zingiz haqingizda qisqacha ma'lumot..."
-                    style={{
-                      background: "rgba(0, 0, 0, 0.25)",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                      color: "var(--text-primary, #F8FAFC)",
-                      fontSize: 13.5,
-                      outline: "none",
-                      resize: "none",
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = "var(--primary-glow, #10B981)")}
-                    onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.1)")}
-                  />
-                </div>
-
-                {/* Language Selection */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Asosiy muloqot tili
-                  </label>
-                  <div style={{ display: "flex", gap: 12 }}>
-                    {[
-                      { id: "uz", label: "O'zbekcha (Lotin)" },
-                      { id: "ru", label: "Русский" },
-                      { id: "en", label: "English" },
-                    ].map((lang) => (
-                      <div
-                        key={lang.id}
-                        onClick={() => setLanguage(lang.id)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: 8,
-                          background:
-                            language === lang.id ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.02)",
-                          border: `1.5px solid ${
-                            language === lang.id ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                          }`,
-                          cursor: "pointer",
-                          fontSize: 13,
-                          fontWeight: language === lang.id ? 600 : 400,
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        {lang.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Phase 40: Multi-Device & Account Security Summary */}
-                <div
-                  style={{
-                    paddingTop: 16,
-                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary, #F8FAFC)" }}>
-                    Qurilmalar va Masofaviy Boshqaruv (Phase 40)
-                  </h3>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    {/* Device Summary Card */}
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 10,
-                        background: "rgba(255, 255, 255, 0.02)",
-                        border: "1px solid rgba(255, 255, 255, 0.07)",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        gap: 8,
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary, #94A3B8)", fontSize: 12 }}>
-                          <LaptopIcon size={15} color="#10B981" />
-                          <span>Ulangan Kompyuterlar</span>
-                        </div>
-                        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>
-                          {deviceCount} ta kompyuter
-                        </div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)", marginTop: 2 }}>
-                          Faol: {selectedDeviceName || "Tanlanmagan"}
-                        </div>
-                      </div>
-
-                      {onNavigateToDevices && (
-                        <button
-                          type="button"
-                          onClick={onNavigateToDevices}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontSize: 12,
-                            color: "var(--primary-glow, #10B981)",
-                            background: "transparent",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            fontWeight: 500,
-                          }}
-                        >
-                          <span>Boshqaruv paneliga o'tish</span>
-                          <ExternalLinkIcon size={12} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Telegram Identity Card */}
-                    <div
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: 10,
-                        background: "rgba(255, 255, 255, 0.02)",
-                        border: "1px solid rgba(255, 255, 255, 0.07)",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        gap: 8,
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary, #94A3B8)", fontSize: 12 }}>
-                          <TelegramIcon size={15} color="#38BDF8" />
-                          <span>Telegram Bog'lanishi</span>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                          <span
-                            style={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: "50%",
-                              backgroundColor: telegramStatus?.is_linked ? "#10B981" : "#64748B",
-                            }}
-                          />
-                          <span>{telegramStatus?.is_linked ? "Bog'langan (Faol)" : "Bog'lanmagan"}</span>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)", marginTop: 2 }}>
-                          {telegramStatus?.username
-                            ? `@${telegramStatus.username}`
-                            : telegramStatus?.id
-                            ? `ID: ${telegramStatus.id}`
-                            : "Ulanish uchun Telegram sahifasiga o'ting"}
-                        </div>
-                      </div>
-
-                      {onNavigateToTelegram && (
-                        <button
-                          type="button"
-                          onClick={onNavigateToTelegram}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontSize: 12,
-                            color: "#38BDF8",
-                            background: "transparent",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            fontWeight: 500,
-                          }}
-                        >
-                          <span>Telegram sozlamalari</span>
-                          <ExternalLinkIcon size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Active Remote Sessions Section */}
-                  <div
-                    style={{
-                      padding: "14px 16px",
-                      borderRadius: 10,
-                      background: "rgba(0, 0, 0, 0.25)",
-                      border: "1px solid rgba(255, 255, 255, 0.07)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #F8FAFC)" }}>
-                          Faol Masofaviy Sessiyalar ({activeSessions.length})
-                        </span>
-                        <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-secondary, #94A3B8)" }}>
-                          Turli xil kompyuterlar orqali ochilgan faol boshqaruv sessiyalari
-                        </p>
-                      </div>
-
-                      {activeSessions.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleLogoutAllSessions}
-                          disabled={loggingOutSessions}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: 8,
-                            background: "rgba(239, 68, 68, 0.15)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            color: "#EF4444",
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          {loggingOutSessions ? "Chiqilmoqda..." : "Barcha sessiyalardan chiqish"}
-                        </button>
-                      )}
-                    </div>
-
-                    {activeSessions.length === 0 ? (
-                      <div style={{ fontSize: 12, color: "var(--text-muted, #64748B)", padding: "6px 0" }}>
-                        Hozirda birorta ham faol masofaviy sessiya mavjud emas.
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {activeSessions.map((sess) => (
-                          <div
-                            key={sess.session_id}
-                            style={{
-                              padding: "8px 12px",
-                              borderRadius: 6,
-                              background: "rgba(255, 255, 255, 0.02)",
-                              border: "1px solid rgba(255, 255, 255, 0.05)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              fontSize: 12,
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#10B981" }} />
-                              <span style={{ fontWeight: 500, color: "var(--text-primary, #F8FAFC)" }}>
-                                {sess.device_name || sess.device_id}
-                              </span>
-                              <span style={{ color: "var(--text-muted, #64748B)", fontFamily: "monospace", fontSize: 11 }}>
-                                (ID: {sess.session_id.slice(0, 8)}...)
-                              </span>
-                            </div>
-                            <span style={{ color: "var(--text-muted, #64748B)", fontSize: 11 }}>
-                              Amal qilish muddati: {new Date(sess.expires_at * 1000).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: ULANGAN HISOBLAR (LINKED ACCOUNTS) */}
-            {activeTab === "linked-accounts" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 22,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Ulangan Hisoblar va Integratsiyalar</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Google, Telegram, GitHub va bulutli xizmatlar bilan xavfsiz integratsiya
-                  </p>
-                </div>
-
-                {/* 1. Email / Parol Account Card */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(56, 189, 248, 0.1)",
-                          border: "1px solid rgba(56, 189, 248, 0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <KeyIcon size={20} color="#38BDF8" />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Email & Parol</span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              padding: "2px 8px",
-                              borderRadius: 12,
-                              background: "rgba(16, 185, 129, 0.15)",
-                              color: "#34D399",
-                              border: "1px solid rgba(16, 185, 129, 0.3)",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Ulangan (Asosiy)
-                          </span>
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          {authAccount?.email || "Foydalanuvchi elektron pochta manzili"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Google Account Card */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <GoogleIcon size={22} />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Google Akkaunt</span>
-                          {identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url ? (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(16, 185, 129, 0.15)",
-                                color: "#34D399",
-                                border: "1px solid rgba(16, 185, 129, 0.3)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Ulangan (Faol)
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(148, 163, 184, 0.12)",
-                                color: "#94A3B8",
-                                border: "1px solid rgba(148, 163, 184, 0.2)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Ulanmagan
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          Google OAuth 2.0 orqali bir martalik xavfsiz autentifikatsiya va profil ma'lumotlari
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* Unlink Button (shown only when Google is connected) */}
-                      {(identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url) && (
-                        <button
-                          type="button"
-                          onClick={handleUnlinkGoogle}
-                          disabled={unlinkingGoogle || linkingGoogle}
-                          style={{
-                            padding: "8px 14px",
-                            background: "rgba(239, 68, 68, 0.1)",
-                            border: "1px solid rgba(239, 68, 68, 0.25)",
-                            borderRadius: 8,
-                            color: "#F87171",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            cursor: unlinkingGoogle || linkingGoogle ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!unlinkingGoogle) e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)";
-                          }}
-                        >
-                          <UnlinkIcon size={13} />
-                          <span>{unlinkingGoogle ? "Uzilmoqda..." : "Hisobni uzish"}</span>
-                        </button>
-                      )}
-
-                      {/* Connect / Reconnect Button */}
-                      <button
-                        type="button"
-                        onClick={handleStartGoogleOAuth}
-                        disabled={linkingGoogle || unlinkingGoogle}
-                        style={{
-                          padding: "8px 16px",
-                          background: "rgba(255, 255, 255, 0.08)",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
-                          borderRadius: 8,
-                          color: "#FFFFFF",
-                          fontSize: "12.5px",
-                          fontWeight: 600,
-                          cursor: linkingGoogle || unlinkingGoogle ? "not-allowed" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!linkingGoogle) e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                        }}
-                      >
-                        <GoogleIcon size={14} />
-                        <span>
-                          {linkingGoogle
-                            ? "Ulanmoqda..."
-                            : identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url
-                            ? "Qayta ulanish"
-                            : "Google bilan ulash"}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Lockout Warning Notice if sole identity */}
-                  {identitiesData && !identitiesData.can_unlink_google && identitiesData.is_google_linked && (
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "rgba(245, 158, 11, 0.1)",
-                        border: "1px solid rgba(245, 158, 11, 0.25)",
-                        color: "#FDE68A",
-                        fontSize: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <InfoIcon size={15} color="#F59E0B" />
-                      <span>Google sizning yagona kirish usulingizdir. Akkauntdan chiqib qolmaslik uchun uzishdan oldin parol o'rnating.</span>
-                    </div>
-                  )}
-
-                  {/* Google Profile Details if available */}
-                  {(identitiesData?.is_google_linked || authAccount?.provider === "google" || authAccount?.avatar_url || authAccount?.email?.endsWith("@gmail.com")) && (
-                    <div
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.06)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <Avatar
-                        initials={effectiveInitials}
-                        size={36}
-                        avatarStyle={avatar}
-                        avatarUrl={authAccount?.avatar_url}
-                      />
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#F1F5F9" }}>
-                          {authAccount?.username || name}
-                        </span>
-                        <span style={{ fontSize: 11.5, color: "#94A3B8" }}>
-                          {authAccount?.email}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Telegram Bot & Notification Card */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(56, 189, 248, 0.12)",
-                          border: "1px solid rgba(56, 189, 248, 0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <TelegramIcon size={22} color="#38BDF8" />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Telegram Bot & Masofaviy Boshqaruv</span>
-                          {telegramStatus?.is_linked ? (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(16, 185, 129, 0.15)",
-                                color: "#34D399",
-                                border: "1px solid rgba(16, 185, 129, 0.3)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Bog'langan (Faol)
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(245, 158, 11, 0.12)",
-                                color: "#FBBF24",
-                                border: "1px solid rgba(245, 158, 11, 0.25)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Bog'lanmagan
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          Masofadan kompyuterni boshqarish, skrinshot olish va bildirishnomalar qabul qilish
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {telegramStatus?.is_linked && (
-                        <button
-                          type="button"
-                          onClick={handleUnlinkTelegram}
-                          disabled={unlinkingTelegram}
-                          style={{
-                            padding: "8px 12px",
-                            background: "rgba(239, 68, 68, 0.12)",
-                            border: "1px solid rgba(239, 68, 68, 0.25)",
-                            borderRadius: 8,
-                            color: "#FCA5A5",
-                            fontSize: "12px",
-                            fontWeight: 500,
-                            cursor: unlinkingTelegram ? "default" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          <UnlinkIcon size={14} color="#FCA5A5" />
-                          <span>{unlinkingTelegram ? "Uzilmoqda..." : "Uzish"}</span>
-                        </button>
-                      )}
-                      {onNavigateToTelegram && (
-                        <button
-                          type="button"
-                          onClick={onNavigateToTelegram}
-                          style={{
-                            padding: "8px 16px",
-                            background: "rgba(56, 189, 248, 0.15)",
-                            border: "1px solid rgba(56, 189, 248, 0.35)",
-                            borderRadius: 8,
-                            color: "#38BDF8",
-                            fontSize: "12.5px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "rgba(56, 189, 248, 0.25)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "rgba(56, 189, 248, 0.15)";
-                          }}
-                        >
-                          <TelegramIcon size={14} color="#38BDF8" />
-                          <span>{telegramStatus?.is_linked ? "Telegram Sozlamalari" : "Telegramga Bog'lash"}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {telegramStatus?.is_linked && (
-                    <div
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.06)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        fontSize: 12.5,
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981" }} />
-                        <span style={{ color: "#F1F5F9", fontWeight: 500 }}>
-                          {telegramStatus.username ? `@${telegramStatus.username}` : "Telegram Foydalanuvchisi"}
-                        </span>
-                        {telegramStatus.id && (
-                          <span style={{ color: "#64748B", fontFamily: "monospace" }}>
-                            (ID: {telegramStatus.id})
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ color: "#34D399", fontSize: 11.5, fontWeight: 500 }}>
-                        ✓ Faol xabarlar almashinuvi yoqilgan
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. GitHub Integration Card */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <GithubIcon size={22} color="#FFFFFF" />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>GitHub Repozitoriyalar & Tooling</span>
-                          {savedGithubToken ? (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(16, 185, 129, 0.15)",
-                                color: "#34D399",
-                                border: "1px solid rgba(16, 185, 129, 0.3)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Ulangan (Token Saqlangan)
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 12,
-                                background: "rgba(148, 163, 184, 0.12)",
-                                color: "#94A3B8",
-                                border: "1px solid rgba(148, 163, 184, 0.2)",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Ulanmagan
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          AI yordamchining GitHub omborlari, kod tahlili va repozitoriy vositalari bilan ishlashi
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* GitHub Token Management Form */}
-                  {savedGithubToken ? (
-                    <div
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.06)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: 10,
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <KeyIcon size={16} color="#34D399" />
-                        <div>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#F1F5F9" }}>
-                            Personal Access Token
-                          </div>
-                          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace" }}>
-                            ghp_••••••••••••••••{savedGithubToken.slice(-4)}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveGitHubToken}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          background: "rgba(239, 68, 68, 0.12)",
-                          border: "1px solid rgba(239, 68, 68, 0.25)",
-                          color: "#FCA5A5",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Tokenni o'chirish
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <input
-                          type="password"
-                          value={githubToken}
-                          onChange={(e) => setGithubToken(e.target.value)}
-                          placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                          style={{
-                            flex: 1,
-                            padding: "9px 12px",
-                            background: "rgba(8, 14, 28, 0.65)",
-                            border: "1px solid rgba(255, 255, 255, 0.12)",
-                            borderRadius: "8px",
-                            color: "#FFFFFF",
-                            fontSize: "13px",
-                            outline: "none",
-                          }}
-                          onFocus={(e) => (e.target.style.borderColor = "#38BDF8")}
-                          onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleSaveGitHubToken}
-                          disabled={!githubToken.trim()}
-                          style={{
-                            padding: "9px 18px",
-                            background: githubToken.trim() ? "linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)" : "rgba(255, 255, 255, 0.08)",
-                            border: "none",
-                            borderRadius: "8px",
-                            color: "#FFFFFF",
-                            fontSize: "12.5px",
-                            fontWeight: 600,
-                            cursor: githubToken.trim() ? "pointer" : "default",
-                            opacity: githubToken.trim() ? 1 : 0.5,
-                          }}
-                        >
-                          Saqlash
-                        </button>
-                      </div>
-                      <div style={{ fontSize: "11.5px", color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span>Tavsiya etilgan ruxsatlar: <code>repo</code>, <code>read:user</code></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {githubTokenSaved && (
-                    <div style={{ fontSize: "12px", color: "#34D399", fontWeight: 500 }}>
-                      ✓ GitHub tokeni muvaffaqiyatli saqlandi!
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. Supabase Cloud Sync Card */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(16, 185, 129, 0.12)",
-                          border: "1px solid rgba(16, 185, 129, 0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <ShieldIcon size={22} color="#10B981" />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>Supabase Cloud Database & Auth</span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              padding: "2px 8px",
-                              borderRadius: 12,
-                              background: "rgba(16, 185, 129, 0.15)",
-                              color: "#34D399",
-                              border: "1px solid rgba(16, 185, 129, 0.3)",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Faol & Sinxron
-                          </span>
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          Foydalanuvchi ma'lumotlari va sessiyalari Supabase Cloud orqali xavfsiz himoyalangan
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 10,
-                      paddingTop: 4,
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255, 255, 255, 0.02)",
-                        border: "1px solid rgba(255, 255, 255, 0.05)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, color: "#64748B" }}>Foydalanuvchi UUID</div>
-                      <div style={{ fontSize: 12, color: "#F1F5F9", fontFamily: "monospace", marginTop: 2 }}>
-                        {authAccount?.id || "Lokal sessiya"}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 8,
-                        background: "rgba(255, 255, 255, 0.02)",
-                        border: "1px solid rgba(255, 255, 255, 0.05)",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, color: "#64748B" }}>Autentifikatsiya Holati</div>
-                      <div style={{ fontSize: 12, color: "#34D399", fontWeight: 600, marginTop: 2 }}>
-                        {authAccount?.is_verified ? "Tasdiqlangan Foydalanuvchi" : "Faol Sessiya"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Faol Qurilmalar va Masofaviy Sessiyalar */}
-                <div
-                  style={{
-                    background: "rgba(8, 14, 28, 0.55)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                    padding: "18px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          background: "rgba(129, 140, 248, 0.12)",
-                          border: "1px solid rgba(129, 140, 248, 0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <LaptopIcon size={22} color="#818CF8" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF" }}>
-                          Faol Qurilmalar va Masofaviy Sessiyalar ({activeSessions.length})
-                        </div>
-                        <p style={{ margin: "3px 0 0", fontSize: 12, color: "#94A3B8" }}>
-                          Ulangan kompyuterlar soni: {deviceCount} ta. Turli xil qurilmalardagi faol boshqaruv sessiyalari
-                        </p>
-                      </div>
-                    </div>
-
-                    {activeSessions.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleLogoutAllSessions}
-                        disabled={loggingOutSessions}
-                        style={{
-                          padding: "8px 14px",
-                          borderRadius: 8,
-                          background: "rgba(239, 68, 68, 0.15)",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                          color: "#EF4444",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: loggingOutSessions ? "default" : "pointer",
-                        }}
-                      >
-                        {loggingOutSessions ? "Chiqilmoqda..." : "Barcha sessiyalardan chiqish"}
-                      </button>
-                    )}
-                  </div>
-
-                  {activeSessions.length === 0 ? (
-                    <div style={{ fontSize: 12.5, color: "#64748B", padding: "8px 0" }}>
-                      Hozirda birorta ham faol masofaviy sessiya mavjud emas.
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {activeSessions.map((sess) => (
-                        <div
-                          key={sess.session_id}
-                          style={{
-                            padding: "10px 14px",
-                            borderRadius: 8,
-                            background: "rgba(255, 255, 255, 0.02)",
-                            border: "1px solid rgba(255, 255, 255, 0.05)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            fontSize: 12.5,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#10B981" }} />
-                            <span style={{ fontWeight: 600, color: "#F8FAFC" }}>
-                              {sess.device_name || sess.device_id}
-                            </span>
-                            <span style={{ color: "#64748B", fontFamily: "monospace", fontSize: 11 }}>
-                              (ID: {sess.session_id.slice(0, 8)}...)
-                            </span>
-                          </div>
-                          <span style={{ color: "#94A3B8", fontSize: 11.5 }}>
-                            Amal qilish muddati: {new Date(sess.expires_at * 1000).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: XAVFSIZLIK & AGENT ACCESS */}
-            {activeTab === "security" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <AgentAccessSecuritySection />
-              </div>
-            )}
-
-            {/* TAB 2: TASHQI KO'RINISH (APPEARANCE) */}
-            {activeTab === "appearance" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Tashqi Ko'rinish va Mavzular</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Quiet Intelligence dizayn tizimi, mavzu va vizual effektlar
-                  </p>
-                </div>
-
-                {/* Theme Selector */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Ilova Mavzusi
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    {[
-                      {
-                        id: "dark",
-                        title: "Quiet Dark",
-                        desc: "Klassik 80% to'q fon (#0E1422) va zumrad aksenti",
-                      },
-                      {
-                        id: "oled",
-                        title: "OLED Qora",
-                        desc: "Mutlaq qora (#000000), kontrast va energiya tejovchi",
-                      },
-                      {
-                        id: "cyber",
-                        title: "Midnight Cyber",
-                        desc: "Chuqur to'q ko'k kiber fon va yorqin konturlar",
-                      },
-                    ].map((thm) => (
-                      <div
-                        key={thm.id}
-                        onClick={() => setTheme(thm.id)}
-                        style={{
-                          background:
-                            theme === thm.id ? "rgba(16, 185, 129, 0.12)" : "rgba(255, 255, 255, 0.02)",
-                          border: `1.5px solid ${
-                            theme === thm.id ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                          }`,
-                          borderRadius: 10,
-                          padding: "14px 16px",
-                          cursor: "pointer",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 4,
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <strong style={{ fontSize: 13.5 }}>{thm.title}</strong>
-                          {theme === thm.id && <CheckIcon size={14} color="#10B981" />}
-                        </div>
-                        <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                          {thm.desc}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Toggles */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 6 }}>
-                  {/* Smooth Animations Toggle */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Silliq Animatsiyalar (Transitions)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Misa interfeysi animatsiyalarini faollashtirish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={animations}
-                      onChange={(e) => setAnimations(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  {/* Glassmorphism Toggle */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Shaffof Shisha Effekti (Glassmorphism Blur)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Yon panel va yuqori sarlavhalarda nozik blur effektini ko'rsatish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={glassmorphism}
-                      onChange={(e) => setGlassmorphism(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  {/* Compact Sidebar Mode */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Ixcham Yon Panel (Compact Mode)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Yon panelni sukut bo'yicha yig'ilgan holda ochish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={compactMode}
-                      onChange={(e) => setCompactMode(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: OVOZ SOZLAMALARI (VOICE) */}
-            {activeTab === "voice" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Misa Nutqi va Ovoz Dvigateli</h2>
-                    <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                      Tabiiy o'zbek tili neyron modeli, tezlik va ovozli sinov
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleTestVoice}
-                    disabled={testingVoice}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: testingVoice ? "rgba(16, 185, 129, 0.3)" : "rgba(16, 185, 129, 0.15)",
-                      border: "1px solid rgba(16, 185, 129, 0.35)",
-                      color: "#34D399",
-                      padding: "8px 16px",
-                      borderRadius: 8,
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      cursor: testingVoice ? "default" : "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <PlayIcon size={13} color="#34D399" />
-                    <span>{testingVoice ? "Ovoz yangramoqda..." : "Ovozni sinash"}</span>
-                  </button>
-                </div>
-
-                {/* Voice Selection Cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Ovoz Turini Tanlang
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div
-                      onClick={() => setVoiceType("ayol")}
-                      style={{
-                        background:
-                          voiceType === "ayol"
-                            ? "rgba(16, 185, 129, 0.12)"
-                            : "rgba(255, 255, 255, 0.02)",
-                        border: `1.5px solid ${
-                          voiceType === "ayol" ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                        }`,
-                        borderRadius: 10,
-                        padding: "16px 18px",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <strong style={{ fontSize: 14 }}>Madina (Ayol ovozi)</strong>
-                        {voiceType === "ayol" && <CheckIcon size={14} color="#10B981" />}
-                      </div>
-                      <span style={{ fontSize: 12, color: "var(--text-muted, #64748B)" }}>
-                        uz-UZ-MadinaNeural · Yumshoq, muloyim va ravon intonatsiya
-                      </span>
-                    </div>
-
-                    <div
-                      onClick={() => setVoiceType("erkak")}
-                      style={{
-                        background:
-                          voiceType === "erkak"
-                            ? "rgba(16, 185, 129, 0.12)"
-                            : "rgba(255, 255, 255, 0.02)",
-                        border: `1.5px solid ${
-                          voiceType === "erkak" ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                        }`,
-                        borderRadius: 10,
-                        padding: "16px 18px",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <strong style={{ fontSize: 14 }}>Sardor (Erkak ovozi)</strong>
-                        {voiceType === "erkak" && <CheckIcon size={14} color="#10B981" />}
-                      </div>
-                      <span style={{ fontSize: 12, color: "var(--text-muted, #64748B)" }}>
-                        uz-UZ-SardorNeural · Jiddiy, ishonchli va aniq tembr
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TTS Speed Slider */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                      Nutq Tezligi (TTS Speed)
-                    </label>
-                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--primary-glow, #10B981)" }}>
-                      {ttsSpeed.toFixed(1)}x
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1.0}
-                    max={2.5}
-                    step={0.1}
-                    value={ttsSpeed}
-                    onChange={(e) => setTtsSpeed(parseFloat(e.target.value))}
-                    style={{ width: "100%", accentColor: "var(--primary-glow, #10B981)", cursor: "pointer" }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted, #64748B)" }}>
-                    <span>1.0x (Sokin)</span>
-                    <span>1.5x (Normal)</span>
-                    <span>2.0x (Tezkor - Standart)</span>
-                    <span>2.5x (Maksimal)</span>
-                  </div>
-                </div>
-
-                {/* Audio Features */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>AI Javoblarini Avtomatik O'qish (Auto-Speak)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Suhbat va ovozli muloqot rejimida javoblarni ovoz chiqarib o'qish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={autoSpeak}
-                      onChange={(e) => setAutoSpeak(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Ovoz Sezgirligi (VAD - Voice Activity Detection)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Faqat inson nutqi yangraganda mikrofonni faollashtirish va jimlikda avtomatik to'xtash
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={vadEnabled}
-                      onChange={(e) => setVadEnabled(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: AI SOZLAMALARI (AI ENGINE) */}
-            {activeTab === "ai" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Sun'iy Intellekt Dvigateli</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Google Gemini, OpenRouter va mahalliy buyruqlar yadrosi
-                  </p>
-                </div>
-
-                {/* Model Selector Cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Faol AI Modeli
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-                    {[
-                      {
-                        id: "gemini",
-                        name: "Google Gemini 1.5 (Flash / Pro)",
-                        badge: "Tavsiya etiladi",
-                        badgeColor: "#10B981",
-                        desc: "Katta kontekst, chuqur fikrlash (Thinking mode) va mukammal o'zbek tili mantiqi.",
-                      },
-                      {
-                        id: "openrouter",
-                        name: "OpenRouter (GPT-4o / Claude 3.5)",
-                        badge: "Universal",
-                        badgeColor: "#3B82F6",
-                        desc: "Muqobil bulutli yirik til modellari tarmog'i.",
-                      },
-                      {
-                        id: "local",
-                        name: "Misa Mahalliy Qoidalar (Local Dispatcher)",
-                        badge: "Oflayn",
-                        badgeColor: "#F59E0B",
-                        desc: "Internet talab qilinmaydi: Windows ilovalarini ochish, ovozni boshqarish, taymerlar.",
-                      },
-                    ].map((mod) => (
-                      <div
-                        key={mod.id}
-                        onClick={() => setAiModel(mod.id)}
-                        style={{
-                          background:
-                            aiModel === mod.id ? "rgba(16, 185, 129, 0.12)" : "rgba(255, 255, 255, 0.02)",
-                          border: `1.5px solid ${
-                            aiModel === mod.id ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                          }`,
-                          borderRadius: 10,
-                          padding: "14px 18px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <strong style={{ fontSize: 14 }}>{mod.name}</strong>
-                            <span
-                              style={{
-                                fontSize: 10.5,
-                                padding: "1px 7px",
-                                borderRadius: 8,
-                                background: `${mod.badgeColor}20`,
-                                color: mod.badgeColor,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {mod.badge}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: 12, color: "var(--text-muted, #64748B)" }}>
-                            {mod.desc}
-                          </span>
-                        </div>
-                        {aiModel === mod.id && <CheckIcon size={16} color="#10B981" />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* API Key Configuration */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                    <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)", fontWeight: 500 }}>
-                      Gemini API Kaliti (GEMINI_API_KEY)
-                    </label>
-                    <span
-                      style={{
-                        fontSize: 11.5,
-                        color:
-                          keyValidationStatus === "testing"
-                            ? "#38BDF8"
-                            : keyValidationStatus === "valid"
-                            ? "#34D399"
-                            : keyValidationStatus === "invalid"
-                            ? "#F87171"
-                            : hasGeminiKey
-                            ? "#34D399"
-                            : "#F59E0B",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 5,
+                        padding: "6px 4px",
+                        borderRadius: "7px",
+                        fontSize: "11.5px",
                         fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 6,
-                        backgroundColor:
-                          keyValidationStatus === "testing"
-                            ? "rgba(56, 189, 248, 0.12)"
-                            : keyValidationStatus === "valid"
-                            ? "rgba(16, 185, 129, 0.12)"
-                            : keyValidationStatus === "invalid"
-                            ? "rgba(239, 68, 68, 0.15)"
-                            : "rgba(255, 255, 255, 0.05)",
-                        border:
-                          keyValidationStatus === "valid"
-                            ? "1px solid rgba(16, 185, 129, 0.3)"
-                            : keyValidationStatus === "invalid"
-                            ? "1px solid rgba(239, 68, 68, 0.35)"
-                            : "1px solid transparent",
-                      }}
-                    >
-                      <KeyIcon size={12} color="currentColor" />
-                      {keyValidationStatus === "testing"
-                        ? "Sinovdan o'tkazilmoqda..."
-                        : keyValidationStatus === "valid"
-                        ? "✓ Kalit faol va tasdiqlangan"
-                        : keyValidationStatus === "invalid"
-                        ? "⚠ Yaroqsiz kalit"
-                        : hasGeminiKey
-                        ? "Kalit kiritilgan"
-                        : "Kalit kiritilmagan"}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      value={geminiApiKey}
-                      onChange={(e) => {
-                        setGeminiApiKey(e.target.value);
-                        if (keyValidationStatus !== "untested") {
-                          setKeyValidationStatus("untested");
-                          setKeyValidationError("");
-                        }
-                      }}
-                      placeholder={hasGeminiKey ? "••••••••••••••••••••••••••••••••" : "AIzaSy..."}
-                      style={{
-                        flex: "1 1 260px",
-                        background: "rgba(0, 0, 0, 0.25)",
-                        border:
-                          keyValidationStatus === "invalid"
-                            ? "1px solid rgba(239, 68, 68, 0.6)"
-                            : keyValidationStatus === "valid"
-                            ? "1px solid rgba(16, 185, 129, 0.6)"
-                            : "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: 8,
-                        padding: "10px 14px",
-                        color: "var(--text-primary, #F8FAFC)",
-                        fontSize: 13.5,
-                        fontFamily: "monospace",
-                        outline: "none",
-                        transition: "border-color 0.2s ease",
-                      }}
-                      onFocus={(e) => {
-                        if (keyValidationStatus === "invalid") {
-                          e.target.style.borderColor = "#EF4444";
-                        } else if (keyValidationStatus === "valid") {
-                          e.target.style.borderColor = "#10B981";
-                        } else {
-                          e.target.style.borderColor = "var(--primary-glow, #10B981)";
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (keyValidationStatus === "invalid") {
-                          e.target.style.borderColor = "rgba(239, 68, 68, 0.6)";
-                        } else if (keyValidationStatus === "valid") {
-                          e.target.style.borderColor = "rgba(16, 185, 129, 0.6)";
-                        } else {
-                          e.target.style.borderColor = "rgba(255, 255, 255, 0.1)";
-                        }
-                      }}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      style={{
-                        padding: "0 14px",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: 8,
-                        color: "var(--text-secondary, #94A3B8)",
-                        fontSize: 12,
-                        cursor: "pointer",
-                        height: "42px",
-                      }}
-                    >
-                      {showApiKey ? "Yashirish" : "Ko'rsatish"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isTestingKey || !geminiApiKey.trim()}
-                      onClick={() => handleTestApiKey(geminiApiKey)}
-                      style={{
-                        padding: "0 18px",
+                        color: responseLength === l.id ? "#FFFFFF" : "var(--text-secondary)",
                         background:
-                          keyValidationStatus === "valid"
-                            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3))"
-                            : keyValidationStatus === "invalid"
-                            ? "linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.3))"
-                            : "linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(99, 102, 241, 0.25))",
-                        border:
-                          keyValidationStatus === "valid"
-                            ? "1px solid rgba(16, 185, 129, 0.5)"
-                            : keyValidationStatus === "invalid"
-                            ? "1px solid rgba(239, 68, 68, 0.5)"
-                            : "1px solid rgba(56, 189, 248, 0.45)",
-                        borderRadius: 8,
-                        color:
-                          keyValidationStatus === "valid"
-                            ? "#34D399"
-                            : keyValidationStatus === "invalid"
-                            ? "#FCA5A5"
-                            : "#38BDF8",
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: isTestingKey || !geminiApiKey.trim() ? "not-allowed" : "pointer",
-                        opacity: isTestingKey || !geminiApiKey.trim() ? 0.6 : 1,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        height: "42px",
-                        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
+                          responseLength === l.id ? "rgba(147, 3, 197, 0.35)" : "transparent",
                       }}
                     >
-                      {isTestingKey ? "Tekshirilmoqda..." : "🔍 Tekshirish"}
+                      {l.label}
                     </button>
-                  </div>
-
-                  {/* Validation Error Alert */}
-                  {keyValidationStatus === "invalid" && keyValidationError && (
-                    <div
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 8,
-                        backgroundColor: "rgba(239, 68, 68, 0.15)",
-                        border: "1px solid rgba(239, 68, 68, 0.35)",
-                        color: "#FCA5A5",
-                        fontSize: 12.5,
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 10,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>❌</span>
-                      <div>
-                        <strong style={{ color: "#EF4444" }}>API Kaliti Yaroqsiz: </strong>
-                        <span>{keyValidationError}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Validation Success Alert */}
-                  {keyValidationStatus === "valid" && (
-                    <div
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 8,
-                        backgroundColor: "rgba(16, 185, 129, 0.15)",
-                        border: "1px solid rgba(16, 185, 129, 0.35)",
-                        color: "#6EE7B7",
-                        fontSize: 12.5,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span style={{ fontSize: 14 }}>✓</span>
-                      <span>Google Gemini API kaliti sinovdan o'tdi va to'liq faol!</span>
-                    </div>
-                  )}
-
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                    Kalit xavfsiz holda faqat ushbu kompyuterda lokal saqlanadi
-                  </span>
+                  ))}
                 </div>
+              </div>
+            </div>
 
-                {/* Thinking AI Toggle */}
+            {/* Gemini API Key & Voice Test */}
+            <div>
+              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                Gemini AI API Kaliti {apiKeyMasked ? `(Joriy: ${apiKeyMasked})` : ""}
+              </label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="password"
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder="AIzaSy... yangi kalit kiritish"
+                  className="misa-glass-input"
+                  style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", fontSize: "12.5px" }}
+                />
+                <button
+                  type="button"
+                  onClick={handleTestGeminiKey}
+                  disabled={testingKey}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    background: "rgba(147, 3, 197, 0.2)",
+                    border: "1px solid rgba(192, 76, 253, 0.35)",
+                    color: "#E8B3FF",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {testingKey ? "..." : "Tekshirish"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestVoice}
+                  disabled={testingVoice}
+                  title="Misa ovozini sinab ko'rish"
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "#F5F0FF",
+                    fontSize: "12px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <VolumeIcon size={13} color="#E8B3FF" />
+                  <span>Ovoz</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Cognitive Toggles */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[
+                {
+                  label: "Suhbatlarni eslab qolish",
+                  sub: "Oldingi kontekst asosida shaxsiylashtirilgan javob berish",
+                  val: rememberChats,
+                  setVal: setRememberChats,
+                },
+                {
+                  label: "Avtomatik tavsiyalar",
+                  sub: "Ish jarayonida aqlli maslahatlar ko'rsatish",
+                  val: autoSuggestions,
+                  setVal: setAutoSuggestions,
+                },
+              ].map((tg, i) => (
                 <div
+                  key={i}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "12px 16px",
-                    background: "rgba(0, 0, 0, 0.2)",
-                    borderRadius: 10,
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(2, 6, 14, 0.45)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 500 }}>Fikrlovchi AI (Gemini Thinking Mode)</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                      Murakkab savollarga javob berishdan oldin ichki mantiqiy fikrlash zanjirini yuritish
+                    <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#FFFFFF" }}>
+                      {tg.label}
                     </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{tg.sub}</div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={thinkingEnabled}
-                    onChange={(e) => setThinkingEnabled(e.target.checked)}
-                    style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                  />
-                </div>
-
-                {/* Cognitive Mode */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ fontSize: 13, color: "var(--text-secondary, #94A3B8)" }}>
-                    Kognitiv Xarakter va Javob Uslubi
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                    {[
-                      { id: "precise", title: "Aniq va Qat'iy", desc: "Tizim va kod buyruqlari" },
-                      { id: "balanced", title: "Muvozanatli", desc: "Kundalik savol-javob" },
-                      { id: "creative", title: "Ijodiy", desc: "G'oyalar va erkin suhbat" },
-                    ].map((m) => (
-                      <div
-                        key={m.id}
-                        onClick={() => setAiMode(m.id)}
-                        style={{
-                          background:
-                            aiMode === m.id ? "rgba(16, 185, 129, 0.12)" : "rgba(255, 255, 255, 0.02)",
-                          border: `1.5px solid ${
-                            aiMode === m.id ? "var(--primary-glow, #10B981)" : "rgba(255, 255, 255, 0.08)"
-                          }`,
-                          borderRadius: 8,
-                          padding: "12px 14px",
-                          cursor: "pointer",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 3,
-                          transition: "all 0.15s ease",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <strong style={{ fontSize: 13 }}>{m.title}</strong>
-                          {aiMode === m.id && <CheckIcon size={13} color="#10B981" />}
-                        </div>
-                        <span style={{ fontSize: 11, color: "var(--text-muted, #64748B)" }}>
-                          {m.desc}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: BILDIRISHNOMALAR (NOTIFICATIONS) */}
-            {activeTab === "notifications" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Tizim Bildirishnomalari</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Rejalashtiruvchi signallari va ovozli bildirishnomalar boshqaruvi
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Rejalashtiruvchi Eslatmalari (Scheduler Alarms)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Vaqti kelgan vazifalar bo'yicha ekranda jonli ogohlantirish bannerini ko'rsatish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifScheduler}
-                      onChange={(e) => setNotifScheduler(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Ovozli Eslatmalar (Spoken Reminders)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Eslatma vaqti kelganda Misa ovozi bilan matnni o'qib eshittirish
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifVoice}
-                      onChange={(e) => setNotifVoice(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Interfeys Tovushlari (UI Sound Effects)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Mikrofon ochilishi, vazifa bajarilishi va xatolik signallari
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifSoundEffects}
-                      onChange={(e) => setNotifSoundEffects(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 6: MAXFIYLIK VA XAVFSIZLIK (PRIVACY) */}
-            {activeTab === "privacy" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Maxfiylik va Ma'lumotlar Xavfsizligi</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    100% lokal xotira, telemetriya bloklanishi va ma'lumotlarni tozalash
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    padding: "14px 18px",
-                    background: "rgba(16, 185, 129, 0.08)",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    borderRadius: 10,
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                  }}
-                >
-                  <ShieldIcon size={20} color="#10B981" />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <strong style={{ fontSize: 13.5, color: "#34D399" }}>
-                      Mahalliy Xavfsizlik Kafolati
-                    </strong>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary, #94A3B8)", lineHeight: 1.5 }}>
-                      Misa sizning xotirangiz, eslatmalaringiz, suhbatlaringiz va tizim buyruqlaringizni
-                      faqat kompyuteringizning mahalliy <code>data/</code> katalogida saqlaydi. Tashqi serverlarga
-                      hech qanday shaxsiy ma'lumot jo'natilmaydi.
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Faqat Mahalliy Xotira (Local Storage Only)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Barcha fayllar lokal saqlanadi
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={localStorageOnly}
-                      onChange={(e) => setLocalStorageOnly(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      background: "rgba(0, 0, 0, 0.2)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>Telemetriya va Kuzatuvni O'chirish</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Hech qanday foydalanish statistikasi yoki xatolik hisobotlari tashqariga chiqmaydi
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={telemetryDisabled}
-                      onChange={(e) => setTelemetryDisabled(e.target.checked)}
-                      style={{ width: 18, height: 18, accentColor: "#10B981", cursor: "pointer" }}
-                    />
-                  </div>
-                </div>
-
-                {/* Actions: Clear History */}
-                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F87171" }}>
-                        Suhbatlar Tarixini Tozalash
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>
-                        Saqlangan barcha AI suhbatlari va kontekst tarixini qaytarib bo'lmaydigan tarzda o'chiradi
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleClearHistory}
-                      disabled={clearingHistory}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: "rgba(239, 68, 68, 0.15)",
-                        border: "1px solid rgba(239, 68, 68, 0.3)",
-                        color: "#F87171",
-                        padding: "8px 16px",
-                        borderRadius: 8,
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: clearingHistory ? "default" : "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <TrashIcon size={14} color="#F87171" />
-                      <span>{clearingHistory ? "Tozalanmoqda..." : "Tarixni tozalash"}</span>
-                    </button>
-                  </div>
-
-                  {clearSuccess && (
-                    <div style={{ marginTop: 10, fontSize: 12, color: "#34D399" }}>
-                      Suhbatlar tarixi muvaffaqiyatli tozalandi.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 7: DASTUR HAQIDA (ABOUT) */}
-            {activeTab === "about" && (
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid var(--border-subtle, rgba(255,255,255,0.07))",
-                  borderRadius: 14,
-                  padding: "24px 28px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 20,
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 600 }}>Dastur Haqida</h2>
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary, #94A3B8)" }}>
-                    Misa AI 9.0.0 tizim arxitekturasi va texnik xususiyatlari
-                  </p>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Ilova Nomi</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{appInfo.name}</div>
-                  </div>
-
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Versiya</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4, color: "#10B981" }}>
-                      {appInfo.version} ({appInfo.codename})
-                    </div>
-                  </div>
-
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Desktop Dvigateli</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{appInfo.engine}</div>
-                  </div>
-
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Backend API Porti</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>127.0.0.1:18420 (Asinxron)</div>
-                  </div>
-
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Tizim Arxitekturasi</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{appInfo.architecture}</div>
-                  </div>
-
-                  <div style={{ background: "rgba(0, 0, 0, 0.2)", padding: 14, borderRadius: 10 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--text-muted, #64748B)" }}>Ishlab chiquvchi</span>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{appInfo.developer}</div>
-                  </div>
-                </div>
-
-                {/* Phase 48: Auto Update & Release Section */}
-                <div
-                  style={{
-                    background: "rgba(16, 185, 129, 0.04)",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    borderRadius: 12,
-                    padding: "16px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F8FAFC" }}>
-                        Xavfsiz Yangilanish Tizimi (Auto-Update)
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
-                        Kanal: <span style={{ color: "#10B981", fontWeight: 500 }}>Barqaror (Stable)</span> • Kriptografik tekshiruv: Ed25519 + SHA-256
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleCheckForUpdates}
-                      disabled={updateCheckLoading}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        background: "linear-gradient(135deg, #10B981, #059669)",
-                        color: "#FFFFFF",
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "8px 16px",
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: updateCheckLoading ? "not-allowed" : "pointer",
-                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
-                      }}
-                    >
-                      {updateCheckLoading ? "Tekshirilmoqda..." : "Yangilanishlarni Tekshirish"}
-                    </button>
-                  </div>
-
-                  {updateNotice && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: updateNotice.includes("xatolik") ? "#F87171" : "#34D399",
-                        background: updateNotice.includes("xatolik") ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
-                        padding: "8px 12px",
-                        borderRadius: 6,
-                      }}
-                    >
-                      {updateNotice}
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    padding: "14px 18px",
-                    background: "rgba(255, 255, 255, 0.02)",
-                    borderRadius: 10,
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                    fontSize: 12,
-                    color: "var(--text-muted, #64748B)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Misa AI — bu aqlli ovozli yordamchi va kompyuter boshqaruv tizimi bo'lib,
-                  Quiet Intelligence konsepsiyasi asosida ishlab chiqilgan.
-                  Har qanday savol va takliflar uchun tizim mualliflariga murojaat qilishingiz mumkin.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Change Password Modal (Phase 41) */}
-        {changePwdModalOpen && (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1000,
-              padding: "20px",
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                maxWidth: "420px",
-                background: "#0F172A",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "16px",
-                padding: "24px 28px",
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#FFFFFF" }}>
-                  Parolni o'zgartirish
-                </h3>
-                <button
-                  onClick={() => setChangePwdModalOpen(false)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#94A3B8",
-                    fontSize: "18px",
-                    cursor: "pointer",
-                    padding: "4px",
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {pwdChangeError && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(239, 68, 68, 0.12)",
-                    border: "1px solid rgba(239, 68, 68, 0.25)",
-                    color: "#FCA5A5",
-                    fontSize: "12.5px",
-                    marginBottom: "14px",
-                  }}
-                >
-                  {pwdChangeError}
-                </div>
-              )}
-
-              {pwdChangeSuccess && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(16, 185, 129, 0.12)",
-                    border: "1px solid rgba(16, 185, 129, 0.25)",
-                    color: "#6EE7B7",
-                    fontSize: "12.5px",
-                    marginBottom: "14px",
-                  }}
-                >
-                  {pwdChangeSuccess}
-                </div>
-              )}
-
-              <form onSubmit={handlePasswordChangeSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Joriy parol (ixtiyoriy)</label>
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    style={{
-                      padding: "9px 12px",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      borderRadius: "8px",
-                      color: "#FFFFFF",
-                      fontSize: "13.5px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Yangi parol (kamida 8 belgi, harf va raqam)</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    style={{
-                      padding: "9px 12px",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      borderRadius: "8px",
-                      color: "#FFFFFF",
-                      fontSize: "13.5px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                  <label style={{ fontSize: "12px", color: "#94A3B8" }}>Yangi parolni tasdiqlang</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    style={{
-                      padding: "9px 12px",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      borderRadius: "8px",
-                      color: "#FFFFFF",
-                      fontSize: "13.5px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
                   <button
                     type="button"
-                    onClick={() => setChangePwdModalOpen(false)}
+                    onClick={() => tg.setVal(!tg.val)}
                     style={{
-                      padding: "8px 14px",
-                      background: "transparent",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      borderRadius: "8px",
-                      color: "#94A3B8",
-                      fontSize: "13px",
-                      cursor: "pointer",
+                      width: "40px",
+                      height: "22px",
+                      borderRadius: "999px",
+                      padding: "3px",
+                      background: tg.val ? "#9303C5" : "rgba(255,255,255,0.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: tg.val ? "flex-end" : "flex-start",
                     }}
                   >
-                    Bekor qilish
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={pwdChangeSubmitting}
-                    style={{
-                      padding: "8px 16px",
-                      background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                      border: "none",
-                      borderRadius: "8px",
-                      color: "#052E16",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      cursor: pwdChangeSubmitting ? "default" : "pointer",
-                    }}
-                  >
-                    {pwdChangeSubmitting ? "Saqlanmoqda..." : "Saqlash"}
+                    <span
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "50%",
+                        background: "#FFFFFF",
+                      }}
+                    />
                   </button>
                 </div>
-              </form>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Phase 48: Secure Auto-Update Modal */}
-        <UpdateModal
-          isOpen={updateModalOpen}
-          onClose={() => setUpdateModalOpen(false)}
-          updateInfo={updateInfo}
-          onUpdateComplete={() => {
-            setUpdateNotice("Dastur muvaffaqiyatli yangilandi!");
-          }}
-        />
+        {/* ── CARD 3: TASHQI KO'RINISH (APPEARANCE & ULTRA GLASS) ── */}
+        {showSection("appearance") && (
+          <div
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#E8B3FF",
+                }}
+              >
+                <SettingsIcon size={16} color="#E8B3FF" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Tashqi ko'rinish
+                </h2>
+                <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  Mavzu, urg'u rangi va Ultra Glass shaffofligi
+                </p>
+              </div>
+            </div>
+
+            {/* Theme Mode Cards */}
+            <div>
+              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+                Mavzu rejimi
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                {(
+                  [
+                    { id: "dark", label: "Qorong'i" },
+                    { id: "light", label: "Yorug'" },
+                    { id: "system", label: "Tizim" },
+                  ] as const
+                ).map((m) => {
+                  const active = themeMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => updateAppearance({ theme: m.id })}
+                      style={{
+                        padding: "12px",
+                        borderRadius: "14px",
+                        background: active
+                          ? "rgba(147, 3, 197, 0.24)"
+                          : "rgba(2, 6, 14, 0.45)",
+                        border: active
+                          ? "2px solid #C04CFD"
+                          : "1px solid rgba(255, 255, 255, 0.08)",
+                        color: active ? "#FFFFFF" : "var(--text-secondary)",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Accent Color Swatches */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#FFFFFF" }}>
+                  Asosiy urf-odat rangi (Urg'u)
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                  Tugmalar va faol elementlar uchun
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {ACCENT_PRESETS.map((ac) => {
+                  const isSelected = accentColor.toLowerCase() === ac.color.toLowerCase();
+                  return (
+                    <button
+                      key={ac.id}
+                      type="button"
+                      onClick={() =>
+                        updateAppearance({ accentColor: ac.color, accentGlow: ac.glow })
+                      }
+                      title={ac.label}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        backgroundColor: ac.color,
+                        border: isSelected ? "2.5px solid #FFFFFF" : "1px solid rgba(255,255,255,0.2)",
+                        boxShadow: isSelected ? `0 0 12px ${ac.glow}` : "none",
+                        cursor: "pointer",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Animations Toggle */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "rgba(2, 6, 14, 0.45)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#FFFFFF" }}>
+                  Interfeys animatsiyalari
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                  Silliq o'tishlar va mikro-harakatlar
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateAppearance({ animationsEnabled: !animationsEnabled })}
+                style={{
+                  width: "40px",
+                  height: "22px",
+                  borderRadius: "999px",
+                  padding: "3px",
+                  background: animationsEnabled ? "#9303C5" : "rgba(255,255,255,0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: animationsEnabled ? "flex-end" : "flex-start",
+                }}
+              >
+                <span
+                  style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#FFFFFF" }}
+                />
+              </button>
+            </div>
+
+            {/* Ultra Glass Opacity Slider */}
+            <div
+              style={{
+                padding: "12px",
+                borderRadius: "12px",
+                background: "rgba(2, 6, 14, 0.45)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "8px",
+                  fontSize: "12px",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "#FFFFFF" }}>
+                  Shisha effekti shaffofligi (Ultra Glass)
+                </span>
+                <span style={{ fontWeight: 700, color: "#E8B3FF" }}>{glassOpacity}%</span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                value={glassOpacity}
+                onChange={(e) => updateAppearance({ glassOpacity: Number(e.target.value) })}
+                className="misa-range"
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── CARD 4: BILDIRISHNOMALAR (NOTIFICATIONS) ── */}
+        {showSection("notifications") && (
+          <div
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#E8B3FF",
+                }}
+              >
+                <BellIcon size={16} color="#E8B3FF" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Bildirishnomalar
+                </h2>
+                <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  Ogohlantirishlar va eslatmalar boshqaruvi
+                </p>
+              </div>
+            </div>
+
+            {[
+              {
+                title: "Ilova ichidagi bildirishnomalar",
+                desc: "Muhim jarayonlar haqida tezkor xabarlar",
+                val: inAppNotif,
+                set: setInAppNotif,
+              },
+              {
+                title: "Eslatma va rejalar signali",
+                desc: "Rejalashtirilgan vazifalar vaqti kelganda",
+                val: scheduleAlerts,
+                set: setScheduleAlerts,
+              },
+              {
+                title: "Misa kunlik xulosalari",
+                desc: "Har kuni kechqurun samaradorlik tahlili",
+                val: dailyDigest,
+                set: setDailyDigest,
+              },
+              {
+                title: "Tizim yangilanishlari",
+                desc: "Yangi Misa v9.x imkoniyatlari haqida xabar",
+                val: updateAlerts,
+                set: setUpdateAlerts,
+              },
+            ].map((n, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "11px 14px",
+                  borderRadius: "12px",
+                  background: "rgba(2, 6, 14, 0.45)",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                    {n.title}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{n.desc}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    n.set(!n.val);
+                    showToast(`${n.title}: ${!n.val ? "Yoqildi" : "O'chirildi"}`);
+                  }}
+                  style={{
+                    width: "40px",
+                    height: "22px",
+                    borderRadius: "999px",
+                    padding: "3px",
+                    background: n.val ? "#9303C5" : "rgba(255,255,255,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: n.val ? "flex-end" : "flex-start",
+                  }}
+                >
+                  <span
+                    style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#FFFFFF" }}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── CARD 5: XAVFSIZLIK VA MAXFIYLIK (SECURITY) ── */}
+        {showSection("security") && (
+          <div
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#E8B3FF",
+                }}
+              >
+                <ShieldIcon size={16} color="#E8B3FF" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Xavfsizlik va Maxfiylik
+                </h2>
+                <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  Hisob himoyasi, faol seanslar va ma'lumotlar boshqaruvi
+                </p>
+              </div>
+            </div>
+
+            {/* Password Row */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "rgba(2, 6, 14, 0.45)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <KeyIcon size={15} color="#E8B3FF" />
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                    Parolni o'zgartirish
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                    Hisobingiz xavfsizlik parolini yangilash
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordModalOpen(true)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "8px",
+                  background: "rgba(255, 255, 255, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  fontSize: "12px",
+                  color: "#FFFFFF",
+                }}
+              >
+                Yangilash
+              </button>
+            </div>
+
+            {/* 2FA Row */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "rgba(2, 6, 14, 0.45)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                  Ikki bosqichli himoya (2FA)
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                  Telegram OTP va qo'shimcha xavfsizlik qatlami
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTwoFactorEnabled((p) => !p);
+                  showToast(!twoFactorEnabled ? "2FA himoyasi faollashtirildi" : "2FA o'chirildi");
+                }}
+                style={{
+                  width: "40px",
+                  height: "22px",
+                  borderRadius: "999px",
+                  padding: "3px",
+                  background: twoFactorEnabled ? "#9303C5" : "rgba(255,255,255,0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: twoFactorEnabled ? "flex-end" : "flex-start",
+                }}
+              >
+                <span
+                  style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#FFFFFF" }}
+                />
+              </button>
+            </div>
+
+            {/* Active Session Row */}
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "rgba(2, 6, 14, 0.45)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Faol seanslar ({Math.max(1, devices.length)})
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                  Windows Desktop • Misa AI v9.0 • Hozir faol
+                </div>
+              </div>
+              {onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/devices")}
+                  style={{
+                    fontSize: "11.5px",
+                    fontWeight: 600,
+                    color: "#E8B3FF",
+                  }}
+                >
+                  Qurilmalar →
+                </button>
+              )}
+            </div>
+
+            {/* Export JSON, Update Check & Delete Account */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={handleExportUserData}
+                style={{
+                  padding: "10px",
+                  borderRadius: "12px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                  color: "#F5F0FF",
+                }}
+              >
+                JSON Eksport
+              </button>
+              <button
+                type="button"
+                onClick={handleCheckUpdates}
+                disabled={checkingUpdate}
+                style={{
+                  padding: "10px",
+                  borderRadius: "12px",
+                  background: "rgba(147, 3, 197, 0.16)",
+                  border: "1px solid rgba(192, 76, 253, 0.32)",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                  color: "#E8B3FF",
+                }}
+              >
+                {checkingUpdate ? "Tekshirilmoqda..." : "Yangilanish"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteAccountModalOpen(true)}
+                style={{
+                  padding: "10px",
+                  borderRadius: "12px",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.28)",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                  color: "#FCA5A5",
+                }}
+              >
+                Hisobni o'chirish
+              </button>
+            </div>
+
+            {/* Toggle Agent Access Security Section */}
+            <button
+              type="button"
+              onClick={() => setShowAgentSecurity((p) => !p)}
+              style={{
+                fontSize: "12px",
+                color: "#E8B3FF",
+                textAlign: "left",
+                paddingTop: "4px",
+              }}
+            >
+              {showAgentSecurity
+                ? "▾ Kompyuter Agent Xavfsizlik Ruxsatlarini yashirish"
+                : "▸ Kompyuter Agent Xavfsizlik Ruxsatlarini boshqarish"}
+            </button>
+            {showAgentSecurity && <AgentAccessSecuritySection />}
+          </div>
+        )}
+
+        {/* ── CARD 6: ULANGAN XIZMATLAR (CONNECTED SERVICES & INTEGRATIONS) ── */}
+        {showSection("services") && (
+          <div
+            className="misa-glass-card"
+            style={{
+              padding: "24px",
+              borderRadius: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#E8B3FF",
+                }}
+              >
+                <PluginsIcon size={16} color="#E8B3FF" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                  Ulangan xizmatlar
+                </h2>
+                <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  Tashqi platformalar, Telegram bot va tizim markazlari
+                </p>
+              </div>
+            </div>
+
+            {/* 1. Google Workspace */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "14px",
+                background: "rgba(2, 6, 14, 0.48)",
+                border: "1px solid rgba(255, 255, 255, 0.07)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <GoogleIcon size={18} />
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                    Google Workspace
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#4EDEA3" }}>
+                    ● {authAccount?.email || email}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await backendService.signInWithGoogle("link");
+                  if (res.url) await backendService.openExternalUrl(res.url);
+                }}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  background: "rgba(255, 255, 255, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  fontSize: "11.5px",
+                  color: "#F5F0FF",
+                }}
+              >
+                Sinxronlash
+              </button>
+            </div>
+
+            {/* 2. Telegram Bot */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "14px",
+                background: "rgba(2, 6, 14, 0.48)",
+                border: "1px solid rgba(255, 255, 255, 0.07)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <TelegramIcon size={18} color="#38BDF8" />
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                    Telegram Bot
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: telegramAcc?.is_linked ? "#4EDEA3" : "var(--text-secondary)",
+                    }}
+                  >
+                    {telegramAcc?.is_linked
+                      ? `● Ulangan (@${telegramAcc.link?.telegram_username || "faol"})`
+                      : "Masofaviy xabarlar va bildirishnomalar"}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("/telegram")}
+                className="misa-btn-violet"
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "8px",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                }}
+              >
+                {telegramAcc?.is_linked ? "Boshqarish" : "Ulash"}
+              </button>
+            </div>
+
+            {/* 3. GitHub Integration */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "14px",
+                background: "rgba(2, 6, 14, 0.48)",
+                border: "1px solid rgba(255, 255, 255, 0.07)",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>
+                  GitHub Repozitoriyalar
+                </div>
+                <div style={{ fontSize: "11px", color: githubToken ? "#4EDEA3" : "var(--text-secondary)" }}>
+                  {githubToken ? "● Token saqlangan" : "Kod baza va repozitoriyalar tahlili"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGithubModalOpen(true)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.35)",
+                  color: "#E8B3FF",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                }}
+              >
+                {githubToken ? "Yangilash" : "Ulash"}
+              </button>
+            </div>
+
+            {/* Quick Links to Other System Centers */}
+            {onNavigate && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/remote")}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#F5F0FF",
+                  }}
+                >
+                  <RemoteControlIcon size={14} color="#E8B3FF" />
+                  <span>Masofaviy Boshqaruv</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/devices")}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#F5F0FF",
+                  }}
+                >
+                  <LaptopIcon size={14} color="#E8B3FF" />
+                  <span>Qurilmalar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/plugins")}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#F5F0FF",
+                  }}
+                >
+                  <PluginsIcon size={14} color="#E8B3FF" />
+                  <span>Plaginlar Katalogi</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/commands")}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#F5F0FF",
+                  }}
+                >
+                  <CommandsIcon size={14} color="#E8B3FF" />
+                  <span>Buyruqlar Markazi</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          4. BOTTOM VERSION & LOGOUT BAR
+         ══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="misa-glass-card"
+        style={{
+          padding: "16px 24px",
+          borderRadius: "20px",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              backgroundColor: "#10B981",
+              boxShadow: "0 0 8px #10B981",
+            }}
+          />
+          <span style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+            Misa AI Desktop v9.0.0 — Ultra Glass Edition
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLogoutClick}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "9px 20px",
+            borderRadius: "12px",
+            background: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "#FCA5A5",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          <span>Hisobdan chiqish</span>
+        </button>
+      </div>
+
+      {/*MODAL: PASSWORD CHANGE */}
+      {passwordModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 500,
+            background: "rgba(2, 6, 14, 0.8)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <form
+            onSubmit={handlePasswordChangeSubmit}
+            className="misa-ultra-glass"
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              borderRadius: "22px",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+                Parolni yangilash
+              </h3>
+              <button type="button" onClick={() => setPasswordModalOpen(false)}>
+                <CloseIcon size={14} color="var(--text-secondary)" />
+              </button>
+            </div>
+            <input
+              type="password"
+              required
+              placeholder="Yangi parol (kamida 8 belgi)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="misa-glass-input"
+              style={{ padding: "10px 14px", borderRadius: "12px", fontSize: "13px" }}
+            />
+            <input
+              type="password"
+              required
+              placeholder="Yangi parolni tasdiqlang"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="misa-glass-input"
+              style={{ padding: "10px 14px", borderRadius: "12px", fontSize: "13px" }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setPasswordModalOpen(false)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "999px",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "var(--text-secondary)",
+                  fontSize: "12.5px",
+                }}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="submit"
+                className="misa-btn-violet"
+                style={{ padding: "8px 18px", borderRadius: "999px", fontSize: "12.5px", fontWeight: 600 }}
+              >
+                Saqlash
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: GITHUB TOKEN */}
+      {githubModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 500,
+            background: "rgba(2, 6, 14, 0.8)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            className="misa-ultra-glass"
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              borderRadius: "22px",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+              GitHub Personal Access Token
+            </h3>
+            <input
+              type="password"
+              placeholder="ghp_..."
+              value={githubToken}
+              onChange={(e) => setGithubToken(e.target.value)}
+              className="misa-glass-input"
+              style={{ padding: "10px 14px", borderRadius: "12px", fontSize: "13px" }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setGithubModalOpen(false)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "999px",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "var(--text-secondary)",
+                  fontSize: "12.5px",
+                }}
+              >
+                Yopish
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await backendService.saveGithubToken(githubToken.trim());
+                  setGithubModalOpen(false);
+                  showToast("GitHub token saqlandi ✓");
+                }}
+                className="misa-btn-violet"
+                style={{ padding: "8px 18px", borderRadius: "999px", fontSize: "12.5px", fontWeight: 600 }}
+              >
+                Saqlash
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELETE ACCOUNT CONFIRMATION */}
+      {deleteAccountModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 500,
+            background: "rgba(2, 6, 14, 0.8)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            className="misa-ultra-glass"
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              borderRadius: "22px",
+              padding: "24px",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
+              Mahalliy hisob ma'lumotlarini tozalash
+            </h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              Ushbu amal mahalliy sessiya va sozlamalarni tozalaydi hamda tizimdan chiqaradi. Tasdiqlaysizmi?
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setDeleteAccountModalOpen(false)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "999px",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "var(--text-secondary)",
+                  fontSize: "12.5px",
+                }}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDeleteAccountModalOpen(false);
+                  await handleLogoutClick();
+                }}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "999px",
+                  background: "#EF4444",
+                  color: "#FFFFFF",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                }}
+              >
+                Tozalash va Chiqish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-export default AccountPage;

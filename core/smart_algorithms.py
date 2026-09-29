@@ -1,5 +1,5 @@
 # ========== smart_algorithms.py ==========
-# Aqlli algoritmlar moduli — Mikasa AI uchun
+# Aqlli algoritmlar moduli — Misa AI uchun
 # Levenshtein, TF-IDF, LRU Cache, Rate Limiter, Markov Chain, Priority Queue
 
 import time

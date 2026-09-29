@@ -83,12 +83,12 @@ class BasePhase42Test(unittest.TestCase):
     """Base setup for Phase 42 tests with isolated temporary directories."""
     def setUp(self):
         self._orig_env = dict(os.environ)
-        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MISA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MISA_ENV"):
             os.environ.pop(k, None)
         from core.v8 import AccountAuthManager
         AccountAuthManager._instance = None
         AccountAuthManager._default_instance = None
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_phase42_test_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_phase42_test_")
         self.pairing_storage = os.path.join(self.temp_dir, "pairing.json")
         self.device_storage = os.path.join(self.temp_dir, "devices.json")
         self.cred_storage = os.path.join(self.temp_dir, "credentials.json")

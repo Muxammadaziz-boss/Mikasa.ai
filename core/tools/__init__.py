@@ -1,5 +1,5 @@
 # ========== core/tools/__init__.py ==========
-# Mikasa AI 7.x — Tool System 2.0 Core Package
+# Misa AI 7.x — Tool System 2.0 Core Package
 # Capability-Driven Intelligence, Contract 2.0, Safe Execution & Discovery
 
 from core.tools.contract import (

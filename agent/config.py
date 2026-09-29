@@ -8,13 +8,13 @@ import logging
 from dataclasses import dataclass, asdict
 from typing import Dict, Any, Optional
 
-logger = logging.getLogger("mikasa.agent.config")
+logger = logging.getLogger("misa.agent.config")
 
 
 @dataclass
 class AgentConfig:
     """
-    Mikasa Windows PC Agent konfiguratsiya modeli.
+    Misa Windows PC Agent konfiguratsiya modeli.
     Maxfiy kalitlar hech qachon ushbu konfiguratsiyada saqlanmaydi.
     """
     backend_url: str = "http://127.0.0.1:18420"
@@ -59,17 +59,25 @@ class AgentConfig:
     def load(
         cls,
         config_path: Optional[str] = None,
-        env_prefix: str = "MIKASA_AGENT_"
+        env_prefix: str = "MISA_AGENT_"
     ) -> "AgentConfig":
         """
         Konfiguratsiyani fayldan va muhit o'zgaruvchilaridan (env) xavfsiz yuklash.
         Ustuvorlik: Environment variables > Config file > Default values
         """
         appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
-        default_dir = os.path.join(appdata, "MikasaAI", "agent")
+        default_dir = os.path.join(appdata, "MisaAI", "agent")
         default_cfg_file = os.path.join(default_dir, "agent_config.json")
 
-        cfg_file = config_path or os.environ.get(f"{env_prefix}CONFIG_PATH") or default_cfg_file
+        def _get_env(key: str) -> Optional[str]:
+            val = os.environ.get(f"{env_prefix}{key}")
+            if val is not None:
+                return val
+            if env_prefix == "MISA_AGENT_":
+                return os.environ.get(f"MISA_AGENT_{key}")
+            return None
+
+        cfg_file = config_path or _get_env("CONFIG_PATH") or default_cfg_file
         file_data: Dict[str, Any] = {}
 
         if os.path.exists(cfg_file):
@@ -80,40 +88,40 @@ class AgentConfig:
                 logger.warning(f"[AgentConfig] Konfiguratsiya faylini o'qishda xato: {e}")
 
         backend_url = (
-            os.environ.get(f"{env_prefix}BACKEND_URL")
+            _get_env("BACKEND_URL")
             or file_data.get("backend_url")
             or "http://127.0.0.1:18420"
         )
         device_id = (
-            os.environ.get(f"{env_prefix}DEVICE_ID")
+            _get_env("DEVICE_ID")
             or file_data.get("device_id")
         )
         friendly_name = (
-            os.environ.get(f"{env_prefix}FRIENDLY_NAME")
+            _get_env("FRIENDLY_NAME")
             or file_data.get("friendly_name")
         )
         heartbeat_interval = float(
-            os.environ.get(f"{env_prefix}HEARTBEAT_INTERVAL")
+            _get_env("HEARTBEAT_INTERVAL")
             or file_data.get("heartbeat_interval")
             or 30.0
         )
         heartbeat_timeout = float(
-            os.environ.get(f"{env_prefix}HEARTBEAT_TIMEOUT")
+            _get_env("HEARTBEAT_TIMEOUT")
             or file_data.get("heartbeat_timeout")
             or 60.0
         )
         reconnect_base_delay = float(
-            os.environ.get(f"{env_prefix}RECONNECT_BASE_DELAY")
+            _get_env("RECONNECT_BASE_DELAY")
             or file_data.get("reconnect_base_delay")
             or 1.0
         )
         reconnect_max_delay = float(
-            os.environ.get(f"{env_prefix}RECONNECT_MAX_DELAY")
+            _get_env("RECONNECT_MAX_DELAY")
             or file_data.get("reconnect_max_delay")
             or 60.0
         )
         vault_dir = (
-            os.environ.get(f"{env_prefix}VAULT_DIR")
+            _get_env("VAULT_DIR")
             or file_data.get("vault_dir")
             or os.path.join(default_dir, "vault")
         )

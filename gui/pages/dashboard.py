@@ -1,5 +1,5 @@
 # ========== dashboard.py ==========
-# Mikasa AI v6.0.0 — Apple Dark Minimal Dashboard
+# Misa AI v6.0.0 — Apple Dark Minimal Dashboard
 # Toza, zamonaviy va nafis interfeys
 
 import customtkinter as ctk

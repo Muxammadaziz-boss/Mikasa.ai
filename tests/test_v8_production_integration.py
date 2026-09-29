@@ -43,7 +43,7 @@ class TestCORSProductionIntegration(unittest.TestCase):
     def test_is_production_or_remote_enabled_default_dev(self):
         os.environ["ENVIRONMENT"] = "development"
         os.environ.pop("RAILWAY_ENVIRONMENT", None)
-        os.environ.pop("MIKASA_ALLOW_REMOTE_API", None)
+        os.environ.pop("MISA_ALLOW_REMOTE_API", None)
         self.assertFalse(is_production_or_remote_enabled())
 
     def test_is_production_or_remote_enabled_railway(self):
@@ -51,7 +51,7 @@ class TestCORSProductionIntegration(unittest.TestCase):
         self.assertTrue(is_production_or_remote_enabled())
 
     def test_is_production_or_remote_enabled_explicit_flag(self):
-        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
+        os.environ["MISA_ALLOW_REMOTE_API"] = "true"
         self.assertTrue(is_production_or_remote_enabled())
 
     def test_is_production_or_remote_enabled_env_production(self):
@@ -66,7 +66,7 @@ class TestProductionAPIServerIntegration(AioHTTPTestCase):
         self._orig_env = dict(os.environ)
         os.environ["ENVIRONMENT"] = "production"
         os.environ["RAILWAY_ENVIRONMENT"] = "production"
-        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
+        os.environ["MISA_ALLOW_REMOTE_API"] = "true"
         return create_app()
 
     def tearDown(self):
@@ -85,26 +85,26 @@ class TestProductionAPIServerIntegration(AioHTTPTestCase):
     @unittest_run_loop
     async def test_options_preflight_returns_204_with_cors_headers(self):
         headers = {
-            "Origin": "https://mikasa-v8-api-production.up.railway.app",
+            "Origin": "https://misa.up.railway.app",
             "Access-Control-Request-Method": "POST",
             "Access-Control-Request-Headers": "Authorization, Content-Type",
         }
         resp = await self.client.request("OPTIONS", "/api/telegram/status", headers=headers)
         self.assertEqual(resp.status, 204)
-        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://mikasa-v8-api-production.up.railway.app")
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://misa.up.railway.app")
         self.assertIn("GET", resp.headers.get("Access-Control-Allow-Methods", ""))
         self.assertIn("Authorization", resp.headers.get("Access-Control-Allow-Headers", ""))
 
     @unittest_run_loop
     async def test_telegram_status_allowed_in_production(self):
         headers = {
-            "Origin": "https://mikasa-v8-api-production.up.railway.app",
+            "Origin": "https://misa.up.railway.app",
         }
         resp = await self.client.request("GET", "/api/telegram/status", headers=headers)
         self.assertEqual(resp.status, 200)
         data = await resp.json()
         self.assertTrue(data.get("ok"))
-        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://mikasa-v8-api-production.up.railway.app")
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://misa.up.railway.app")
 
 
 class TestResolveAuthIdentityProduction(unittest.TestCase):
@@ -125,9 +125,9 @@ class TestResolveAuthIdentityProduction(unittest.TestCase):
         req = MagicMock()
         req.headers = {
             "Authorization": "Bearer fake-token-123",
-            "X-Mikasa-User-Id": "admin"
+            "X-Misa-User-Id": "admin"
         }
-        req.query = {"mikasa_user_id": "admin"}
+        req.query = {"misa_user_id": "admin"}
 
         with patch("core.v8.AccountAuthManager.get_default_instance") as mock_auth_cls:
             mock_mgr = MagicMock()
@@ -146,7 +146,7 @@ class TestResolveAuthIdentityProduction(unittest.TestCase):
         req = MagicMock()
         req.headers = {
             "Authorization": "Bearer fake-token-123",
-            "X-Mikasa-User-Id": "99999999-9999-9999-9999-999999999999"
+            "X-Misa-User-Id": "99999999-9999-9999-9999-999999999999"
         }
         req.query = {}
 
@@ -160,7 +160,7 @@ class TestResolveAuthIdentityProduction(unittest.TestCase):
             self.assertEqual(err.status, 403)
 
     def test_missing_token_when_auth_enforced_returns_401(self):
-        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        os.environ["MISA_REQUIRE_AUTH"] = "true"
         req = MagicMock()
         req.headers = {}
         req.query = {}
@@ -204,7 +204,7 @@ class TestTelegramIdentitySupabaseSync(unittest.TestCase):
         mgr = TelegramIdentityManager.get_default_instance()
         test_uuid = "12345678-1234-5678-1234-567812345678"
         link = UserTelegramLink(
-            mikasa_user_id=test_uuid,
+            misa_user_id=test_uuid,
             telegram_user_id=123456789,
             metadata={"username": "testuser", "first_name": "Test"}
         )
@@ -239,9 +239,9 @@ class TestGoogleOAuthRedirectAndSecurity(AioHTTPTestCase):
         self._orig_env = dict(os.environ)
         os.environ.pop("RAILWAY_ENVIRONMENT", None)
         os.environ.pop("RAILWAY_PROJECT_ID", None)
-        os.environ.pop("MIKASA_ENV", None)
+        os.environ.pop("MISA_ENV", None)
         os.environ["ENVIRONMENT"] = "production"
-        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
+        os.environ["MISA_ALLOW_REMOTE_API"] = "true"
         return create_app()
 
     def tearDown(self):
@@ -393,11 +393,11 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
 
     async def get_application(self):
         import tempfile
-        self._temp_dir = tempfile.mkdtemp(prefix="mikasa_tg_audit_")
+        self._temp_dir = tempfile.mkdtemp(prefix="misa_tg_audit_")
         self._storage_path = os.path.join(self._temp_dir, "tg_links.json")
         os.environ["ENVIRONMENT"] = "production"
-        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
-        os.environ["TELEGRAM_BOT_USERNAME"] = "Mikasa_ai_agent_bot"
+        os.environ["MISA_ALLOW_REMOTE_API"] = "true"
+        os.environ["TELEGRAM_BOT_USERNAME"] = "Misa_ai_agent_bot"
         os.environ.pop("SUPABASE_URL", None)
         os.environ.pop("SUPABASE_PUBLISHABLE_KEY", None)
         os.environ.pop("SUPABASE_ANON_KEY", None)
@@ -417,39 +417,39 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_01_bot_username_consistency_across_backend_and_frontend(self):
-        """Bot username must be Mikasa_ai_agent_bot across API, Bot, IdentityManager, and Frontend."""
+        """Bot username must be Misa_ai_agent_bot across API, Bot, IdentityManager, and Frontend."""
         status_resp = await self.client.request("GET", "/api/telegram/status")
         self.assertEqual(status_resp.status, 200)
         status_data = await status_resp.json()
-        self.assertEqual(status_data.get("bot_username"), "Mikasa_ai_agent_bot")
+        self.assertEqual(status_data.get("bot_username"), "Misa_ai_agent_bot")
 
         mgr = TelegramIdentityManager.get_default_instance()
         req, otp, deep_link, err = mgr.create_link_request("11111111-1111-4111-8111-111111111111")
         self.assertIsNone(err)
-        self.assertTrue(deep_link.startswith("https://t.me/Mikasa_ai_agent_bot?start="))
+        self.assertTrue(deep_link.startswith("https://t.me/Misa_ai_agent_bot?start="))
 
         tg_page_path = os.path.join(BASE_DIR, "Misa", "src", "pages", "TelegramIntegrationPage.tsx")
         with open(tg_page_path, "r", encoding="utf-8") as f:
             tg_page_code = f.read()
-        self.assertIn("Mikasa_ai_agent_bot", tg_page_code)
-        self.assertNotIn("MikasaUniversalBot", tg_page_code)
+        self.assertIn("Misa_ai_agent_bot", tg_page_code)
+        self.assertNotIn("MisaUniversalBot", tg_page_code)
 
         bs_path = os.path.join(BASE_DIR, "Misa", "src", "services", "backendService.ts")
         with open(bs_path, "r", encoding="utf-8") as f:
             bs_code = f.read()
-        self.assertIn("Mikasa_ai_agent_bot", bs_code)
-        self.assertNotIn("MikasaUniversalBot", bs_code)
+        self.assertIn("Misa_ai_agent_bot", bs_code)
+        self.assertNotIn("MisaUniversalBot", bs_code)
 
     @unittest_run_loop
     async def test_02_bot_otp_formats_and_command_variants(self):
-        """Test plain 6-digit OTP, spaced OTP, /link <otp>, /link@Mikasa_ai_agent_bot <otp>, and /start <token>."""
+        """Test plain 6-digit OTP, spaced OTP, /link <otp>, /link@Misa_ai_agent_bot <otp>, and /start <token>."""
         from core.v8.telegram_gateway import MockTelegramTransport
         from core.v8.universal_bot import UniversalTelegramBot
 
         mgr = TelegramIdentityManager.get_default_instance()
         transport = MockTelegramTransport()
         bot = UniversalTelegramBot(transport=transport, identity_manager=mgr)
-        self.assertEqual(bot.bot_username, "Mikasa_ai_agent_bot")
+        self.assertEqual(bot.bot_username, "Misa_ai_agent_bot")
 
         # 1. Plain 6-digit OTP with space ("123 456")
         req1, otp1, _, _ = mgr.create_link_request("user_fmt_1")
@@ -465,26 +465,26 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
         self.assertIn("muvaffaqiyatli bog'landi", transport.sent_messages[-1]["text"])
         self.assertNotIn("Tasdiqlash kodi talab qilinadi", transport.sent_messages[-1]["text"])
 
-        # 2. /link@Mikasa_ai_agent_bot <otp>
+        # 2. /link@Misa_ai_agent_bot <otp>
         req2, otp2, _, _ = mgr.create_link_request("user_fmt_2")
         await bot.process_update({
             "message": {
                 "message_id": 2,
                 "chat": {"id": 910002},
                 "from": {"id": 910002, "first_name": "Dilshod"},
-                "text": f"/link@Mikasa_ai_agent_bot <{otp2}>",
+                "text": f"/link@Misa_ai_agent_bot <{otp2}>",
             }
         })
         self.assertIn("muvaffaqiyatli bog'landi", transport.sent_messages[-1]["text"])
 
-        # 3. /start@Mikasa_ai_agent_bot <link_token>
+        # 3. /start@Misa_ai_agent_bot <link_token>
         req3, _, _, _ = mgr.create_link_request("user_fmt_3")
         await bot.process_update({
             "message": {
                 "message_id": 3,
                 "chat": {"id": 910003},
                 "from": {"id": 910003, "first_name": "Kamola"},
-                "text": f"/start@Mikasa_ai_agent_bot {req3.link_token}",
+                "text": f"/start@Misa_ai_agent_bot {req3.link_token}",
             }
         })
         self.assertIn("Tabriklaymiz", transport.sent_messages[-1]["text"])
@@ -576,7 +576,7 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
 
             # Step 1: Desktop App generates OTP
             req, plaintext_otp, deep_link, err = desktop_mgr.create_link_request(
-                mikasa_user_id=user_uuid,
+                misa_user_id=user_uuid,
                 auth_token="user_jwt_token"
             )
             self.assertIsNone(err)
@@ -604,7 +604,7 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
             self.assertIsNotNone(refreshed_req)
             self.assertEqual(refreshed_req.status, "VERIFIED")
 
-            desktop_link = desktop_mgr.get_link_by_mikasa_user(user_uuid, auth_token="user_jwt_token", refresh=True)
+            desktop_link = desktop_mgr.get_link_by_misa_user(user_uuid, auth_token="user_jwt_token", refresh=True)
             self.assertIsNotNone(desktop_link)
             self.assertEqual(desktop_link.telegram_user_id, 777888999)
 
@@ -622,7 +622,7 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
         ok_cross, msg_cross, _ = mgr.verify_otp(
             otp=otp_a,
             telegram_user_id=500001,
-            expected_mikasa_user_id=user_b
+            expected_misa_user_id=user_b
         )
         self.assertFalse(ok_cross)
         self.assertIn("USER_MISMATCH", msg_cross)
@@ -654,7 +654,7 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
             self.assertEqual(verify_resp.status, 403)
 
         # 4. Already-linked Telegram user trying to redeem another user's OTP
-        ok_a, _, _ = mgr.verify_otp(otp=otp_a, telegram_user_id=500001, expected_mikasa_user_id=user_a)
+        ok_a, _, _ = mgr.verify_otp(otp=otp_a, telegram_user_id=500001, expected_misa_user_id=user_a)
         self.assertTrue(ok_a)
 
         req_b, otp_b, _, _ = mgr.create_link_request(user_b)
@@ -677,7 +677,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
     3. Webhook update parsing & awaiting bot handler completion before HTTP 200
     4. Telegram sendMessage error logging & Markdown plain-text fallback without leaking bot token
     5. Invalid, expired, and reused OTP rejection
-    6. Valid OTP linking mikasa_user_id <-> telegram_user_id (including transient JWT Supabase sync)
+    6. Valid OTP linking misa_user_id <-> telegram_user_id (including transient JWT Supabase sync)
     7. Cross-user OTP verification rejection
     8. Missing/invalid JWT returning 401 on protected endpoints
     9. Frontend backendService.ts sending Authorization: Bearer header
@@ -690,13 +690,13 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
 
     async def get_application(self):
         import tempfile
-        self._temp_dir = tempfile.mkdtemp(prefix="mikasa_railway_diag_")
+        self._temp_dir = tempfile.mkdtemp(prefix="misa_railway_diag_")
         self._storage_path = os.path.join(self._temp_dir, "tg_links_diag.json")
         os.environ["ENVIRONMENT"] = "production"
-        os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
+        os.environ["MISA_ALLOW_REMOTE_API"] = "true"
         os.environ["TELEGRAM_BOT_TOKEN"] = "123456789:AAFakeSecretTokenForTestingOnly999"
         os.environ["TELEGRAM_WEBHOOK_SECRET"] = "railway_webhook_secret_xyz"
-        os.environ["TELEGRAM_BOT_USERNAME"] = "Mikasa_ai_agent_bot"
+        os.environ["TELEGRAM_BOT_USERNAME"] = "Misa_ai_agent_bot"
         os.environ.pop("SUPABASE_URL", None)
         os.environ.pop("SUPABASE_PUBLISHABLE_KEY", None)
         os.environ.pop("SUPABASE_ANON_KEY", None)
@@ -804,7 +804,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
         self.assertEqual(len(transport.sent_messages), 1)
         self.assertIn("muvaffaqiyatli bog'landi", transport.sent_messages[0]["text"])
         self.assertEqual(len(svc._active_handlers), 0)
-        self.assertIsNotNone(mgr.get_link_by_mikasa_user("user_webhook_sync"))
+        self.assertIsNotNone(mgr.get_link_by_misa_user("user_webhook_sync"))
 
     @unittest_run_loop
     async def test_04_aiohttp_transport_send_message_logs_errors_and_redacts_token(self):
@@ -891,8 +891,8 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
         ok_reuse, msg_reuse, _ = mgr.verify_otp(otp, telegram_user_id=70004)
         self.assertFalse(ok_reuse)
 
-    def test_06_valid_otp_links_mikasa_and_telegram_user_with_transient_jwt_sync(self):
-        """6. To'g'ri OTP mikasa_user_id va telegram_user_id ni bog'lashi (transient JWT bilan Supabase sync)."""
+    def test_06_valid_otp_links_misa_and_telegram_user_with_transient_jwt_sync(self):
+        """6. To'g'ri OTP misa_user_id va telegram_user_id ni bog'lashi (transient JWT bilan Supabase sync)."""
         os.environ["SUPABASE_URL"] = "https://vdcssmzguxfknqkfxbed.supabase.co"
         os.environ["SUPABASE_PUBLISHABLE_KEY"] = "sb_pub_key"
         # Intentionally NO SUPABASE_SECRET_KEY to verify transient user JWT fallback!
@@ -923,10 +923,10 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
                 self.assertNotIn(user_jwt, f.read())
 
             # Webhook verifies OTP without passing auth_token directly (uses req._transient_auth_token)
-            ok, msg, linked = mgr.verify_otp(otp, telegram_user_id=888999, username="mikasa_fan")
+            ok, msg, linked = mgr.verify_otp(otp, telegram_user_id=888999, username="misa_fan")
             self.assertTrue(ok, msg)
             self.assertIsNotNone(linked)
-            self.assertEqual(linked.mikasa_user_id, user_uuid)
+            self.assertEqual(linked.misa_user_id, user_uuid)
             self.assertEqual(linked.telegram_user_id, 888999)
             # Verify Supabase calls used Bearer <user_jwt>
             self.assertTrue(any(h == f"Bearer {user_jwt}" for _, h in captured_Auth_headers))
@@ -940,7 +940,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
         ok, msg, _ = mgr.verify_otp(
             otp=otp_owner,
             telegram_user_id=990011,
-            expected_mikasa_user_id="attacker_user_id",
+            expected_misa_user_id="attacker_user_id",
         )
         self.assertFalse(ok)
         self.assertIn("USER_MISMATCH", msg)
@@ -948,7 +948,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
     @unittest_run_loop
     async def test_08_missing_or_invalid_token_returns_401(self):
         """8. Token yo'q yoki noto'g'ri bo'lsa 401 qaytishi."""
-        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        os.environ["MISA_REQUIRE_AUTH"] = "true"
         for method, path in [
             ("POST", "/api/telegram/link/start"),
             ("POST", "/api/telegram/link/verify"),
@@ -994,7 +994,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
 
         # Reload a brand-new manager instance from the same storage path
         mgr2 = TelegramIdentityManager(storage_path=self._storage_path)
-        loaded_link = mgr2.get_link_by_mikasa_user("persistent_user_99")
+        loaded_link = mgr2.get_link_by_misa_user("persistent_user_99")
         self.assertIsNotNone(loaded_link)
         self.assertEqual(loaded_link.telegram_user_id, 55443322)
         self.assertEqual(loaded_link.metadata.get("username"), "persist_uz")

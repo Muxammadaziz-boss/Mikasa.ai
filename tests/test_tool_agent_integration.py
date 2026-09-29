@@ -342,7 +342,7 @@ class TestToolAgentIntegration(unittest.TestCase):
             goal="Calculate and format",
             steps=[
                 PlanStep(step_id="s1", order=1, intent="Calc", tool="calc_step", parameters={"expression": "50 * 2"}),
-                PlanStep(step_id="s2", order=2, intent="Format", tool="format_step", parameters={"text": "mikasa tool system 2.0"}),
+                PlanStep(step_id="s2", order=2, intent="Format", tool="format_step", parameters={"text": "misa tool system 2.0"}),
             ]
         )
 
@@ -350,7 +350,7 @@ class TestToolAgentIntegration(unittest.TestCase):
         self.assertTrue(response.success)
         self.assertEqual(plan.status, PlanStatus.COMPLETED)
         self.assertEqual(plan.steps[0].observed_result, "100")
-        self.assertEqual(plan.steps[1].observed_result, "MIKASA TOOL SYSTEM 2.0")
+        self.assertEqual(plan.steps[1].observed_result, "MISA TOOL SYSTEM 2.0")
 
 
 if __name__ == "__main__":

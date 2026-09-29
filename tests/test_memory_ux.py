@@ -1,5 +1,5 @@
 # ========== test_memory_ux.py ==========
-# Mikasa AI 7.x — Phase 30: Memory UX, User Control & Privacy Unit Tests
+# Misa AI 7.x — Phase 30: Memory UX, User Control & Privacy Unit Tests
 # Comprehensive test cases covering Memory Inspector, Edit, Safe Delete, Pinning,
 # Do-Not-Remember policies, and Atomic persistence.
 
@@ -118,7 +118,7 @@ class TestMemoryUX(unittest.TestCase):
 
     # 5. Memory update validation: empty content rejected
     def test_05_update_knowledge_empty_content_rejected(self):
-        self.memory.add_knowledge("loyiha", "Mikasa AI", category="work")
+        self.memory.add_knowledge("loyiha", "Misa AI", category="work")
         item = self.memory.knowledge[0]
 
         res = self.memory.update_knowledge_item(item.id, content="   ")
@@ -176,13 +176,13 @@ class TestMemoryUX(unittest.TestCase):
     def test_11_pin_boosts_relevance_score(self):
         item_normal = MemoryItem(
             key="server",
-            content="Mikasa serveri",
+            content="Misa serveri",
             importance=0.5,
             pinned=False,
         )
         item_pinned = MemoryItem(
             key="server",
-            content="Mikasa serveri",
+            content="Misa serveri",
             importance=0.5,
             pinned=True,
         )

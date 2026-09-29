@@ -1,7 +1,7 @@
 # ========== logger.py ==========
-# Mikasa AI 8.0.0 — Production Logging Subsystem [Phase 22]
+# Misa AI 8.0.0 — Production Logging Subsystem [Phase 22]
 # Provides structured rotating logs:
-#   - logs/mikasa.log  (General application events, AI engine, memory, tools)
+#   - logs/misa.log  (General application events, AI engine, memory, tools)
 #   - logs/backend.log (API server requests, WebSocket, supervisor lifecycle)
 #   - logs/crash.log   (Unhandled exceptions, thread failures, fatal errors)
 # Includes automatic sensitive data sanitization (API keys, tokens, credentials).
@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-MIKASA_LOG_PATH = os.path.join(LOGS_DIR, "mikasa.log")
+MISA_LOG_PATH = os.path.join(LOGS_DIR, "misa.log")
 BACKEND_LOG_PATH = os.path.join(LOGS_DIR, "backend.log")
 CRASH_LOG_PATH = os.path.join(LOGS_DIR, "crash.log")
 
@@ -65,9 +65,9 @@ def sanitize_text(text: str) -> str:
     return res
 
 
-def get_mikasa_handler(max_bytes: int = 10 * 1024 * 1024, backup_count: int = 5) -> RotatingFileHandler:
-    """logs/mikasa.log uchun rotating fayl handler"""
-    handler = RotatingFileHandler(MIKASA_LOG_PATH, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8")
+def get_misa_handler(max_bytes: int = 10 * 1024 * 1024, backup_count: int = 5) -> RotatingFileHandler:
+    """logs/misa.log uchun rotating fayl handler"""
+    handler = RotatingFileHandler(MISA_LOG_PATH, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
     handler.addFilter(SensitiveDataFilter())
     return handler

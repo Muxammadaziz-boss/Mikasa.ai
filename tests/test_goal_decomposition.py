@@ -1,5 +1,5 @@
 # ========== test_goal_decomposition.py ==========
-# Mikasa AI 7.x — Unit Tests for Goal Decomposition 2.0 (GoalDecomposer)
+# Misa AI 7.x — Unit Tests for Goal Decomposition 2.0 (GoalDecomposer)
 
 import unittest
 from unittest.mock import MagicMock

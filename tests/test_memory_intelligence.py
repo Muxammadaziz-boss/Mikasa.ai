@@ -1,5 +1,5 @@
 # ========== test_memory_intelligence.py ==========
-# Mikasa AI 7.x — Phase 29: Memory & Context Intelligence Unit Tests
+# Misa AI 7.x — Phase 29: Memory & Context Intelligence Unit Tests
 # 25 Comprehensive Test Cases covering Normalization, Policies, Retrieval, Continuity & Resilience
 
 import os
@@ -279,8 +279,8 @@ class TestMemoryIntelligence(unittest.TestCase):
         bad_memory.get_knowledge.side_effect = RuntimeError("Database locked")
 
         engine = ContextEngine(memory=bad_memory)
-        req = engine.assemble("Salom Mikasa")
-        self.assertEqual(req.message, "Salom Mikasa")
+        req = engine.assemble("Salom Misa")
+        self.assertEqual(req.message, "Salom Misa")
         self.assertIn("prompt", req.system_context)
 
     # 22. Memory clearing

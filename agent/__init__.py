@@ -1,7 +1,7 @@
 # ========== agent/__init__.py ==========
 # Phase 45 — Production Windows PC Agent Package
 """
-Mikasa AI v8.0.0 — Production-Grade Windows PC Agent
+Misa AI v8.0.0 — Production-Grade Windows PC Agent
 Cryptographic authentication, persistent identity, secure transport, and heartbeat management.
 """
 

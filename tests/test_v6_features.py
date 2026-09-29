@@ -1,5 +1,5 @@
 # ========== test_v6_features.py ==========
-# Mikasa AI v6.0.0 yangi funksiyalari uchun Unit-testlar to'plami
+# Misa AI v6.0.0 yangi funksiyalari uchun Unit-testlar to'plami
 
 import unittest
 

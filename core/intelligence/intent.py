@@ -1,5 +1,5 @@
 # ========== intent.py ==========
-# Mikasa AI 7.x — Intent Engine
+# Misa AI 7.x — Intent Engine
 # Normalized Intent Representation & Intent Categorization
 
 import logging

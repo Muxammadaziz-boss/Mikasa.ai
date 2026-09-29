@@ -1,5 +1,5 @@
 # ========== test_intelligence_core.py ==========
-# Mikasa AI 7.x — Phase 28 Intelligence Core Comprehensive Unit & Integration Tests
+# Misa AI 7.x — Phase 28 Intelligence Core Comprehensive Unit & Integration Tests
 # Verifies Provider Abstraction, Context, Intent, Decision, Permission, Orchestrator and Compatibility
 
 import os

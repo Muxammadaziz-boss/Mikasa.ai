@@ -10,12 +10,12 @@ from agent.audit import AgentAuditLogger
 from agent.crypto import AgentCrypto
 from agent.transport import SecureTransport
 
-logger = logging.getLogger("mikasa.agent.auth")
+logger = logging.getLogger("misa.agent.auth")
 
 
 class AgentAuth:
     """
-    Mikasa Backend bilan kriptografik chaqiriq-javob autentifikatsiyasi.
+    Misa Backend bilan kriptografik chaqiriq-javob autentifikatsiyasi.
     1. /api/devices/{device_id}/challenge orqali 32-bayt nonce oladi.
     2. Mahalliy DPAPI/Ed25519 xususiy kalit bilan kanonik xabarni imzolaydi.
     3. /api/devices/{device_id}/authenticate ga imzoni yuborib, DeviceSession tokenini oladi.

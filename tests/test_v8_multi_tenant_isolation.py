@@ -11,8 +11,8 @@ import json
 import time
 
 from core.v8.account_device import (
-    MikasaUser,
-    MikasaProfile,
+    MisaUser,
+    MisaProfile,
     AccountDeviceManager,
 )
 from core.v8.device_pairing import DevicePairingManager
@@ -49,7 +49,7 @@ class MockRequest:
 
 class TestV8MultiTenantIsolation(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_multitenant_test_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_multitenant_test_")
         self.pairing_storage = os.path.join(self.temp_dir, "pairing.json")
         self.device_storage = os.path.join(self.temp_dir, "devices.json")
         self.cred_storage = os.path.join(self.temp_dir, "credentials.json")

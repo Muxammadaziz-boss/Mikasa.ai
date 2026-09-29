@@ -1,6 +1,6 @@
 // ========== RemoteControlPage.tsx ==========
-// Mikasa AI v8.0.0 — Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi
-// Telegram Bot ↔ Mikasa Remote Gateway ↔ User Linking ↔ Permission Center ↔ PC Agent
+// Misa AI v9.0.0 — Masofaviy Boshqaruv & Ruxsatlar Markazi
+// Telegram Bot ↔ Misa Remote Gateway ↔ User Linking ↔ Permission Center ↔ PC Agent
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {

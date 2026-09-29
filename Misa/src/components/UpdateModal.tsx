@@ -1,6 +1,6 @@
 // ========== src/components/UpdateModal.tsx ==========
-// Mikasa AI 8.0.0 — Phase 48: Secure Auto-Update Glassmorphic Modal
-// Cinematic Dark UI matching Mikasa's design system with Ed25519 & SHA-256 verification indicator.
+// Misa AI v9.0.0 — Secure Auto-Update Ultra Glass Modal
+// Ultra Glass Dark UI matching Misa's design system with Ed25519 & SHA-256 verification indicator.
 
 import React, { useState, useEffect, useRef } from "react";
 import {

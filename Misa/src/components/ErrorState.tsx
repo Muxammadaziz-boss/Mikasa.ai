@@ -1,5 +1,5 @@
 // ========== ErrorState.tsx ==========
-// Mikasa AI 7.x — Reusable Inline Error State [Phase 21]
+// Misa AI v9.0.0 — Reusable Inline Error State
 // 3-part structured error: What happened, Why, Action button
 
 import React from "react";

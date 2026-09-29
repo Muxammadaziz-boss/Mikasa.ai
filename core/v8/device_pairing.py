@@ -27,7 +27,7 @@ class DevicePairingSession:
     Doimiy autentifikatsiya yoki masofaviy boshqaruv huquqini bermaydi.
     """
     id: str  # UUID
-    user_id: str  # auth.users.id / MikasaUser UUID
+    user_id: str  # auth.users.id / MisaUser UUID
     pairing_code_hash: str  # SHA-256(salt + ":" + code)
     pairing_code_salt: str  # 16-bayt random salt (hex)
     created_at: float = field(default_factory=time.time)

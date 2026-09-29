@@ -1,80 +1,123 @@
-/* ========== mikasa-7: design tokens ========== */
-/* Mikasa AI 7.0 Design System — Dark, Minimal, Desktop-Native */
+/* ========== Misa AI v9.0: Ultra Glass Design Tokens ========== */
+/* Deep Midnight Canvas (#02060E) & Luminous Violet (#9303C5 / #C04CFD) */
 
 :root {
-  /* 1. Base Backgrounds (Near-Black & Deep Navy) */
-  --bg-darkest: #05070B;
-  --bg-dark: #080C14;
-  --bg-input: rgba(12, 17, 27, 0.85);
-  
-  /* 2. Surfaces (80% Solid / 20% Translucent) */
-  --surface: #0E1422;
-  --surface-elevated: #131A2B;
-  --surface-hover: rgba(255, 255, 255, 0.05);
-  --surface-active: rgba(56, 189, 248, 0.12);
+  /* 1. Core Canvas & Ultra Glass Surfaces */
+  --bg-darkest: #02060E;
+  --background: #02060E;
+  --surface-lowest: #060912;
+  --surface-low: rgba(15, 19, 31, 0.72);
+  --surface: rgba(24, 13, 36, 0.55);
+  --surface-elevated: rgba(33, 20, 48, 0.68);
+  --surface-high: rgba(36, 40, 56, 0.65);
+  --surface-highest: rgba(46, 51, 69, 0.75);
+  --surface-hover: rgba(147, 3, 197, 0.14);
+  --surface-active: rgba(147, 3, 197, 0.24);
+  --surface-card: rgba(18, 13, 29, 0.62);
 
-  /* 3. Primary Accents */
-  --primary: #0284C7;
-  --primary-hover: #0369A1;
-  --primary-glow: #38BDF8;
-  --primary-soft: rgba(2, 132, 199, 0.18);
+  /* Dynamic User Appearance Overrides (controlled from Profile & Settings) */
+  --misa-accent: #9303C5;
+  --misa-accent-glow: #C04CFD;
+  --misa-accent-soft: #E8B3FF;
+  --misa-glass-opacity: 0.65;
+  --misa-blur: 24px;
 
-  /* 4. Secondary & Ambient Tones */
-  --secondary: #06B6D4;
-  --accent: #8B5CF6;
-  --accent-glow: rgba(139, 92, 246, 0.25);
-  --copper-ambient: rgba(245, 158, 11, 0.15);
+  /* 2. Borders & Specular Highlights */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(232, 179, 255, 0.22);
+  --border-violet: rgba(192, 76, 253, 0.35);
+  --border-focus: rgba(192, 76, 253, 0.55);
+  --glass-highlight: rgba(255, 255, 255, 0.14);
 
-  /* 5. Functional Status Colors */
+  /* 3. Typography Hierarchy */
+  --text-primary: #F5F0FF;
+  --text-secondary: #A99AB8;
+  --text-muted: #6D657E;
+
+  /* 4. Brand & Semantic Accents */
+  --primary: var(--misa-accent, #9303C5);
+  --primary-hover: var(--misa-accent-glow, #C04CFD);
+  --primary-glow: var(--misa-accent-glow, #C04CFD);
+  --primary-container: #500075;
+  --secondary: var(--misa-accent-soft, #E8B3FF);
+  --accent-purple: #9303C5;
+  --accent-indigo: #7C3AED;
+  --accent-emerald: #4EDEA3;
+
   --success: #10B981;
-  --success-glow: rgba(16, 185, 129, 0.25);
-  --error: #EF4444;
-  --error-glow: rgba(239, 68, 68, 0.25);
+  --success-glow: #4EDEA3;
   --warning: #F59E0B;
+  --danger: #EF4444;
+  --danger-soft: #FF716C;
 
-  /* 6. Typography High-Contrast Scale */
-  --text-primary: #FFFFFF;
-  --text-secondary: #CBD5E1;
-  --text-muted: #8E9BAE;
-  --text-accent: #38BDF8;
+  /* 5. Typography Scale */
+  --font-display: 'Sora', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family: 'Hanken Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 
-  /* 7. Borders (Subtle hairline glass) */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  --border-active: rgba(56, 189, 248, 0.45);
-  --border-focus: #0284C7;
+  --text-display: 28px;
+  --text-title: 20px;
+  --text-section: 16px;
+  --text-body: 14px;
+  --text-caption: 12px;
+  --text-micro: 11px;
 
-  /* 8. Glassmorphic Tokens */
-  --glass-sidebar: rgba(7, 10, 17, 0.65);
-  --glass-composer: rgba(12, 17, 28, 0.72);
-  --glass-card: rgba(13, 19, 31, 0.55);
-  --glass-card-hover: rgba(20, 28, 45, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-border-cyan: rgba(56, 189, 248, 0.25);
-  --glass-blur: blur(24px);
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
 
-  /* 9. Glow & Shadows */
-  --glow-subtle: 0 4px 24px rgba(2, 132, 199, 0.12);
-  --glow-active: 0 0 20px rgba(56, 189, 248, 0.22);
-  --glow-composer: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.2);
-  --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.6);
+  /* 6. Spacing & Layout */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
 
-  /* 10. Typography Scale */
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-size-display: 34px;
-  --font-size-heading: 18px;
-  --font-size-title: 15px;
-  --font-size-body: 13.5px;
-  --font-size-caption: 12px;
-  --font-size-label: 10.5px;
+  --sidebar-width-expanded: 220px;
+  --sidebar-width-collapsed: 64px;
+  --topbar-height: 68px;
 
-  /* 11. Geometry & Layout */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  /* 7. Radius & Atmospheric Shadows */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-pill: 9999px;
 
-  --topnav-height: 52px;
+  --shadow-sm: 0 4px 16px rgba(2, 6, 14, 0.5);
+  --shadow-md: 0 16px 40px rgba(2, 6, 14, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --shadow-glow: 0 0 28px rgba(147, 3, 197, 0.4), 0 0 60px rgba(192, 76, 253, 0.15);
+  --shadow-glass: 0 20px 50px rgba(2, 6, 14, 0.8), 0 0 35px rgba(147, 3, 197, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* 8. Motion */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Light Mode Adaptive Override (when user selects "Yorug'" in Appearance settings) */
+html.theme-light {
+  --bg-darkest: #F6F3FA;
+  --background: #F6F3FA;
+  --surface-lowest: #FFFFFF;
+  --surface-low: rgba(255, 255, 255, 0.82);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-elevated: rgba(248, 244, 255, 0.9);
+  --surface-card: rgba(255, 255, 255, 0.85);
+  --text-primary: #160C24;
+  --text-secondary: #4E4163;
+  --text-muted: #7D6F94;
+  --border-subtle: rgba(147, 3, 197, 0.14);
+  --border-strong: rgba(147, 3, 197, 0.28);
+}
+
+/* Disable animations when user toggles off UI animations */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }

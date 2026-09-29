@@ -1,5 +1,5 @@
 # ========== test_v6_performance.py ==========
-# Mikasa AI — Performance V2: Lazy Loading, Card Cache, Result Diffing,
+# Misa AI — Performance V2: Lazy Loading, Card Cache, Result Diffing,
 # Navigation Generation Tokens, Lifecycle Hardening, and Stress Tests
 
 import os
@@ -7,7 +7,7 @@ import time
 import unittest
 import customtkinter as ctk
 
-from gui.app import MikasaApp
+from gui.app import MisaApp
 from gui.pages.commands import CommandsPage
 from gui.pages.voice import VoicePage
 from gui.pages.scheduler import SchedulerPage
@@ -16,7 +16,7 @@ from gui.icons import IconEngine
 
 
 class TestV6AppLazyLoading(unittest.TestCase):
-    """Test suite verifying MikasaApp lazy loading, page caching, and navigation state machine"""
+    """Test suite verifying MisaApp lazy loading, page caching, and navigation state machine"""
 
     def setUp(self):
         IconEngine.clear_cache()
@@ -41,7 +41,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_lazy_initialization_on_startup(self):
         """Verify that app startup only initializes home and does NOT instantiate all pages"""
-        self.app = MikasaApp(connect_backend=False, show_splash=False)
+        self.app = MisaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
         # On startup, only initial page (home) should be instantiated
@@ -57,7 +57,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_lazy_navigation_and_page_caching(self):
         """Verify lazy creation on first navigation and instant caching on subsequent visits"""
-        self.app = MikasaApp(connect_backend=False, show_splash=False)
+        self.app = MisaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
         self.assertEqual(len(self.app._pages), 1)
 
@@ -82,7 +82,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_rapid_navigation_cancels_pending_lazy_jobs(self):
         """Verify rapid navigation cancels earlier lazy jobs without crashing or orphaned widgets"""
-        self.app = MikasaApp(connect_backend=False, show_splash=False)
+        self.app = MisaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
         # Rapid clicks without sync (asynchronous path)
@@ -100,7 +100,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_navigation_generation_token_drops_stale_callback(self):
         """Verify stale navigation callback from an earlier requested page is rejected"""
-        self.app = MikasaApp(connect_backend=False, show_splash=False)
+        self.app = MisaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
         initial_gen = self.app._nav_generation

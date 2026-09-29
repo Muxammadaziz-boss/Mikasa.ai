@@ -532,13 +532,13 @@ class TelegramRemoteGateway:
         last_seen = device_info.get("last_seen", "Hozirgina")
 
         return (
-            f"🖥️ **MIKASA AI — Kompyuter Holati**\n\n"
+            f"🖥️ **MISA AI — Kompyuter Holati**\n\n"
             f"• **Holat:** {state_str}\n"
             f"• **Qurilma:** `{hostname}`\n"
             f"• **Tizim:** {os_info}\n"
             f"• **IP / MAC:** `{device_info.get('local_ip', '127.0.0.1')}` / `{device_info.get('mac_address', 'N/A')}`\n"
             f"• **Oxirgi faollik:** `{last_seen}`\n"
-            f"• **Versiya:** Mikasa v8.0.0"
+            f"• **Versiya:** Misa v8.0.0"
         )
 
     # ========================================================
@@ -609,7 +609,7 @@ class TelegramRemoteGateway:
         bar = "█" * filled + "░" * unfilled
 
         text = (
-            f"⚡ **Mikasa Masofaviy Boshqaruv**\n"
+            f"⚡ **Misa Masofaviy Boshqaruv**\n"
             f"`[{bar}] {pct}%`\n\n"
             f"[{current_step}/{total_steps}] {message}"
         )

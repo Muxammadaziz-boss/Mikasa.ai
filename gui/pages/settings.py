@@ -20,7 +20,7 @@ def _safe_remove(path):
 
 
 class SettingsPage(ctk.CTkFrame):
-    """Mikasa AI umumiy sozlamalar sahifasi"""
+    """Misa AI umumiy sozlamalar sahifasi"""
 
     def __init__(self, master, app=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)

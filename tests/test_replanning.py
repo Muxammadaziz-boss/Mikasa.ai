@@ -1,5 +1,5 @@
 # ========== test_replanning.py ==========
-# Mikasa AI 7.x — Unit Tests for Replanning Engine 2.0 (ReplanningEngine)
+# Misa AI 7.x — Unit Tests for Replanning Engine 2.0 (ReplanningEngine)
 
 import unittest
 from unittest.mock import MagicMock

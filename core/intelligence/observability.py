@@ -1,5 +1,5 @@
 # ========== observability.py ==========
-# Mikasa AI 7.x — Context Observability, Pipeline Tracing & Memory Metrics
+# Misa AI 7.x — Context Observability, Pipeline Tracing & Memory Metrics
 # Process-Local, Bounded, Sensitive-Redacted Telemetry Subsystem
 
 import re

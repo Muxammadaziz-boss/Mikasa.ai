@@ -127,7 +127,7 @@ def execute_app_list(params: Dict[str, Any]) -> Dict[str, Any]:
             {"name": "explorer.exe", "pid": 1104},
             {"name": "chrome.exe", "pid": 4820},
             {"name": "code.exe", "pid": 8920},
-            {"name": "Mikasa.exe", "pid": 1042}
+            {"name": "Misa.exe", "pid": 1042}
         ]
 
     return {

@@ -14,12 +14,12 @@ from agent.lifecycle import AgentLifecycleManager
 from agent.startup import WindowsStartupManager
 from agent.audit import AgentAuditLogger
 
-logger = logging.getLogger("mikasa.agent.main")
+logger = logging.getLogger("misa.agent.main")
 
 
 class WindowsAgent:
     """
-    Mikasa Windows PC Agentining bosh koordinatori.
+    Misa Windows PC Agentining bosh koordinatori.
     Dasturiy va CLI interfeyslarini taqdim etadi.
     """
 
@@ -50,7 +50,7 @@ class WindowsAgent:
         """Qurilma holati va identifikatorini chiqarish"""
         ident = self.lifecycle.identity
         print("=" * 60)
-        print(" MIKASA WINDOWS AGENT — STATUS")
+        print(" MISA WINDOWS AGENT - STATUS")
         print("=" * 60)
         print(f"Device ID:          {ident.device_id}")
         print(f"Device Name:        {ident.name}")
@@ -87,8 +87,8 @@ class WindowsAgent:
 def main():
     """CLI buyruqlar satri kirish nuqtasi"""
     parser = argparse.ArgumentParser(
-        description="Mikasa AI — Production Windows PC Agent (Phase 45)",
-        prog="MikasaAgent"
+        description="Misa AI - Production Windows PC Agent (Phase 45)",
+        prog="MisaAgent"
     )
     subparsers = parser.add_subparsers(dest="command", help="Amallar")
 

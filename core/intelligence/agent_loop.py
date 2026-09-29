@@ -1,5 +1,5 @@
 # ========== agent_loop.py ==========
-# Mikasa AI 7.x — Agentic Multi-Step Intelligence Loop
+# Misa AI 7.x — Agentic Multi-Step Intelligence Loop
 # PLAN → ACT → OBSERVE → VERIFY → CONTINUE → COMPLETE
 # Deterministic, Bounded, Permission-Aware & Observability-Integrated
 
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 class AgentLoop:
     """
-    Mikasa AI Agentik Ko'p Bosqichli Boshqaruv Dvigateli.
+    Misa AI Agentik Ko'p Bosqichli Boshqaruv Dvigateli.
     PLAN → ACT → OBSERVE → VERIFY → CONTINUE siklini chegaralangan,
     xavfsiz, deterministik va to'liq kuzatiladigan tarzda boshqaradi.
     """

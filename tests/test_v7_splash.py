@@ -1,17 +1,17 @@
 # ========== tests/test_v7_splash.py ==========
-# Mikasa AI 7.0 — Splash Screen & MikasaOrb Unit Tests
+# Misa AI 7.0 — Splash Screen & MisaOrb Unit Tests
 
 import unittest
 import time
 import customtkinter as ctk
 from gui.icons import VectorIconEngine
-from gui.orb import MikasaOrb
-from gui.splash import MikasaSplashScreen, MikasaLoadingBar
-from gui.app import MikasaApp
+from gui.orb import MisaOrb
+from gui.splash import MisaSplashScreen, MisaLoadingBar
+from gui.app import MisaApp
 
 
-class TestV7MikasaOrb(unittest.TestCase):
-    """MikasaOrb vizual yadrosi unit testlari"""
+class TestV7MisaOrb(unittest.TestCase):
+    """MisaOrb vizual yadrosi unit testlari"""
 
     def setUp(self):
         VectorIconEngine.clear_cache()
@@ -27,7 +27,7 @@ class TestV7MikasaOrb(unittest.TestCase):
 
     def test_orb_initialization_and_states(self):
         """Orb to'g'ri yaratilishi va holatlari tekshiruvi"""
-        orb = MikasaOrb(self.root, size=200, state="loading")
+        orb = MisaOrb(self.root, size=200, state="loading")
         self.root.update()
 
         self.assertEqual(orb.get_state(), "loading")
@@ -51,13 +51,13 @@ class TestV7MikasaOrb(unittest.TestCase):
         orb.destroy()
 
     def test_orb_backward_compatibility_alias(self):
-        """AppleSiriOrb = MikasaOrb ekanligi va mavjud kod bilan ishlashi"""
+        """AppleSiriOrb = MisaOrb ekanligi va mavjud kod bilan ishlashi"""
         from gui.components import AppleSiriOrb
-        self.assertIs(AppleSiriOrb, MikasaOrb)
+        self.assertIs(AppleSiriOrb, MisaOrb)
 
 
-class TestV7MikasaLoadingBar(unittest.TestCase):
-    """MikasaLoadingBar progress indikatori testlari"""
+class TestV7MisaLoadingBar(unittest.TestCase):
+    """MisaLoadingBar progress indikatori testlari"""
 
     def setUp(self):
         VectorIconEngine.clear_cache()
@@ -72,7 +72,7 @@ class TestV7MikasaLoadingBar(unittest.TestCase):
         VectorIconEngine.clear_cache()
 
     def test_loading_bar_progress_modes(self):
-        bar = MikasaLoadingBar(self.root, width=200, height=2)
+        bar = MisaLoadingBar(self.root, width=200, height=2)
         self.root.update()
 
         self.assertIsNone(bar._progress)
@@ -88,7 +88,7 @@ class TestV7MikasaLoadingBar(unittest.TestCase):
 
 
 class TestV7SplashScreen(unittest.TestCase):
-    """MikasaSplashScreen komponenti testlari"""
+    """MisaSplashScreen komponenti testlari"""
 
     def setUp(self):
         VectorIconEngine.clear_cache()
@@ -104,7 +104,7 @@ class TestV7SplashScreen(unittest.TestCase):
 
     def test_splash_screen_structure_and_hierarchy(self):
         """Splash ekranning to'liq vizual strukturasi va elementlari"""
-        splash = MikasaSplashScreen(self.root)
+        splash = MisaSplashScreen(self.root)
         splash.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
         self.root.update()
 
@@ -115,7 +115,7 @@ class TestV7SplashScreen(unittest.TestCase):
 
         # 2. Markaziy kontent
         self.assertTrue(hasattr(splash, "orb"))
-        self.assertIsInstance(splash.orb, MikasaOrb)
+        self.assertIsInstance(splash.orb, MisaOrb)
         self.assertEqual(splash.orb.get_state(), "loading")
 
         self.assertTrue(hasattr(splash, "brand_title"))
@@ -142,7 +142,7 @@ class TestV7SplashScreen(unittest.TestCase):
 
     def test_splash_fade_out_and_destroy(self):
         """Splash ekranning silliq so'nishi va tozalanishi"""
-        splash = MikasaSplashScreen(self.root)
+        splash = MisaSplashScreen(self.root)
         splash.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
         self.root.update()
 
@@ -157,8 +157,8 @@ class TestV7SplashScreen(unittest.TestCase):
         self.assertFalse(splash.winfo_exists())
 
 
-class TestV7MikasaAppStartupIntegration(unittest.TestCase):
-    """MikasaApp bilan Splash integratsiyasi testlari"""
+class TestV7MisaAppStartupIntegration(unittest.TestCase):
+    """MisaApp bilan Splash integratsiyasi testlari"""
 
     def setUp(self):
         VectorIconEngine.clear_cache()
@@ -168,7 +168,7 @@ class TestV7MikasaAppStartupIntegration(unittest.TestCase):
 
     def test_app_with_splash_startup(self):
         """App splash bilan ishga tushishi va keyin asosiy oynaga o'tishi"""
-        app = MikasaApp(connect_backend=False, show_splash=True)
+        app = MisaApp(connect_backend=False, show_splash=True)
         app.withdraw()
         app.update()
 
@@ -201,7 +201,7 @@ class TestV7MikasaAppStartupIntegration(unittest.TestCase):
 
     def test_app_without_splash(self):
         """show_splash=False berilganda to'g'ridan-to'g'ri asosiy oyna ochilishi"""
-        app = MikasaApp(connect_backend=False, show_splash=False)
+        app = MisaApp(connect_backend=False, show_splash=False)
         app.withdraw()
         app.update()
 

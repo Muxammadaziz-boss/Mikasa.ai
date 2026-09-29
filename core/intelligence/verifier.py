@@ -1,5 +1,5 @@
 # ========== verifier.py ==========
-# Mikasa AI 7.x — Step Verification Engine
+# Misa AI 7.x — Step Verification Engine
 # Deterministic & Semantic Verification for Agentic Plan Execution
 
 import logging

@@ -96,7 +96,7 @@ class TestAccountAPI(unittest.TestCase):
                 "name": "Muhammadaziz",
                 "avatar": "purple",
                 "role": "Bosh Muhandis",
-                "bio": "Mikasa AI yaratuvchisi",
+                "bio": "Misa AI yaratuvchisi",
                 "language": "uz",
             }
             resp = await handle_account_update(MockRequest(json_data=update_payload))
@@ -112,7 +112,7 @@ class TestAccountAPI(unittest.TestCase):
             self.assertEqual(get_data.get("name"), "Muhammadaziz")
             self.assertEqual(get_data.get("avatar"), "purple")
             self.assertEqual(get_data.get("role"), "Bosh Muhandis")
-            self.assertEqual(get_data.get("bio"), "Mikasa AI yaratuvchisi")
+            self.assertEqual(get_data.get("bio"), "Misa AI yaratuvchisi")
 
         asyncio.run(_run())
 

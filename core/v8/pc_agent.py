@@ -1,5 +1,5 @@
 # ========== core/v8/pc_agent.py ==========
-# Phase 35/36 — Mikasa PC Agent Service
+# Phase 35/36 — Misa PC Agent Service
 # Gateway Connection, Heartbeat, Device Registry Pairing, Reconnect & Safe Tool Execution
 
 import time
@@ -16,7 +16,7 @@ from core.agent_tools import get_registry
 logger = logging.getLogger("core.v8.pc_agent")
 
 
-class MikasaPCAgent:
+class MisaPCAgent:
     """
     Foydalanuvchi kompyuterida ishlovchi agent.
     Gatewayga ulanish, pairing tekshiruvi, davriy heartbeat jo'natish
@@ -206,7 +206,7 @@ class MikasaPCAgent:
                 }
 
         else:
-            # 4. Mikasa Tool System 2.0 yoki RemoteToolRegistry orqali chaqirish
+            # 4. Misa Tool System 2.0 yoki RemoteToolRegistry orqali chaqirish
             reg = get_registry()
             tool = reg.get(action)
             if tool:

@@ -1,6 +1,6 @@
 # ========== packaging/build_agent.py ==========
 # Phase 45 — Windows Agent Build Automation Script
-# Builds MikasaAgent.exe standalone binary with strict security checks
+# Builds MisaAgent.exe standalone binary with strict security checks
 
 import os
 import sys
@@ -91,9 +91,9 @@ def build_binary() -> bool:
 
 def post_build_verify() -> bool:
     """Post-build executable verification"""
-    exe_path = os.path.join(DIST_DIR, "MikasaAgent.exe")
+    exe_path = os.path.join(DIST_DIR, "MisaAgent.exe")
     if sys.platform != "win32":
-        exe_path = os.path.join(DIST_DIR, "MikasaAgent")
+        exe_path = os.path.join(DIST_DIR, "MisaAgent")
 
     if not os.path.exists(exe_path):
         logger.error(f"[Post-Build] Executable not found at {exe_path}")
@@ -131,7 +131,7 @@ def main():
     if not post_build_verify():
         sys.exit(1)
 
-    logger.info("[SUCCESS] MikasaAgent binar fayli tayyor!")
+    logger.info("[SUCCESS] MisaAgent binar fayli tayyor!")
 
 
 if __name__ == "__main__":

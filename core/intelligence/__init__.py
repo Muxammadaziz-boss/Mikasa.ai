@@ -1,5 +1,5 @@
 # ========== __init__.py ==========
-# Mikasa AI 7.x — Intelligence Core Package
+# Misa AI 7.x — Intelligence Core Package
 # Modular Intelligence Architecture (Context -> Intent -> Reasoning -> Decision -> Tool -> Verification -> Response)
 
 from core.intelligence.types import (

@@ -1,5 +1,5 @@
 // ========== updateService.ts ==========
-// Mikasa AI 8.0.0 — Phase 48: Desktop Auto-Update Client Service
+// Misa AI v9.0.0 — Desktop Auto-Update Client Service
 // Interacts with backend update routes: /api/updates/*
 
 const DEFAULT_API_URL = "http://127.0.0.1:18420";
@@ -30,6 +30,7 @@ export interface UpdateArtifact {
 }
 
 export interface UpdateCheckResponse {
+  ok?: boolean;
   update_available: boolean;
   current_version: string;
   target_version?: string;

@@ -12,7 +12,7 @@ from core.v8.heartbeat import DeviceState, HeartbeatManager
 from core.v8.wol import WakeOnLanManager
 from core.v8.envelope import EnvelopeManager, RemoteCommandEnvelope
 from core.v8.telegram_gateway import TelegramRemoteGateway
-from core.v8.pc_agent import MikasaPCAgent
+from core.v8.pc_agent import MisaPCAgent
 from core.v8.planning_remote import create_remote_wake_and_verify_dag
 from core.v8.events import RemoteEventType, RemoteAuditLogger
 from core.v8.auth_session import RemoteAuthEngine, SessionManager
@@ -25,7 +25,7 @@ logger = logging.getLogger("core.v8.orchestrator")
 
 class RemoteOrchestrator:
     """
-    Mikasa AI v8.0.0 Masofaviy Boshqaruv Markaziy Koordinatori.
+    Misa AI v8.0.0 Masofaviy Boshqaruv Markaziy Koordinatori.
     Barcha qatlamlarni birlashtiradi va xavfsiz boshqaradi:
     Telegram -> User Linking -> Permission Center -> Session Auth -> Envelope/RateLimit -> Intent/DAG -> WoL -> Tool System 2.0 -> PC Agent.
     """
@@ -37,7 +37,7 @@ class RemoteOrchestrator:
         wol_manager: Optional[WakeOnLanManager] = None,
         envelope_manager: Optional[EnvelopeManager] = None,
         device_registry: Optional[DeviceRegistry] = None,
-        pc_agent: Optional[MikasaPCAgent] = None,
+        pc_agent: Optional[MisaPCAgent] = None,
         session_manager: Optional[SessionManager] = None,
         auth_engine: Optional[RemoteAuthEngine] = None,
         user_linking: Optional[UserLinkingStore] = None,
@@ -57,7 +57,7 @@ class RemoteOrchestrator:
             envelope_manager=self.envelope_manager,
             wol_manager=self.wol_manager
         )
-        self.pc_agent = pc_agent or MikasaPCAgent(
+        self.pc_agent = pc_agent or MisaPCAgent(
             heartbeat_manager=self.heartbeat_manager,
             envelope_manager=self.envelope_manager,
             device_registry=self.device_registry
@@ -146,16 +146,16 @@ class RemoteOrchestrator:
             self._audit.log(RemoteEventType.REMOTE_REQUEST_DENIED, user_id=user_str, reason="Unauthorized")
             await self.gateway.transport.send_message(
                 chat_id,
-                "⛔ **Ruxsat berilmadi!**\nSizning Telegram hisobingiz Mikasa tizimiga bog'lanmagan. "
+                "⛔ **Ruxsat berilmadi!**\nSizning Telegram hisobingiz Misa tizimiga bog'lanmagan. "
                 "Ilovada 'Telegram ulash' tugmasini bosing va `/pair MK-XXXXXX` kodini yuboring."
             )
             return {"success": False, "error": "UNAUTHORIZED", "user_id": user_str}
 
         self._audit.log(RemoteEventType.REMOTE_REQUEST_AUTHORIZED, user_id=user_str)
 
-        # 3. Qurilmani va Mikasa hisobini aniqlash
+        # 3. Qurilmani va Misa hisobini aniqlash
         link = self.user_linking.get_link_by_telegram(user_str)
-        effective_user_id = link.mikasa_user_id if link else (
+        effective_user_id = link.misa_user_id if link else (
             "admin" if self.gateway.is_authorized(user_str) else user_str
         )
         device = self.resolve_target_device(user_str)
@@ -234,7 +234,7 @@ class RemoteOrchestrator:
             linked = self.user_linking.get_link_by_telegram(user_str)
             dev_str = f"`{linked.device_id}`" if linked else "Bog'lanmagan"
             msg = (
-                f"👤 **Mikasa Foydalanuvchi Hisobi:**\n"
+                f"👤 **Misa Foydalanuvchi Hisobi:**\n"
                 f"• Telegram Numeric ID: `{user_str}`\n"
                 f"• Bog'langan qurilma: {dev_str}\n"
                 f"• Telegram Gateway: Faol"
@@ -257,7 +257,7 @@ class RemoteOrchestrator:
                     chat_id,
                     "✅ **Parol tasdiqlandi! Masofaviy sessiya ochildi.**\n\n"
                     "⏱️ Sessiya muddati: 15 daqiqa.\n"
-                    "🤖 Mikasa Agent: READY\n\n"
+                    "🤖 Misa Agent: READY\n\n"
                     "Masofaviy buyruqlarni yuborishingiz mumkin."
                 )
                 return {
@@ -636,7 +636,7 @@ class RemoteOrchestrator:
         """
         user_str = str(user_id) if user_id is not None else ""
         link = self.user_linking.get_link_by_telegram(user_str)
-        effective_user_id = link.mikasa_user_id if link else (
+        effective_user_id = link.misa_user_id if link else (
             "admin" if self.gateway.is_authorized(user_str) else user_str
         )
         self._audit.log(RemoteEventType.WOL_REQUESTED, device_id=device_id, user_id=user_str)
@@ -743,9 +743,9 @@ class RemoteOrchestrator:
             remaining = self.auth_engine.get_remaining_attempts(user_str) if user_str else 3
             final_text = (
                 "⚡ **Kompyuterni uyg'otish boshlandi.**\n\n"
-                "⏳ Mikasa PC Agent kutilmoqda...\n\n"
+                "⏳ Misa PC Agent kutilmoqda...\n\n"
                 "🟢 **Kompyuter online bo'ldi.**\n"
-                "🤖 **Mikasa Agent:** READY\n\n"
+                "🤖 **Misa Agent:** READY\n\n"
                 "🔐 **Parolni tasdiqlang!**\n"
                 "Masofaviy sessiyani ochish uchun maxfiy parol yoki PIN kodni yuboring.\n"
                 f"⏳ Qolgan urinishlar: `{remaining}` ta\n\n"

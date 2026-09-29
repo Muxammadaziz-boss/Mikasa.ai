@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase45.py ==========
-# Mikasa AI v8.0.0 — Phase 45: Real Windows PC Agent Production-Grade Suite
+# Misa AI v8.0.0 — Phase 45: Real Windows PC Agent Production-Grade Suite
 # Comprehensive Test Suite covering 30 requirements:
 #  1. Identity: Stable device_id across multiple invocations (same hardware)
 #  2. Identity: Hardware fingerprint determinism and format
@@ -122,7 +122,7 @@ class TestPhase45WindowsAgent(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self._orig_env = dict(os.environ)
-        self.tmp_dir = tempfile.mkdtemp(prefix="mikasa_agent_test_")
+        self.tmp_dir = tempfile.mkdtemp(prefix="misa_agent_test_")
         self.vault_dir = os.path.join(self.tmp_dir, "vault")
         os.makedirs(self.vault_dir, exist_ok=True)
         self.audit = AgentAuditLogger.get_instance()
@@ -224,7 +224,7 @@ class TestPhase45WindowsAgent(unittest.IsolatedAsyncioTestCase):
     # 9. Transport: TLS verification mandatory
     def test_09_transport_tls_verification_mandatory(self):
         transport = SecureTransport(
-            backend_url="https://mikasa-secure.internal:18420",
+            backend_url="https://misa-secure.internal:18420",
             device_id="dev-tls-1"
         )
         self.assertTrue(transport.verify_ssl)
@@ -595,7 +595,7 @@ class TestPhase45WindowsAgent(unittest.IsolatedAsyncioTestCase):
         guidance = WindowsStartupManager.get_service_guidance()
         self.assertFalse(guidance["uac_bypass"])
         self.assertFalse(guidance["stealth"])
-        self.assertIn("MikasaAgent", guidance["task_scheduler_cmd"])
+        self.assertIn("MisaAgent", guidance["task_scheduler_cmd"])
 
         # Check enable / disable executes safely
         if not WindowsStartupManager.is_windows():

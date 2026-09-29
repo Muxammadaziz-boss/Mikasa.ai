@@ -1,5 +1,5 @@
 # ========== adapter.py ==========
-# Mikasa AI 7.x — Compatibility Adapter
+# Misa AI 7.x — Compatibility Adapter
 # Bridges Intelligence Core with Existing Frontend & Legacy AI Engine Contracts
 
 import datetime

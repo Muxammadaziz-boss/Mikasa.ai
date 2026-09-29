@@ -161,7 +161,7 @@ FAQAT JSON QAYTARING. BOSHQA HECH NARSA YOZMANG.
 
 
 def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
-    """AI ga savol yuborish — Mikasa Intelligence Core orqali
+    """AI ga savol yuborish — Misa Intelligence Core orqali
     (Context -> Intent -> Reasoning -> Decision -> Tool -> Verification -> Response)
     Har qanday nosozlikda an'anaviy to'g'ridan-to'g'ri fallback saqlanadi.
     """

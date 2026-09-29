@@ -1,5 +1,5 @@
 # ========== memory_retriever.py ==========
-# Mikasa AI 7.x — Deterministic Memory Retrieval & Multi-Factor Ranking
+# Misa AI 7.x — Deterministic Memory Retrieval & Multi-Factor Ranking
 # High-Relevance Context Scoring without Heavy External Vector Databases
 
 import re

@@ -1,5 +1,5 @@
 # ========== validator.py ==========
-# Mikasa AI 7.x — Parameter Validation & Sanitization Engine
+# Misa AI 7.x — Parameter Validation & Sanitization Engine
 # Strict Type Checking, Required Field Enforcement & Injection Defense
 
 import re

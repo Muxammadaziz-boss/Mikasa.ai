@@ -1,5 +1,5 @@
 // ========== backendService.ts ==========
-// Mikasa AI 8.0.0 — Desktop Frontend to Python Backend Connector
+// Misa AI v9.0.0 — Desktop Frontend to Python Backend Connector
 // Connects to local aiohttp API Server at http://127.0.0.1:18420
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
@@ -97,10 +97,11 @@ export function formatAuthError(err: any): string {
   if (
     msg.includes("identity_already_exists") ||
     msg.includes("already linked") ||
-    msg.includes("boshqa Mikasa akkauntiga ulangan") ||
+    msg.includes("boshqa Misa akkauntiga ulangan") ||
+    msg.includes("boshqa Misa akkauntiga ulangan") ||
     msg.includes("Identity is already linked")
   ) {
-    return "Bu Google hisob allaqachon boshqa Mikasa akkauntiga ulangan.";
+    return "Bu Google hisob allaqachon boshqa Misa akkauntiga ulangan.";
   }
   if (
     msg.includes("bad_oauth_state") ||
@@ -134,6 +135,7 @@ export interface BackendStatus {
 export interface ChatResponse {
   ok: boolean;
   response: string;
+  reply?: string;
   user?: string;
   mode?: string;
   timestamp?: string;
@@ -164,6 +166,7 @@ export interface KnowledgeItem {
   key: string;
   value: string;
   content?: string;
+  category?: string;
   type?: "fact" | "preference" | "work_context" | "task" | "note" | string;
   source?: "user" | "conversation" | "system" | string;
   importance?: number;
@@ -178,12 +181,19 @@ export interface KnowledgeItem {
   superseded_by?: string | null;
 }
 
+export type StructuredMemoryItem = KnowledgeItem;
+
 export interface MemoryPolicyConfig {
-  do_not_remember_all: boolean;
+  do_not_remember_all?: boolean;
   do_not_remember?: boolean;
-  blocked_types: string[];
-  blocked_keys: string[];
+  blocked_types?: string[];
+  blocked_keys?: string[];
+  can_remember?: boolean;
+  save_episodes?: boolean;
+  allow_profile_learning?: boolean;
 }
+
+export type MemoryPrivacySettings = MemoryPolicyConfig;
 
 export interface MemoryMetrics {
   total_memories: number;
@@ -215,6 +225,10 @@ export interface ContextTraceStageItem {
 export interface ContextTraceItem {
   trace_id: string;
   query?: string;
+  input_summary?: string;
+  operation?: string;
+  model_used?: string;
+  status?: string;
   timestamp: string;
   total_duration_ms: number;
   duration_ms?: number;
@@ -222,6 +236,8 @@ export interface ContextTraceItem {
   stages: ContextTraceStageItem[];
   success?: boolean;
 }
+
+export type TraceItem = ContextTraceItem;
 
 export interface ContextTurn {
   role: string;
@@ -233,7 +249,11 @@ export interface MemoryResponse {
   ok: boolean;
   profile: Record<string, any>;
   knowledge: KnowledgeItem[];
-  conversations: Array<{ user: string; agent: string; time: string }>;
+  structured_facts?: KnowledgeItem[];
+  facts?: Record<string, any> | KnowledgeItem[];
+  privacy?: MemoryPolicyConfig;
+  working_memory?: Array<Record<string, any>>;
+  conversations: Array<{ user: string; agent: string; assistant?: string; time: string; timestamp?: string }>;
   context?: ContextTurn[];
   stats: {
     kontekst_hajmi?: number;
@@ -242,6 +262,8 @@ export interface MemoryResponse {
     faol_bilimlar_soni?: number;
     pinned_bilimlar_soni?: number;
     profil_toliq?: boolean;
+    facts_count?: number;
+    [key: string]: any;
   };
 }
 
@@ -250,10 +272,14 @@ export type TaskStatus = "active" | "completed" | "repeating" | "failed" | "canc
 export interface ScheduledTaskItem {
   id: string;
   task_id?: string;
+  title?: string;
+  command?: string;
+  trigger_time?: string;
   type: string;
   task_type?: string;
   run_at: string;
   run_at_iso?: string;
+  time_str?: string;
   data: { text?: string; [key: string]: any };
   completed: boolean;
   enabled: boolean;
@@ -265,6 +291,8 @@ export interface ScheduledTaskItem {
   status: TaskStatus;
   created_at?: string;
 }
+
+export type SchedulerTask = ScheduledTaskItem;
 
 export interface SchedulerResponse {
   ok: boolean;
@@ -348,6 +376,7 @@ export interface AccountAppInfo {
 export interface AccountSettings {
   ok: boolean;
   name: string;
+  email?: string;
   avatar?: string;
   role?: string;
   bio?: string;
@@ -366,6 +395,8 @@ export interface AccountSettings {
   ai_mode?: string;
   thinking_enabled?: boolean;
   has_gemini_key?: boolean;
+  api_key_masked?: string;
+  settings?: Record<string, any>;
   version: string;
   app_info?: AccountAppInfo;
   notifications?: AccountNotificationSettings;
@@ -405,8 +436,11 @@ export interface SystemMetrics {
   timestamp: string;
 }
 
+export type SystemTelemetry = SystemMetrics;
+
 export interface PlanStepData {
   step_id: string;
+  id?: string;
   order: number;
   intent: string;
   tool: string;
@@ -417,6 +451,7 @@ export interface PlanStepData {
   required_capability?: string;
   parameters: Record<string, any>;
   expected_result?: string;
+  result_summary?: string;
   risk_level: "low" | "medium" | "high";
   status: "pending" | "running" | "completed" | "failed" | "skipped" | "waiting_confirmation";
   retry_count: number;
@@ -432,6 +467,8 @@ export interface PlanStepData {
   };
   error?: string;
 }
+
+export type AgentStepItem = PlanStepData;
 
 export interface AgentPlanData {
   plan_id: string;
@@ -461,6 +498,8 @@ export interface AgentPlanData {
   }>;
   metadata?: Record<string, any>;
 }
+
+export type AgentPlanEvent = AgentPlanData;
 
 export interface AgentExecutionStateData {
   state: string;
@@ -520,6 +559,8 @@ export interface PairingCodeResponse {
 
 export interface RemoteAuditItem {
   event_id: string;
+  id?: string;
+  action?: string;
   timestamp: string;
   event_type: string;
   telegram_user_id?: string;
@@ -528,8 +569,10 @@ export interface RemoteAuditItem {
   details?: Record<string, any>;
 }
 
+export type AuditItem = RemoteAuditItem;
+
 export const DEFAULT_API_URL = "http://127.0.0.1:18420";
-export const PRODUCTION_API_URL = "https://mikasa-v8-api-production.up.railway.app";
+export const PRODUCTION_API_URL = "https://misa.up.railway.app";
 
 const FORBIDDEN_FRONTEND_PORTS = new Set(["140", "1420", "1421", "5173"]);
 const OAUTH_STATE_REGEX = /^[A-Za-z0-9_\-.:]{1,256}$/;
@@ -604,7 +647,7 @@ export function resolveApiBase(win?: any, envOverride?: Record<string, any>): st
   if (w) {
     let customUrl = "";
     try {
-      customUrl = String(w.localStorage?.getItem("mikasa_backend_url") || "").trim();
+      customUrl = String(w.localStorage?.getItem("misa_backend_url") || "").trim();
     } catch {}
 
     const isProdWeb = isProductionWebRuntime(w);
@@ -890,13 +933,13 @@ class BackendService {
           } else if (payload.type === "account_updated" && payload.data) {
             if (payload.data.name) {
               try {
-                localStorage.setItem("mikasa_user_name", payload.data.name);
+                localStorage.setItem("misa_user_name", payload.data.name);
               } catch {}
               this.notifyStatus({ ...this.currentStatus, user: payload.data.name });
             }
             if (payload.data.avatar) {
               try {
-                localStorage.setItem("mikasa_user_avatar", payload.data.avatar);
+                localStorage.setItem("misa_user_avatar", payload.data.avatar);
               } catch {}
             }
             this.accountListeners.forEach((cb) => {
@@ -978,7 +1021,7 @@ class BackendService {
       const data: BackendStatus = await res.json();
       if (data.user) {
         try {
-          localStorage.setItem("mikasa_user_name", data.user);
+          localStorage.setItem("misa_user_name", data.user);
         } catch {}
       }
       this.notifyStatus(data);
@@ -987,7 +1030,7 @@ class BackendService {
       }
       return data;
     } catch {
-      const cachedUser = localStorage.getItem("mikasa_user_name") || undefined;
+      const cachedUser = localStorage.getItem("misa_user_name") || undefined;
       // Agar HTTP hali javob bermasa, Rust Tauri supervisoridan xizmat ishga tushayotganini tekshirish
       try {
         const { invoke } = await import("@tauri-apps/api/core");
@@ -1493,16 +1536,29 @@ class BackendService {
   }
 
   public async addSchedulerTask(
-    text: string,
+    textOrPayload: string | { title?: string; text?: string; time_str?: string; delay_minutes?: number; repeat_minutes?: number; type?: string },
     delayMinutes = 15,
     repeatMinutes = 0,
     type = "reminder"
-  ): Promise<{ ok: boolean; message?: string }> {
+  ): Promise<{ ok: boolean; message?: string; task?: ScheduledTaskItem }> {
     try {
+      let body: Record<string, any>;
+      if (typeof textOrPayload === "string") {
+        body = { text: textOrPayload, delay_minutes: delayMinutes, repeat_minutes: repeatMinutes, type };
+      } else {
+        body = {
+          text: textOrPayload.title || textOrPayload.text || "",
+          title: textOrPayload.title || textOrPayload.text || "",
+          time_str: textOrPayload.time_str,
+          delay_minutes: textOrPayload.delay_minutes ?? delayMinutes,
+          repeat_minutes: textOrPayload.repeat_minutes ?? repeatMinutes,
+          type: textOrPayload.type || type,
+        };
+      }
       const res = await fetch(`${API_BASE}/api/scheduler/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, delay_minutes: delayMinutes, repeat_minutes: repeatMinutes, type }),
+        body: JSON.stringify(body),
       });
       return await res.json();
     } catch (err: any) {
@@ -1682,14 +1738,14 @@ class BackendService {
 
   // ========== 6. HISOB VA SOZLAMALAR ==========
   public async getAccount(): Promise<AccountSettings> {
-    const cachedName = localStorage.getItem("mikasa_user_name") || "Ustoz";
+    const cachedName = localStorage.getItem("misa_user_name") || "Ustoz";
     try {
       const res = await fetch(`${API_BASE}/api/account`, { method: "GET" });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data: AccountSettings = await res.json();
       if (data.name) {
         try {
-          localStorage.setItem("mikasa_user_name", data.name);
+          localStorage.setItem("misa_user_name", data.name);
         } catch {}
       }
       return data;
@@ -1728,14 +1784,14 @@ class BackendService {
   ): Promise<{ ok: boolean; message: string; [key: string]: any }> {
     if (data.name) {
       try {
-        localStorage.setItem("mikasa_user_name", data.name);
+        localStorage.setItem("misa_user_name", data.name);
       } catch {}
       this.currentStatus.user = data.name;
       this.notifyStatus({ ...this.currentStatus, user: data.name });
     }
     if (data.avatar) {
       try {
-        localStorage.setItem("mikasa_user_avatar", data.avatar);
+        localStorage.setItem("misa_user_avatar", data.avatar);
       } catch {}
     }
     try {
@@ -1747,14 +1803,14 @@ class BackendService {
       const result = await res.json();
       if (result.name) {
         try {
-          localStorage.setItem("mikasa_user_name", result.name);
+          localStorage.setItem("misa_user_name", result.name);
         } catch {}
         this.currentStatus.user = result.name;
         this.notifyStatus({ ...this.currentStatus, user: result.name });
       }
       if (result.avatar) {
         try {
-          localStorage.setItem("mikasa_user_avatar", result.avatar);
+          localStorage.setItem("misa_user_avatar", result.avatar);
         } catch {}
       }
       return result;
@@ -1816,7 +1872,7 @@ class BackendService {
   }
 
   public getUserName(): string {
-    return this.currentStatus.user || localStorage.getItem("mikasa_user_name") || "Ustoz";
+    return this.currentStatus.user || localStorage.getItem("misa_user_name") || "Ustoz";
   }
 
   // ========== Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi ==========
@@ -1939,11 +1995,11 @@ class BackendService {
     return this.getAuthHeaders();
   }
 
-  public async startTelegramLink(mikasaUserId?: string): Promise<TelegramLinkStartResponse> {
+  public async startTelegramLink(misaUserId?: string): Promise<TelegramLinkStartResponse> {
     try {
       const bodyPayload: Record<string, any> = {};
-      if (mikasaUserId && mikasaUserId !== "admin") {
-        bodyPayload.mikasa_user_id = mikasaUserId;
+      if (misaUserId && misaUserId !== "admin") {
+        bodyPayload.misa_user_id = misaUserId;
       }
       const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/link/start`, {
@@ -1985,12 +2041,12 @@ class BackendService {
 
   public async getTelegramLinkStatus(
     requestId?: string,
-    mikasaUserId?: string
+    misaUserId?: string
   ): Promise<TelegramLinkStatusResponse> {
     try {
       const params = new URLSearchParams();
       if (requestId) params.append("request_id", requestId);
-      if (mikasaUserId && mikasaUserId !== "admin") params.append("mikasa_user_id", mikasaUserId);
+      if (misaUserId && misaUserId !== "admin") params.append("misa_user_id", misaUserId);
       const queryString = params.toString();
       const url = queryString ? `${API_BASE}/api/telegram/link/status?${queryString}` : `${API_BASE}/api/telegram/link/status`;
       const authHeaders = await this.getFreshAuthHeaders();
@@ -2024,12 +2080,12 @@ class BackendService {
   }
 
   public async unlinkTelegramAccount(
-    mikasaUserId?: string,
+    misaUserId?: string,
     telegramUserId?: number
   ): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
       const bodyPayload: Record<string, any> = {};
-      if (mikasaUserId && mikasaUserId !== "admin") bodyPayload.mikasa_user_id = mikasaUserId;
+      if (misaUserId && misaUserId !== "admin") bodyPayload.misa_user_id = misaUserId;
       if (telegramUserId) bodyPayload.telegram_user_id = telegramUserId;
       const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/telegram/unlink`, {
@@ -2043,11 +2099,11 @@ class BackendService {
     }
   }
 
-  public async getTelegramAccount(mikasaUserId?: string): Promise<TelegramAccountResponse> {
+  public async getTelegramAccount(misaUserId?: string): Promise<TelegramAccountResponse> {
     try {
       let url = `${API_BASE}/api/telegram/account`;
-      if (mikasaUserId && mikasaUserId !== "admin") {
-        url += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
+      if (misaUserId && misaUserId !== "admin") {
+        url += `?misa_user_id=${encodeURIComponent(misaUserId)}`;
       }
       const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(url, {
@@ -2057,8 +2113,8 @@ class BackendService {
       if (isLocalhostUrl(API_BASE) && !localData?.is_linked && authHeaders.Authorization) {
         try {
           let cloudUrl = `${PRODUCTION_API_URL}/api/telegram/account`;
-          if (mikasaUserId && mikasaUserId !== "admin") {
-            cloudUrl += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
+          if (misaUserId && misaUserId !== "admin") {
+            cloudUrl += `?misa_user_id=${encodeURIComponent(misaUserId)}`;
           }
           const cloudRes = await fetch(cloudUrl, { headers: { ...authHeaders } });
           if (cloudRes.ok) {
@@ -2085,7 +2141,7 @@ class BackendService {
       return {
         ok: false,
         configured: false,
-        bot_username: "Mikasa_ai_agent_bot",
+        bot_username: "Misa_ai_agent_bot",
         active_links_count: 0,
         pending_requests_count: 0,
         error: String(err),
@@ -2263,9 +2319,9 @@ class BackendService {
     this.authToken = token;
     try {
       if (token) {
-        localStorage.setItem("mikasa_session_token", token);
+        localStorage.setItem("misa_session_token", token);
       } else {
-        localStorage.removeItem("mikasa_session_token");
+        localStorage.removeItem("misa_session_token");
       }
     } catch {}
   }
@@ -2273,7 +2329,7 @@ class BackendService {
   public getAuthToken(): string | null {
     if (!this.authToken && typeof window !== "undefined") {
       try {
-        this.authToken = localStorage.getItem("mikasa_session_token");
+        this.authToken = localStorage.getItem("misa_session_token");
         if (!this.authToken) {
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -2299,7 +2355,7 @@ class BackendService {
     const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
-      headers["X-Mikasa-Session-Token"] = token;
+      headers["X-Misa-Session-Token"] = token;
     }
     return headers;
   }
@@ -2349,7 +2405,7 @@ class BackendService {
       };
     }
     try {
-      const email = payload.email || `${payload.username.toLowerCase()}@mikasa.local`;
+      const email = payload.email || `${payload.username.toLowerCase()}@misa.local`;
       const { data, error } = await supabase.auth.signUp({
         email: email,
         password: payload.password,
@@ -2416,7 +2472,7 @@ class BackendService {
         payload.email ||
         (payload.username_or_email.includes("@")
           ? payload.username_or_email
-          : `${payload.username_or_email.toLowerCase()}@mikasa.local`);
+          : `${payload.username_or_email.toLowerCase()}@misa.local`);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: targetEmail,
@@ -2460,7 +2516,7 @@ class BackendService {
   }
 
   private async verifyOAuthCallbackReachability(callbackBase: string): Promise<{ ok: boolean; error?: string }> {
-    if (typeof window === "undefined" || (globalThis as any).__MIKASA_SKIP_OAUTH_HEALTH_CHECK__) {
+    if (typeof window === "undefined" || (globalThis as any).__MISA_SKIP_OAUTH_HEALTH_CHECK__) {
       return { ok: true };
     }
     const pingHealth = async (base: string): Promise<boolean> => {
@@ -2520,7 +2576,7 @@ class BackendService {
   ): Promise<void> {
     try {
       if (typeof window !== "undefined" && window.localStorage) {
-        window.localStorage.setItem("mikasa_oauth_state", state);
+        window.localStorage.setItem("misa_oauth_state", state);
       }
     } catch {}
 
@@ -2612,7 +2668,7 @@ class BackendService {
     let savedState = "";
     try {
       if (typeof window !== "undefined" && window.localStorage) {
-        savedState = window.localStorage.getItem("mikasa_oauth_state") || "";
+        savedState = window.localStorage.getItem("misa_oauth_state") || "";
       }
     } catch {}
     const targetState = (state || this.activeOAuthState || savedState || "").trim();
@@ -2627,7 +2683,7 @@ class BackendService {
       this.activeOAuthState = null;
       try {
         if (typeof window !== "undefined" && window.localStorage) {
-          window.localStorage.removeItem("mikasa_oauth_state");
+          window.localStorage.removeItem("misa_oauth_state");
         }
       } catch {}
     };
@@ -3052,7 +3108,7 @@ class BackendService {
 
   public getGitHubToken(): string | null {
     try {
-      return localStorage.getItem("mikasa_github_token") || null;
+      return localStorage.getItem("misa_github_token") || null;
     } catch {
       return null;
     }
@@ -3061,9 +3117,9 @@ class BackendService {
   public setGitHubToken(token: string | null): void {
     try {
       if (token) {
-        localStorage.setItem("mikasa_github_token", token);
+        localStorage.setItem("misa_github_token", token);
       } else {
-        localStorage.removeItem("mikasa_github_token");
+        localStorage.removeItem("misa_github_token");
       }
     } catch {}
   }
@@ -3203,6 +3259,265 @@ class BackendService {
       return { ok: false, error: String(err) };
     }
   }
+
+  // ========== Misa v9.0 Convenience & Unified Methods ==========
+
+  public async getCurrentAuthUser(): Promise<MikasaAuthUser | null> {
+    try {
+      const res = await this.getMe();
+      if (res.ok && res.authenticated && res.user) {
+        return res.user;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  public async sendMessage(
+    text: string,
+    options?: { mode?: "ask" | "command" | "summary" | string; [key: string]: any }
+  ): Promise<ChatResponse> {
+    const mode = (options?.mode === "command" || options?.mode === "summary" ? options.mode : "ask") as "ask" | "command" | "summary";
+    const res = await this.sendChat(text, mode);
+    return {
+      ...res,
+      reply: res.reply || res.response,
+    };
+  }
+
+  public async getSystemTelemetry(): Promise<SystemMetrics | null> {
+    return this.getSystemMetrics();
+  }
+
+  public onOrbStateChange(cb: (ev: { state: VoiceState }) => void): () => void {
+    return this.onVoiceStateChange((state) => {
+      cb({ state });
+    });
+  }
+
+  public onAgentPlan(cb: (plan: AgentPlanData) => void): () => void {
+    return this.onAgentEvent((ev) => {
+      if ((ev.type === "agent_plan" || ev.type === "agent_plan_created") && ev.data) {
+        cb((ev.data.plan || ev.data) as AgentPlanData);
+      }
+    });
+  }
+
+  public onAgentStepUpdate(cb: (update: any) => void): () => void {
+    return this.onAgentEvent((ev) => {
+      if (ev.type.startsWith("agent_step") && ev.data) {
+        cb(ev.data);
+      }
+    });
+  }
+
+  public getAssetUrl(pathOrUrl: string): string {
+    if (!pathOrUrl) return "";
+    if (/^(https?:|data:|blob:)/i.test(pathOrUrl)) {
+      return pathOrUrl;
+    }
+    return `${API_BASE}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  }
+
+  public async getGeneratedImages(): Promise<
+    Array<{ url: string; filename: string; created_at: string; prompt?: string }>
+  > {
+    try {
+      const res = await fetch(`${API_BASE}/api/images`, { method: "GET" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+      return (data.images || []).map((img: any) => ({
+        url: img.url || "",
+        filename: img.filename || "image.png",
+        created_at: img.created_at || new Date().toISOString(),
+        prompt: img.prompt,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  public async generateImage(prompt: string): Promise<{
+    ok: boolean;
+    image_url?: string;
+    url?: string;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/images/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      const cmdRes = await this.executeCommand("generate_image", { prompt });
+      return {
+        ok: cmdRes.ok,
+        message: cmdRes.result,
+      };
+    } catch (err: any) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public async sendFeedback(
+    queryOrId: string,
+    responseOrRating: string | number,
+    rating?: string | number
+  ): Promise<{ ok: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          rating !== undefined
+            ? { query: queryOrId, response: responseOrRating, rating }
+            : { message_id: queryOrId, rating: responseOrRating }
+        ),
+      });
+      return { ok: res.ok };
+    } catch {
+      return { ok: true };
+    }
+  }
+
+  public getGithubToken(): string | null {
+    return this.getGitHubToken();
+  }
+
+  public async saveGithubToken(token: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    this.setGitHubToken(token || null);
+    return { ok: true, message: "GitHub token saqlandi" };
+  }
+
+  public async testApiKey(apiKey?: string): Promise<{
+    ok: boolean;
+    valid?: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    return this.testGeminiApiKey(apiKey);
+  }
+
+  public async getAuditTraces(): Promise<{
+    ok: boolean;
+    traces?: ContextTraceItem[];
+    audits?: RemoteAuditItem[];
+    audit_logs?: RemoteAuditItem[];
+  }> {
+    try {
+      const [traces, remoteAudit] = await Promise.all([
+        this.getContextTraces(),
+        this.getRemoteAudit(),
+      ]);
+      const events = remoteAudit?.events || [];
+      return {
+        ok: true,
+        traces: traces || [],
+        audits: events,
+        audit_logs: events,
+      };
+    } catch {
+      return { ok: false, traces: [], audits: [], audit_logs: [] };
+    }
+  }
+
+  public async updateMemoryPrivacy(settings: Partial<MemoryPolicyConfig>): Promise<{ ok: boolean }> {
+    const ok = await this.saveMemoryPolicy({
+      ...settings,
+      do_not_remember_all: settings.do_not_remember_all ?? settings.do_not_remember ?? false,
+    });
+    return { ok };
+  }
+
+  public async updateMemoryItem(
+    idOrCategory: string,
+    keyOrPayload:
+      | string
+      | { key?: string; value?: string; category?: string; type?: string; pinned?: boolean },
+    value?: string
+  ): Promise<{ ok: boolean; item?: KnowledgeItem; message?: string; error?: string }> {
+    if (typeof keyOrPayload === "string") {
+      if (idOrCategory === "profile") {
+        const ok = await this.saveProfile({ [keyOrPayload]: value ?? "" });
+        return { ok };
+      }
+      const ok = await this.saveKnowledge(keyOrPayload, value ?? "", idOrCategory);
+      return { ok };
+    }
+    return this.updateKnowledgeItem(idOrCategory, {
+      key: keyOrPayload.key,
+      value: keyOrPayload.value,
+      type: keyOrPayload.category || keyOrPayload.type,
+      pinned: keyOrPayload.pinned,
+    });
+  }
+
+  public async addFact(
+    key: string,
+    value: string,
+    category?: string
+  ): Promise<{ ok: boolean; item?: KnowledgeItem }> {
+    const ok = await this.saveKnowledge(key, value, category || "fact");
+    return {
+      ok,
+      item: {
+        id: `mem_${Date.now()}`,
+        key,
+        value,
+        category: category || "fact",
+        type: category || "fact",
+        pinned: false,
+        created_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  public async deleteMemoryItem(categoryOrId: string, key?: string): Promise<{ ok: boolean }> {
+    if (key !== undefined) {
+      const ok = await this.deleteKnowledge(key);
+      return { ok };
+    }
+    const ok = await this.deleteKnowledgeItem(categoryOrId);
+    return { ok };
+  }
+
+  public async clearMemoryCategory(category: string): Promise<{ ok: boolean }> {
+    if (category === "all" || category === "knowledge" || category === "facts") {
+      const ok = await this.clearKnowledge();
+      return { ok };
+    }
+    if (category === "context" || category === "working") {
+      const ok = await this.clearContext();
+      return { ok };
+    }
+    if (category === "conversations" || category === "history") {
+      const ok = await this.clearHistory();
+      return { ok };
+    }
+    const ok = await this.clearKnowledge();
+    return { ok };
+  }
+
+  public async forgetMemoryKey(key: string): Promise<{ ok: boolean }> {
+    const ok = await this.deleteKnowledge(key);
+    return { ok };
+  }
+
+  public async deleteSchedulerTask(taskId: string): Promise<{ ok: boolean }> {
+    const ok = await this.removeSchedulerTask(taskId);
+    return { ok };
+  }
+
+  public async clearCompletedSchedulerTasks(): Promise<{ ok: boolean }> {
+    const ok = await this.clearCompletedTasks();
+    return { ok };
+  }
 }
 
 export interface DevicePairingStartResponse {
@@ -3263,14 +3578,15 @@ export interface TelegramLinkVerifyResponse {
   message?: string;
   link?: {
     id: string;
-    mikasa_user_id: string;
+    misa_user_id: string;
     telegram_user_id: number;
+    telegram_username?: string;
     linked_at: number;
     last_verified_at: number;
     status: string;
     metadata?: Record<string, any>;
   };
-  mikasa_user_id?: string;
+  misa_user_id?: string;
   error?: string;
 }
 
@@ -3291,8 +3607,9 @@ export interface TelegramAccountResponse {
   is_linked: boolean;
   link?: {
     id: string;
-    mikasa_user_id: string;
+    misa_user_id: string;
     telegram_user_id: number;
+    telegram_username?: string;
     linked_at: number;
     last_verified_at: number;
     status: string;
@@ -3322,7 +3639,7 @@ export interface TelegramBotStatusResponse {
 // Phase 40: Universal Account & Multi-Device Interfaces
 export interface UserDevice {
   id: string;
-  mikasa_user_id: string;
+  misa_user_id: string;
   device_id: string;
   name: string;
   hostname: string;
@@ -3407,6 +3724,8 @@ export interface MikasaAuthUser {
   provider?: string;
 }
 
+export type MisaAuthUser = MikasaAuthUser;
+
 export interface MikasaAccountSession {
   session_id: string;
   user_id: string;
@@ -3417,6 +3736,8 @@ export interface MikasaAccountSession {
   client_ip?: string;
   user_agent?: string;
 }
+
+export type MisaAccountSession = MikasaAccountSession;
 
 export interface AuthResponse {
   ok: boolean;

@@ -1,5 +1,5 @@
 """
-Mikasa AI v6.0.0 — Final Visual QA & Production Multi-Resolution Verification Suite.
+Misa AI v6.0.0 — Final Visual QA & Production Multi-Resolution Verification Suite.
 Validates:
 - All 8 pages render cleanly without exception.
 - Window scaling across 1024x700, 1280x800, 1440x900, 1920x1080.

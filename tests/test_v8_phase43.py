@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase43.py ==========
-# Mikasa AI v8.0.0 — Phase 43: Real Supabase E2E Integration & Auth Validation
+# Misa AI v8.0.0 — Phase 43: Real Supabase E2E Integration & Auth Validation
 # Comprehensive Test Suite covering:
 # 1. Real & Asymmetric JWT Verification (ES256 Raw (R||S) -> DER, RS256, HS256)
 # 2. Supabase Auth Lifecycle (Register validation, Login claims, Email verification errors)
@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding, utils
 from cryptography.hazmat.primitives import hashes
 
 from core.v8.account_device import (
-    MikasaUser,
+    MisaUser,
     AccountDeviceManager,
 )
 from core.v8.account_auth import (
@@ -76,7 +76,7 @@ class BasePhase43Test(unittest.TestCase):
     """Clean test isolation harness for Phase 43."""
     def setUp(self):
         self._orig_env = dict(os.environ)
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p43_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p43_")
 
         self.adm_storage = os.path.join(self.temp_dir, "test_adm.json")
         self.auth_storage = os.path.join(self.temp_dir, "test_auth.json")
@@ -89,7 +89,7 @@ class BasePhase43Test(unittest.TestCase):
         os.environ["SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_p43_test_key_12345"
         os.environ["SUPABASE_SECRET_KEY"] = "sb_secret_p43_test_key_67890"
         os.environ["SUPABASE_JWT_SECRET"] = self.jwt_secret
-        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        os.environ["MISA_REQUIRE_AUTH"] = "true"
 
         AccountDeviceManager._default_instance = None
         AccountDeviceManager._instance = None
@@ -129,7 +129,7 @@ class BasePhase43Test(unittest.TestCase):
         private_key: ec.EllipticCurvePrivateKey,
         kid: str,
         user_id: str,
-        email: str = "es256@mikasa.ai",
+        email: str = "es256@misa.ai",
         exp_seconds: int = 3600,
         issuer: Optional[str] = None
     ) -> str:
@@ -146,7 +146,7 @@ class BasePhase43Test(unittest.TestCase):
             "user_metadata": {
                 "username": user_id.split("-")[0],
                 "display_name": f"User {user_id.split('-')[0].capitalize()}",
-                "avatar_url": "https://avatar.mikasa.ai/u/1.png"
+                "avatar_url": "https://avatar.misa.ai/u/1.png"
             }
         }
         h_b64 = self.auth_mgr._base64url_encode(json.dumps(header).encode("utf-8"))
@@ -182,21 +182,21 @@ class TestPhase43JWTVerificationEngine(BasePhase43Test):
             private_key=private_key,
             kid=kid,
             user_id="usr-es256-alisher",
-            email="alisher@mikasa.ai"
+            email="alisher@misa.ai"
         )
 
         ok, msg, claims = self.auth_mgr.verify_supabase_jwt(token)
         self.assertTrue(ok, f"Verification failed: {msg}")
         self.assertIsNotNone(claims)
         self.assertEqual(claims.user_id, "usr-es256-alisher")
-        self.assertEqual(claims.email, "alisher@mikasa.ai")
-        self.assertEqual(claims.avatar_url, "https://avatar.mikasa.ai/u/1.png")
+        self.assertEqual(claims.email, "alisher@misa.ai")
+        self.assertEqual(claims.avatar_url, "https://avatar.misa.ai/u/1.png")
         self.assertTrue(claims.is_valid)
 
         # Verify claims.to_dict() has avatar_url
         claims_dict = claims.to_dict()
         self.assertIn("avatar_url", claims_dict)
-        self.assertEqual(claims_dict["avatar_url"], "https://avatar.mikasa.ai/u/1.png")
+        self.assertEqual(claims_dict["avatar_url"], "https://avatar.misa.ai/u/1.png")
 
     def test_02_es256_expired_token_rejected(self):
         """Scenario 2: ES256 token with past exp timestamp is rejected with EXPIRED_TOKEN."""
@@ -263,7 +263,7 @@ class TestPhase43JWTVerificationEngine(BasePhase43Test):
         header = {"alg": "RS256", "typ": "JWT", "kid": kid}
         payload = {
             "sub": "usr-rs256-bobur",
-            "email": "bobur@mikasa.ai",
+            "email": "bobur@misa.ai",
             "role": "authenticated",
             "exp": int(time.time()) + 3600,
             "iat": int(time.time()),
@@ -308,7 +308,7 @@ class TestPhase43AuthMeAndSessionRestore(BasePhase43Test):
             private_key=self.ec_key,
             kid=self.kid,
             user_id=user_id,
-            email="dilshod@mikasa.ai"
+            email="dilshod@misa.ai"
         )
 
         req = MockRequest(
@@ -321,7 +321,7 @@ class TestPhase43AuthMeAndSessionRestore(BasePhase43Test):
         self.assertTrue(data["ok"])
         self.assertTrue(data["authenticated"])
         self.assertEqual(data["user"]["id"], user_id)
-        self.assertEqual(data["user"]["email"], "dilshod@mikasa.ai")
+        self.assertEqual(data["user"]["email"], "dilshod@misa.ai")
         self.assertEqual(data["session"]["user_id"], user_id)
 
     def test_08_auth_me_missing_token_returns_401(self):
@@ -390,8 +390,8 @@ class TestPhase43MultiTenantBoundaries(BasePhase43Test):
         self.auth_mgr.jwks_client.add_mock_key(self.kid, self.ec_key.public_key())
         self.user_a = "user-uuid-alice"
         self.user_b = "user-uuid-bob"
-        self.token_a = self.create_mock_es256_token(self.ec_key, self.kid, self.user_a, "alice@mikasa.ai")
-        self.token_b = self.create_mock_es256_token(self.ec_key, self.kid, self.user_b, "bob@mikasa.ai")
+        self.token_a = self.create_mock_es256_token(self.ec_key, self.kid, self.user_a, "alice@misa.ai")
+        self.token_b = self.create_mock_es256_token(self.ec_key, self.kid, self.user_b, "bob@misa.ai")
 
     def test_12_tenant_a_cannot_access_tenant_b_query_param_403(self):
         """Scenario 12: User A attempting to pass ?user_id=User-B is rejected with 403 Forbidden."""
@@ -406,12 +406,12 @@ class TestPhase43MultiTenantBoundaries(BasePhase43Test):
         self.assertIn("Cross-tenant access denied", data["error"])
 
     def test_13_tenant_a_cannot_access_tenant_b_header_spoofing_403(self):
-        """Scenario 13: User A attempting to pass X-Mikasa-User-Id: User-B is rejected with 403."""
+        """Scenario 13: User A attempting to pass X-Misa-User-Id: User-B is rejected with 403."""
         req = MockRequest(
             method="GET",
             headers={
                 "Authorization": f"Bearer {self.token_a}",
-                "X-Mikasa-User-Id": self.user_b
+                "X-Misa-User-Id": self.user_b
             }
         )
         resp = asyncio.run(handle_devices_list(req))
@@ -589,7 +589,7 @@ class TestPhase43SecurityScanAndLiveAudit(unittest.TestCase):
     def test_25_no_default_test_secrets_in_codebase(self):
         """Scenario 25: Ensure no forbidden fallback secrets exist in project files."""
         base_dir = os.path.dirname(os.path.dirname(__file__))
-        forbidden = "-".join(["mikasa", "default", "test", "secret"])
+        forbidden = "-".join(["misa", "default", "test", "secret"])
 
         violations = []
         for root, _, files in os.walk(base_dir):

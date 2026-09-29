@@ -71,10 +71,10 @@ class TestWindowsQA(unittest.TestCase):
 
     def test_temp_file_creation_and_cleanup(self):
         """Windows %TEMP% katalogida xavfsiz fayl yaratish va tozalash"""
-        test_file = os.path.join(tempfile.gettempdir(), f"mikasa_qa_test_{os.getpid()}.tmp")
+        test_file = os.path.join(tempfile.gettempdir(), f"misa_qa_test_{os.getpid()}.tmp")
         try:
             with open(test_file, "w", encoding="utf-8") as f:
-                f.write("Mikasa AI Windows QA check")
+                f.write("Misa AI Windows QA check")
             self.assertTrue(os.path.exists(test_file))
         finally:
             if os.path.exists(test_file):

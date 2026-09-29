@@ -16,8 +16,8 @@ import json
 import time
 
 from core.v8.account_device import (
-    MikasaUser,
-    MikasaProfile,
+    MisaUser,
+    MisaProfile,
     AccountDeviceManager,
 )
 from core.v8.account_auth import (
@@ -68,9 +68,9 @@ class TestSupabaseJWTVerification(unittest.TestCase):
         """Scenario 1: Valid HS256 JWT signature verification and claims extraction."""
         token = self.auth_mgr.create_mock_jwt(
             user_id="user-uuid-001",
-            email="developer@mikasa.ai",
-            username="mikasadev",
-            display_name="Mikasa Developer",
+            email="developer@misa.ai",
+            username="misadev",
+            display_name="Misa Developer",
             role="authenticated",
             exp_seconds=1800,
             secret=self.secret
@@ -80,9 +80,9 @@ class TestSupabaseJWTVerification(unittest.TestCase):
         self.assertEqual(msg, "OK")
         self.assertIsNotNone(claims)
         self.assertEqual(claims.user_id, "user-uuid-001")
-        self.assertEqual(claims.email, "developer@mikasa.ai")
-        self.assertEqual(claims.username, "mikasadev")
-        self.assertEqual(claims.display_name, "Mikasa Developer")
+        self.assertEqual(claims.email, "developer@misa.ai")
+        self.assertEqual(claims.username, "misadev")
+        self.assertEqual(claims.display_name, "Misa Developer")
         self.assertEqual(claims.role, "authenticated")
         self.assertTrue(claims.is_valid)
 
@@ -90,7 +90,7 @@ class TestSupabaseJWTVerification(unittest.TestCase):
         """Scenario 2: Token with expired timestamp is rejected."""
         token = self.auth_mgr.create_mock_jwt(
             user_id="user-uuid-expired",
-            email="expired@mikasa.ai",
+            email="expired@misa.ai",
             exp_seconds=-60,
             secret=self.secret
         )
@@ -103,7 +103,7 @@ class TestSupabaseJWTVerification(unittest.TestCase):
         """Scenario 3: Token signed with a different key is rejected for invalid signature."""
         token = self.auth_mgr.create_mock_jwt(
             user_id="user-uuid-tampered",
-            email="tampered@mikasa.ai",
+            email="tampered@misa.ai",
             secret="different-unauthorized-secret-key!"
         )
         ok, msg, claims = self.auth_mgr.verify_supabase_jwt(token)
@@ -169,7 +169,7 @@ class TestProfileAndZeroPasswordStorage(unittest.TestCase):
     """Scenarios 7-12: Public Profile Sync & Zero Backend Password Storage"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_profile_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_test_profile_")
         self.storage_file = os.path.join(self.test_dir, "accounts.json")
         self.device_mgr = AccountDeviceManager(storage_path=self.storage_file)
         self.auth_mgr = SupabaseAuthManager(
@@ -180,9 +180,9 @@ class TestProfileAndZeroPasswordStorage(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_07_zero_password_storage_in_mikasa_user(self):
-        """Scenario 7: Assert MikasaUser and MikasaProfile have ZERO password storage attributes."""
-        user = MikasaUser(id="uuid-test-01", username="testuser", email="test@example.com")
+    def test_07_zero_password_storage_in_misa_user(self):
+        """Scenario 7: Assert MisaUser and MisaProfile have ZERO password storage attributes."""
+        user = MisaUser(id="uuid-test-01", username="testuser", email="test@example.com")
         self.assertFalse(hasattr(user, "password_hash"))
         self.assertFalse(hasattr(user, "password_salt"))
         self.assertFalse(hasattr(user, "password"))
@@ -191,10 +191,10 @@ class TestProfileAndZeroPasswordStorage(unittest.TestCase):
         self.assertNotIn("password_hash", data)
         self.assertNotIn("password_salt", data)
         self.assertNotIn("password", data)
-        self.assertIs(MikasaProfile, MikasaUser)
+        self.assertIs(MisaProfile, MisaUser)
 
     def test_08_upsert_profile_from_supabase_new_user(self):
-        """Scenario 8: upsert_profile_from_supabase creates new MikasaUser with Supabase UUID."""
+        """Scenario 8: upsert_profile_from_supabase creates new MisaUser with Supabase UUID."""
         profile = self.device_mgr.upsert_profile_from_supabase(
             user_id="auth-users-uuid-101",
             email="newuser@example.com",
@@ -272,9 +272,9 @@ class TestProfileAndZeroPasswordStorage(unittest.TestCase):
         claims2, profile2 = self.auth_mgr.authenticate_token(token_no_email)
         self.assertEqual(profile2.username, "uuid-plain-only")
 
-    def test_12_mikasa_user_json_serialization(self):
-        """Scenario 12: MikasaUser serialization roundtrip maintains structure without password leaks."""
-        user = MikasaUser(
+    def test_12_misa_user_json_serialization(self):
+        """Scenario 12: MisaUser serialization roundtrip maintains structure without password leaks."""
+        user = MisaUser(
             id="uuid-ser-1",
             username="serial_user",
             email="ser@example.com",
@@ -286,7 +286,7 @@ class TestProfileAndZeroPasswordStorage(unittest.TestCase):
         self.assertNotIn("password", d)
         self.assertNotIn("password_hash", d)
 
-        roundtrip = MikasaUser.from_dict(d)
+        roundtrip = MisaUser.from_dict(d)
         self.assertEqual(roundtrip.id, user.id)
         self.assertEqual(roundtrip.username, user.username)
         self.assertEqual(roundtrip.email, user.email)
@@ -298,7 +298,7 @@ class TestInputValidationAndRateLimiter(unittest.TestCase):
 
     def test_13_validate_username_valid(self):
         """Scenario 13: Valid usernames conform to length and character set."""
-        valid_cases = ["john_doe", "alice-99", "admin_user", "MikasaAI", "dev-v8"]
+        valid_cases = ["john_doe", "alice-99", "admin_user", "MisaAI", "dev-v8"]
         for u in valid_cases:
             valid, clean = validate_username(u)
             self.assertTrue(valid, f"Should be valid: {u}")
@@ -371,7 +371,7 @@ class TestRLSMigrationAndTenantIsolation(unittest.TestCase):
     """Scenarios 19-24: PostgreSQL RLS Migration & Multi-Tenant Isolation"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_rls_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_test_rls_")
         self.device_file = os.path.join(self.test_dir, "devices.json")
         self.account_mgr = AccountDeviceManager(storage_path=self.device_file)
 
@@ -465,30 +465,30 @@ class TestRLSMigrationAndTenantIsolation(unittest.TestCase):
         user_b = self.account_mgr.upsert_profile_from_supabase(user_id="user-uuid-B2", username="bob2")
 
         # Link telegram for User A
-        req, otp, deep_link, err = tg_mgr.create_link_request(mikasa_user_id=user_a.id)
+        req, otp, deep_link, err = tg_mgr.create_link_request(misa_user_id=user_a.id)
         tg_mgr.verify_otp(otp=otp, telegram_user_id=987654321, username="alice_tg")
 
         # Verify link belongs to User A
-        link_a = tg_mgr.get_link_by_mikasa_user(user_a.id)
+        link_a = tg_mgr.get_link_by_misa_user(user_a.id)
         self.assertIsNotNone(link_a)
         self.assertEqual(link_a.telegram_user_id, 987654321)
 
         # User B has no link
-        link_b = tg_mgr.get_link_by_mikasa_user(user_b.id)
+        link_b = tg_mgr.get_link_by_misa_user(user_b.id)
         self.assertIsNone(link_b)
 
         # User B cannot unlink User A's telegram link
         self.assertEqual(tg_mgr.count_active_links(), 1)
         ok = tg_mgr.unlink(telegram_user_id=111222333)
         self.assertFalse(ok)
-        self.assertIsNotNone(tg_mgr.get_link_by_mikasa_user(user_a.id))
+        self.assertIsNotNone(tg_mgr.get_link_by_misa_user(user_a.id))
 
 
 class TestAPISupabaseAuthAndSessionDecoupling(unittest.TestCase):
     """Scenarios 25-30: Bearer Token API Endpoints & Session Separation"""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_api_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_test_api_")
         self.storage_file = os.path.join(self.test_dir, "accounts.json")
         self.account_mgr = AccountDeviceManager(storage_path=self.storage_file)
         self.auth_mgr = SupabaseAuthManager(
@@ -512,7 +512,7 @@ class TestAPISupabaseAuthAndSessionDecoupling(unittest.TestCase):
         async def _run():
             token = self.auth_mgr.create_mock_jwt(
                 user_id="user-uuid-api-me",
-                email="me@mikasa.ai",
+                email="me@misa.ai",
                 username="meperson",
                 display_name="Me Person",
                 secret=self.auth_mgr.supabase_jwt_secret
@@ -525,7 +525,7 @@ class TestAPISupabaseAuthAndSessionDecoupling(unittest.TestCase):
             self.assertTrue(data["authenticated"])
             self.assertEqual(data["user"]["id"], "user-uuid-api-me")
             self.assertEqual(data["user"]["username"], "meperson")
-            self.assertEqual(data["user"]["email"], "me@mikasa.ai")
+            self.assertEqual(data["user"]["email"], "me@misa.ai")
             self.assertNotIn("password", data["user"])
 
         asyncio.run(_run())

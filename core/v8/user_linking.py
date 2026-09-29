@@ -1,6 +1,6 @@
 # ========== core/v8/user_linking.py ==========
 # Phase 38 — User Account ↔ Telegram Linking & One-Time Pairing Engine
-# Links Mikasa User ID, Telegram numeric ID, and Paired PC Device IDs
+# Links Misa User ID, Telegram numeric ID, and Paired PC Device IDs
 
 import os
 import time
@@ -42,7 +42,7 @@ class TelegramIdentity:
 class PairingToken:
     """Bir martalik, qisqa muddatli (5 daqiqa) pairing kodi (MK-XXXXXX)"""
     code: str
-    mikasa_user_id: str
+    misa_user_id: str
     device_id: str
     created_at: float = field(default_factory=time.time)
     expires_at: float = 0.0
@@ -66,8 +66,8 @@ class PairingToken:
 
 @dataclass
 class UserDeviceLink:
-    """Mikasa foydalanuvchisi, Telegram raqamli ID va PC qurilmasi o'rtasidagi bog'lanish"""
-    mikasa_user_id: str
+    """Misa foydalanuvchisi, Telegram raqamli ID va PC qurilmasi o'rtasidagi bog'lanish"""
+    misa_user_id: str
     telegram_user_id: str
     device_id: str
     created_at: float = field(default_factory=time.time)
@@ -114,12 +114,12 @@ class UserLinkingStore:
 
     def generate_pairing_code(
         self,
-        mikasa_user_id: str,
+        misa_user_id: str,
         device_id: str,
         ttl: Optional[float] = None
     ) -> str:
         """
-        Mikasa ilovasi uchun bir martalik MK-XXXXXX kodi yaratish.
+        Misa ilovasi uchun bir martalik MK-XXXXXX kodi yaratish.
         Standart yaroqlilik muddati: 5 daqiqa (300 soniya).
         """
         token_ttl = ttl if ttl is not None else self.DEFAULT_TOKEN_TTL
@@ -131,14 +131,14 @@ class UserLinkingStore:
 
         token = PairingToken(
             code=code,
-            mikasa_user_id=str(mikasa_user_id),
+            misa_user_id=str(misa_user_id),
             device_id=str(device_id),
             created_at=now,
             expires_at=now + token_ttl,
             is_used=False
         )
         self._pending_tokens[code] = token
-        logger.info(f"[UserLinking] Yangi pairing kodi yaratildi: dev={device_id}, user={mikasa_user_id}, ttl={token_ttl}s")
+        logger.info(f"[UserLinking] Yangi pairing kodi yaratildi: dev={device_id}, user={misa_user_id}, ttl={token_ttl}s")
         return code
 
     def get_token(self, code: str) -> Optional[PairingToken]:
@@ -181,7 +181,7 @@ class UserLinkingStore:
 
         meta_dict = metadata if isinstance(metadata, dict) else ({"username": str(metadata)} if metadata else {})
         link = UserDeviceLink(
-            mikasa_user_id=token.mikasa_user_id,
+            misa_user_id=token.misa_user_id,
             telegram_user_id=tg_id_str,
             device_id=token.device_id,
             created_at=now,
@@ -194,13 +194,13 @@ class UserLinkingStore:
 
         self._audit.log(
             RemoteEventType.ACCOUNT_LINKED,
-            user_id=token.mikasa_user_id,
+            user_id=token.misa_user_id,
             device_id=token.device_id,
             telegram_user_id=tg_id_str
         )
         self._audit.log(
             RemoteEventType.DEVICE_PAIRED,
-            user_id=token.mikasa_user_id,
+            user_id=token.misa_user_id,
             device_id=token.device_id,
             telegram_user_id=tg_id_str
         )
@@ -218,13 +218,13 @@ class UserLinkingStore:
             self.save()
             self._audit.log(
                 RemoteEventType.ACCOUNT_UNLINKED,
-                user_id=link.mikasa_user_id,
+                user_id=link.misa_user_id,
                 device_id=dev_id,
                 telegram_user_id=link.telegram_user_id
             )
             self._audit.log(
                 RemoteEventType.DEVICE_UNPAIRED,
-                user_id=link.mikasa_user_id,
+                user_id=link.misa_user_id,
                 device_id=dev_id,
                 telegram_user_id=link.telegram_user_id
             )

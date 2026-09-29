@@ -1,5 +1,5 @@
 # ========== test_v6_chat_ux.py ==========
-# Mikasa AI v6.0.0 — Chat UX Critical Fix & Activity Collapsing Testlari
+# Misa AI v6.0.0 — Chat UX Critical Fix & Activity Collapsing Testlari
 
 import unittest
 import customtkinter as ctk

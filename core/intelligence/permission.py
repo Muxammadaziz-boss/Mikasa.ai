@@ -1,5 +1,5 @@
 # ========== permission.py ==========
-# Mikasa AI 7.x — Permission & Risk Model
+# Misa AI 7.x — Permission & Risk Model
 # Action Authorization & Confirmation Requirements
 
 import logging

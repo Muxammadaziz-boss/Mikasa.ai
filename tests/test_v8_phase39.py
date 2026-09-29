@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase39.py ==========
-# Phase 39 — Universal Telegram Bot ↔ Mikasa User App
+# Phase 39 — Universal Telegram Bot ↔ Misa User App
 # Comprehensive Multi-User Identity & OTP Account Linking Test Suite
 # Minimum 27 unit & integration tests covering all Phase 39 specifications
 
@@ -22,7 +22,7 @@ class TestPhase39TelegramIdentity(unittest.TestCase):
     """1-5: Canonical Identity, Entropy, Data Models, Plaintext Secret Protection"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p39_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p39_")
         self.storage_file = os.path.join(self.temp_dir, "telegram_links.json")
         self.mgr = TelegramIdentityManager(storage_path=self.storage_file)
 
@@ -76,7 +76,7 @@ class TestPhase39TelegramIdentity(unittest.TestCase):
         otps = set()
         for _ in range(50):
             req, otp, deep_link, err = self.mgr.create_link_request(
-                mikasa_user_id=f"user_{_}",
+                misa_user_id=f"user_{_}",
                 current_time=1000.0
             )
             self.assertIsNone(err)
@@ -112,13 +112,13 @@ class TestPhase39TelegramIdentity(unittest.TestCase):
     def test_05_link_token_generation(self):
         """5. Cryptographically secure link_token and deep link URL format."""
         req, otp, deep_link, err = self.mgr.create_link_request(
-            mikasa_user_id="bob",
-            bot_username="MikasaTestBot"
+            misa_user_id="bob",
+            bot_username="MisaTestBot"
         )
         self.assertIsNone(err)
         self.assertIsNotNone(req.link_token)
         self.assertGreaterEqual(len(req.link_token), 24)
-        self.assertTrue(deep_link.startswith("https://t.me/MikasaTestBot?start="))
+        self.assertTrue(deep_link.startswith("https://t.me/MisaTestBot?start="))
         self.assertTrue(deep_link.endswith(req.link_token))
 
 
@@ -126,7 +126,7 @@ class TestPhase39OtpVerificationAndSecurity(unittest.TestCase):
     """6-12: OTP Verification, Constant-time compare, Replay, Expiry, Lockout, Rate Limiting"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p39_sec_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p39_sec_")
         self.storage_file = os.path.join(self.temp_dir, "telegram_links.json")
         self.mgr = TelegramIdentityManager(storage_path=self.storage_file)
 
@@ -147,7 +147,7 @@ class TestPhase39OtpVerificationAndSecurity(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("muvaffaqiyatli", msg)
         self.assertIsNotNone(link)
-        self.assertEqual(link.mikasa_user_id, "user_alpha")
+        self.assertEqual(link.misa_user_id, "user_alpha")
         self.assertEqual(link.telegram_user_id, 123456789)
         self.assertEqual(link.status, "ACTIVE")
         self.assertTrue(link.is_active)
@@ -221,10 +221,10 @@ class TestPhase39OtpVerificationAndSecurity(unittest.TestCase):
         # 6th attempt with correct OTP is rejected because request is locked
         ok6, msg6, _ = self.mgr.verify_otp(otp, 123123123, request_id=req.request_id)
         self.assertFalse(ok6)
-        self.assertIn("MAX_ATTEMPTS_EXCEEDED", msg6)
+        self.assertIn("RATE_LIMITED", msg6)
 
     def test_12_rate_limiting_otp_generation(self):
-        """12. Rate limiting: max 3 OTP generation requests per 10 minutes per Mikasa account."""
+        """12. Rate limiting: max 3 OTP generation requests per 10 minutes per Misa account."""
         t0 = 50000.0
         # 3 allowed requests
         for i in range(3):
@@ -247,7 +247,7 @@ class TestPhase39DeepLinkAndUnlink(unittest.TestCase):
     """13-17: Deep-link token, Unlink, Cleanup, Multi-user Isolation"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p39_link_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p39_link_")
         self.storage_file = os.path.join(self.temp_dir, "telegram_links.json")
         self.mgr = TelegramIdentityManager(storage_path=self.storage_file)
 
@@ -268,7 +268,7 @@ class TestPhase39DeepLinkAndUnlink(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIsNotNone(link)
         self.assertEqual(link.telegram_user_id, 987123654)
-        self.assertEqual(link.mikasa_user_id, "deeplink_user")
+        self.assertEqual(link.misa_user_id, "deeplink_user")
 
     def test_14_single_use_link_token(self):
         """14. Single-use deep-link token cannot be reused."""
@@ -291,7 +291,7 @@ class TestPhase39DeepLinkAndUnlink(unittest.TestCase):
         unlinked = self.mgr.unlink(telegram_user_id=99001122)
         self.assertTrue(unlinked)
         self.assertIsNone(self.mgr.get_link_by_telegram_user(99001122))
-        self.assertIsNone(self.mgr.get_link_by_mikasa_user("unlink_user"))
+        self.assertIsNone(self.mgr.get_link_by_misa_user("unlink_user"))
 
         # Unlinking non-existent returns False
         self.assertFalse(self.mgr.unlink(telegram_user_id=99001122))
@@ -306,7 +306,7 @@ class TestPhase39DeepLinkAndUnlink(unittest.TestCase):
         self.assertEqual(req2.status, "PENDING")
 
         # Unlink user
-        self.mgr.unlink(mikasa_user_id="user_cancel")
+        self.mgr.unlink(misa_user_id="user_cancel")
         req2_updated = self.mgr.get_request(req2.request_id)
         self.assertEqual(req2_updated.status, "EXPIRED")
 
@@ -325,27 +325,27 @@ class TestPhase39DeepLinkAndUnlink(unittest.TestCase):
         # Assert isolated lookups
         l1 = self.mgr.get_link_by_telegram_user(1010101)
         l2 = self.mgr.get_link_by_telegram_user(2020202)
-        self.assertEqual(l1.mikasa_user_id, "user_one")
-        self.assertEqual(l2.mikasa_user_id, "user_two")
+        self.assertEqual(l1.misa_user_id, "user_one")
+        self.assertEqual(l2.misa_user_id, "user_two")
 
         # Unlink user_one should NOT affect user_two
-        self.mgr.unlink(mikasa_user_id="user_one")
-        self.assertIsNone(self.mgr.get_link_by_mikasa_user("user_one"))
-        self.assertIsNotNone(self.mgr.get_link_by_mikasa_user("user_two"))
+        self.mgr.unlink(misa_user_id="user_one")
+        self.assertIsNone(self.mgr.get_link_by_misa_user("user_one"))
+        self.assertIsNotNone(self.mgr.get_link_by_misa_user("user_two"))
 
 
 class TestPhase39UniversalBot(unittest.TestCase):
     """18-25: Universal Bot Commands (/start, /link, raw OTP, /unlink, /account, /status, /help)"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p39_bot_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p39_bot_")
         self.storage_file = os.path.join(self.temp_dir, "telegram_links.json")
         self.mgr = TelegramIdentityManager(storage_path=self.storage_file)
         self.transport = MockTelegramTransport()
         self.bot = UniversalTelegramBot(
             transport=self.transport,
             identity_manager=self.mgr,
-            bot_username="MikasaUniversalBot"
+            bot_username="MisaUniversalBot"
         )
 
     def tearDown(self):
@@ -366,7 +366,7 @@ class TestPhase39UniversalBot(unittest.TestCase):
         sent = self.transport.sent_messages[0]
         self.assertEqual(sent["chat"]["id"], 1001)
         self.assertIn("Assalomu alaykum", sent["text"])
-        self.assertIn("Mikasa AI Universal Telegram Botiga xush kelibsiz", sent["text"])
+        self.assertIn("Misa AI Universal Telegram Botiga xush kelibsiz", sent["text"])
 
     def test_19_bot_start_with_token(self):
         """19. Bot /start <link_token> performs automatic account linking."""
@@ -388,7 +388,7 @@ class TestPhase39UniversalBot(unittest.TestCase):
         # Check identity manager state
         link = self.mgr.get_link_by_telegram_user(2002)
         self.assertIsNotNone(link)
-        self.assertEqual(link.mikasa_user_id, "bot_user_1")
+        self.assertEqual(link.misa_user_id, "bot_user_1")
 
     def test_20_bot_link_command_with_code(self):
         """20. Bot /link <otp> verifies 6-digit code and links account."""
@@ -452,7 +452,7 @@ class TestPhase39UniversalBot(unittest.TestCase):
         self.assertIn("Bog'lanmagan (Not Linked)", sent1["text"])
 
         # Link user and check again
-        req, otp, _, _ = self.mgr.create_link_request("nodir_mikasa")
+        req, otp, _, _ = self.mgr.create_link_request("nodir_misa")
         self.mgr.verify_otp(otp, 6006, username="nodir_dev")
 
         update2 = {
@@ -466,10 +466,10 @@ class TestPhase39UniversalBot(unittest.TestCase):
         asyncio.run(self.bot.process_update(update2))
         sent2 = self.transport.sent_messages[1]
         self.assertIn("Faol (Active)", sent2["text"])
-        self.assertIn("nodir_mikasa", sent2["text"])
+        self.assertIn("nodir_misa", sent2["text"])
 
     def test_24_bot_unlink_command(self):
-        """24. /unlink decouples Telegram account from Mikasa account."""
+        """24. /unlink decouples Telegram account from Misa account."""
         req, otp, _, _ = self.mgr.create_link_request("unlink_bot_user")
         self.mgr.verify_otp(otp, 7007)
 
@@ -499,7 +499,7 @@ class TestPhase39UniversalBot(unittest.TestCase):
         }
         asyncio.run(self.bot.process_update(update_status))
         sent_status = self.transport.sent_messages[0]
-        self.assertIn("Mikasa Universal Telegram Bot Holati", sent_status["text"])
+        self.assertIn("Misa Universal Telegram Bot Holati", sent_status["text"])
         self.assertIn("Phase 39", sent_status["text"])
 
         # Test /help
@@ -513,7 +513,7 @@ class TestPhase39UniversalBot(unittest.TestCase):
         }
         asyncio.run(self.bot.process_update(update_help))
         sent_help = self.transport.sent_messages[1]
-        self.assertIn("Mikasa Telegram Bot Buyruqlari", sent_help["text"])
+        self.assertIn("Misa Telegram Bot Buyruqlari", sent_help["text"])
         self.assertIn("/start", sent_help["text"])
         self.assertIn("/link", sent_help["text"])
         self.assertIn("/unlink", sent_help["text"])
@@ -524,14 +524,14 @@ class TestPhase39AuditAndE2E(unittest.TestCase):
     """26-27: Audit Logging Secret Redaction and Full E2E Lifecycle"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p39_e2e_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p39_e2e_")
         self.storage_file = os.path.join(self.temp_dir, "telegram_links.json")
         self.mgr = TelegramIdentityManager(storage_path=self.storage_file)
         self.transport = MockTelegramTransport()
         self.bot = UniversalTelegramBot(
             transport=self.transport,
             identity_manager=self.mgr,
-            bot_username="MikasaUniversalBot"
+            bot_username="MisaUniversalBot"
         )
         self.audit = RemoteAuditLogger.get_instance()
 
@@ -583,7 +583,7 @@ class TestPhase39AuditAndE2E(unittest.TestCase):
             }
         }
         asyncio.run(self.bot.process_update(update_open))
-        self.assertIn("Mikasa AI Universal Telegram Botiga xush kelibsiz", self.transport.sent_messages[-1]["text"])
+        self.assertIn("Misa AI Universal Telegram Botiga xush kelibsiz", self.transport.sent_messages[-1]["text"])
 
         # 3. User sends 6-digit OTP code to the bot
         update_otp = {
@@ -601,7 +601,7 @@ class TestPhase39AuditAndE2E(unittest.TestCase):
         self.assertEqual(self.mgr.count_active_links(), 1)
         link = self.mgr.get_link_by_telegram_user(777111222)
         self.assertIsNotNone(link)
-        self.assertEqual(link.mikasa_user_id, "admin_owner")
+        self.assertEqual(link.misa_user_id, "admin_owner")
         self.assertEqual(link.status, "ACTIVE")
 
         # 5. User inspects account via bot

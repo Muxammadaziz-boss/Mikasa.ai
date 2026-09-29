@@ -1,5 +1,5 @@
 # ========== planner.py ==========
-# Mikasa AI 7.x — Planning & Reasoning 2.0 Engine
+# Misa AI 7.x — Planning & Reasoning 2.0 Engine
 # Goal Decomposition, Dependency Graphs, Execution Ordering, Plan Optimization & Versioned Replanning
 
 import re

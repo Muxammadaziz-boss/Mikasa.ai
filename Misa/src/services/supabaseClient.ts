@@ -1,5 +1,5 @@
 // ==============================================================================
-// Mikasa AI — Supabase Client Service (Phase 41+)
+// Misa AI v9.0.0 — Supabase Client Service
 // Handles direct client-side authentication, session persistence and tokens.
 // NOTE: Only VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are used here.
 // NEVER expose SUPABASE_SECRET_KEY or service_role to the frontend!

@@ -1,5 +1,5 @@
 # ========== test_planning_agent_integration.py ==========
-# Mikasa AI 7.x — Integration Tests for Planning & Reasoning 2.0 Loop
+# Misa AI 7.x — Integration Tests for Planning & Reasoning 2.0 Loop
 
 import unittest
 from unittest.mock import MagicMock

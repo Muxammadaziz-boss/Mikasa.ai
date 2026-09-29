@@ -1,5 +1,5 @@
 # ========== core/v8/__init__.py ==========
-# Mikasa AI v8.0.0 — Phase 38: Mikasa Online Remote Control + User Permission Center
+# Misa AI v8.0.0 — Phase 38: Misa Online Remote Control + User Permission Center
 # Package initialization, versioning & exports
 
 from core.v8.device import (
@@ -20,7 +20,7 @@ from core.v8.envelope import (
     EnvelopeManager,
     RateLimiter
 )
-from core.v8.pc_agent import MikasaPCAgent
+from core.v8.pc_agent import MisaPCAgent
 from core.v8.telegram_gateway import (
     TelegramRemoteGateway,
     TelegramTransport,
@@ -45,7 +45,7 @@ from core.v8.telegram_identity import (
 )
 from core.v8.universal_bot import UniversalTelegramBot
 from core.v8.account_device import (
-    MikasaUser,
+    MisaUser,
     Device,
     UserDeviceLink as AccountUserDeviceLink,
     UserDeviceContext,
@@ -139,7 +139,7 @@ __all__ = [
     "AccountSession",
     "AuthRateLimiter",
     # Device & Accounts (Phase 40)
-    "MikasaUser",
+    "MisaUser",
     "Device",
     "AccountDeviceManager",
     "UserDeviceContext",
@@ -162,7 +162,7 @@ __all__ = [
     "EnvelopeManager",
     "RateLimiter",
     # Agent & Gateway
-    "MikasaPCAgent",
+    "MisaPCAgent",
     "TelegramRemoteGateway",
     "TelegramTransport",
     "MockTelegramTransport",

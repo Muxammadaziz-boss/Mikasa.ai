@@ -1,5 +1,5 @@
 # ========== icons.py ==========
-# Mikasa AI — Professional Vector Iconography Engine
+# Misa AI — Professional Vector Iconography Engine
 # Supersampled anti-aliased vector rendering via PIL and CTkImage.
 # Eliminates platform-dependent emoji variations and provides consistent,
 # high-DPI Lucide/Linear-style stroke icons.

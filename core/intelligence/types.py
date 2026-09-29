@@ -1,5 +1,5 @@
 # ========== types.py ==========
-# Mikasa AI 7.x — Intelligence Core Types
+# Misa AI 7.x — Intelligence Core Types
 # Normalized Data Structures for Context, Provider, Intent, Decision and Response
 
 from dataclasses import dataclass, field

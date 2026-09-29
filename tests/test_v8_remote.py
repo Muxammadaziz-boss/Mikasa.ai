@@ -1,5 +1,5 @@
 # ========== test_v8_remote.py ==========
-# Phase 35 — Mikasa AI v8.0.0 Remote PC Control Test Suite
+# Phase 35 — Misa AI v8.0.0 Remote PC Control Test Suite
 # Tests: Device Identity, Heartbeat, WoL, Envelope, Telegram Gateway, PCAgent, Planning DAG
 
 import os
@@ -24,7 +24,7 @@ from core.v8 import (  # noqa: E402
     WakeRelay,
     RemoteCommandEnvelope,
     EnvelopeManager,
-    MikasaPCAgent,
+    MisaPCAgent,
     TelegramRemoteGateway,
     create_remote_wake_and_verify_dag,
 )
@@ -57,7 +57,7 @@ class TestV8RemoteControl(unittest.TestCase):
         self.assertTrue(ident.hostname)
         self.assertTrue(ident.username)
         self.assertEqual(ident.agent_version, "8.0.0")
-        self.assertEqual(ident.mikasa_version, "8.0.0")
+        self.assertEqual(ident.misa_version, "8.0.0")
         self.assertTrue(ident.fingerprint)
         d = ident.to_dict()
         self.assertEqual(d["device_id"], ident.device_id)
@@ -220,7 +220,7 @@ class TestV8RemoteControl(unittest.TestCase):
     def test_13_agent_reconnect_backoff(self):
         async def _run():
             hm = HeartbeatManager()
-            agent = MikasaPCAgent(heartbeat_manager=hm)
+            agent = MisaPCAgent(heartbeat_manager=hm)
             # Normal holatda backoff 1.0s
             self.assertEqual(agent._backoff, 1.0)
 
@@ -239,7 +239,7 @@ class TestV8RemoteControl(unittest.TestCase):
     # 14. AgentLoop integration
     def test_14_agent_loop_integration(self):
         async def _run():
-            agent = MikasaPCAgent()
+            agent = MisaPCAgent()
             await agent.register()
 
             env = agent.envelope_manager.create_envelope(
@@ -300,7 +300,7 @@ class TestV8RemoteControl(unittest.TestCase):
     # 18. High-risk command confirmation flow
     def test_18_confirmation_flow(self):
         async def _run():
-            agent = MikasaPCAgent()
+            agent = MisaPCAgent()
             await agent.register()
 
             # Confirmation bo'lmagan yuqori xavfli buyruq (shutdown) rad etiladi
@@ -326,7 +326,7 @@ class TestV8RemoteControl(unittest.TestCase):
         cmd_wake = gw.parse_command("⚡ Wake PC")
         self.assertEqual(cmd_wake["action"], "wake")
 
-        cmd_uzbek_wake = gw.parse_command("Mikasa, kompyuterni yoq")
+        cmd_uzbek_wake = gw.parse_command("Misa, kompyuterni yoq")
         self.assertEqual(cmd_uzbek_wake["action"], "wake")
 
         # Tugmalar
@@ -347,12 +347,12 @@ class TestV8RemoteControl(unittest.TestCase):
             relay = MockWakeRelay(succeed=True)
             gw.wol_manager = WakeOnLanManager(relay=relay)
 
-            agent = MikasaPCAgent(envelope_manager=gw.envelope_manager)
+            agent = MisaPCAgent(envelope_manager=gw.envelope_manager)
             await agent.register()
             await agent.send_heartbeat()
 
             # 2. Telegramdan status so'rovi
-            parsed = gw.parse_command("Mikasa, kompyuterim yoqilganmi?")
+            parsed = gw.parse_command("Misa, kompyuterim yoqilganmi?")
             self.assertEqual(parsed["action"], "status")
 
             env = gw.envelope_manager.create_envelope(

@@ -1,5 +1,5 @@
 # ========== test_plan_model.py ==========
-# Mikasa AI 7.x — Unit Tests for Planning Model 2.0 (PlanStep & AgentPlan)
+# Misa AI 7.x — Unit Tests for Planning Model 2.0 (PlanStep & AgentPlan)
 
 import unittest
 from core.intelligence.types import (

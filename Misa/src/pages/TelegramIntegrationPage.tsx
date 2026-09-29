@@ -285,7 +285,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "var(--background, #0B0F17)",
+        backgroundColor: "transparent",
         color: "var(--text-primary, #F8FAFC)",
         overflowY: "auto",
         position: "relative",
@@ -298,11 +298,11 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             position: "fixed",
             bottom: "24px",
             right: "24px",
-            backgroundColor: "#1E293B",
+            backgroundColor: "rgba(18, 22, 34, 0.9)",
             color: "#F8FAFC",
-            border: "1px solid #10B981",
+            border: "1px solid #4EDEA3",
             padding: "12px 20px",
-            borderRadius: "8px",
+            borderRadius: "12px",
             fontSize: "14px",
             boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
             zIndex: 1000,
@@ -312,7 +312,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             animation: "fadeIn 0.2s ease-out",
           }}
         >
-          <CheckIcon size={16} color="#10B981" />
+          <CheckIcon size={16} color="#4EDEA3" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -325,8 +325,8 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
           justifyContent: "space-between",
           padding: "20px 32px",
           borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          backgroundColor: "rgba(15, 23, 42, 0.6)",
-          backdropFilter: "blur(12px)",
+          backgroundColor: "rgba(18, 22, 34, 0.55)",
+          backdropFilter: "blur(24px)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -352,20 +352,20 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             style={{
               width: "40px",
               height: "40px",
-              borderRadius: "10px",
-              backgroundColor: "rgba(37, 99, 235, 0.15)",
-              border: "1px solid rgba(37, 99, 235, 0.3)",
+              borderRadius: "12px",
+              backgroundColor: "rgba(147, 3, 197, 0.2)",
+              border: "1px solid rgba(192, 76, 253, 0.35)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#38BDF8",
+              color: "#E8B3FF",
             }}
           >
             <TelegramIcon size={22} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>
+              <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0, fontFamily: "var(--font-display)" }}>
                 Universal Telegram Bot
               </h1>
               <span
@@ -373,13 +373,13 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
                   fontSize: "11px",
                   padding: "2px 8px",
                   borderRadius: "12px",
-                  backgroundColor: "rgba(16, 185, 129, 0.15)",
-                  color: "#10B981",
-                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  backgroundColor: "rgba(147, 3, 197, 0.22)",
+                  color: "#E8B3FF",
+                  border: "1px solid rgba(192, 76, 253, 0.35)",
                   fontWeight: 600,
                 }}
               >
-                v8.0.0 Phase 39
+                v9.0.0 Ultra Glass
               </span>
             </div>
             <p style={{ fontSize: "13px", color: "var(--text-muted, #94A3B8)", margin: "4px 0 0 0" }}>
@@ -425,13 +425,13 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             style={{
               padding: "16px",
               borderRadius: "12px",
-              backgroundColor: "rgba(30, 41, 59, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "rgba(18, 22, 34, 0.55)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
             }}
           >
             <div style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "4px" }}>Bot Nomi</div>
-            <div style={{ fontSize: "15px", fontWeight: 600, color: "#38BDF8" }}>
-              @{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}
+            <div style={{ fontSize: "15px", fontWeight: 600, color: "#E8B3FF" }}>
+              @{(botStatus?.bot_username || "Misa_ai_agent_bot").replace(/^@/, "")}
             </div>
           </div>
           <div
@@ -584,7 +584,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               <div>
                 <div style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "4px" }}>Misa User ID</div>
                 <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                  {accountInfo.link.mikasa_user_id}
+                  {accountInfo.link.misa_user_id}
                 </div>
               </div>
               <div>
@@ -795,7 +795,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               <ol style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#94A3B8", lineHeight: "1.8" }}>
                 <li>Yuqoridagi 6 xonali kodni nusxalang.</li>
                 <li>
-                  Telegramda <strong style={{ color: "#38BDF8" }}>@{(botStatus?.bot_username || "Mikasa_ai_agent_bot").replace(/^@/, "")}</strong> botini oching.
+                  Telegramda <strong style={{ color: "#E8B3FF" }}>@{(botStatus?.bot_username || "Misa_ai_agent_bot").replace(/^@/, "")}</strong> botini oching.
                 </li>
                 <li>
                   Kodni shunchaki botga yuboring (masalan: <code style={{ color: "#10B981" }}>{otpCode}</code>) yoki{" "}

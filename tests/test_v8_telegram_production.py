@@ -29,7 +29,7 @@ class TestTelegramBotCommandsProduction(unittest.TestCase):
     """Core bot commands including /session and /logout."""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_tg_prod_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_tg_prod_")
         self.tg_storage = os.path.join(self.temp_dir, "tg.json")
         self.adm_storage = os.path.join(self.temp_dir, "adm.json")
         self.identity_mgr = TelegramIdentityManager(storage_path=self.tg_storage)
@@ -225,7 +225,7 @@ class TestTelegramWebhookIntegration(AioHTTPTestCase):
 
 class TestMultiTenantIsolationTelegram(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_tg_isolation_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_tg_isolation_")
         self.tg_storage = os.path.join(self.temp_dir, "tg.json")
         self.adm_storage = os.path.join(self.temp_dir, "adm.json")
         self.identity_mgr = TelegramIdentityManager(storage_path=self.tg_storage)
@@ -299,7 +299,7 @@ class TestRailwayProductionFixes(unittest.TestCase):
     """Regression tests for Railway Telegram OTP linking, Supabase PGRST301, webhook secret redaction, and OAuth state errors."""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_prod_fixes_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_prod_fixes_")
         self.tg_storage = os.path.join(self.temp_dir, "tg_local.json")
         self.cloud_storage = os.path.join(self.temp_dir, "tg_cloud.json")
 
@@ -354,7 +354,7 @@ class TestRailwayProductionFixes(unittest.TestCase):
             )
             self.assertTrue(ok, f"Expected OTP verification to succeed after sync, got: {msg}")
             self.assertIsNotNone(acc)
-            self.assertEqual(acc.mikasa_user_id, "user-sync-1")
+            self.assertEqual(acc.misa_user_id, "user-sync-1")
 
         asyncio.run(_run())
 
@@ -383,7 +383,7 @@ class TestRailwayProductionFixes(unittest.TestCase):
         async def _run():
             with patch("aiohttp.ClientSession", return_value=mock_session_cm):
                 with self.assertLogs("core.v8.telegram_webhook", level="INFO") as cm:
-                    ok, _ = await svc.register_webhook("https://mikasa-v8-api-production.up.railway.app")
+                    ok, _ = await svc.register_webhook("https://misa.up.railway.app")
                     self.assertTrue(ok)
             combined_logs = "\n".join(cm.output)
             self.assertNotIn(secret, combined_logs)
@@ -414,7 +414,7 @@ class TestRailwayProductionFixes(unittest.TestCase):
                 "error_code": "bad_oauth_state",
                 "error_description": "OAuth state not found or expired",
             }
-            req.headers = {"Host": "mikasa-v8-api-production.up.railway.app"}
+            req.headers = {"Host": "misa.up.railway.app"}
             resp = await handle_oauth_callback(req)
             self.assertEqual(resp.status, 200)
             self.assertIn("bad_oauth_state", resp.text)

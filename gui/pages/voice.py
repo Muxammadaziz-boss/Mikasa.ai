@@ -38,7 +38,7 @@ class VoicePage(ctk.CTkFrame):
         orb_container = ctk.CTkFrame(parent, fg_color="transparent")
         orb_container.pack(pady=(32, 0))
 
-        # "Mikasa" sarlavhasi
+        # "Misa" sarlavhasi
         ctk.CTkLabel(
             orb_container,
             text="Misa",

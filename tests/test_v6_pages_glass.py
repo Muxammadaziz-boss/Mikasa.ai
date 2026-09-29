@@ -1,5 +1,5 @@
 # ========== test_v6_pages_glass.py ==========
-# Mikasa AI v6.0.0 — Barcha sahifalardagi Glass tugmalar va navigatsiya testi
+# Misa AI v6.0.0 — Barcha sahifalardagi Glass tugmalar va navigatsiya testi
 
 import unittest
 import customtkinter as ctk

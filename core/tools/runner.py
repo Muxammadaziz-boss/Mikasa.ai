@@ -1,5 +1,5 @@
 # ========== runner.py ==========
-# Mikasa AI 7.x — Safe Tool Execution Runner & Pipeline
+# Misa AI 7.x — Safe Tool Execution Runner & Pipeline
 # Timeout Enforcement, Health Tracking, Permission Integration & Normalization
 
 import time

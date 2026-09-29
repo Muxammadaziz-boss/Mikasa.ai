@@ -1,5 +1,5 @@
 """
-Mikasa AI v6.0.0 — Custom Window Drag Safety & Proactive Watcher Thread-Safety Tests
+Misa AI v6.0.0 — Custom Window Drag Safety & Proactive Watcher Thread-Safety Tests
 Verifies:
 1. Pure-Tkinter window drag replaces native SendMessageW/ReleaseCapture modal loop.
 2. Dragging on maximized window restores normal state smoothly.
@@ -63,7 +63,7 @@ class TestWindowDragSafety(unittest.TestCase):
     def test_drag_logic_without_ctypes(self):
         """Oynani surish mantiqi ctypes SendMessageW chaqirmaydi"""
         from unittest.mock import MagicMock
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
 
         # App ob'ektining surish metodlarini tekshirish
         mock_app = MagicMock()
@@ -71,10 +71,10 @@ class TestWindowDragSafety(unittest.TestCase):
         mock_app.winfo_x.return_value = 50
         mock_app.winfo_y.return_value = 50
 
-        # Bind MikasaApp methods
-        start_drag = MikasaApp._start_window_drag.__get__(mock_app, MikasaApp)
-        on_drag = MikasaApp._on_window_drag.__get__(mock_app, MikasaApp)
-        end_drag = MikasaApp._end_window_drag.__get__(mock_app, MikasaApp)
+        # Bind MisaApp methods
+        start_drag = MisaApp._start_window_drag.__get__(mock_app, MisaApp)
+        on_drag = MisaApp._on_window_drag.__get__(mock_app, MisaApp)
+        end_drag = MisaApp._end_window_drag.__get__(mock_app, MisaApp)
 
         event_start = MockEvent(x=10, y=10, x_root=60, y_root=60)
         start_drag(event_start)
@@ -95,7 +95,7 @@ class TestWindowDragSafety(unittest.TestCase):
     def test_drag_on_maximized_window_restores_gracefully(self):
         """Kattalashtirilgan oyna surilganda avval normal holatga qaytib, o'lcham hisoblanadi"""
         from unittest.mock import MagicMock
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
 
         mock_app = MagicMock()
         mock_app.state.return_value = "zoomed"
@@ -103,7 +103,7 @@ class TestWindowDragSafety(unittest.TestCase):
         mock_app.winfo_x.return_value = 0
         mock_app.winfo_y.return_value = 0
 
-        start_drag = MikasaApp._start_window_drag.__get__(mock_app, MikasaApp)
+        start_drag = MisaApp._start_window_drag.__get__(mock_app, MisaApp)
         event_start = MockEvent(x=960, y=18, x_root=960, y_root=18)
 
         start_drag(event_start)
@@ -137,16 +137,16 @@ class TestStressDragAndWatcherConcurrency(unittest.TestCase):
     def test_concurrent_drag_and_watcher_execution(self):
         """Fon watcher va UI drag parallel ishlaganda race condition yoki deadlock yuz bermasligi kerak"""
         from unittest.mock import MagicMock
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
 
         mock_app = MagicMock()
         mock_app.state.return_value = "normal"
         mock_app.winfo_x.return_value = 100
         mock_app.winfo_y.return_value = 100
 
-        start_drag = MikasaApp._start_window_drag.__get__(mock_app, MikasaApp)
-        on_drag = MikasaApp._on_window_drag.__get__(mock_app, MikasaApp)
-        end_drag = MikasaApp._end_window_drag.__get__(mock_app, MikasaApp)
+        start_drag = MisaApp._start_window_drag.__get__(mock_app, MisaApp)
+        on_drag = MisaApp._on_window_drag.__get__(mock_app, MisaApp)
+        end_drag = MisaApp._end_window_drag.__get__(mock_app, MisaApp)
 
         watcher = ProactiveWatcher(check_interval=1, min_silent_time=0)
         watcher.start()

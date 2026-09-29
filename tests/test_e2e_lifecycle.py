@@ -92,7 +92,7 @@ class TestE2ELifecycle(unittest.TestCase):
             self.assertIn("name", acc_data)
 
             # 3. CHAT
-            chat_resp = await handle_chat(MockRequest({"query": "Salom Mikasa", "mode": "ask"}))
+            chat_resp = await handle_chat(MockRequest({"query": "Salom Misa", "mode": "ask"}))
             self.assertEqual(chat_resp.status, 200)
             chat_data = json.loads(chat_resp.text)
             self.assertTrue(chat_data.get("ok"))

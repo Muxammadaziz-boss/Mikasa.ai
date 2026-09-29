@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 from core.v8.device import DeviceIdentity, DeviceIdentityManager
 from core.v8.heartbeat import DeviceState
 
-logger = logging.getLogger("mikasa.agent.identity")
+logger = logging.getLogger("misa.agent.identity")
 
 
 class AgentIdentityManager:
@@ -26,7 +26,7 @@ class AgentIdentityManager:
     """
 
     def __init__(self, vault_dir: Optional[str] = None):
-        self.vault_dir = vault_dir or os.path.join(os.path.expanduser("~"), ".mikasa_agent", "vault")
+        self.vault_dir = vault_dir or os.path.join(os.path.expanduser("~"), ".misa_agent", "vault")
 
     def compute_hardware_fingerprint(self) -> str:
         """Apparat xeshini hisoblash (instansiya metodi)"""
@@ -98,7 +98,7 @@ class AgentIdentityManager:
             local_ip=DeviceIdentityManager.get_local_ip(),
             fingerprint=fingerprint,
             agent_version="8.0.0",
-            mikasa_version="8.0.0",
+            misa_version="8.0.0",
             status=DeviceState.ONLINE,
             metadata={
                 "friendly_name": friendly_name or hostname,

@@ -1,5 +1,5 @@
 # ========== app.py ==========
-# Mikasa AI — Asosiy Application Shell
+# Misa AI — Asosiy Application Shell
 # Sidebar navigatsiya + Main content area + Status bar
 
 import customtkinter as ctk
@@ -26,8 +26,8 @@ except ImportError:
     VERSION = "8.0.0"
 
 
-class MikasaApp(ctk.CTk):
-    """Mikasa AI asosiy dastur oynasi"""
+class MisaApp(ctk.CTk):
+    """Misa AI asosiy dastur oynasi"""
 
     def __init__(self, connect_backend=False, show_splash=True):
         super().__init__()
@@ -74,11 +74,11 @@ class MikasaApp(ctk.CTk):
         self._setup_custom_window_chrome()
         self.bind("<Configure>", self._on_window_configure, add="+")
 
-        # Splash Screen ni ishga tushirish (Mikasa 7.0 birinchi vizual kadri)
+        # Splash Screen ni ishga tushirish (Misa 7.0 birinchi vizual kadri)
         if show_splash:
-            from gui.splash import MikasaSplashScreen
+            from gui.splash import MisaSplashScreen
 
-            self.splash = MikasaSplashScreen(self, on_retry=self._on_splash_retry)
+            self.splash = MisaSplashScreen(self, on_retry=self._on_splash_retry)
             self.splash.place(relx=0, rely=0, relwidth=1.0, relheight=1.0)
             self.splash.lift()
 

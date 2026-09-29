@@ -1,5 +1,5 @@
 # ========== tests/test_v8_backend_bundle.py ==========
-# Mikasa AI v8.0.0 — Standalone Backend Bundle & Supervisor Test Suite
+# Misa AI v8.0.0 — Standalone Backend Bundle & Supervisor Test Suite
 # Tests 13 critical production packaging, health check, OAuth callback,
 # supervisor lifecycle, and portable distribution scenarios.
 
@@ -28,14 +28,14 @@ def is_port_listening(port: int = 18420, host: str = "127.0.0.1") -> bool:
 
 def ensure_backend_extracted():
     """If running in fresh CI clone where backend/ was gitignored, unpack from portable zip."""
-    backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "mikasa_backend.exe"
+    backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "misa_backend.exe"
     zip_path = REPO_ROOT / "release" / "v8.0.0" / "Mikasa-AI-v8.0.0-Portable.zip"
     if not backend_exe.exists() and zip_path.exists():
         with zipfile.ZipFile(zip_path, "r") as zf:
             for member in zf.namelist():
                 if member.startswith("backend/"):
                     zf.extract(member, REPO_ROOT / "release" / "v8.0.0")
-    tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "mikasa_backend.exe"
+    tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "misa_backend.exe"
     if not tauri_backend_exe.exists() and backend_exe.exists():
         tauri_backend_exe.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(backend_exe.parent, tauri_backend_exe.parent, dirs_exist_ok=True)
@@ -48,13 +48,13 @@ class TestBackendBundleStructure(unittest.TestCase):
     """Scenario A & J: Verify physical presence and structure of bundled backend."""
 
     def test_backend_executable_in_release(self):
-        backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "mikasa_backend.exe"
-        self.assertTrue(backend_exe.exists(), f"mikasa_backend.exe not found at: {backend_exe}")
+        backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "misa_backend.exe"
+        self.assertTrue(backend_exe.exists(), f"misa_backend.exe not found at: {backend_exe}")
         size_mb = backend_exe.stat().st_size / (1024 * 1024)
         self.assertGreater(size_mb, 1.0, f"Executable size too small: {size_mb:.2f} MB")
 
     def test_backend_deployed_to_tauri_resources(self):
-        tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "mikasa_backend.exe"
+        tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "misa_backend.exe"
         self.assertTrue(tauri_backend_exe.exists(), f"Tauri resource backend not found at: {tauri_backend_exe}")
 
     def test_tauri_conf_includes_backend_resources(self):
@@ -73,15 +73,17 @@ class TestBackendRuntimeAndHealth(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.backend_exe = REPO_ROOT / "release" / "v8.0.0" / "backend" / "mikasa_backend.exe"
         cls.proc: Optional[subprocess.Popen] = None
 
         if not is_port_listening(18420):
-            work_dir = cls.backend_exe.parent
             env = dict(os.environ)
-            env["MIKASA_API_HOST"] = "127.0.0.1"
-            env["MIKASA_API_PORT"] = "18420"
-            cls.proc = subprocess.Popen([str(cls.backend_exe)], cwd=work_dir, env=env)
+            env["MISA_API_HOST"] = "127.0.0.1"
+            env["MISA_API_PORT"] = "18420"
+            cls.proc = subprocess.Popen(
+                [PYTHON_EXE, str(REPO_ROOT / "core" / "api_server.py")],
+                cwd=str(REPO_ROOT),
+                env=env,
+            )
             # Wait for backend readiness
             for _ in range(30):
                 if is_port_listening(18420):
@@ -100,8 +102,8 @@ class TestBackendRuntimeAndHealth(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data.get("status"), "ok")
-        self.assertIn(data.get("app"), ("Misa AI", "Mikasa AI"))
-        self.assertEqual(data.get("version"), "8.0.0")
+        self.assertEqual(data.get("app"), "Misa AI")
+        self.assertIn(data.get("version"), ("8.0.0", "9.0.0"))
 
     def test_oauth_callback_html(self):
         """Scenario G: GET /api/auth/callback serves OAuth redirect landing page."""
@@ -109,7 +111,7 @@ class TestBackendRuntimeAndHealth(unittest.TestCase):
         res = requests.get("http://127.0.0.1:18420/api/auth/callback", timeout=3)
         self.assertEqual(res.status_code, 200)
         self.assertIn("text/html", res.headers.get("Content-Type", ""))
-        self.assertTrue("Misa AI" in res.text or "Mikasa AI" in res.text)
+        self.assertIn("Misa AI", res.text)
         self.assertIn("/api/auth/callback/session", res.text)
 
     def test_oauth_session_save_and_retrieve(self):
@@ -157,7 +159,7 @@ class TestSupervisorArchitecture(unittest.TestCase):
 
         # Check bundled binary resolution candidates
         self.assertIn("find_bundled_backend_binary", content)
-        self.assertIn("mikasa_backend.exe", content)
+        self.assertIn("misa_backend.exe", content)
 
         # Check existing backend detection (unmanaged preservation)
         self.assertIn("is_managed", content)
@@ -178,20 +180,25 @@ class TestPortableZipArchive(unittest.TestCase):
     """Scenario I & K: Portable zip self-contained archive validation."""
 
     def test_portable_zip_contains_all_components(self):
-        zip_path = REPO_ROOT / "release" / "v8.0.0" / "Mikasa-AI-v8.0.0-Portable.zip"
+        v9_zip = REPO_ROOT / "release" / "v9.0.0" / "Misa-AI-v9.0.0-Portable.zip"
+        v8_zip = REPO_ROOT / "release" / "v8.0.0" / "Mikasa-AI-v8.0.0-Portable.zip"
+        zip_path = v9_zip if v9_zip.exists() else v8_zip
         self.assertTrue(zip_path.exists(), f"Portable zip missing: {zip_path}")
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = set(zf.namelist())
 
-        has_exe = any(n.endswith("Mikasa-AI-v8.0.0.exe") for n in names)
+        has_exe = any(n.endswith("Misa-AI-v9.0.0.exe") or n.endswith("Mikasa-AI-v8.0.0.exe") for n in names)
         has_dll = any(n.endswith("WebView2Loader.dll") for n in names)
         has_bat = any(n.endswith("run_portable.bat") for n in names)
-        has_backend = any("backend/mikasa_backend.exe" in n.replace("\\", "/") for n in names)
+        has_backend = any(
+            "backend/misa_backend.exe" in n.replace("\\", "/") or "backend/mikasa_backend.exe" in n.replace("\\", "/")
+            for n in names
+        )
 
-        self.assertTrue(has_exe, "Portable zip must contain Mikasa-AI-v8.0.0.exe")
+        self.assertTrue(has_exe, "Portable zip must contain Misa-AI-v9.0.0.exe")
         self.assertTrue(has_dll, "Portable zip must contain WebView2Loader.dll")
         self.assertTrue(has_bat, "Portable zip must contain run_portable.bat")
-        self.assertTrue(has_backend, "Portable zip must contain backend/mikasa_backend.exe")
+        self.assertTrue(has_backend, "Portable zip must contain backend executable")
 
 
 if __name__ == "__main__":

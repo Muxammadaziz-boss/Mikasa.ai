@@ -6,10 +6,10 @@ import sys
 import logging
 from typing import Dict, Any
 
-logger = logging.getLogger("mikasa.agent.startup")
+logger = logging.getLogger("misa.agent.startup")
 
 RUN_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
-APP_NAME = "MikasaWindowsAgent"
+APP_NAME = "MisaWindowsAgent"
 
 
 class WindowsStartupManager:
@@ -28,7 +28,7 @@ class WindowsStartupManager:
 
     @classmethod
     def is_startup_enabled(cls) -> bool:
-        """HKCU Run kalitida MikasaAgent mavjudligini tekshirish"""
+        """HKCU Run kalitida MisaAgent mavjudligini tekshirish"""
         if not cls.is_windows():
             return False
         try:
@@ -73,7 +73,7 @@ class WindowsStartupManager:
 
     @classmethod
     def disable_startup(cls) -> bool:
-        """HKCU Run kalitidan MikasaAgentni toza o'chirish"""
+        """HKCU Run kalitidan MisaAgentni toza o'chirish"""
         if not cls.is_windows():
             return False
         try:
@@ -99,14 +99,14 @@ class WindowsStartupManager:
         Tizim ma'murlari uchun Windows Service yoki Task Scheduler qo'llanmasi.
         """
         return {
-            "service_name": "MikasaAgentService",
+            "service_name": "MisaAgentService",
             "task_scheduler_cmd": (
-                'schtasks /create /tn "MikasaAgent" /tr "C:\\Path\\To\\MikasaAgent.exe --service" '
+                'schtasks /create /tn "MisaAgent" /tr "C:\\Path\\To\\MisaAgent.exe --service" '
                 '/sc onlogon /rl limited'
             ),
             "nssm_cmd": (
-                'nssm install MikasaAgent "C:\\Path\\To\\MikasaAgent.exe" && '
-                'nssm set MikasaAgent AppParameters "--service"'
+                'nssm install MisaAgent "C:\\Path\\To\\MisaAgent.exe" && '
+                'nssm set MisaAgent AppParameters "--service"'
             ),
             "uac_bypass": False,
             "stealth": False

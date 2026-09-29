@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase38.py ==========
-# Phase 38 — Mikasa Online Remote Control + User Permission Center Test Suite
+# Phase 38 — Misa Online Remote Control + User Permission Center Test Suite
 # Exactly 20 comprehensive unit & integration tests covering:
 # 1. Telegram identity numeric ID validation & user creation
 # 2. Pairing code generation (MK-XXXXXX format, 5-minute TTL)

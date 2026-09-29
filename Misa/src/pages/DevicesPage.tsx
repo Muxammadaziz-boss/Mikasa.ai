@@ -1,5 +1,5 @@
 // ========== DevicesPage.tsx ==========
-// Mikasa AI v8.0.0 — Phase 40: Universal Account & Device Management 2.0
+// Misa AI v9.0.0 — Universal Account & Device Management 2.0
 // Multi-Device management page: list, select, rename, revoke
 
 import React, { useState, useEffect, useCallback } from "react";

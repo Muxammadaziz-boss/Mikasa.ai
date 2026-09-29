@@ -11,7 +11,7 @@ from typing import Dict, Any
 from core.v8.events import RemoteEventType
 from agent.audit import AgentAuditLogger
 
-logger = logging.getLogger("mikasa.agent.recovery")
+logger = logging.getLogger("misa.agent.recovery")
 
 
 class CrashRecoveryManager:

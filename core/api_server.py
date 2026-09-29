@@ -1,5 +1,5 @@
 # ========== api_server.py ==========
-# Mikasa AI 8.0.0 — Desktop Background Backend API Server
+# Misa AI 9.0.0 — Desktop Background Backend API Server
 # Ushbu server Tauri frontend (React) va Python AI yadrosi (main.py, ai_engine,
 # agent_memory, agent_scheduler, agent_tools, command_dispatcher) orasidagi
 # to'liq asinxron ko'prik (REST + WebSocket) hisoblanadi.
@@ -29,8 +29,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 def get_data_dir() -> str:
-    """Xavfsiz ma'lumotlar papkasi yo'lini aniqlash (mahalliy data/ yoki %APPDATA%/MikasaAI/data)."""
-    if custom := os.environ.get("MIKASA_DATA_DIR"):
+    """Xavfsiz ma'lumotlar papkasi yo'lini aniqlash (mahalliy data/ yoki %APPDATA%/MisaAI/data)."""
+    if custom := os.environ.get("MISA_DATA_DIR"):
         os.makedirs(custom, exist_ok=True)
         return custom
     local_data = os.path.join(BASE_DIR, "data")
@@ -44,7 +44,7 @@ def get_data_dir() -> str:
     except Exception:
         pass
     appdata = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    safe_data = os.path.join(appdata, "MikasaAI", "data")
+    safe_data = os.path.join(appdata, "MisaAI", "data")
     os.makedirs(safe_data, exist_ok=True)
     return safe_data
 
@@ -54,7 +54,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("MikasaAPIServer")
+logger = logging.getLogger("MisaAPIServer")
 try:
     from core.logger import get_backend_handler, install_crash_handlers
     logger.addHandler(get_backend_handler())
@@ -77,7 +77,7 @@ _main_loop = None
 
 
 def load_runtime_dotenv() -> None:
-    """Runtime ishga tushganda .env va mikasa-7/.env fayllaridan konfiguratsiyani yuklash."""
+    """Runtime ishga tushganda .env va Misa/.env fayllaridan konfiguratsiyani yuklash."""
     try:
         from dotenv import load_dotenv
         search_roots = [BASE_DIR, os.getcwd()]
@@ -97,8 +97,6 @@ def load_runtime_dotenv() -> None:
             if os.path.isfile(root_env):
                 load_dotenv(root_env, override=False)
             frontend_env = os.path.join(root, "Misa", ".env")
-        if not os.path.isfile(frontend_env):
-            frontend_env = os.path.join(root, "mikasa-7", ".env")
             if os.path.isfile(frontend_env):
                 load_dotenv(frontend_env, override=False)
     except Exception:
@@ -116,9 +114,9 @@ def _is_headless_server_mode() -> bool:
         return True
     if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"):
         return True
-    if os.environ.get("MIKASA_HEADLESS_SERVER", "").strip().lower() in ("1", "true", "yes"):
+    if os.environ.get("MISA_HEADLESS_SERVER", "").strip().lower() in ("1", "true", "yes"):
         return True
-    if os.environ.get("MIKASA_ENV", "").strip().lower() == "production":
+    if os.environ.get("MISA_ENV", "").strip().lower() == "production":
         return True
     return False
 
@@ -407,7 +405,7 @@ async def handle_system_metrics(request):
 # ========== 2. CHAT & VOICE HANDLERS ==========
 def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask") -> str:
     """
-    Mikasa AI 8.0.0 — Unified Command & AI Pipeline
+    Misa AI 9.0.0 — Unified Command & AI Pipeline
     Mahalliy buyruqlarni darhol kompyuterda bajaradi, murakkab savollarni AI ga yo'naltiradi.
     """
     clean_text = text.strip()
@@ -846,7 +844,7 @@ async def handle_voice_start(request):
             clean_reply = re.sub(r"^[🤖✨✅⚠️❌]\s*(?:Agent:|AI:)?\s*", "", msg_str).strip()
             sync_broadcast("voice_state", {"state": "speaking"}, loop)
             sync_broadcast("ai_response", {"text": clean_reply, "mode": "voice"}, loop)
-            sync_broadcast("voice_transcript", {"text": clean_reply, "sender": "mikasa"}, loop)
+            sync_broadcast("voice_transcript", {"text": clean_reply, "sender": "misa"}, loop)
         # 3. Tinglash holatiga qaytish
         elif "🎙️ Tinglash boshlandi" in msg_str or "Tinglash davom" in msg_str:
             sync_broadcast("voice_state", {"state": "listening"}, loop)
@@ -2515,24 +2513,24 @@ async def handle_telegram_link_start(request):
     except Exception:
         body = {}
 
-    body_uid = str(body.get("mikasa_user_id") or "").strip()
+    body_uid = str(body.get("misa_user_id") or "").strip()
     if user is not None or user_id != "admin":
         if body_uid and body_uid not in (user_id, "admin"):
             return web.json_response(
                 {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi hisobi uchun OTP yaratish taqiqlangan."},
                 status=403
             )
-        mikasa_user_id = user_id
+        misa_user_id = user_id
     else:
-        mikasa_user_id = body_uid or user_id
+        misa_user_id = body_uid or user_id
 
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Misa_ai_agent_bot").strip() or "Misa_ai_agent_bot"
     auth_token = get_auth_token_from_request(request)
 
     req, otp, deep_link, err_msg = mgr.create_link_request(
-        mikasa_user_id=mikasa_user_id,
+        misa_user_id=misa_user_id,
         bot_username=bot_username,
         expected_telegram_user_id=body.get("expected_telegram_user_id"),
         auth_token=auth_token
@@ -2543,13 +2541,13 @@ async def handle_telegram_link_start(request):
 
     await broadcast_ws("PAIRING_CREATED", {
         "request_id": req.request_id,
-        "mikasa_user_id": req.mikasa_user_id,
+        "misa_user_id": req.misa_user_id,
         "expires_at": req.expires_at,
         "ttl_seconds": int(mgr.DEFAULT_TTL)
     })
     await broadcast_ws("PAIRING_WAITING", {
         "request_id": req.request_id,
-        "mikasa_user_id": req.mikasa_user_id
+        "misa_user_id": req.misa_user_id
     })
 
     return web.json_response({
@@ -2582,7 +2580,7 @@ async def handle_telegram_link_sync(request):
     otp_hash = str(req_payload.get("otp_hash") or "").strip()
     salt = str(req_payload.get("salt") or "").strip()
     link_token = str(req_payload.get("link_token") or "").strip()
-    body_uid = str(req_payload.get("mikasa_user_id") or body.get("mikasa_user_id") or "").strip() or user_id
+    body_uid = str(req_payload.get("misa_user_id") or body.get("misa_user_id") or "").strip() or user_id
 
     if user is not None or user_id != "admin":
         if body_uid and body_uid not in (user_id, "admin"):
@@ -2590,9 +2588,9 @@ async def handle_telegram_link_sync(request):
                 {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi nomidan OTP sinxronlash taqiqlangan."},
                 status=403
             )
-        mikasa_user_id = user_id
+        misa_user_id = user_id
     else:
-        mikasa_user_id = body_uid
+        misa_user_id = body_uid
 
     if not request_id or not otp_hash or not salt:
         return web.json_response({"ok": False, "error": "request_id, otp_hash va salt majburiy"}, status=400)
@@ -2603,7 +2601,7 @@ async def handle_telegram_link_sync(request):
     now = time.time()
     sync_dict = {
         "request_id": request_id,
-        "mikasa_user_id": mikasa_user_id,
+        "misa_user_id": misa_user_id,
         "otp_hash": otp_hash,
         "salt": salt,
         "link_token": link_token,
@@ -2620,7 +2618,7 @@ async def handle_telegram_link_sync(request):
     return web.json_response({
         "ok": True,
         "request_id": req.request_id,
-        "mikasa_user_id": req.mikasa_user_id,
+        "misa_user_id": req.misa_user_id,
         "expires_at": req.expires_at,
     })
 
@@ -2636,17 +2634,17 @@ async def handle_telegram_link_verify(request):
     except Exception:
         return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
 
-    body_uid = str(body.get("mikasa_user_id") or "").strip()
-    expected_mikasa_user_id: Optional[str] = None
+    body_uid = str(body.get("misa_user_id") or "").strip()
+    expected_misa_user_id: Optional[str] = None
     if user is not None or user_id != "admin":
         if body_uid and body_uid not in (user_id, "admin"):
             return web.json_response(
                 {"ok": False, "error": "Ruxsat etilmadi: Boshqa foydalanuvchi nomidan OTP tasdiqlash taqiqlangan."},
                 status=403
             )
-        expected_mikasa_user_id = user_id
+        expected_misa_user_id = user_id
     elif body_uid and body_uid != "admin":
-        expected_mikasa_user_id = body_uid
+        expected_misa_user_id = body_uid
 
     otp = body.get("otp", "")
     tg_id = body.get("telegram_user_id")
@@ -2665,24 +2663,24 @@ async def handle_telegram_link_verify(request):
         username=username,
         request_id=request_id,
         auth_token=auth_token,
-        expected_mikasa_user_id=expected_mikasa_user_id
+        expected_misa_user_id=expected_misa_user_id
     )
 
     if ok and link:
         await broadcast_ws("PAIRING_VERIFIED", {
             "telegram_user_id": link.telegram_user_id,
-            "mikasa_user_id": link.mikasa_user_id
+            "misa_user_id": link.misa_user_id
         })
         await broadcast_ws("TELEGRAM_CONNECTED", {
             "telegram_user_id": link.telegram_user_id,
-            "mikasa_user_id": link.mikasa_user_id,
+            "misa_user_id": link.misa_user_id,
             "linked_at": link.linked_at
         })
         return web.json_response({
             "ok": True,
             "message": msg,
             "link": link.to_dict(),
-            "mikasa_user_id": link.mikasa_user_id
+            "misa_user_id": link.misa_user_id
         })
 
     await broadcast_ws("PAIRING_FAILED", {
@@ -2698,7 +2696,7 @@ async def handle_telegram_link_status(request):
     if err:
         return err
 
-    mikasa_user_id = user_id
+    misa_user_id = user_id
     request_id = request.query.get("request_id")
     auth_token = get_auth_token_from_request(request)
 
@@ -2709,7 +2707,7 @@ async def handle_telegram_link_status(request):
         req = mgr.get_request(request_id, auth_token=auth_token, refresh=True)
         if not req:
             return web.json_response({"ok": False, "error": "So'rov topilmadi"}, status=404)
-        if (user is not None or mikasa_user_id != "admin") and req.mikasa_user_id != mikasa_user_id:
+        if (user is not None or misa_user_id != "admin") and req.misa_user_id != misa_user_id:
             return web.json_response(
                 {"ok": False, "error": "Ruxsat etilmadi: Ushbu bog'lanish so'rovi boshqa foydalanuvchiga tegishli."},
                 status=403
@@ -2717,7 +2715,7 @@ async def handle_telegram_link_status(request):
         ttl_left = max(0, int(req.expires_at - time.time()))
         status_name = "EXPIRED" if (req.status == "PENDING" and req.is_expired()) else req.status
         is_verified = (req.status == "VERIFIED")
-        link = mgr.get_link_by_mikasa_user(req.mikasa_user_id, auth_token=auth_token, refresh=is_verified)
+        link = mgr.get_link_by_misa_user(req.misa_user_id, auth_token=auth_token, refresh=is_verified)
         return web.json_response({
             "ok": True,
             "status": "CONNECTED" if (is_verified or (link and link.is_active)) else status_name,
@@ -2730,7 +2728,7 @@ async def handle_telegram_link_status(request):
             "ttl_seconds": ttl_left
         })
 
-    link = mgr.get_link_by_mikasa_user(mikasa_user_id, auth_token=auth_token, refresh=True)
+    link = mgr.get_link_by_misa_user(misa_user_id, auth_token=auth_token, refresh=True)
     if link and link.is_active:
         return web.json_response({
             "ok": True,
@@ -2761,17 +2759,17 @@ async def handle_telegram_unlink(request):
     except Exception:
         body = {}
 
-    mikasa_user_id = user_id
+    misa_user_id = user_id
     tg_id = body.get("telegram_user_id")
 
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
     auth_token = get_auth_token_from_request(request)
 
-    unlinked = mgr.unlink(mikasa_user_id=mikasa_user_id, telegram_user_id=tg_id, auth_token=auth_token)
+    unlinked = mgr.unlink(misa_user_id=misa_user_id, telegram_user_id=tg_id, auth_token=auth_token)
     if unlinked:
         await broadcast_ws("TELEGRAM_DISCONNECTED", {
-            "mikasa_user_id": mikasa_user_id
+            "misa_user_id": misa_user_id
         })
         return web.json_response({"ok": True, "message": "Telegram hisobi muvaffaqiyatli uzildi"})
 
@@ -2784,12 +2782,12 @@ async def handle_telegram_account(request):
     if err:
         return err
 
-    mikasa_user_id = user_id
+    misa_user_id = user_id
     auth_token = get_auth_token_from_request(request)
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
 
-    link = mgr.get_link_by_mikasa_user(mikasa_user_id, auth_token=auth_token, refresh=True)
+    link = mgr.get_link_by_misa_user(misa_user_id, auth_token=auth_token, refresh=True)
     ident = mgr.get_identity(link.telegram_user_id) if link else None
 
     return web.json_response({
@@ -2804,7 +2802,7 @@ async def handle_telegram_status(request):
     """GET /api/telegram/status - Telegram Bot tizim holati"""
     from core.v8 import TelegramIdentityManager
     mgr = TelegramIdentityManager.get_default_instance()
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Mikasa_ai_agent_bot").strip() or "Mikasa_ai_agent_bot"
+    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Misa_ai_agent_bot").strip() or "Misa_ai_agent_bot"
 
     return web.json_response({
         "ok": True,
@@ -2818,7 +2816,7 @@ async def handle_telegram_status(request):
 # ========== 8.1. PHASE 40 & 41: ACCOUNT & MULTI-DEVICE MANAGEMENT API ==========
 
 def get_auth_token_from_request(request) -> Optional[str]:
-    """So'rovdan sessiya tokenini ajratib olish (Faqat Authorization Bearer yoki X-Mikasa-Session-Token header).
+    """So'rovdan sessiya tokenini ajratib olish (Faqat Authorization Bearer yoki X-Misa-Session-Token header).
     Xavfsizlik talabi: Query parametridan token o'qish (loglarda sizib chiqishi xavfi tufayli) to'liq bekor qilingan.
     """
     auth_header = getattr(request, "headers", {}).get("Authorization", "")
@@ -2826,7 +2824,7 @@ def get_auth_token_from_request(request) -> Optional[str]:
         token = auth_header[7:].strip()
         if token:
             return token
-    token = getattr(request, "headers", {}).get("X-Mikasa-Session-Token")
+    token = getattr(request, "headers", {}).get("X-Misa-Session-Token")
     if token:
         return token.strip()
     return None
@@ -2844,7 +2842,7 @@ def resolve_auth_identity(
        - Haqiqiy bo'lsa -> user_id = JWT.sub.
        - Agar request parametri (query yoki header) orqali boshqa user_id uzatilgan bo'lsa -> 403 Forbidden ("Cross-tenant access denied").
     3. Agar token berilmagan bo'lsa:
-       - Supabase sozlangan bo'lsa (yoki MIKASA_REQUIRE_AUTH yoqilgan bo'lsa) va required=True:
+       - Supabase sozlangan bo'lsa (yoki MISA_REQUIRE_AUTH yoqilgan bo'lsa) va required=True:
          -> 401 Unauthorized.
        - Offline / test rejimida (Supabase sozlanmagan bo'lsa):
          parametr orqali kelgan user_id olinadi (yoki "local_user"), lekin hech qachon avtomatik "admin" ga fallback qilinmaydi.
@@ -2856,10 +2854,10 @@ def resolve_auth_identity(
     req_headers = getattr(request, "headers", {}) or {}
     req_query = getattr(request, "query", {}) or {}
     param_user_id = (
-        req_headers.get("X-Mikasa-User-Id")
+        req_headers.get("X-Misa-User-Id")
         or req_headers.get("X-User-Id")
         or req_query.get("user_id")
-        or req_query.get("mikasa_user_id")
+        or req_query.get("misa_user_id")
     )
     if param_user_id:
         param_user_id = str(param_user_id).strip()
@@ -2874,7 +2872,7 @@ def resolve_auth_identity(
             return None, None, None, err_resp
 
         authenticated_user_id = user.id
-        # "me", "self", "current" yoki frontend default "mikasa_user_id=admin" ni
+        # "me", "self", "current" yoki frontend default "misa_user_id=admin" ni
         # autentifikatsiyalangan foydalanuvchining o'ziga xaritalash
         # (Explicit ?user_id=admin spoofing esa rad etiladi!)
         explicit_query_user_id = str(req_query.get("user_id") or "").strip().lower()
@@ -2903,12 +2901,12 @@ def resolve_auth_identity(
     is_production = bool(
         os.environ.get("RAILWAY_ENVIRONMENT")
         or os.environ.get("RAILWAY_PROJECT_ID")
-        or os.environ.get("MIKASA_ENV", "").strip().lower() == "production"
-        or os.environ.get("MIKASA_API_HOST", "127.0.0.1").strip() == "0.0.0.0"
+        or os.environ.get("MISA_ENV", "").strip().lower() == "production"
+        or os.environ.get("MISA_API_HOST", "127.0.0.1").strip() == "0.0.0.0"
     )
     is_auth_enforced = (
         auth_mgr.is_configured()
-        or os.environ.get("MIKASA_REQUIRE_AUTH", "").lower() in ("true", "1")
+        or os.environ.get("MISA_REQUIRE_AUTH", "").lower() in ("true", "1")
         or is_production
     )
     if is_auth_enforced and required:
@@ -3246,7 +3244,7 @@ async def handle_auth_register(request):
     """POST /api/auth/register - Supabase Auth xabarnomasi"""
     return web.json_response({
         "ok": True,
-        "message": "Supabase Auth orqali ro'yxatdan o'tish frontend mijozida (supabase.auth.signUp) to'g'ridan-to'g'ri amalga oshiriladi. Mikasa backend parollarni qabul qilmaydi va saqlamaydi.",
+        "message": "Supabase Auth orqali ro'yxatdan o'tish frontend mijozida (supabase.auth.signUp) to'g'ridan-to'g'ri amalga oshiriladi. Misa backend parollarni qabul qilmaydi va saqlamaydi.",
         "provider": "supabase_auth"
     }, status=200)
 
@@ -3508,7 +3506,7 @@ async def handle_oauth_callback(request):
       let state = searchParams.get('state') || hashParams.get('state') || '';
       if (!state) {
         try {
-          state = (window.localStorage && localStorage.getItem('mikasa_oauth_state')) || '';
+          state = (window.localStorage && localStorage.getItem('misa_oauth_state')) || '';
         } catch (e) {}
       }
       const errorCode = searchParams.get('error_code') || hashParams.get('error_code') || '';
@@ -3542,7 +3540,7 @@ async def handle_oauth_callback(request):
         var safeErr = ((errorCode && rawErr.indexOf(errorCode) === -1) ? (errorCode + ': ' + rawErr) : rawErr)
           .replace(/(access_token|refresh_token|code)=[^&\\s]+/gi, '$1=[REDACTED]');
         if (errorCode === 'bad_oauth_state' || safeErr.indexOf('bad_oauth_state') !== -1 || safeErr.indexOf('OAuth state not found or expired') !== -1) {
-          msgEl.textContent = "Avtorizatsiya sessiyasi muddati tugagan yoki havola eskirgan (bad_oauth_state). Ushbu oynani yopib, Mikasa ilovasidan Google orqali kirishni yangidan boshlang.";
+          msgEl.textContent = "Avtorizatsiya sessiyasi muddati tugagan yoki havola eskirgan (bad_oauth_state). Ushbu oynani yopib, Misa ilovasidan Google orqali kirishni yangidan boshlang.";
         } else {
           msgEl.textContent = "Xatolik: " + safeErr;
         }
@@ -4280,13 +4278,13 @@ async def handle_device_heartbeat(request):
     """POST /api/devices/{device_id}/heartbeat - PC Agent davriy heartbeat qabul qilish"""
     dev_id = request.match_info.get("device_id", "").strip()
 
-    # 1. DeviceSession tokenini tekshirish (Header: Authorization: Bearer <token> yoki X-Mikasa-Device-Token)
+    # 1. DeviceSession tokenini tekshirish (Header: Authorization: Bearer <token> yoki X-Misa-Device-Token)
     auth_header = request.headers.get("Authorization", "").strip()
     token = ""
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
     if not token:
-        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+        token = request.headers.get("X-Misa-Device-Token", "").strip()
 
     from core.v8.device_auth import DeviceAuthManager
     from core.v8.device_enrollment import DeviceEnrollmentManager
@@ -4482,7 +4480,7 @@ async def handle_command_pending(request):
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
     if not token:
-        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+        token = request.headers.get("X-Misa-Device-Token", "").strip()
         
     from core.v8.device_auth import DeviceAuthManager
     from core.v8.device_enrollment import DeviceEnrollmentManager
@@ -4523,7 +4521,7 @@ async def handle_command_result(request):
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
     if not token:
-        token = request.headers.get("X-Mikasa-Device-Token", "").strip()
+        token = request.headers.get("X-Misa-Device-Token", "").strip()
         
     from core.v8.device_auth import DeviceAuthManager
     from core.v8.device_enrollment import DeviceEnrollmentManager
@@ -4920,13 +4918,13 @@ _CORS_BYPASS_PREFIXES = ("/health", "/ready", "/api/ready", "/api/health", "/tel
 
 def is_production_or_remote_enabled() -> bool:
     """Tekshirish: Server bulutda (Railway/production) yoki masofaviy API rejimida ishlayaptimi?"""
-    if os.environ.get("MIKASA_ALLOW_REMOTE_API", "").lower() in ("true", "1", "yes"):
+    if os.environ.get("MISA_ALLOW_REMOTE_API", "").lower() in ("true", "1", "yes"):
         return True
     if os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod", "staging"):
         return True
-    if os.environ.get("MIKASA_ENV", "").lower() in ("production", "prod", "staging"):
+    if os.environ.get("MISA_ENV", "").lower() in ("production", "prod", "staging"):
         return True
-    if os.environ.get("MIKASA_API_HOST", "").strip() == "0.0.0.0":
+    if os.environ.get("MISA_API_HOST", "").strip() == "0.0.0.0":
         return True
     for key in (
         "RAILWAY_ENVIRONMENT",
@@ -4964,9 +4962,9 @@ def _is_production_mode() -> bool:
     """Production rejimda ishga tushganligini aniqlash."""
     if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"):
         return True
-    if os.environ.get("MIKASA_ENV", "").strip().lower() == "production":
+    if os.environ.get("MISA_ENV", "").strip().lower() == "production":
         return True
-    host = os.environ.get("MIKASA_API_HOST", "127.0.0.1").strip()
+    host = os.environ.get("MISA_API_HOST", "127.0.0.1").strip()
     if host == "0.0.0.0":
         return True
     return False
@@ -4990,7 +4988,7 @@ async def auth_enforcement_middleware(request, handler):
         if path.startswith(prefix):
             return await handler(request)
 
-    # Qurilma agentlari o'zining Ed25519 challenge-response yoki X-Mikasa-Device-Token orqali tekshiriladi
+    # Qurilma agentlari o'zining Ed25519 challenge-response yoki X-Misa-Device-Token orqali tekshiriladi
     if path.startswith("/api/devices/") and path.endswith((
         "/challenge", "/authenticate", "/heartbeat", "/commands/pending", "/result"
     )):
@@ -5022,8 +5020,8 @@ async def cors_middleware(request, handler):
         opt_resp.headers["Access-Control-Allow-Origin"] = origin or "*"
         opt_resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         opt_resp.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
-            "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+            "Content-Type, Authorization, X-Misa-Session-Token, X-Misa-User-Id, "
+            "X-Misa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
         )
         opt_resp.headers["Access-Control-Allow-Private-Network"] = "true"
         opt_resp.headers["Access-Control-Max-Age"] = "86400"
@@ -5038,8 +5036,8 @@ async def cors_middleware(request, handler):
         bypass_resp.headers["Access-Control-Allow-Origin"] = origin or "*"
         bypass_resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         bypass_resp.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
-            "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+            "Content-Type, Authorization, X-Misa-Session-Token, X-Misa-User-Id, "
+            "X-Misa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
         )
         bypass_resp.headers["Access-Control-Allow-Private-Network"] = "true"
         return bypass_resp
@@ -5053,7 +5051,7 @@ async def cors_middleware(request, handler):
     is_allowed = True
     if origin:
         origin_clean = origin.strip().lower()
-        configured_raw = os.environ.get("MIKASA_ALLOWED_ORIGINS", "").strip()
+        configured_raw = os.environ.get("MISA_ALLOWED_ORIGINS", "").strip()
         configured_origins = [
             o.strip().lower()
             for o in configured_raw.split(",")
@@ -5105,8 +5103,8 @@ async def cors_middleware(request, handler):
     response.headers["Access-Control-Allow-Origin"] = allowed_header_origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Authorization, X-Mikasa-Session-Token, X-Mikasa-User-Id, "
-        "X-Mikasa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
+        "Content-Type, Authorization, X-Misa-Session-Token, X-Misa-User-Id, "
+        "X-Misa-Device-Token, apikey, X-Client-Info, Accept, X-Requested-With"
     )
     response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
@@ -5300,10 +5298,10 @@ def create_app():
 
 def run_server(host=None, port=None):
     load_runtime_dotenv()
-    resolved_host = host or os.environ.get("MIKASA_API_HOST", "127.0.0.1")
+    resolved_host = host or os.environ.get("MISA_API_HOST", "127.0.0.1")
     resolved_port = port
     if resolved_port is None:
-        port_env = os.environ.get("PORT") or os.environ.get("MIKASA_API_PORT", "18420")
+        port_env = os.environ.get("PORT") or os.environ.get("MISA_API_PORT", "18420")
         try:
             resolved_port = int(port_env)
         except ValueError:

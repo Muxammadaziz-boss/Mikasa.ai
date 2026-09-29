@@ -1,7 +1,7 @@
 # ========== packaging/build_backend.py ==========
-# Mikasa AI v8.0.0 — Standalone Backend Production Bundler
+# Misa AI v9.0.0 — Standalone Backend Production Bundler
 # Uses PyInstaller to bundle core/api_server.py into a self-contained
-# production runtime (backend/mikasa_backend.exe + libraries).
+# production runtime (backend/misa_backend.exe + libraries).
 # Excludes heavy ML/notebook dependencies (torch, matplotlib, jupyter)
 # to achieve ~30MB footprint and sub-second startup.
 
@@ -25,7 +25,7 @@ def build():
 
     build_dir = root_dir / "build" / "pyinstaller_backend"
     dist_dir = root_dir / "dist" / "backend_build"
-    backend_target_name = "mikasa_backend"
+    backend_target_name = "misa_backend"
 
     # Clean previous build artifacts
     if build_dir.exists():
@@ -108,19 +108,22 @@ def build():
 
     logger.info(f"✔ Successfully compiled backend: {exe_file}")
 
-    # Destination 1: mikasa-7/src-tauri/backend/ (for Tauri bundle.resources)
+    # Destination 1: Misa/src-tauri/backend/ (for Tauri bundle.resources)
     tauri_backend_dir = root_dir / "Misa" / "src-tauri" / "backend"
     if tauri_backend_dir.exists():
         shutil.rmtree(tauri_backend_dir, ignore_errors=True)
     shutil.copytree(built_dir, tauri_backend_dir)
     logger.info(f"✔ Deployed backend to Tauri resources: {tauri_backend_dir}")
 
-    # Destination 2: release/v8.0.0/backend/ (for release distribution)
-    release_backend_dir = root_dir / "release" / "v8.0.0" / "backend"
-    if release_backend_dir.exists():
-        shutil.rmtree(release_backend_dir, ignore_errors=True)
-    shutil.copytree(built_dir, release_backend_dir)
-    logger.info(f"✔ Deployed backend to Release: {release_backend_dir}")
+    # Destination 2: release/v9.0.0/backend/ (for release distribution)
+    for rel_ver in ["v9.0.0", "v8.0.0"]:
+        rel_dir = root_dir / "release" / rel_ver
+        if rel_dir.exists():
+            release_backend_dir = rel_dir / "backend"
+            if release_backend_dir.exists():
+                shutil.rmtree(release_backend_dir, ignore_errors=True)
+            shutil.copytree(built_dir, release_backend_dir)
+            logger.info(f"✔ Deployed backend to Release ({rel_ver}): {release_backend_dir}")
 
     logger.info("==================================================")
     logger.info("✨ Production Backend Bundling Complete!")

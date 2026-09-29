@@ -1,5 +1,5 @@
 # ========== core/v8/telegram_identity.py ==========
-# Phase 39 — Universal Telegram Bot ↔ Mikasa User App
+# Phase 39 — Universal Telegram Bot ↔ Misa User App
 # Multi-User Telegram Identity & OTP Account Linking Engine
 # Canonical numeric Telegram ID, salted SHA-256 OTP hashing, deep-link token verification
 
@@ -80,7 +80,7 @@ class TelegramLinkRequest:
     One-time pairing request for account linking.
     Plaintext OTP is NEVER stored. Only salted SHA-256 hash is persisted.
     """
-    mikasa_user_id: str
+    misa_user_id: str
     otp_hash: str
     salt: str
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -110,7 +110,7 @@ class TelegramLinkRequest:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TelegramLinkRequest":
         valid_fields = {
-            "mikasa_user_id", "otp_hash", "salt", "request_id",
+            "misa_user_id", "otp_hash", "salt", "request_id",
             "created_at", "expires_at", "status", "attempt_count",
             "telegram_user_id", "used_at", "link_token",
             "expected_telegram_user_id"
@@ -122,10 +122,10 @@ class TelegramLinkRequest:
 @dataclass
 class UserTelegramLink:
     """
-    Active persistent link between Mikasa User Account and Telegram Numeric ID.
-    Enforces 1:1 active mapping between Mikasa user and Telegram account.
+    Active persistent link between Misa User Account and Telegram Numeric ID.
+    Enforces 1:1 active mapping between Misa user and Telegram account.
     """
-    mikasa_user_id: str
+    misa_user_id: str
     telegram_user_id: int
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     linked_at: float = field(default_factory=time.time)
@@ -161,7 +161,7 @@ class UserTelegramLink:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserTelegramLink":
         valid_fields = {
-            "mikasa_user_id", "telegram_user_id", "id",
+            "misa_user_id", "telegram_user_id", "id",
             "linked_at", "last_verified_at", "status", "metadata"
         }
         filtered = {k: v for k, v in data.items() if k in valid_fields}
@@ -179,7 +179,7 @@ class TelegramIdentityManager:
     MAX_ATTEMPTS: int = 5
     RATE_LIMIT_MAX_REQUESTS: int = 3
     RATE_LIMIT_WINDOW: float = 600.0  # 10 minutes
-    DEFAULT_BOT_USERNAME: str = "Mikasa_ai_agent_bot"
+    DEFAULT_BOT_USERNAME: str = "Misa_ai_agent_bot"
 
     _default_instance: Optional["TelegramIdentityManager"] = None
 
@@ -191,11 +191,11 @@ class TelegramIdentityManager:
             "v8_telegram_links.json"
         )
         self._links_by_tg: Dict[int, UserTelegramLink] = {}
-        self._links_by_mikasa: Dict[str, UserTelegramLink] = {}
+        self._links_by_misa: Dict[str, UserTelegramLink] = {}
         self._identities: Dict[int, TelegramIdentity] = {}
         self._requests: Dict[str, TelegramLinkRequest] = {}  # request_id -> req
         self._requests_by_token: Dict[str, TelegramLinkRequest] = {}  # link_token -> req
-        self._generation_history: Dict[str, List[float]] = {}  # mikasa_user_id -> timestamps
+        self._generation_history: Dict[str, List[float]] = {}  # misa_user_id -> timestamps
         
         # XAVFSIZLIK: Telegram foydalanuvchi uchun noto'g'ri OTP urinishlari limiti (brute-force oldini olish)
         self._telegram_otp_failures: Dict[int, List[float]] = {}  # telegram_user_id -> [timestamp, ...]
@@ -224,13 +224,13 @@ class TelegramIdentityManager:
         candidate_hash = cls.hash_otp(otp, salt)
         return hmac.compare_digest(candidate_hash, expected_hash)
 
-    def check_rate_limit(self, mikasa_user_id: str, current_time: Optional[float] = None) -> bool:
+    def check_rate_limit(self, misa_user_id: str, current_time: Optional[float] = None) -> bool:
         """
         Check if user has exceeded max 3 OTP requests in the last 10 minutes.
         Returns True if request is allowed, False if rate limited.
         """
         now = current_time if current_time is not None else time.time()
-        uid = str(mikasa_user_id)
+        uid = str(misa_user_id)
         history = self._generation_history.get(uid, [])
         # Prune older than window
         cutoff = now - self.RATE_LIMIT_WINDOW
@@ -238,31 +238,31 @@ class TelegramIdentityManager:
         self._generation_history[uid] = recent
         return len(recent) < self.RATE_LIMIT_MAX_REQUESTS
 
-    def record_rate_limit_attempt(self, mikasa_user_id: str, current_time: Optional[float] = None):
+    def record_rate_limit_attempt(self, misa_user_id: str, current_time: Optional[float] = None):
         now = current_time if current_time is not None else time.time()
-        uid = str(mikasa_user_id)
+        uid = str(misa_user_id)
         if uid not in self._generation_history:
             self._generation_history[uid] = []
         self._generation_history[uid].append(now)
 
     def create_link_request(
         self,
-        mikasa_user_id: str,
+        misa_user_id: str,
         ttl: Optional[float] = None,
-        bot_username: str = "Mikasa_ai_agent_bot",
+        bot_username: str = "Misa_ai_agent_bot",
         current_time: Optional[float] = None,
         expected_telegram_user_id: Optional[Any] = None,
         auth_token: Optional[str] = None
     ) -> Tuple[Optional[TelegramLinkRequest], Optional[str], Optional[str], Optional[str]]:
         """
-        Generate a new 6-digit OTP and deep link for a Mikasa account.
+        Generate a new 6-digit OTP and deep link for a Misa account.
         Returns (request, plaintext_otp, deep_link, error_message).
         Plaintext OTP is ONLY returned in this call and NEVER stored.
         """
         now = current_time if current_time is not None else time.time()
-        uid = str(mikasa_user_id).strip()
+        uid = str(misa_user_id).strip()
         if not uid:
-            return None, None, None, "INVALID_USER_ID: Mikasa User ID bo'sh bo'lishi mumkin emas"
+            return None, None, None, "INVALID_USER_ID: Misa User ID bo'sh bo'lishi mumkin emas"
 
         expected_tg_int: Optional[int] = None
         if expected_telegram_user_id is not None:
@@ -285,7 +285,7 @@ class TelegramIdentityManager:
 
         # Expire any prior PENDING requests for the same user so only the latest code is active
         for old_req in list(self._requests.values()):
-            if old_req.mikasa_user_id == uid and old_req.status == "PENDING":
+            if old_req.misa_user_id == uid and old_req.status == "PENDING":
                 old_req.status = "EXPIRED"
                 self.sync_request_to_supabase(old_req, auth_token=auth_token)
 
@@ -300,7 +300,7 @@ class TelegramIdentityManager:
         deep_link = f"https://t.me/{clean_bot}?start={link_token}"
 
         req = TelegramLinkRequest(
-            mikasa_user_id=uid,
+            misa_user_id=uid,
             otp_hash=otp_hash,
             salt=salt,
             created_at=now,
@@ -351,7 +351,7 @@ class TelegramIdentityManager:
             payload.update(kwargs)
 
         req_id = str(payload.get("request_id") or "").strip()
-        uid = str(payload.get("mikasa_user_id") or "").strip()
+        uid = str(payload.get("misa_user_id") or "").strip()
         otp_hash = str(payload.get("otp_hash") or "").strip()
         salt = str(payload.get("salt") or "").strip()
         if not req_id or not uid or not otp_hash or not salt:
@@ -362,7 +362,7 @@ class TelegramIdentityManager:
             req._transient_auth_token = auth_token
 
         for old_req in list(self._requests.values()):
-            if old_req.mikasa_user_id == uid and old_req.request_id != req.request_id and old_req.status == "PENDING":
+            if old_req.misa_user_id == uid and old_req.request_id != req.request_id and old_req.status == "PENDING":
                 old_req.status = "EXPIRED"
                 old_req._transient_auth_token = None
 
@@ -374,7 +374,7 @@ class TelegramIdentityManager:
             self.sync_request_to_supabase(req, auth_token=auth_token)
         return req
 
-    DEFAULT_CLOUD_API_URL = "https://mikasa-v8-api-production.up.railway.app"
+    DEFAULT_CLOUD_API_URL = "https://misa.up.railway.app"
 
     def _resolve_cloud_api_url(self) -> str:
         """Resolve cloud API URL for Desktop <-> Railway OTP synchronization."""
@@ -382,12 +382,12 @@ class TelegramIdentityManager:
             os.environ.get("RAILWAY_ENVIRONMENT")
             or os.environ.get("RAILWAY_PROJECT_ID")
             or os.environ.get("ENVIRONMENT", "").lower() == "production"
-            or os.environ.get("MIKASA_ENV", "").lower() == "production"
+            or os.environ.get("MISA_ENV", "").lower() == "production"
         ):
             return ""
         cloud_url = (
-            os.environ.get("MIKASA_CLOUD_API_URL")
-            or os.environ.get("MIKASA_BACKEND_URL")
+            os.environ.get("MISA_CLOUD_API_URL")
+            or os.environ.get("MISA_BACKEND_URL")
             or (self.DEFAULT_CLOUD_API_URL if self._auto_supabase else "")
         ).strip().rstrip("/")
         if not cloud_url or "127.0.0.1" in cloud_url or "localhost" in cloud_url:
@@ -467,10 +467,10 @@ class TelegramIdentityManager:
                                 req.telegram_user_id = tg_uid
                             changed = True
                     link_data = data.get("link")
-                    if isinstance(link_data, dict) and link_data.get("telegram_user_id") and link_data.get("mikasa_user_id"):
+                    if isinstance(link_data, dict) and link_data.get("telegram_user_id") and link_data.get("misa_user_id"):
                         link_obj = UserTelegramLink.from_dict(link_data)
                         self._links_by_tg[link_obj.telegram_user_id] = link_obj
-                        self._links_by_mikasa[link_obj.mikasa_user_id] = link_obj
+                        self._links_by_misa[link_obj.misa_user_id] = link_obj
                         changed = True
                     if changed:
                         self.save()
@@ -522,7 +522,7 @@ class TelegramIdentityManager:
         request_id: Optional[str] = None,
         current_time: Optional[float] = None,
         auth_token: Optional[str] = None,
-        expected_mikasa_user_id: Optional[str] = None
+        expected_misa_user_id: Optional[str] = None
     ) -> Tuple[bool, str, Optional[UserTelegramLink]]:
         """
         Verify candidate 6-digit OTP against pending request(s).
@@ -545,7 +545,7 @@ class TelegramIdentityManager:
         if len(tg_failures) >= self.MAX_TELEGRAM_OTP_FAILURES:
             return False, "RATE_LIMITED: Juda ko'p noto'g'ri urinishlar. 10 daqiqadan keyin qayta urinib ko'ring", None
 
-        expected_uid = str(expected_mikasa_user_id).strip() if expected_mikasa_user_id else None
+        expected_uid = str(expected_misa_user_id).strip() if expected_misa_user_id else None
 
         # Resolve candidate request
         req: Optional[TelegramLinkRequest] = None
@@ -584,11 +584,11 @@ class TelegramIdentityManager:
                     req = sorted(all_matching, key=lambda x: x.created_at, reverse=True)[0]
                 elif matching_reqs:
                     if expected_uid:
-                        user_pending = [r for r in matching_reqs if r.mikasa_user_id == expected_uid]
+                        user_pending = [r for r in matching_reqs if r.misa_user_id == expected_uid]
                         if user_pending:
                             req = sorted(user_pending, key=lambda x: x.created_at, reverse=True)[0]
                     else:
-                        distinct_users = {r.mikasa_user_id for r in matching_reqs}
+                        distinct_users = {r.misa_user_id for r in matching_reqs}
                         if len(distinct_users) == 1:
                             req = sorted(matching_reqs, key=lambda x: x.created_at, reverse=True)[0]
 
@@ -602,7 +602,7 @@ class TelegramIdentityManager:
         effective_auth_token = auth_token or getattr(req, "_transient_auth_token", None)
 
         # Cross-user ownership enforcement (API caller vs request owner)
-        if expected_uid and req.mikasa_user_id != expected_uid:
+        if expected_uid and req.misa_user_id != expected_uid:
             self._audit.log(
                 RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
                 request_id=req.request_id,
@@ -617,7 +617,7 @@ class TelegramIdentityManager:
             self._audit.log(
                 RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
                 request_id=req.request_id,
-                user_id=req.mikasa_user_id,
+                user_id=req.misa_user_id,
                 telegram_user_id=str(tg_int),
                 reason="TELEGRAM_USER_MISMATCH"
             )
@@ -632,7 +632,7 @@ class TelegramIdentityManager:
             self._audit.log(
                 RemoteEventType.TELEGRAM_LINK_EXPIRED,
                 request_id=req.request_id,
-                user_id=req.mikasa_user_id,
+                user_id=req.misa_user_id,
                 telegram_user_id=str(tg_int)
             )
             return False, "CODE_EXPIRED: Tasdiqlash kodining muddati o'tgan (5 daqiqa)", None
@@ -670,26 +670,26 @@ class TelegramIdentityManager:
             self._audit.log(
                 RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
                 request_id=req.request_id,
-                user_id=req.mikasa_user_id,
+                user_id=req.misa_user_id,
                 telegram_user_id=str(tg_int),
                 attempt_count=req.attempt_count,
                 remaining_attempts=remaining
             )
             return False, f"INVALID_OTP: Kod noto'g'ri. Qolgan urinishlar soni: {remaining}", None
 
-        # Prevent cross-user OTP hijacking if this Telegram ID is already actively linked to a DIFFERENT Mikasa user
+        # Prevent cross-user OTP hijacking if this Telegram ID is already actively linked to a DIFFERENT Misa user
         existing_tg_link = self.get_link_by_telegram_user(tg_int)
-        if existing_tg_link and existing_tg_link.is_active and existing_tg_link.mikasa_user_id != req.mikasa_user_id:
+        if existing_tg_link and existing_tg_link.is_active and existing_tg_link.misa_user_id != req.misa_user_id:
             self._audit.log(
                 RemoteEventType.TELEGRAM_OTP_VERIFICATION_FAILED,
                 request_id=req.request_id,
-                user_id=req.mikasa_user_id,
+                user_id=req.misa_user_id,
                 telegram_user_id=str(tg_int),
                 reason="TELEGRAM_ALREADY_LINKED"
             )
             return (
                 False,
-                "TELEGRAM_ALREADY_LINKED: Ushbu Telegram hisobi boshqa Mikasa hisobiga bog'langan. Avval /unlink buyrug'i orqali uzing",
+                "TELEGRAM_ALREADY_LINKED: Ushbu Telegram hisobi boshqa Misa hisobiga bog'langan. Avval /unlink buyrug'i orqali uzing",
                 None
             )
 
@@ -698,8 +698,8 @@ class TelegramIdentityManager:
         req.telegram_user_id = tg_int
         req.used_at = now
 
-        # Revoke any prior active link for this Mikasa user or Telegram user (clean 1:1 mapping)
-        self._revoke_existing_links(req.mikasa_user_id, tg_int)
+        # Revoke any prior active link for this Misa user or Telegram user (clean 1:1 mapping)
+        self._revoke_existing_links(req.misa_user_id, tg_int)
 
         # Create active link
         meta = {}
@@ -709,7 +709,7 @@ class TelegramIdentityManager:
             meta["first_name"] = str(first_name)
 
         link = UserTelegramLink(
-            mikasa_user_id=req.mikasa_user_id,
+            misa_user_id=req.misa_user_id,
             telegram_user_id=tg_int,
             linked_at=now,
             last_verified_at=now,
@@ -717,7 +717,7 @@ class TelegramIdentityManager:
             metadata=meta
         )
         self._links_by_tg[tg_int] = link
-        self._links_by_mikasa[req.mikasa_user_id] = link
+        self._links_by_misa[req.misa_user_id] = link
 
         # Update or register Telegram Identity
         ident = self._identities.get(tg_int)
@@ -747,18 +747,18 @@ class TelegramIdentityManager:
         self._audit.log(
             RemoteEventType.TELEGRAM_OTP_VERIFICATION_SUCCESS,
             request_id=req.request_id,
-            user_id=req.mikasa_user_id,
+            user_id=req.misa_user_id,
             telegram_user_id=str(tg_int)
         )
         self._audit.log(
             RemoteEventType.TELEGRAM_ACCOUNT_LINKED,
             request_id=req.request_id,
-            user_id=req.mikasa_user_id,
+            user_id=req.misa_user_id,
             telegram_user_id=str(tg_int)
         )
 
-        logger.info(f"[TelegramIdentity] Muvaffaqiyatli bog'landi: tg_id={tg_int} ↔ mikasa_user={req.mikasa_user_id}")
-        return True, "OK: Mikasa hisobi Telegram bot bilan muvaffaqiyatli bog'landi", link
+        logger.info(f"[TelegramIdentity] Muvaffaqiyatli bog'landi: tg_id={tg_int} ↔ misa_user={req.misa_user_id}")
+        return True, "OK: Misa hisobi Telegram bot bilan muvaffaqiyatli bog'landi", link
 
     def verify_link_token(
         self,
@@ -768,7 +768,7 @@ class TelegramIdentityManager:
         username: Optional[str] = None,
         current_time: Optional[float] = None,
         auth_token: Optional[str] = None,
-        expected_mikasa_user_id: Optional[str] = None
+        expected_misa_user_id: Optional[str] = None
     ) -> Tuple[bool, str, Optional[UserTelegramLink]]:
         """
         Verify deep-link token (e.g. from t.me/bot?start=<token>).
@@ -789,8 +789,8 @@ class TelegramIdentityManager:
 
         effective_auth_token = auth_token or getattr(req, "_transient_auth_token", None)
 
-        expected_uid = str(expected_mikasa_user_id).strip() if expected_mikasa_user_id else None
-        if expected_uid and req.mikasa_user_id != expected_uid:
+        expected_uid = str(expected_misa_user_id).strip() if expected_misa_user_id else None
+        if expected_uid and req.misa_user_id != expected_uid:
             return False, "USER_MISMATCH: Ushbu havola boshqa foydalanuvchi hisobiga tegishli", None
 
         if req.expected_telegram_user_id is not None and req.expected_telegram_user_id != tg_int:
@@ -804,7 +804,7 @@ class TelegramIdentityManager:
             self._audit.log(
                 RemoteEventType.TELEGRAM_LINK_EXPIRED,
                 request_id=req.request_id,
-                user_id=req.mikasa_user_id,
+                user_id=req.misa_user_id,
                 telegram_user_id=str(tg_int)
             )
             return False, "CODE_EXPIRED: Havolaning muddati o'tgan (5 daqiqa)", None
@@ -815,10 +815,10 @@ class TelegramIdentityManager:
             return False, f"TOKEN_INVALID: Havola holati yaroqsiz: {req.status}", None
 
         existing_tg_link = self.get_link_by_telegram_user(tg_int)
-        if existing_tg_link and existing_tg_link.is_active and existing_tg_link.mikasa_user_id != req.mikasa_user_id:
+        if existing_tg_link and existing_tg_link.is_active and existing_tg_link.misa_user_id != req.misa_user_id:
             return (
                 False,
-                "TELEGRAM_ALREADY_LINKED: Ushbu Telegram hisobi boshqa Mikasa hisobiga bog'langan. Avval /unlink buyrug'i orqali uzing",
+                "TELEGRAM_ALREADY_LINKED: Ushbu Telegram hisobi boshqa Misa hisobiga bog'langan. Avval /unlink buyrug'i orqali uzing",
                 None
             )
 
@@ -827,7 +827,7 @@ class TelegramIdentityManager:
         req.telegram_user_id = tg_int
         req.used_at = now
 
-        self._revoke_existing_links(req.mikasa_user_id, tg_int)
+        self._revoke_existing_links(req.misa_user_id, tg_int)
 
         meta = {}
         if username:
@@ -836,7 +836,7 @@ class TelegramIdentityManager:
             meta["first_name"] = str(first_name)
 
         link = UserTelegramLink(
-            mikasa_user_id=req.mikasa_user_id,
+            misa_user_id=req.misa_user_id,
             telegram_user_id=tg_int,
             linked_at=now,
             last_verified_at=now,
@@ -844,7 +844,7 @@ class TelegramIdentityManager:
             metadata=meta
         )
         self._links_by_tg[tg_int] = link
-        self._links_by_mikasa[req.mikasa_user_id] = link
+        self._links_by_misa[req.misa_user_id] = link
 
         ident = self._identities.get(tg_int)
         if ident is None:
@@ -873,36 +873,36 @@ class TelegramIdentityManager:
         self._audit.log(
             RemoteEventType.TELEGRAM_ACCOUNT_LINKED,
             request_id=req.request_id,
-            user_id=req.mikasa_user_id,
+            user_id=req.misa_user_id,
             telegram_user_id=str(tg_int)
         )
 
-        logger.info(f"[TelegramIdentity] Havola orqali muvaffaqiyatli bog'landi: tg_id={tg_int} ↔ user={req.mikasa_user_id}")
-        return True, "OK: Mikasa hisobi havola orqali Telegram bot bilan muvaffaqiyatli bog'landi", link
+        logger.info(f"[TelegramIdentity] Havola orqali muvaffaqiyatli bog'landi: tg_id={tg_int} ↔ user={req.misa_user_id}")
+        return True, "OK: Misa hisobi havola orqali Telegram bot bilan muvaffaqiyatli bog'landi", link
 
-    def _revoke_existing_links(self, mikasa_user_id: str, telegram_user_id: int):
+    def _revoke_existing_links(self, misa_user_id: str, telegram_user_id: int):
         """Internal helper to clean up any prior active links for users being paired."""
         old_by_tg = self._links_by_tg.get(telegram_user_id)
         if old_by_tg and old_by_tg.is_active:
             old_by_tg.status = "REVOKED"
-            if old_by_tg.mikasa_user_id in self._links_by_mikasa:
-                del self._links_by_mikasa[old_by_tg.mikasa_user_id]
+            if old_by_tg.misa_user_id in self._links_by_misa:
+                del self._links_by_misa[old_by_tg.misa_user_id]
 
-        old_by_mikasa = self._links_by_mikasa.get(mikasa_user_id)
-        if old_by_mikasa and old_by_mikasa.is_active:
-            old_by_mikasa.status = "REVOKED"
-            if old_by_mikasa.telegram_user_id in self._links_by_tg:
-                del self._links_by_tg[old_by_mikasa.telegram_user_id]
+        old_by_misa = self._links_by_misa.get(misa_user_id)
+        if old_by_misa and old_by_misa.is_active:
+            old_by_misa.status = "REVOKED"
+            if old_by_misa.telegram_user_id in self._links_by_tg:
+                del self._links_by_tg[old_by_misa.telegram_user_id]
 
     def unlink(
         self,
-        mikasa_user_id: Optional[str] = None,
+        misa_user_id: Optional[str] = None,
         telegram_user_id: Optional[Any] = None,
         auth_token: Optional[str] = None
     ) -> bool:
         """
         Revoke active link relationship and cancel pending pairing requests.
-        Can be invoked by Mikasa User ID or Telegram User ID.
+        Can be invoked by Misa User ID or Telegram User ID.
         """
         link: Optional[UserTelegramLink] = None
         tg_int: Optional[int] = None
@@ -911,23 +911,23 @@ class TelegramIdentityManager:
             if tg_int:
                 link = self._links_by_tg.get(tg_int)
 
-        if not link and mikasa_user_id is not None:
-            link = self._links_by_mikasa.get(str(mikasa_user_id))
+        if not link and misa_user_id is not None:
+            link = self._links_by_misa.get(str(misa_user_id))
 
         if not link and (self._auto_supabase or auth_token):
-            self.load_from_supabase(auth_token=auth_token, user_id=str(mikasa_user_id) if mikasa_user_id else None)
+            self.load_from_supabase(auth_token=auth_token, user_id=str(misa_user_id) if misa_user_id else None)
             if tg_int:
                 link = self._links_by_tg.get(tg_int)
-            if not link and mikasa_user_id is not None:
-                link = self._links_by_mikasa.get(str(mikasa_user_id))
+            if not link and misa_user_id is not None:
+                link = self._links_by_misa.get(str(misa_user_id))
 
         if link and link.is_active:
             tg_to_delete = link.telegram_user_id
             link.status = "REVOKED"
             if link.telegram_user_id in self._links_by_tg:
                 del self._links_by_tg[link.telegram_user_id]
-            if link.mikasa_user_id in self._links_by_mikasa:
-                del self._links_by_mikasa[link.mikasa_user_id]
+            if link.misa_user_id in self._links_by_misa:
+                del self._links_by_misa[link.misa_user_id]
 
             # Update identity if present
             ident = self._identities.get(link.telegram_user_id)
@@ -936,7 +936,7 @@ class TelegramIdentityManager:
 
             # Cancel any pending requests for this user
             for r in self._requests.values():
-                if r.mikasa_user_id == link.mikasa_user_id and r.status == "PENDING":
+                if r.misa_user_id == link.misa_user_id and r.status == "PENDING":
                     r.status = "EXPIRED"
                     self.sync_request_to_supabase(r, auth_token=auth_token)
 
@@ -945,25 +945,25 @@ class TelegramIdentityManager:
 
             self._audit.log(
                 RemoteEventType.TELEGRAM_ACCOUNT_UNLINKED,
-                user_id=link.mikasa_user_id,
+                user_id=link.misa_user_id,
                 telegram_user_id=str(link.telegram_user_id)
             )
-            logger.info(f"[TelegramIdentity] Bog'lanish bekor qilindi: tg={link.telegram_user_id}, mikasa={link.mikasa_user_id}")
+            logger.info(f"[TelegramIdentity] Bog'lanish bekor qilindi: tg={link.telegram_user_id}, misa={link.misa_user_id}")
             return True
 
         return False
 
-    def get_link_by_mikasa_user(
+    def get_link_by_misa_user(
         self,
-        mikasa_user_id: str,
+        misa_user_id: str,
         auth_token: Optional[str] = None,
         refresh: bool = False
     ) -> Optional[UserTelegramLink]:
-        uid = str(mikasa_user_id).strip()
-        link = self._links_by_mikasa.get(uid)
+        uid = str(misa_user_id).strip()
+        link = self._links_by_misa.get(uid)
         if (refresh or link is None) and (self._auto_supabase or auth_token):
             self.load_from_supabase(auth_token=auth_token, user_id=uid)
-            link = self._links_by_mikasa.get(uid)
+            link = self._links_by_misa.get(uid)
         return link if (link and link.is_active) else None
 
     def get_link_by_telegram_user(
@@ -1068,7 +1068,7 @@ class TelegramIdentityManager:
                     lnk = UserTelegramLink.from_dict(item)
                     if lnk.is_active:
                         self._links_by_tg[lnk.telegram_user_id] = lnk
-                        self._links_by_mikasa[lnk.mikasa_user_id] = lnk
+                        self._links_by_misa[lnk.misa_user_id] = lnk
 
                 raw_idents = data.get("identities", [])
                 for item in raw_idents:
@@ -1210,7 +1210,7 @@ class TelegramIdentityManager:
         if not url:
             return
 
-        uid_str = str(req_obj.mikasa_user_id).strip()
+        uid_str = str(req_obj.misa_user_id).strip()
         req_id_str = str(req_obj.request_id).strip()
         try:
             uuid.UUID(uid_str)
@@ -1388,7 +1388,7 @@ class TelegramIdentityManager:
                     if existing is None:
                         new_req = TelegramLinkRequest(
                             request_id=req_id,
-                            mikasa_user_id=uid,
+                            misa_user_id=uid,
                             otp_hash=otp_hash,
                             salt=salt,
                             created_at=created_at,
@@ -1433,11 +1433,11 @@ class TelegramIdentityManager:
         if not url:
             return
 
-        uid_str = str(link.mikasa_user_id).strip()
+        uid_str = str(link.misa_user_id).strip()
         try:
             uuid.UUID(uid_str)
         except (ValueError, AttributeError):
-            logger.debug(f"[TelegramIdentity] mikasa_user_id '{uid_str}' UUID emas, Supabase sync o'tkazib yuborildi.")
+            logger.debug(f"[TelegramIdentity] misa_user_id '{uid_str}' UUID emas, Supabase sync o'tkazib yuborildi.")
             return
 
         headers = self._build_supabase_headers(
@@ -1576,7 +1576,7 @@ class TelegramIdentityManager:
                     verified_ts = self._parse_iso_timestamp(row.get("updated_at"), linked_ts) or linked_ts
 
                     link = UserTelegramLink(
-                        mikasa_user_id=row_user_id,
+                        misa_user_id=row_user_id,
                         telegram_user_id=tg_id,
                         linked_at=linked_ts,
                         last_verified_at=verified_ts,
@@ -1584,7 +1584,7 @@ class TelegramIdentityManager:
                         metadata=meta
                     )
                     self._links_by_tg[tg_id] = link
-                    self._links_by_mikasa[row_user_id] = link
+                    self._links_by_misa[row_user_id] = link
 
                     ident = TelegramIdentity(
                         telegram_user_id=tg_id,

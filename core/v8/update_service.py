@@ -1,5 +1,5 @@
 # ========== core/v8/update_service.py ==========
-# Mikasa AI v8.0.0 — Phase 48: Secure Auto Update & Release System
+# Misa AI v8.0.0 — Phase 48: Secure Auto Update & Release System
 # Fail-closed, cryptographically signed (Ed25519 + SHA-256), crash-safe,
 # atomic staging and rollback update engine for Windows Desktop.
 
@@ -23,13 +23,13 @@ from cryptography.exceptions import InvalidSignature
 
 logger = logging.getLogger("core.v8.update_service")
 
-# Default official Mikasa Update Authority Public Key (Ed25519 - 64 hex chars)
+# Default official Misa Update Authority Public Key (Ed25519 - 64 hex chars)
 # Private key is NEVER stored in repository or client bundle.
 DEFAULT_TRUSTED_PUBLIC_KEY = "b4be839fd62657c0e786e1a2ad590c05c45c511371d041137c5ca9ac57c29829"
 
 # Default update repository / manifest endpoints
 DEFAULT_GITHUB_OWNER = "Muxammadaziz-boss"
-DEFAULT_GITHUB_REPO = "Mikasa.ai"
+DEFAULT_GITHUB_REPO = "Misa.ai"
 DEFAULT_MANIFEST_URL = f"https://raw.githubusercontent.com/{DEFAULT_GITHUB_OWNER}/{DEFAULT_GITHUB_REPO}/dev-v8.0.0/release/v8.0.0/version_manifest.json"
 
 # Auto-check minimum interval: 6 hours (21600 seconds)
@@ -272,7 +272,7 @@ class UpdateManifest:
                 if isinstance(info, dict):
                     info_copy = dict(info)
                     if "name" not in info_copy:
-                        info_copy["name"] = f"Mikasa-AI-v{version_str}-{arch}.exe"
+                        info_copy["name"] = f"Misa-AI-v{version_str}-{arch}.exe"
                     artifacts.append(UpdateArtifact.from_dict(info_copy))
 
         release_notes = sanitize_release_notes(data.get("release_notes", []))
@@ -299,7 +299,7 @@ class UpdateCrypto:
     def __init__(self, trusted_public_key_hex: Optional[str] = None):
         key = (
             trusted_public_key_hex
-            or os.environ.get("MIKASA_UPDATE_PUBLIC_KEY")
+            or os.environ.get("MISA_UPDATE_PUBLIC_KEY")
             or DEFAULT_TRUSTED_PUBLIC_KEY
         ).strip().lower()
         self.trusted_public_key_hex = key
@@ -412,8 +412,8 @@ class UpdateStateManager:
         if state_file_path:
             self.state_file = Path(state_file_path)
         else:
-            base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home() / ".mikasa")
-            self.state_file = Path(base) / "Mikasa" / "update_state.json"
+            base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home() / ".misa")
+            self.state_file = Path(base) / "Misa" / "update_state.json"
 
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self._current_state = UpdateState.IDLE
@@ -497,7 +497,7 @@ class UpdateStateManager:
 
 class UpdateService:
     """
-    Production-grade Secure Auto-Update & Release Service for Mikasa AI Desktop.
+    Production-grade Secure Auto-Update & Release Service for Misa AI Desktop.
     
     Invariants:
     - HTTPS only (rejects unencrypted HTTP)
@@ -523,9 +523,9 @@ class UpdateService:
         self.crypto = UpdateCrypto(trusted_public_key)
         self.state_manager = UpdateStateManager(state_file_path)
 
-        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home() / ".mikasa")
-        self.staging_dir = Path(staging_dir) if staging_dir else Path(base) / "Mikasa" / "updates" / "staging"
-        self.backup_dir = Path(backup_dir) if backup_dir else Path(base) / "Mikasa" / "updates" / "backups"
+        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA") or str(Path.home() / ".misa")
+        self.staging_dir = Path(staging_dir) if staging_dir else Path(base) / "Misa" / "updates" / "staging"
+        self.backup_dir = Path(backup_dir) if backup_dir else Path(base) / "Misa" / "updates" / "backups"
 
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)

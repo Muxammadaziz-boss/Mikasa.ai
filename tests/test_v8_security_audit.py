@@ -1,5 +1,5 @@
 # ========== tests/test_v8_security_audit.py ==========
-# Mikasa AI v8.0.0 — Comprehensive Security Audit Test Suite
+# Misa AI v8.0.0 — Comprehensive Security Audit Test Suite
 # Hardened Multi-Tenant, Supabase JWT, OAuth & Cryptographic Device Security
 #
 # Sections Covered:
@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 
 from core.v8.account_device import (
-    MikasaUser,
+    MisaUser,
     Device,
     AccountDeviceManager,
 )
@@ -81,7 +81,7 @@ class BaseSecurityAuditTest(unittest.TestCase):
     """Base test class providing clean environment isolation."""
     def setUp(self):
         self._orig_env = dict(os.environ)
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_sec_audit_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_sec_audit_")
 
         # Isolated storage paths
         self.adm_storage = os.path.join(self.temp_dir, "test_adm.json")
@@ -97,7 +97,7 @@ class BaseSecurityAuditTest(unittest.TestCase):
         os.environ["SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_audit_test_key_12345"
         os.environ["SUPABASE_SECRET_KEY"] = "sb_secret_audit_test_key_67890"
         os.environ["SUPABASE_JWT_SECRET"] = self.jwt_secret
-        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        os.environ["MISA_REQUIRE_AUTH"] = "true"
 
         # Initialize managers
         AccountDeviceManager._default_instance = None
@@ -140,7 +140,7 @@ class BaseSecurityAuditTest(unittest.TestCase):
         with _pending_oauth_lock:
             _pending_oauth_sessions.clear()
 
-    def create_token(self, user_id: str, email: str = "user@mikasa.ai", exp_seconds: int = 3600, secret: Optional[str] = None) -> str:
+    def create_token(self, user_id: str, email: str = "user@misa.ai", exp_seconds: int = 3600, secret: Optional[str] = None) -> str:
         sec = secret or self.jwt_secret
         return self.supabase_auth.create_mock_jwt(
             user_id=user_id,
@@ -230,7 +230,7 @@ class TestSecurityAuthentication(BaseSecurityAuditTest):
         header = {"alg": "RS256", "typ": "JWT", "kid": kid}
         payload = {
             "sub": "user-uuid-rs256",
-            "email": "rs256@mikasa.ai",
+            "email": "rs256@misa.ai",
             "role": "authenticated",
             "exp": int(time.time()) + 3600,
             "iat": int(time.time()),
@@ -310,8 +310,8 @@ class TestSecurityMultiTenantAuthorization(BaseSecurityAuditTest):
         self.assertFalse(data["ok"])
         self.assertIn("Cross-tenant access denied", data["error"])
 
-    def test_10_tenant_spoofed_x_mikasa_user_id_header_rejected_403(self):
-        """Scenario 10: User A token with X-Mikasa-User-Id: user-B is rejected with 403 Forbidden."""
+    def test_10_tenant_spoofed_x_misa_user_id_header_rejected_403(self):
+        """Scenario 10: User A token with X-Misa-User-Id: user-B is rejected with 403 Forbidden."""
         user_a_id = "user-uuid-alice"
         user_b_id = "user-uuid-bob"
 
@@ -320,7 +320,7 @@ class TestSecurityMultiTenantAuthorization(BaseSecurityAuditTest):
             method="GET",
             headers={
                 "Authorization": f"Bearer {token_a}",
-                "X-Mikasa-User-Id": user_b_id
+                "X-Misa-User-Id": user_b_id
             }
         )
         resp = asyncio.run(handle_devices_list(req))
@@ -554,7 +554,7 @@ class TestSecurityOAuthFlow(BaseSecurityAuditTest):
             method="POST",
             body={
                 "access_token": "sb-token-oauth-111",
-                "user": {"id": "user-uuid-oauth", "email": "oauth@mikasa.ai"},
+                "user": {"id": "user-uuid-oauth", "email": "oauth@misa.ai"},
                 "state": state
             }
         )
@@ -702,7 +702,7 @@ class TestSecurityStaticAudit(unittest.TestCase):
     def test_31_no_default_test_secret_in_codebase(self):
         """Scenario 31: Default test secret pattern must NOT exist anywhere in source code."""
         base_dir = os.path.dirname(os.path.dirname(__file__))
-        forbidden = "-".join(["mikasa", "default", "test", "secret"])
+        forbidden = "-".join(["misa", "default", "test", "secret"])
 
         checked_extensions = (".py", ".ts", ".tsx", ".js", ".json", ".sql", ".env.example")
         violations = []

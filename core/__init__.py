@@ -1,5 +1,5 @@
 # ========== core/ ==========
-# Mikasa AI Agent yadrosi
+# Misa AI Agent yadrosi
 # Barcha agent modullari shu yerda
 
 from core.agent_tools import Tool, ToolRegistry, create_default_registry, get_registry

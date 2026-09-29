@@ -1,5 +1,5 @@
 # ========== provider.py ==========
-# Mikasa AI 7.x — AI Provider Base Interface & Provider Manager
+# Misa AI 7.x — AI Provider Base Interface & Provider Manager
 # Provider Abstraction & Deterministic Fallback Mechanism
 
 import abc
@@ -78,7 +78,7 @@ class ProviderManager:
 
             return AIResponse(
                 provider="local",
-                model="mikasa-offline-core",
+                model="misa-offline-core",
                 type="answer",
                 content=resp_text,
                 success=True,

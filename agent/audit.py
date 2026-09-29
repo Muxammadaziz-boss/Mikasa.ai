@@ -13,7 +13,7 @@ from core.v8.events import (
     sanitize_event_data
 )
 
-logger = logging.getLogger("mikasa.agent.audit")
+logger = logging.getLogger("misa.agent.audit")
 
 
 class AgentAuditLogger:

@@ -35,7 +35,7 @@ class VectorMemory:
             self._client = chromadb.PersistentClient(path=CHROMA_PATH)
             self._collection = self._client.get_or_create_collection(
                 name=self.collection_name,
-                metadata={"description": "Mikasa AI semantic knowledge base"},
+                metadata={"description": "Misa AI semantic knowledge base"},
             )
 
             try:

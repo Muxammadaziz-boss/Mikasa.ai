@@ -1,11 +1,11 @@
 # ========== tests/test_v7_landing.py ==========
-# Mikasa AI 7.0 — Landing Page & Startup Flow Tests
+# Misa AI 7.0 — Landing Page & Startup Flow Tests
 
 import unittest
 import customtkinter as ctk
-from gui.app import MikasaApp
+from gui.app import MisaApp
 from gui.pages.landing import LandingPage, QuickActionCard
-from gui.orb import MikasaOrb
+from gui.orb import MisaOrb
 from gui.icons import VectorIconEngine
 
 
@@ -31,7 +31,7 @@ class TestLandingPageComponents(unittest.TestCase):
 
         # 1. Markaziy AI Orb mavjudligi va holati
         self.assertTrue(hasattr(page, "orb"))
-        self.assertIsInstance(page.orb, MikasaOrb)
+        self.assertIsInstance(page.orb, MisaOrb)
         self.assertEqual(page.orb.get_state(), "idle")
 
         # 2. Salomlashuv va foydalanuvchi ismi
@@ -80,7 +80,7 @@ class TestLandingPageComponents(unittest.TestCase):
         self.assertEqual(page._action_mode, "mic")
 
         # Matn kiritilganda action_btn send rejimiga o'tadi
-        page._input_var.set("Salom Mikasa")
+        page._input_var.set("Salom Misa")
         self.assertEqual(page._action_mode, "send")
 
         # Tozalash tugmasi bosilganda
@@ -107,7 +107,7 @@ class TestLandingPageComponents(unittest.TestCase):
 
 
 class TestStartupLandingFlow(unittest.TestCase):
-    """MikasaApp startap va landing oqimi integratsiya testi"""
+    """MisaApp startap va landing oqimi integratsiya testi"""
 
     def setUp(self):
         VectorIconEngine.clear_cache()
@@ -117,7 +117,7 @@ class TestStartupLandingFlow(unittest.TestCase):
 
     def test_startup_default_page_is_home(self):
         # Splash siz yaratish
-        app = MikasaApp(connect_backend=False, show_splash=False)
+        app = MisaApp(connect_backend=False, show_splash=False)
         app.update()
 
         # 1. Startapda joriy sahifa home/landing bo'lishi kerak, voice EMAS
@@ -137,7 +137,7 @@ class TestStartupLandingFlow(unittest.TestCase):
         app._on_closing()
 
     def test_landing_primary_voice_navigation(self):
-        app = MikasaApp(connect_backend=False, show_splash=False)
+        app = MisaApp(connect_backend=False, show_splash=False)
         app.update()
 
         home_page = app._pages.get("home")
@@ -154,7 +154,7 @@ class TestStartupLandingFlow(unittest.TestCase):
         app._on_closing()
 
     def test_landing_chat_navigation(self):
-        app = MikasaApp(connect_backend=False, show_splash=False)
+        app = MisaApp(connect_backend=False, show_splash=False)
         app.update()
 
         home_page = app._pages.get("home")
@@ -171,7 +171,7 @@ class TestStartupLandingFlow(unittest.TestCase):
         app._on_closing()
 
     def test_landing_composer_submits_to_chat(self):
-        app = MikasaApp(connect_backend=False, show_splash=False)
+        app = MisaApp(connect_backend=False, show_splash=False)
         app.update()
 
         home_page = app._pages.get("home")

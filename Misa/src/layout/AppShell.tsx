@@ -1,532 +1,537 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { WindowControls } from "../components/WindowControls";
 import { Avatar } from "../components/Avatar";
-import { backendService, BackendStatus } from "../services/backendService";
+import { DeviceSelector } from "../components/DeviceSelector";
+import { MisaLogo } from "../components/MisaLogo";
 import {
+  HomeIcon,
   ChatIcon,
-  MemoryIcon,
+  CommandsIcon,
+  DatabaseIcon,
   SchedulerIcon,
+  PluginsIcon,
+  SettingsIcon,
+  RemoteControlIcon,
+  LaptopIcon,
+  TelegramIcon,
   SearchIcon,
+  MicIcon,
 } from "../components/icons/Icons";
 
 interface AppShellProps {
-  currentPath: string;
-  userName?: string;
-  userAvatar?: string;
-  userAvatarUrl?: string;
-  onNavigate: (path: string, initialPrompt?: string) => void;
-  onOpenCommandPalette?: () => void;
   children: React.ReactNode;
+  activePath: string;
+  onNavigate: (path: string) => void;
+  onOpenCommandPalette?: () => void;
+  userName?: string;
+  avatarStyle?: string;
 }
 
+const PRIMARY_NAV_ITEMS = [
+  { path: "/", label: "Asosiy sahifa", icon: HomeIcon },
+  { path: "/chat", label: "Suhbat", icon: ChatIcon },
+  { path: "/memory", label: "Xotira", icon: DatabaseIcon },
+  { path: "/scheduler", label: "Rejalashtirish", icon: SchedulerIcon },
+];
+
+const EXTRA_NAV_ITEMS = [
+  { path: "/commands", label: "Buyruqlar Markazi", desc: "29+ tizim va AI vositalari", icon: CommandsIcon },
+  { path: "/plugins", label: "Plaginlar Katalogi", desc: "Kengaytmalar va integratsiyalar", icon: PluginsIcon },
+  { path: "/devices", label: "Qurilmalar", desc: "Ulangan kompyuterlar boshqaruvi", icon: LaptopIcon },
+  { path: "/remote", label: "Masofaviy Boshqaruv", desc: "Ruxsatlar va xavfsizlik markazi", icon: RemoteControlIcon },
+  { path: "/telegram", label: "Telegram Integratsiya", desc: "OTP ulanish va mobil agent", icon: TelegramIcon },
+  { path: "/voice", label: "Ovozli Muloqot", desc: "To'liq ekranli jonli ovoz rejimi", icon: MicIcon },
+];
+
 export const AppShell: React.FC<AppShellProps> = ({
-  currentPath,
-  userName = "Muxammadaziz",
-  userAvatar,
-  userAvatarUrl,
+  children,
+  activePath,
   onNavigate,
   onOpenCommandPalette,
-  children,
+  userName = "Ustoz",
+  avatarStyle = "cosmic",
 }) => {
-  const [backendState, setBackendState] = useState<"online" | "offline" | "connecting">("connecting");
-  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
-  const [language, setLanguage] = useState<"UZ" | "RU" | "EN">("UZ");
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  const activeExtraItem = EXTRA_NAV_ITEMS.find((item) => item.path === activePath);
 
   useEffect(() => {
-    const unsub = backendService.onStatusChange((status: BackendStatus) => {
-      setBackendState(status.status);
-    });
-    return () => unsub();
-  }, []);
-
-  const isHome = currentPath === "/";
-
-  const effectiveInitials = (() => {
-    const parts = (userName || "M").trim().split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return (userName || "M").trim().slice(0, 2).toUpperCase();
-  })();
-
-  const currentAvatarStyle = userAvatar || "emerald";
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    if (moreMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [moreMenuOpen]);
 
   return (
     <div
-      className="mikasa-app-shell"
+      className="misa-app-shell mikasa-app-shell"
       style={{
         display: "flex",
         flexDirection: "column",
         width: "100vw",
         height: "100vh",
-        backgroundColor: "var(--bg-darkest)",
+        backgroundColor: "var(--bg-darkest, #02060E)",
+        color: "var(--text-primary)",
         overflow: "hidden",
         position: "relative",
       }}
     >
-      {/* Cinematic Abstract Wallpaper Layer */}
-      <div className="cinematic-bg" />
+      {/* 1. Deep Midnight Canvas & Ambient Violet Glows */}
+      <div className="cinematic-bg misa-canvas-bg" />
 
-      {/* Subtle Atmospheric Vignette Overlay */}
-      <div className="cinematic-vignette" />
+      {/* 2. Subtle Architectural Micro-Grid Overlay */}
+      <div className="cinematic-vignette misa-grid-overlay" />
 
-      {/* ═══ UNIFIED GLASS TOP NAVIGATION — IMAGE 4 STYLE ═══ */}
+      {/* 3. FLOATING ULTRA GLASS TOP NAVIGATION BAR (No Sidebar) */}
       <header
         data-tauri-drag-region
-        className="mikasa-glass-topnav"
         style={{
+          position: "relative",
+          zIndex: 100,
+          width: "100%",
+          padding: "12px 16px 6px 16px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          height: "var(--topnav-height, 56px)",
-          padding: "0 20px",
-          background: "rgba(8, 14, 28, 0.55)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          zIndex: 50,
+          justifyContent: "center",
           flexShrink: 0,
-          position: "relative",
           userSelect: "none",
         }}
       >
-        {/* ── LEFT: Stylized Logo + MIKASA AI ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              cursor: "pointer",
-            }}
-            onClick={() => onNavigate("/")}
-          >
-            {/* Glowing Gradient M Logo Icon */}
-            <div
-              style={{
-                width: "30px",
-                height: "30px",
-                borderRadius: "9px",
-                background: "linear-gradient(135deg, #6366F1 0%, #A855F7 50%, #EC4899 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 0 16px rgba(168, 85, 247, 0.45)",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                  fontSize: "17px",
-                  fontWeight: 900,
-                  color: "#FFFFFF",
-                  lineHeight: 1,
-                }}
-              >
-                M
-              </span>
-            </div>
-
-            <span
-              style={{
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                fontSize: "16px",
-                fontWeight: 800,
-                letterSpacing: "0.07em",
-                color: "#FFFFFF",
-              }}
-            >
-              MISA <span style={{ color: "#818CF8" }}>AI</span>
-            </span>
-
-            {/* Online Status Pill */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "2px 7px",
-                borderRadius: "12px",
-                backgroundColor: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                fontSize: "10px",
-                color: "#94A3B8",
-                marginLeft: "4px",
-              }}
-            >
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  backgroundColor:
-                    backendState === "online" ? "#10B981"
-                      : backendState === "connecting" ? "#F59E0B"
-                      : "#EF4444",
-                  boxShadow:
-                    backendState === "online" ? "0 0 8px rgba(16, 185, 129, 0.8)"
-                      : backendState === "connecting" ? "0 0 8px rgba(245, 158, 11, 0.8)"
-                      : "0 0 8px rgba(239, 68, 68, 0.8)",
-                }}
-              />
-              <span>
-                {backendState === "online" ? "Online"
-                  : backendState === "connecting" ? "Ulanmoqda..."
-                  : "Offline"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── CENTER: Navigation Tabs (Image 4 Style) ── */}
         <nav
-          className="mikasa-topnav-center"
+          data-tauri-drag-region
+          className="misa-ultra-glass mikasa-glass-topnav"
+          aria-label="Asosiy navigatsiya"
           style={{
+            width: "100%",
+            maxWidth: "1440px",
+            height: "54px",
+            borderRadius: "9999px",
+            padding: "0 8px 0 16px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            gap: "4px",
-            flex: "0 1 auto",
-            margin: "0 8px",
-            minWidth: 0,
-            overflowX: "auto",
-            scrollbarWidth: "none",
+            justifyContent: "space-between",
+            gap: "12px",
+            background: "rgba(24, 13, 36, var(--misa-glass-opacity, 0.62))",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+            border: "1px solid rgba(232, 179, 255, 0.14)",
+            boxShadow:
+              "0 20px 50px rgba(2, 6, 14, 0.82), 0 0 30px rgba(147, 3, 197, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12)",
           }}
         >
-          {/* Bosh sahifa tab */}
-          <button
-            onClick={() => onNavigate("/")}
-            title="Bosh sahifa"
-            style={{
-              padding: "5px 13px",
-              borderRadius: "20px",
-              backgroundColor: isHome ? "rgba(30, 58, 138, 0.45)" : "transparent",
-              border: isHome ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
-              boxShadow: isHome ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
-              color: isHome ? "#93C5FD" : "#94A3B8",
-              fontSize: "12.5px",
-              fontWeight: isHome ? 600 : 500,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (!isHome) {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
-                e.currentTarget.style.color = "#E2E8F0";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isHome) {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#94A3B8";
-              }
-            }}
-          >
-            Bosh sahifa
-          </button>
-
-          {/* Suxbatlashish */}
-          <button
-            onClick={() => onNavigate("/chat")}
-            title="Suhbatlashish"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "5px 12px",
-              borderRadius: "20px",
-              backgroundColor: currentPath === "/chat" ? "rgba(30, 58, 138, 0.45)" : "transparent",
-              border: currentPath === "/chat" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
-              boxShadow: currentPath === "/chat" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
-              color: currentPath === "/chat" ? "#93C5FD" : "#94A3B8",
-              fontSize: "12.5px",
-              fontWeight: currentPath === "/chat" ? 600 : 500,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (currentPath !== "/chat") {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
-                e.currentTarget.style.color = "#E2E8F0";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentPath !== "/chat") {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#94A3B8";
-              }
-            }}
-          >
-            <ChatIcon size={13} color="currentColor" />
-            <span>Suxbatlashish</span>
-          </button>
-
-          {/* Xotira */}
-          <button
-            onClick={() => onNavigate("/memory")}
-            title="Xotira"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "5px 12px",
-              borderRadius: "20px",
-              backgroundColor: currentPath === "/memory" ? "rgba(30, 58, 138, 0.45)" : "transparent",
-              border: currentPath === "/memory" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
-              boxShadow: currentPath === "/memory" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
-              color: currentPath === "/memory" ? "#93C5FD" : "#94A3B8",
-              fontSize: "12.5px",
-              fontWeight: currentPath === "/memory" ? 600 : 500,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (currentPath !== "/memory") {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
-                e.currentTarget.style.color = "#E2E8F0";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentPath !== "/memory") {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#94A3B8";
-              }
-            }}
-          >
-            <MemoryIcon size={13} color="currentColor" />
-            <span>Xotira</span>
-          </button>
-
-          {/* Rejalashtirish */}
-          <button
-            onClick={() => onNavigate("/scheduler")}
-            title="Rejalashtirish"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "5px 12px",
-              borderRadius: "20px",
-              backgroundColor: currentPath === "/scheduler" ? "rgba(30, 58, 138, 0.45)" : "transparent",
-              border: currentPath === "/scheduler" ? "1px solid rgba(96, 165, 250, 0.4)" : "1px solid transparent",
-              boxShadow: currentPath === "/scheduler" ? "0 0 16px rgba(59, 130, 246, 0.3)" : "none",
-              color: currentPath === "/scheduler" ? "#93C5FD" : "#94A3B8",
-              fontSize: "12.5px",
-              fontWeight: currentPath === "/scheduler" ? 600 : 500,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (currentPath !== "/scheduler") {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
-                e.currentTarget.style.color = "#E2E8F0";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentPath !== "/scheduler") {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#94A3B8";
-              }
-            }}
-          >
-            <SchedulerIcon size={13} color="currentColor" />
-            <span>Rejalashtirish</span>
-          </button>
-
-          {/* Search shortcut button */}
-          {onOpenCommandPalette && (
-            <button
-              onClick={onOpenCommandPalette}
-              title="Qidiruv (Ctrl+K)"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "32px",
-                height: "32px",
-                borderRadius: "50%",
-                backgroundColor: "transparent",
-                border: "1px solid transparent",
-                color: "#64748B",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)";
-                e.currentTarget.style.color = "#E2E8F0";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#64748B";
-              }}
-            >
-              <SearchIcon size={14} color="currentColor" />
-            </button>
-          )}
-        </nav>
-
-        {/* ── RIGHT: Theme + Language + Notification + Profile (NO MIC ICON!) ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, justifyContent: "flex-end" }}>
-          {/* Theme Mode Toggle (Moon icon in Image 4) */}
-          <button
-            onClick={() => setThemeMode((m) => (m === "dark" ? "light" : "dark"))}
-            title={themeMode === "dark" ? "Tungi rejim faol" : "Kunduzgi rejim"}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              backgroundColor: "transparent",
-              color: "#94A3B8",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#E2E8F0"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#94A3B8"; }}
-          >
-            {/* Moon Icon */}
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          </button>
-
-          {/* Language Selector (UZ ⌄ in Image 4) */}
+          {/* ── LEFT: Misa v9.0 Brand Capsule ── */}
           <div
-            onClick={() => setLanguage((l) => (l === "UZ" ? "RU" : l === "RU" ? "EN" : "UZ"))}
-            title="Tilni o'zgartirish"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              flexShrink: 0,
+              ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
+            }}
+          >
+            <MisaLogo onClick={() => onNavigate("/")} showVersion={true} />
+            <div
+              style={{
+                width: "1px",
+                height: "20px",
+                background: "rgba(255, 255, 255, 0.1)",
+              }}
+            />
+          </div>
+
+          {/* ── CENTER: Detached Floating Navigation Pills ── */}
+          <div
+            className="misa-topnav-center mikasa-topnav-center"
             style={{
               display: "flex",
               alignItems: "center",
               gap: "4px",
-              padding: "4px 8px",
-              borderRadius: "8px",
-              backgroundColor: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              color: "#CBD5E1",
-              fontSize: "11.5px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
+              padding: "4px",
+              borderRadius: "9999px",
+              background: "rgba(2, 6, 14, 0.48)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)"; }}
           >
-            <span>{language}</span>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            {PRIMARY_NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activePath === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => onNavigate(item.path)}
+                  aria-current={isActive ? "page" : undefined}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    padding: "7px 16px",
+                    borderRadius: "9999px",
+                    fontSize: "12.5px",
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? "#FFFFFF" : "var(--text-secondary)",
+                    background: isActive
+                      ? "linear-gradient(135deg, rgba(147, 3, 197, 0.36) 0%, rgba(192, 76, 253, 0.22) 100%)"
+                      : "transparent",
+                    border: isActive
+                      ? "1px solid rgba(192, 76, 253, 0.45)"
+                      : "1px solid transparent",
+                    boxShadow: isActive ? "0 0 18px rgba(147, 3, 197, 0.35)" : "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "#FFFFFF";
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = "var(--text-secondary)";
+                      e.currentTarget.style.background = "transparent";
+                    }
+                  }}
+                >
+                  <Icon size={14} color={isActive ? "#E8B3FF" : "currentColor"} />
+                  <span className="misa-topnav-label">{item.label}</span>
+                </button>
+              );
+            })}
+
+            {/* More / System Centers Dropdown Pill */}
+            <div ref={moreMenuRef} style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => setMoreMenuOpen((prev) => !prev)}
+                aria-expanded={moreMenuOpen}
+                title="Boshqa bo'limlar va vositalar"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "7px 14px",
+                  borderRadius: "9999px",
+                  fontSize: "12.5px",
+                  fontWeight: activeExtraItem ? 600 : 500,
+                  color: activeExtraItem || moreMenuOpen ? "#FFFFFF" : "var(--text-secondary)",
+                  background: activeExtraItem
+                    ? "linear-gradient(135deg, rgba(147, 3, 197, 0.36) 0%, rgba(192, 76, 253, 0.22) 100%)"
+                    : moreMenuOpen
+                    ? "rgba(255, 255, 255, 0.08)"
+                    : "transparent",
+                  border: activeExtraItem
+                    ? "1px solid rgba(192, 76, 253, 0.45)"
+                    : "1px solid transparent",
+                  boxShadow: activeExtraItem ? "0 0 18px rgba(147, 3, 197, 0.35)" : "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {activeExtraItem ? (
+                  <>
+                    <activeExtraItem.icon size={14} color="#E8B3FF" />
+                    <span className="misa-topnav-label">{activeExtraItem.label.split(" ")[0]}</span>
+                  </>
+                ) : (
+                  <>
+                    <CommandsIcon size={14} color="currentColor" />
+                    <span className="misa-topnav-label">Markazlar</span>
+                  </>
+                )}
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  style={{
+                    transform: moreMenuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                    opacity: 0.75,
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {moreMenuOpen && (
+                <div
+                  className="misa-ultra-glass"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 10px)",
+                    right: 0,
+                    width: "270px",
+                    padding: "8px",
+                    borderRadius: "20px",
+                    background: "rgba(15, 11, 26, 0.94)",
+                    backdropFilter: "blur(28px)",
+                    WebkitBackdropFilter: "blur(28px)",
+                    border: "1px solid rgba(232, 179, 255, 0.2)",
+                    boxShadow: "0 24px 60px rgba(2, 6, 14, 0.92), 0 0 30px rgba(147, 3, 197, 0.2)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    zIndex: 300,
+                    animation: "misa-fade-in 0.16s ease-out",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "6px 10px 4px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Misa Tizim Markazlari
+                  </div>
+                  {EXTRA_NAV_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    const isItemActive = activePath === item.path;
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          onNavigate(item.path);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          width: "100%",
+                          padding: "9px 11px",
+                          borderRadius: "12px",
+                          textAlign: "left",
+                          background: isItemActive ? "rgba(147, 3, 197, 0.22)" : "transparent",
+                          border: isItemActive
+                            ? "1px solid rgba(192, 76, 253, 0.38)"
+                            : "1px solid transparent",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isItemActive) {
+                            e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isItemActive) {
+                            e.currentTarget.style.background = "transparent";
+                          }
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "30px",
+                            height: "30px",
+                            borderRadius: "9px",
+                            background: isItemActive
+                              ? "rgba(192, 76, 253, 0.25)"
+                              : "rgba(255, 255, 255, 0.05)",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: isItemActive ? "#E8B3FF" : "var(--text-secondary)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon size={15} color="currentColor" />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: "12.5px",
+                              fontWeight: 600,
+                              color: isItemActive ? "#FFFFFF" : "var(--text-primary)",
+                            }}
+                          >
+                            {item.label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "10.5px",
+                              color: "var(--text-muted)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {item.desc}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Notification Bell with Badge (Image 4) */}
-          <button
-            title="Bildirishnomalar (1 ta yangi xabar)"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              backgroundColor: "transparent",
-              color: "#94A3B8",
-              cursor: "pointer",
-              position: "relative",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#E2E8F0"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#94A3B8"; }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            {/* Red badge with dot */}
-            <span
-              style={{
-                position: "absolute",
-                top: "5px",
-                right: "6px",
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                backgroundColor: "#EF4444",
-                boxShadow: "0 0 6px #EF4444",
-              }}
-            />
-          </button>
-
-          {/* User Profile Pill (No mic next to it!) */}
+          {/* ── RIGHT: Search Pill (Ctrl+K), Device Selector, Profile Pill & Window Controls ── */}
           <div
-            onClick={() => onNavigate("/account")}
-            title={`${userName} — Hisob sozlamalari`}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "7px",
-              padding: "3px 8px 3px 4px",
-              maxWidth: "180px",
-              borderRadius: "24px",
-              backgroundColor: currentPath === "/account" ? "rgba(56, 189, 248, 0.15)" : "rgba(255, 255, 255, 0.05)",
-              border: currentPath === "/account"
-                ? "1px solid rgba(56, 189, 248, 0.35)"
-                : "1px solid rgba(255, 255, 255, 0.08)",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.09)";
-              e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.35)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = currentPath === "/account" ? "rgba(56, 189, 248, 0.15)" : "rgba(255, 255, 255, 0.05)";
-              e.currentTarget.style.borderColor = currentPath === "/account" ? "rgba(56, 189, 248, 0.35)" : "rgba(255, 255, 255, 0.08)";
+              gap: "8px",
+              flexShrink: 0,
+              ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
             }}
           >
-            <Avatar initials={effectiveInitials} size={28} avatarStyle={currentAvatarStyle} avatarUrl={userAvatarUrl} />
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15, minWidth: 0, overflow: "hidden" }}>
+            {/* Command Palette Trigger Pill */}
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              title="Tezkor qidiruv va buyruqlar (Ctrl+K)"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "6px 12px",
+                borderRadius: "9999px",
+                background: "rgba(255, 255, 255, 0.035)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                color: "var(--text-secondary)",
+                fontSize: "12px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(147, 3, 197, 0.14)";
+                e.currentTarget.style.borderColor = "rgba(192, 76, 253, 0.35)";
+                e.currentTarget.style.color = "#FFFFFF";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.035)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
+            >
+              <SearchIcon size={13} color="currentColor" />
+              <span className="misa-topnav-label">Qidirish...</span>
+              <kbd
+                style={{
+                  fontSize: "10px",
+                  fontFamily: "var(--font-mono)",
+                  padding: "1px 5px",
+                  borderRadius: "4px",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  color: "var(--text-muted)",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                }}
+              >
+                Ctrl+K
+              </kbd>
+            </button>
+
+            <DeviceSelector onManageDevices={() => onNavigate("/devices")} />
+
+            {/* User Profile & Settings Pill */}
+            <button
+              type="button"
+              onClick={() => onNavigate("/account")}
+              title="Profil va Sozlamalar"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "4px 6px 4px 12px",
+                borderRadius: "9999px",
+                background:
+                  activePath === "/account"
+                    ? "linear-gradient(135deg, rgba(147, 3, 197, 0.36) 0%, rgba(192, 76, 253, 0.2) 100%)"
+                    : "rgba(255, 255, 255, 0.04)",
+                border:
+                  activePath === "/account"
+                    ? "1px solid rgba(192, 76, 253, 0.45)"
+                    : "1px solid rgba(255, 255, 255, 0.1)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (activePath !== "/account") {
+                  e.currentTarget.style.borderColor = "rgba(192, 76, 253, 0.35)";
+                  e.currentTarget.style.background = "rgba(147, 3, 197, 0.12)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activePath !== "/account") {
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                }
+              }}
+            >
               <span
+                className="misa-topnav-label"
                 style={{
                   fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#FFFFFF",
-                  maxWidth: "115px",
-                  whiteSpace: "nowrap",
+                  fontWeight: 600,
+                  color: "#F5F0FF",
+                  maxWidth: "110px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
-                  display: "block",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {userName}
               </span>
-              <span style={{ fontSize: "10px", color: "#818CF8", fontWeight: 600 }}>
-                Pro
-              </span>
-            </div>
-          </div>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <Avatar name={userName} size="sm" styleId={avatarStyle} />
+                <span
+                  style={{
+                    position: "absolute",
+                    bottom: "-1px",
+                    right: "-1px",
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    backgroundColor: "#4EDEA3",
+                    border: "1.5px solid #02060E",
+                    boxShadow: "0 0 6px rgba(78, 222, 163, 0.8)",
+                  }}
+                />
+              </div>
+              <SettingsIcon size={13} color={activePath === "/account" ? "#E8B3FF" : "var(--text-secondary)"} />
+            </button>
 
-          {/* Window Controls */}
-          <WindowControls />
-        </div>
+            <div
+              style={{
+                width: "1px",
+                height: "18px",
+                background: "rgba(255, 255, 255, 0.08)",
+                marginLeft: "2px",
+              }}
+            />
+
+            <WindowControls />
+          </div>
+        </nav>
       </header>
 
-      {/* ═══ MAIN CONTENT AREA — full width ═══ */}
+      {/* 4. FULL-BLEED WORKSPACE STAGE */}
       <main
         style={{
-          display: "flex",
           flex: 1,
-          width: "100%",
-          height: "calc(100vh - var(--topnav-height, 56px))",
-          overflow: "hidden",
           position: "relative",
-          zIndex: 5,
+          zIndex: 10,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {children}

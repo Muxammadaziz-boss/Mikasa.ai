@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const APP_VERSION: &str = "v8.0.0";
-static APP_CORE_BYTES: &[u8] = include_bytes!("../../../Misa/src-tauri/target/release/mikasa-7.exe");
+static APP_CORE_BYTES: &[u8] = include_bytes!("../../../Misa/src-tauri/target/release/misa-7.exe");
 static WEBVIEW2_BYTES: &[u8] = include_bytes!("../../../Misa/src-tauri/target/release/WebView2Loader.dll");
 
 fn main() {
@@ -22,15 +22,15 @@ fn main() {
         }
     }
 
-    // 2. Prepare isolated local runtime folder in %LOCALAPPDATA%\MikasaAI\runtime\v8.0.0
+    // 2. Prepare isolated local runtime folder in %LOCALAPPDATA%\MisaAI\runtime\v8.0.0
     let local_app_data = env::var("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|_| env::temp_dir());
-    let runtime_dir = local_app_data.join("MikasaAI").join("runtime").join(APP_VERSION);
+    let runtime_dir = local_app_data.join("MisaAI").join("runtime").join(APP_VERSION);
     let _ = fs::create_dir_all(&runtime_dir);
 
     let target_dll = runtime_dir.join("WebView2Loader.dll");
-    let target_exe = runtime_dir.join("Mikasa-AI-Core.exe");
+    let target_exe = runtime_dir.join("Misa-AI-Core.exe");
 
     // Write WebView2Loader.dll if missing or size differs
     if !target_dll.exists() || fs::metadata(&target_dll).map(|m| m.len()).unwrap_or(0) != WEBVIEW2_BYTES.len() as u64 {
@@ -59,7 +59,7 @@ fn main() {
     cmd.args(&args);
     cmd.current_dir(&launch_dir);
     if let Some(ref parent) = parent_dir {
-        cmd.env("MIKASA_PORTABLE_DIR", parent);
+        cmd.env("MISA_PORTABLE_DIR", parent);
     }
 
     let _ = cmd.spawn();

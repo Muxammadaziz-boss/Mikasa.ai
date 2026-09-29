@@ -8,12 +8,12 @@ import os
 # Loyiha papkasini PATH ga qo'shish
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gui.app import MikasaApp
+from gui.app import MisaApp
 
 
 def main():
-    print("🔷 MIKASA AI — GUI Test ishga tushmoqda...")
-    app = MikasaApp()
+    print("🔷 MISA AI — GUI Test ishga tushmoqda...")
+    app = MisaApp()
     app.mainloop()
     print("✅ GUI yopildi.")
 

@@ -79,7 +79,7 @@ def _make_manager(tmp_dir=None):
 class TestDefaultState(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
 
@@ -132,7 +132,7 @@ class TestDefaultState(unittest.TestCase):
 class TestFullActivationFlow(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -230,7 +230,7 @@ class TestFullActivationFlow(unittest.TestCase):
 class TestFailedReauth(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -284,7 +284,7 @@ class TestFailedReauth(unittest.TestCase):
 class TestCrossTenantBlocking(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -325,7 +325,7 @@ class TestCrossTenantBlocking(unittest.TestCase):
 class TestDeviceScopedIsolation(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -373,7 +373,7 @@ class TestDeviceScopedIsolation(unittest.TestCase):
 class TestPermissionOverride(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -428,7 +428,7 @@ class TestPermissionOverride(unittest.TestCase):
 class TestEmergencyRevoke(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -492,7 +492,7 @@ class TestEmergencyRevoke(unittest.TestCase):
 class TestDisableFullAccess(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -537,7 +537,7 @@ class TestDisableFullAccess(unittest.TestCase):
 class TestRateLimiting(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
         self.mgr = _make_manager(self.tmp)
@@ -575,7 +575,7 @@ class TestRateLimiting(unittest.TestCase):
 class TestPermissionIntegration(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):
@@ -623,7 +623,7 @@ class TestPermissionIntegration(unittest.TestCase):
 class TestPersistence(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
         self.tmp = tempfile.mkdtemp()
 

@@ -1,5 +1,5 @@
 # ========== app_detector.py ==========
-# Mikasa AI 7.x — Deep Windows Application & Process Inventory Engine
+# Misa AI 7.x — Deep Windows Application & Process Inventory Engine
 # [Phase 6] Haqiqiy vaqt rejimida Windows ilovalari, jarayonlar, registri va portativ dasturlarni aniqlash
 
 import os
@@ -11,7 +11,7 @@ import platform
 import psutil
 from typing import Dict, List, Optional, Tuple, Any
 
-logger = logging.getLogger("MikasaAppDetector")
+logger = logging.getLogger("MisaAppDetector")
 
 try:
     import winreg

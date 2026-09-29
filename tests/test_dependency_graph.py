@@ -1,5 +1,5 @@
 # ========== test_dependency_graph.py ==========
-# Mikasa AI 7.x — Unit Tests for Dependency Graph & Validation (DependencyGraph & PlanValidator)
+# Misa AI 7.x — Unit Tests for Dependency Graph & Validation (DependencyGraph & PlanValidator)
 
 import unittest
 from core.intelligence.types import PlanStep, AgentPlan

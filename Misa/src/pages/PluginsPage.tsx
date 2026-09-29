@@ -1,5 +1,5 @@
 // ========== PluginsPage.tsx ==========
-// Mikasa AI 8.0.0 — Plaginlar va Agent Vositalari Katalogi
+// Misa AI v9.0.0 — Plaginlar va Agent Vositalari Katalogi
 // 5 ta holat: installed, available, disabled, error, updates
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";

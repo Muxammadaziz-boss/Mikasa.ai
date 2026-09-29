@@ -17,7 +17,7 @@ from agent.auth import AgentAuth
 from agent.heartbeat import AgentHeartbeat, AgentState
 from agent.recovery import CrashRecoveryManager
 
-logger = logging.getLogger("mikasa.agent.lifecycle")
+logger = logging.getLogger("misa.agent.lifecycle")
 
 BACKOFF_STEPS: List[float] = [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 60.0]
 

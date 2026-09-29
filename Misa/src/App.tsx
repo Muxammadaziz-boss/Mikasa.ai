@@ -1,88 +1,206 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "./layout/AppShell";
+import { LandingPage } from "./pages/LandingPage";
+import { ChatPage } from "./pages/ChatPage";
+import { VoicePage } from "./pages/VoicePage";
+import { CommandsPage } from "./pages/CommandsPage";
+import { MemoryPage } from "./pages/MemoryPage";
+import { SchedulerPage } from "./pages/SchedulerPage";
+import { PluginsPage } from "./pages/PluginsPage";
+import { AccountPage } from "./pages/AccountPage";
+import { RemoteControlPage } from "./pages/RemoteControlPage";
+import { DevicesPage } from "./pages/DevicesPage";
+import { TelegramIntegrationPage } from "./pages/TelegramIntegrationPage";
+import { AuthPage } from "./pages/AuthPage";
 import { CommandPalette } from "./components/CommandPalette";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UpdateModal } from "./components/UpdateModal";
 import { backendService, MikasaAuthUser } from "./services/backendService";
-import { AuthPage } from "./pages/AuthPage";
+import { UpdateService, UpdateCheckResponse } from "./services/updateService";
+import { supabase, isSupabaseConfigured } from "./services/supabaseClient";
+import "./styles/globals.css";
 
-const LandingPage = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
-const ChatPage = lazy(() => import("./pages/ChatPage").then(m => ({ default: m.ChatPage })));
-const VoicePage = lazy(() => import("./pages/VoicePage").then(m => ({ default: m.VoicePage })));
-const CommandsPage = lazy(() => import("./pages/CommandsPage").then(m => ({ default: m.CommandsPage })));
-const MemoryPage = lazy(() => import("./pages/MemoryPage").then(m => ({ default: m.MemoryPage })));
-const SchedulerPage = lazy(() => import("./pages/SchedulerPage").then(m => ({ default: m.SchedulerPage })));
-const PluginsPage = lazy(() => import("./pages/PluginsPage").then(m => ({ default: m.PluginsPage })));
-const RemoteControlPage = lazy(() => import("./pages/RemoteControlPage").then(m => ({ default: m.RemoteControlPage })));
-const TelegramIntegrationPage = lazy(() => import("./pages/TelegramIntegrationPage").then(m => ({ default: m.TelegramIntegrationPage })));
-const DevicesPage = lazy(() => import("./pages/DevicesPage").then(m => ({ default: m.DevicesPage })));
-const AccountPage = lazy(() => import("./pages/AccountPage").then(m => ({ default: m.AccountPage })));
+export type MisaAuthUser = MikasaAuthUser;
 
-const PageLoadingFallback = () => (
-  <div
-    style={{
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      height: "100%",
-      minHeight: "400px",
-      color: "var(--text-muted, #94A3B8)",
-      fontSize: "14px",
-      gap: "14px",
-    }}
-  >
-    <div
-      style={{
-        width: "28px",
-        height: "28px",
-        border: "2px solid rgba(16, 185, 129, 0.2)",
-        borderTopColor: "#10B981",
-        borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }}
-    />
-    <span>Yuklanmoqda...</span>
-  </div>
-);
+export function applyMisaAppearanceSettings() {
+  try {
+    const raw =
+      localStorage.getItem("misa_appearance_settings") ||
+      localStorage.getItem("misa_appearance_settings");
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const root = document.documentElement;
 
-export function App() {
-  const [currentPath, setCurrentPath] = useState<string>("/");
-  const [chatInitialPrompt, setChatInitialPrompt] = useState<string>("");
-  const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
+    // 1. Theme mode
+    const theme = parsed.theme || "dark";
+    if (theme === "light") {
+      root.classList.add("theme-light");
+      root.classList.remove("dark");
+    } else if (theme === "system") {
+      const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
+      if (prefersLight) {
+        root.classList.add("theme-light");
+        root.classList.remove("dark");
+      } else {
+        root.classList.remove("theme-light");
+        root.classList.add("dark");
+      }
+    } else {
+      root.classList.remove("theme-light");
+      root.classList.add("dark");
+    }
+
+    // 2. Accent color
+    if (parsed.accentColor) {
+      root.style.setProperty("--misa-accent", parsed.accentColor);
+      root.style.setProperty("--primary", parsed.accentColor);
+    }
+    if (parsed.accentGlow) {
+      root.style.setProperty("--misa-accent-glow", parsed.accentGlow);
+      root.style.setProperty("--primary-glow", parsed.accentGlow);
+    }
+
+    // 3. Glass opacity (30% - 100%)
+    if (typeof parsed.glassOpacity === "number") {
+      const normalized = Math.max(0.25, Math.min(0.92, parsed.glassOpacity / 100));
+      root.style.setProperty("--misa-glass-opacity", String(normalized));
+    }
+
+    // 4. Interface animations
+    if (parsed.animationsEnabled === false) {
+      root.classList.add("no-animations");
+    } else {
+      root.classList.remove("no-animations");
+    }
+  } catch {
+    // Ignore storage parse issues
+  }
+}
+
+function App() {
+  const [activePath, setActivePath] = useState<string>("/");
+  const [initialChatQuery, setInitialChatQuery] = useState<string | undefined>(undefined);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+
+  // Phase 48: Auto-update modal state
+  const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
+
+  // Check for updates on startup (after 4s delay)
+  useEffect(() => {
+    applyMisaAppearanceSettings();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await UpdateService.checkForUpdates();
+        if (res && res.ok && res.update_available) {
+          setUpdateInfo(res);
+          setUpdateModalOpen(true);
+        }
+      } catch {
+        // Silent fail on startup update check
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleOpenUpdateModal = useCallback((info: UpdateCheckResponse) => {
+    setUpdateInfo(info);
+    setUpdateModalOpen(true);
+  }, []);
+
+  // Auth & Profile State
   const [authChecking, setAuthChecking] = useState<boolean>(true);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<MikasaAuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<MisaAuthUser | null>(null);
   const [userName, setUserName] = useState<string>(() => {
-    return localStorage.getItem("mikasa_user_name") || "Ustoz";
+    return (
+      localStorage.getItem("misa_user_name") ||
+      localStorage.getItem("misa_user_name") ||
+      "Ustoz"
+    );
   });
-  const [userAvatar, setUserAvatar] = useState<string>(() => {
-    return localStorage.getItem("mikasa_user_avatar") || "emerald";
+  const [avatarStyle, setAvatarStyle] = useState<string>(() => {
+    return (
+      localStorage.getItem("misa_user_avatar") ||
+      localStorage.getItem("misa_user_avatar") ||
+      "cosmic"
+    );
   });
 
-  // Verify auth session on startup
+  // Verify existing session on startup and subscribe to auth changes
   useEffect(() => {
     let mounted = true;
-    const verifyAuth = async () => {
-      try {
-        const res = await backendService.getMe();
-        if (mounted) {
-          if (res.ok && res.authenticated && res.user) {
-            setIsAuthenticated(true);
-            setCurrentUser(res.user);
-            setUserName(res.user.username);
-            try {
-              localStorage.setItem("mikasa_user_name", res.user.username);
-            } catch {}
-            backendService.updateAccount({ name: res.user.username }).catch(() => {});
-          } else {
-            setIsAuthenticated(false);
-            setCurrentUser(null);
+
+    const handleOAuthRedirectIfAny = async () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (
+        (hash && (hash.includes("access_token=") || hash.includes("error="))) ||
+        (search && (search.includes("code=") || search.includes("error=")))
+      ) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.user && mounted) {
+            if (data.session.access_token) {
+              backendService.setAuthToken(data.session.access_token);
+            }
+            const u: MisaAuthUser = {
+              id: data.session.user.id,
+              username:
+                data.session.user.user_metadata?.full_name ||
+                data.session.user.user_metadata?.name ||
+                data.session.user.email?.split("@")[0] ||
+                "User",
+              email: data.session.user.email || "",
+              is_active: true,
+              is_verified: true,
+              created_at: Date.now() / 1000,
+              avatar_url:
+                data.session.user.user_metadata?.avatar_url ||
+                data.session.user.user_metadata?.picture ||
+                undefined,
+              provider: data.session.user.app_metadata?.provider || "google",
+            };
+            setCurrentUser(u);
+            if (u.username) {
+              setUserName(u.username);
+              localStorage.setItem("misa_user_name", u.username);
+              localStorage.setItem("misa_user_name", u.username);
+            }
+            window.history.replaceState({}, document.title, window.location.pathname);
           }
+        } catch (err) {
+          console.error("OAuth redirect check error:", err);
+        }
+      }
+    };
+
+    const initAuth = async () => {
+      try {
+        await handleOAuthRedirectIfAny();
+
+        if (isSupabaseConfigured) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            backendService.setAuthToken(session.access_token);
+          }
+        }
+
+        const user = await backendService.getCurrentAuthUser();
+        if (!mounted) return;
+        if (user) {
+          setCurrentUser(user);
+          if (user.username) {
+            setUserName(user.username);
+            localStorage.setItem("misa_user_name", user.username);
+            localStorage.setItem("misa_user_name", user.username);
+          }
+        } else {
+          setCurrentUser(null);
         }
       } catch {
         if (mounted) {
-          setIsAuthenticated(false);
           setCurrentUser(null);
         }
       } finally {
@@ -92,96 +210,155 @@ export function App() {
       }
     };
 
-    verifyAuth();
+    initAuth();
 
     const unsubAuth = backendService.onAuthChange((user) => {
-      if (user) {
-        setIsAuthenticated(true);
-        setCurrentUser(user);
+      if (!mounted) return;
+      setCurrentUser(user);
+      if (user?.username) {
         setUserName(user.username);
-        try {
-          localStorage.setItem("mikasa_user_name", user.username);
-        } catch {}
-        backendService.updateAccount({ name: user.username }).catch(() => {});
-      } else {
-        setIsAuthenticated(false);
-        setCurrentUser(null);
+      }
+    });
+
+    backendService
+      .getAccount()
+      .then((data) => {
+        if (!mounted) return;
+        const freshName =
+          data.name ||
+          localStorage.getItem("misa_user_name") ||
+          localStorage.getItem("misa_user_name") ||
+          "Ustoz";
+        const freshAvatar =
+          data.avatar ||
+          localStorage.getItem("misa_user_avatar") ||
+          localStorage.getItem("misa_user_avatar") ||
+          "cosmic";
+        setUserName(freshName);
+        setAvatarStyle(freshAvatar);
+        localStorage.setItem("misa_user_name", freshName);
+        localStorage.setItem("misa_user_name", freshName);
+      })
+      .catch(() => {});
+
+    const unsubStatus = backendService.onStatusChange((status) => {
+      if (mounted && status.user) {
+        setUserName(status.user);
       }
     });
 
     return () => {
       mounted = false;
       unsubAuth();
+      unsubStatus();
     };
   }, []);
 
-  // Listen to status updates to keep username synchronized
-  useEffect(() => {
-    const unsub = backendService.onStatusChange((status) => {
-      if (status.user && status.user.trim()) {
-        const freshUser = status.user.trim();
-        // Never let test users or placeholder e2e name overwrite the user
-        if (freshUser.toLowerCase().includes("sinov") || freshUser.toLowerCase().includes("test")) {
-          return;
-        }
-        // If current user is authenticated, keep authenticated name
-        if (currentUser && currentUser.username) {
-          return;
-        }
-        setUserName((prev) => (prev !== freshUser ? freshUser : prev));
-        try {
-          localStorage.setItem("mikasa_user_name", freshUser);
-        } catch {}
-      }
-    });
-    return () => unsub();
-  }, [currentUser]);
-
-  // Listen to account updates (avatar & name)
-  useEffect(() => {
-    const unsub = backendService.onAccountChange((data) => {
-      if (data.name) setUserName(data.name);
-      if (data.avatar) setUserAvatar(data.avatar);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleUserUpdated = (newName: string, newAvatar?: string) => {
-    setUserName(newName);
-    try {
-      localStorage.setItem("mikasa_user_name", newName);
-    } catch {}
+  const handleProfileChange = (newName: string, newAvatar?: string) => {
+    if (newName) {
+      setUserName(newName);
+      localStorage.setItem("misa_user_name", newName);
+      localStorage.setItem("misa_user_name", newName);
+    }
     if (newAvatar) {
-      setUserAvatar(newAvatar);
-      try {
-        localStorage.setItem("mikasa_user_avatar", newAvatar);
-      } catch {}
+      setAvatarStyle(newAvatar);
+      localStorage.setItem("misa_user_avatar", newAvatar);
+      localStorage.setItem("misa_user_avatar", newAvatar);
     }
   };
 
-  const handleNavigate = (path: string, initialPrompt?: string) => {
-    if (initialPrompt !== undefined) {
-      setChatInitialPrompt(initialPrompt);
-    }
-    setCurrentPath(path);
-  };
-
-  // Global Ctrl+K Command Palette shortcut
+  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+1..9)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setIsPaletteOpen((prev) => !prev);
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case "1":
+            e.preventDefault();
+            handleNavigate("/");
+            break;
+          case "2":
+            e.preventDefault();
+            handleNavigate("/chat");
+            break;
+          case "3":
+            e.preventDefault();
+            handleNavigate("/memory");
+            break;
+          case "4":
+            e.preventDefault();
+            handleNavigate("/scheduler");
+            break;
+          case "5":
+            e.preventDefault();
+            handleNavigate("/commands");
+            break;
+          case "6":
+            e.preventDefault();
+            handleNavigate("/plugins");
+            break;
+          case "7":
+            e.preventDefault();
+            handleNavigate("/remote");
+            break;
+          case "8":
+            e.preventDefault();
+            handleNavigate("/devices");
+            break;
+          case "9":
+            e.preventDefault();
+            handleNavigate("/account");
+            break;
+          case "0":
+            e.preventDefault();
+            handleNavigate("/telegram");
+            break;
+        }
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const handleNavigate = (path: string) => {
+    if (path !== "/chat") {
+      setInitialChatQuery(undefined);
+    }
+    setActivePath(path);
+  };
+
+  const handleStartChatWithQuery = (query?: string) => {
+    setInitialChatQuery(query);
+    setActivePath("/chat");
+  };
+
   const renderContent = () => {
-    switch (currentPath) {
+    switch (activePath) {
       case "/":
-        return <LandingPage userName={userName} onNavigate={handleNavigate} />;
+        return (
+          <LandingPage
+            userName={userName}
+            onStartChat={handleStartChatWithQuery}
+            onStartVoice={() => handleNavigate("/voice")}
+            onNavigate={handleNavigate}
+          />
+        );
+      case "/chat":
+        return (
+          <ChatPage
+            userName={userName}
+            initialQuery={initialChatQuery}
+            onNavigateHome={() => handleNavigate("/")}
+            onNavigateVoice={() => handleNavigate("/voice")}
+            onNavigate={handleNavigate}
+          />
+        );
       case "/voice":
         return (
           <VoicePage
@@ -190,95 +367,124 @@ export function App() {
             onNavigateChat={() => handleNavigate("/chat")}
           />
         );
-      case "/chat":
-        return (
-          <ChatPage
-            initialPrompt={chatInitialPrompt}
-            userName={userName}
-            onNavigateHome={() => handleNavigate("/")}
-            onNavigateVoice={() => handleNavigate("/voice")}
-          />
-        );
       case "/commands":
         return <CommandsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/memory":
         return <MemoryPage onNavigateHome={() => handleNavigate("/")} />;
       case "/scheduler":
-        return <SchedulerPage onNavigateHome={() => handleNavigate("/")} />;
+        return (
+          <SchedulerPage
+            onNavigateHome={() => handleNavigate("/")}
+            onAskMisa={handleStartChatWithQuery}
+          />
+        );
       case "/plugins":
         return <PluginsPage onNavigateHome={() => handleNavigate("/")} />;
       case "/remote":
         return <RemoteControlPage onNavigateHome={() => handleNavigate("/")} />;
-      case "/telegram":
-        return <TelegramIntegrationPage onNavigateHome={() => handleNavigate("/")} />;
       case "/devices":
         return <DevicesPage onNavigateHome={() => handleNavigate("/")} />;
+      case "/telegram":
+        return <TelegramIntegrationPage onNavigateHome={() => handleNavigate("/")} />;
       case "/account":
         return (
           <AccountPage
             onNavigateHome={() => handleNavigate("/")}
-            onNavigateToDevices={() => handleNavigate("/devices")}
-            onNavigateToTelegram={() => handleNavigate("/telegram")}
-            onUserUpdated={handleUserUpdated}
+            onNavigate={handleNavigate}
+            onProfileChange={handleProfileChange}
             currentUser={currentUser}
-            onLogout={handleLogout}
+            onLogout={() => {
+              setCurrentUser(null);
+            }}
+            onOpenUpdateModal={handleOpenUpdateModal}
           />
         );
       default:
-        return <LandingPage userName={userName} onNavigate={handleNavigate} />;
+        return (
+          <LandingPage
+            userName={userName}
+            onStartChat={handleStartChatWithQuery}
+            onStartVoice={() => handleNavigate("/voice")}
+            onNavigate={handleNavigate}
+          />
+        );
     }
   };
 
-  const handleLogout = async () => {
-    await backendService.logout();
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setCurrentPath("/");
-  };
-
   if (authChecking) {
-    return <PageLoadingFallback />;
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          width: "100vw",
+          backgroundColor: "#02060E",
+          color: "#F5F0FF",
+          fontFamily: "var(--font-family)",
+          gap: "14px",
+        }}
+      >
+        <div
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            border: "2.5px solid rgba(192, 76, 253, 0.2)",
+            borderTopColor: "#C04CFD",
+            animation: "orb-particle-spin 0.9s linear infinite",
+          }}
+        />
+        <div style={{ fontSize: "13.5px", color: "var(--text-secondary)", fontWeight: 500 }}>
+          Misa AI v9.0 ishga tushirilmoqda...
+        </div>
+      </div>
+    );
   }
 
-  if (!isAuthenticated) {
+  if (!currentUser) {
     return (
-      <AuthPage
-        onAuthSuccess={(user) => {
-          setIsAuthenticated(true);
-          setCurrentUser(user);
-          setUserName(user.username);
-          try {
-            localStorage.setItem("mikasa_user_name", user.username);
-          } catch {}
-        }}
-      />
+      <ErrorBoundary onReset={() => setCurrentUser(null)}>
+        <AuthPage
+          onAuthSuccess={(user) => {
+            setCurrentUser(user);
+            if (user.username) {
+              setUserName(user.username);
+              localStorage.setItem("misa_user_name", user.username);
+              localStorage.setItem("misa_user_name", user.username);
+            }
+          }}
+        />
+      </ErrorBoundary>
     );
   }
 
   return (
-    <>
-      <AppShell
-        currentPath={currentPath}
-        userName={userName}
-        userAvatar={userAvatar}
-        userAvatarUrl={currentUser?.avatar_url}
-        onNavigate={handleNavigate}
-        onOpenCommandPalette={() => setIsPaletteOpen(true)}
-      >
-        <ErrorBoundary fallbackNavigate={() => handleNavigate("/")}>
-          <Suspense fallback={<PageLoadingFallback />}>
-            {renderContent()}
-          </Suspense>
-        </ErrorBoundary>
-      </AppShell>
+    <AppShell
+      activePath={activePath}
+      onNavigate={handleNavigate}
+      onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+      userName={userName}
+      avatarStyle={avatarStyle}
+    >
+      <ErrorBoundary key={activePath} onReset={() => handleNavigate("/")}>
+        {renderContent()}
+      </ErrorBoundary>
       <CommandPalette
-        isOpen={isPaletteOpen}
-        onClose={() => setIsPaletteOpen(false)}
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
         onNavigate={handleNavigate}
+        onExecuteQuery={handleStartChatWithQuery}
       />
-    </>
+      <UpdateModal
+        isOpen={updateModalOpen}
+        onClose={() => setUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+      />
+    </AppShell>
   );
 }
 
 export default App;
-

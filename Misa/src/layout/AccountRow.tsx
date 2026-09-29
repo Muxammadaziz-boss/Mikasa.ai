@@ -21,7 +21,7 @@ export const AccountRow: React.FC<AccountRowProps> = ({
   onClick,
   className = "",
 }) => {
-  const currentAvatarStyle = avatarStyle || localStorage.getItem("mikasa_user_avatar") || "emerald";
+  const currentAvatarStyle = avatarStyle || localStorage.getItem("misa_user_avatar") || localStorage.getItem("mikasa_user_avatar") || "violet";
   const effectiveInitials = initials || (() => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {

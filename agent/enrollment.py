@@ -12,13 +12,13 @@ from agent.crypto import AgentCrypto
 from agent.transport import SecureTransport
 from agent.audit import AgentAuditLogger
 
-logger = logging.getLogger("mikasa.agent.enrollment")
+logger = logging.getLogger("misa.agent.enrollment")
 
 
 class AgentEnrollment:
     """
-    Qurilmani Mikasa hisobiga ulash (Pairing & Enrollment) mijozi.
-    - Foydalanuvchi Mikasa Desktop/Web ilovasidan olgan 6-xonali kod orqali ulanadi.
+    Qurilmani Misa hisobiga ulash (Pairing & Enrollment) mijozi.
+    - Foydalanuvchi Misa Desktop/Web ilovasidan olgan 6-xonali kod orqali ulanadi.
     - Faqatgina ommaviy kalit (Ed25519 public key) yuboriladi, maxfiy kalit diskda shifrlangan qoladi.
     """
 

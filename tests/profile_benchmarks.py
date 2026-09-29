@@ -1,5 +1,5 @@
 """
-Profiling script for Mikasa AI UI performance baseline.
+Profiling script for Misa AI UI performance baseline.
 Measures:
 1. Startup page initialization time.
 2. Navigation transition time between pages.
@@ -10,7 +10,7 @@ Measures:
 import time
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
-from gui.app import MikasaApp
+from gui.app import MisaApp
 from gui.pages.dashboard import DashboardPage
 from gui.pages.voice import VoicePage
 from gui.pages.chat import ChatPage

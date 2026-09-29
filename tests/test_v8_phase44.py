@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase44.py ==========
-# Mikasa AI v8.0.0 — Phase 44: Google OAuth + Account Linking Production-Level Suite
+# Misa AI v8.0.0 — Phase 44: Google OAuth + Account Linking Production-Level Suite
 # Comprehensive Test Suite covering:
 # 1. Google OAuth Flow & State Security (Randomness, Expiration, Replay Rejection, Concurrent Isolation)
 # 2. Audit Logging & Sensitive Data Redaction (Token / Secret / Authorization Code Masking)
@@ -24,7 +24,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 from core.v8.account_device import (
-    MikasaUser,
+    MisaUser,
     AccountDeviceManager,
 )
 from core.v8.account_auth import (
@@ -82,11 +82,11 @@ class BasePhase44Test(unittest.TestCase):
 
     def setUp(self):
         self._orig_env = dict(os.environ)
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_test_p44_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_test_p44_")
         self.db_path = os.path.join(self.test_dir, "test_p44.db")
         self.jwt_secret = "test-secret-key-phase44-strong-64bytes-padding-1234567890abcdef"
 
-        os.environ["MIKASA_REQUIRE_AUTH"] = "true"
+        os.environ["MISA_REQUIRE_AUTH"] = "true"
         os.environ["SUPABASE_JWT_SECRET"] = self.jwt_secret
 
         AccountDeviceManager._default_instance = None
@@ -116,8 +116,8 @@ class BasePhase44Test(unittest.TestCase):
     def create_jwt(
         self,
         user_id: str,
-        email: str = "user@mikasa.ai",
-        username: str = "mikasa_user",
+        email: str = "user@misa.ai",
+        username: str = "misa_user",
         providers: Optional[list] = None,
         primary_provider: str = "email",
         avatar_url: str = "",
@@ -336,7 +336,7 @@ class TestPhase44AccountIdentitiesAPI(BasePhase44Test):
 
     def test_12_identities_endpoint_resolves_user_jwt_sub(self):
         """Scenario 12: GET /api/account/identities resolves verified identity from JWT.sub."""
-        token = self.create_jwt(user_id="user-p44-alice", email="alice@mikasa.ai", username="alice")
+        token = self.create_jwt(user_id="user-p44-alice", email="alice@misa.ai", username="alice")
         req = MockRequest(method="GET", headers={"Authorization": f"Bearer {token}"})
         resp = asyncio.run(handle_account_identities_get(req))
         self.assertEqual(resp.status, 200)
@@ -347,7 +347,7 @@ class TestPhase44AccountIdentitiesAPI(BasePhase44Test):
 
     def test_13_identities_cross_tenant_query_tampering_403(self):
         """Scenario 13: Query parameter spoofing (?user_id=bob) returns 403 Forbidden."""
-        token = self.create_jwt(user_id="user-p44-alice", email="alice@mikasa.ai", username="alice")
+        token = self.create_jwt(user_id="user-p44-alice", email="alice@misa.ai", username="alice")
         req = MockRequest(
             method="GET",
             headers={"Authorization": f"Bearer {token}"},
@@ -360,11 +360,11 @@ class TestPhase44AccountIdentitiesAPI(BasePhase44Test):
         self.assertIn("Cross-tenant access denied", data["error"])
 
     def test_14_identities_cross_tenant_header_spoofing_403(self):
-        """Scenario 14: Header spoofing (X-Mikasa-User-Id: bob) returns 403 Forbidden."""
-        token = self.create_jwt(user_id="user-p44-alice", email="alice@mikasa.ai", username="alice")
+        """Scenario 14: Header spoofing (X-Misa-User-Id: bob) returns 403 Forbidden."""
+        token = self.create_jwt(user_id="user-p44-alice", email="alice@misa.ai", username="alice")
         req = MockRequest(
             method="GET",
-            headers={"Authorization": f"Bearer {token}", "X-Mikasa-User-Id": "user-p44-bob"}
+            headers={"Authorization": f"Bearer {token}", "X-Misa-User-Id": "user-p44-bob"}
         )
         resp = asyncio.run(handle_account_identities_get(req))
         self.assertEqual(resp.status, 403)
@@ -373,7 +373,7 @@ class TestPhase44AccountIdentitiesAPI(BasePhase44Test):
         """Scenario 15: Multi-provider account (email + google) sets can_unlink_google=True."""
         token = self.create_jwt(
             user_id="user-p44-multi",
-            email="multi@mikasa.ai",
+            email="multi@misa.ai",
             username="multi_user",
             providers=["email", "google"],
             avatar_url="https://google.com/avatar.png"
@@ -418,7 +418,7 @@ class TestPhase44AccountUnlinkingAPI(BasePhase44Test):
         token = self.create_jwt(user_id="user-p44-alice")
         req = MockRequest(
             method="POST",
-            headers={"Authorization": f"Bearer {token}", "X-Mikasa-User-Id": "user-p44-bob"},
+            headers={"Authorization": f"Bearer {token}", "X-Misa-User-Id": "user-p44-bob"},
             body={"provider": "google"}
         )
         resp = asyncio.run(handle_account_identities_unlink(req))
@@ -439,7 +439,7 @@ class TestPhase44AccountUnlinkingAPI(BasePhase44Test):
 
     def test_20_unlink_non_linked_google_returns_400(self):
         """Scenario 20: Unlinking Google when it's not linked returns 400."""
-        token = self.create_jwt(user_id="user-p44-emailonly", email="onlyemail@mikasa.ai")
+        token = self.create_jwt(user_id="user-p44-emailonly", email="onlyemail@misa.ai")
         req = MockRequest(
             method="POST",
             headers={"Authorization": f"Bearer {token}"},
@@ -498,7 +498,7 @@ class TestPhase44AccountLinkingInitiate(BasePhase44Test):
         token = self.create_jwt(user_id="user-p44-alice")
         req = MockRequest(
             method="POST",
-            headers={"Authorization": f"Bearer {token}", "X-Mikasa-User-Id": "user-p44-bob"}
+            headers={"Authorization": f"Bearer {token}", "X-Misa-User-Id": "user-p44-bob"}
         )
         resp = asyncio.run(handle_account_identities_link_initiate(req))
         self.assertEqual(resp.status, 403)
@@ -524,7 +524,7 @@ class TestPhase44MergeAndIsolation(BasePhase44Test):
     def test_26_already_linked_error_message_contract(self):
         """Scenario 26: Error format for already linked identity satisfies Uzbek localization."""
         # Verify the contract string is exact
-        expected_msg = "Bu Google hisob allaqachon boshqa Mikasa akkauntiga ulangan."
+        expected_msg = "Bu Google hisob allaqachon boshqa Misa akkauntiga ulangan."
         self.assertIn("allaqachon boshqa", expected_msg)
 
     def test_27_multi_tenant_google_user_device_isolation(self):
@@ -591,7 +591,7 @@ class TestPhase44LiveConfigurationProbe(BasePhase44Test):
         try:
             req = urllib.request.Request(
                 authorize_url,
-                headers={"User-Agent": "Mikasa-AI-Tester/8.0.0"}
+                headers={"User-Agent": "Misa-AI-Tester/8.0.0"}
             )
             with urllib.request.urlopen(req) as resp:
                 # If Google Provider is enabled in Supabase, it redirects to accounts.google.com

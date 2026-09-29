@@ -1,5 +1,5 @@
 # ========== memory_types.py ==========
-# Mikasa AI 7.x — Memory & Context Intelligence Types
+# Misa AI 7.x — Memory & Context Intelligence Types
 # Normalized Memory Item, Categories, Confidence & Active Task Context
 
 import uuid

@@ -12,7 +12,7 @@ from core.v8.events import RemoteEventType
 from agent.audit import AgentAuditLogger
 from agent.transport import SecureTransport
 
-logger = logging.getLogger("mikasa.agent.heartbeat")
+logger = logging.getLogger("misa.agent.heartbeat")
 
 
 class AgentState(str, Enum):

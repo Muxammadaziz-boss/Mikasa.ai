@@ -1,5 +1,5 @@
 // ========== AgentAccessSecuritySection.tsx ==========
-// Mikasa AI v8.0.0 — Phase 47: Full Agent Access & User Consent Security Center
+// Misa AI v9.0.0 — Full Agent Access & User Consent Security Center
 // User-Controlled Agent Authority UI: Device Selection, Warning Modal, Re-Auth, Final Confirmation & Overrides
 
 import React, { useState, useEffect } from "react";

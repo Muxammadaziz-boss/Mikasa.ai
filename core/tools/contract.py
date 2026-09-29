@@ -1,5 +1,5 @@
 # ========== contract.py ==========
-# Mikasa AI 7.x — Tool Contract 2.0 & Normalized Data Structures
+# Misa AI 7.x — Tool Contract 2.0 & Normalized Data Structures
 # Standardized Tool Metadata, Health, Error Codes & ToolResult
 
 import time
@@ -132,7 +132,7 @@ class ToolResult:
 class ToolContract2:
     """
     Tool Contract 2.0.
-    Mikasa AI dagi barcha instrumentlar uchun kengaytirilgan kontrakt.
+    Misa AI dagi barcha instrumentlar uchun kengaytirilgan kontrakt.
     Mavjud `Tool` bilan to'liq orqaga mos.
     """
     name: str

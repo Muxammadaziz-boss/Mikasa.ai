@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # ========== packaging/agent.spec ==========
-# Phase 45 — PyInstaller Specification for Mikasa Windows PC Agent
+# Phase 45 — PyInstaller Specification for Misa Windows PC Agent
 # ZERO SECRETS BUNDLED: No API keys, credentials, or private keys included in binary.
 
 import os
@@ -61,7 +61,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='MikasaAgent',
+    name='MisaAgent',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

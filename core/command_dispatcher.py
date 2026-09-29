@@ -1,5 +1,5 @@
 # ========== command_dispatcher.py ==========
-# Mikasa AI v6.0.0 — Mahalliy va AI Buyruqlarni Taqsimlash Xizmati (Command Dispatcher)
+# Misa AI v6.0.0 — Mahalliy va AI Buyruqlarni Taqsimlash Xizmati (Command Dispatcher)
 # Tezkor mahalliy buyruqlar va murakkab AI topshiriqlarini boshqarish
 
 import os

@@ -64,7 +64,7 @@ AVAILABLE_TEMPLATES = [
         "description": "Windows CLI yoki maxsus Python skriptlarini chaqirish",
         "category": "Tizim",
         "type": "command",
-        "command": "python -c \"print('Mikasa script executed:', '{arg1}')\"",
+        "command": "python -c \"print('Misa script executed:', '{arg1}')\"",
         "parameters": {"arg1": {"type": "string", "description": "Parametr qiymati"}},
         "version": "1.0.0",
         "author": "Misa AI Team",

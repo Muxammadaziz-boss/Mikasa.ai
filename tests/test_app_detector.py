@@ -1,5 +1,5 @@
 # ========== test_app_detector.py ==========
-# Mikasa AI 7.x — WindowsAppDetector va Chuqur Inventarizatsiya Testlari
+# Misa AI 7.x — WindowsAppDetector va Chuqur Inventarizatsiya Testlari
 
 import unittest
 from core.app_detector import WindowsAppDetector, AppInfo, get_app_detector

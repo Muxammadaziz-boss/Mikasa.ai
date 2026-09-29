@@ -1,5 +1,5 @@
 # ========== orchestrator.py ==========
-# Mikasa AI 7.x — Intelligence Orchestrator
+# Misa AI 7.x — Intelligence Orchestrator
 # Central Cognitive Controller: Pipeline Coordinator from Context to Verified Response
 
 import time
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class IntelligenceOrchestrator:
     """
-    Mikasa AI Intelligence Core orkestratori.
+    Misa AI Intelligence Core orkestratori.
     Barcha intellektual bosqichlarni (Kontekst -> Niyat -> Fikrlash -> Qaror -> Vosita -> Tasdiqlash -> Javob)
     birlashtiruvchi markaziy boshqaruvchi.
     """

@@ -1,5 +1,5 @@
 # ========== test_v6_user_account.py ==========
-# Mikasa AI v6.0.0 — User Account Area & Chat Avatar Testlari
+# Misa AI v6.0.0 — User Account Area & Chat Avatar Testlari
 
 import unittest
 import customtkinter as ctk
@@ -152,10 +152,10 @@ class TestCleanShellAndNavigation(unittest.TestCase):
         VectorIconEngine.clear_cache()
 
     def test_clean_shell_minimal_topbar_and_sidebar(self):
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
         from gui.components import WindowControls
 
-        app = MikasaApp(connect_backend=False)
+        app = MisaApp(connect_backend=False)
         app.update()
 
         # 1. Top bar faqat logo va window controls'dan iborat

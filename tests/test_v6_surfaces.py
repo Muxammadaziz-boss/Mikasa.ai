@@ -1,5 +1,5 @@
 # ========== test_v6_surfaces.py ==========
-# Mikasa AI v6.0.0 — Solid/Glass Surface System & Semantic Token Hardening Tests
+# Misa AI v6.0.0 — Solid/Glass Surface System & Semantic Token Hardening Tests
 
 import unittest
 import customtkinter as ctk

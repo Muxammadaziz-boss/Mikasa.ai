@@ -31,7 +31,7 @@ class DeviceCredential:
     Backendda faqat 32-baytlik Ed25519 ommaviy kaliti (public_key) saqlanadi.
     """
     id: str  # UUID
-    user_id: str  # auth.users.id / MikasaUser UUID
+    user_id: str  # auth.users.id / MisaUser UUID
     device_id: str  # Hardware device_id
     public_key: str  # 64-belgili hex satr (32-bayt Ed25519 public key)
     algorithm: str = "ed25519"
@@ -113,7 +113,7 @@ class WindowsCredentialStore(SecureCredentialStore):
             self.base_dir = base_dir
         else:
             appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
-            self.base_dir = os.path.join(appdata, "MikasaAI", "secure_vault")
+            self.base_dir = os.path.join(appdata, "MisaAI", "secure_vault")
         os.makedirs(self.base_dir, exist_ok=True)
         self._is_windows = platform.system().lower() == "windows"
 
@@ -136,7 +136,7 @@ class WindowsCredentialStore(SecureCredentialStore):
         in_blob = DATA_BLOB(cb, buf)
         out_blob = DATA_BLOB()
         if not ctypes.windll.crypt32.CryptProtectData(
-            ctypes.byref(in_blob), 'MikasaDeviceKey', None, None, None, 0, ctypes.byref(out_blob)
+            ctypes.byref(in_blob), 'MisaDeviceKey', None, None, None, 0, ctypes.byref(out_blob)
         ):
             raise ctypes.WinError()
         res = ctypes.string_at(out_blob.pbData, out_blob.cbData)

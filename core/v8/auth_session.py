@@ -245,7 +245,7 @@ class RemoteAuthEngine:
         if env_secret_hash and env_secret_hash.startswith("pbkdf2:"):
             self._password_hash = env_secret_hash
         else:
-            env_pw = os.environ.get("REMOTE_AUTH_PASSWORD") or os.environ.get("ADMIN_PAROL") or default_password or "mikasa2026"
+            env_pw = os.environ.get("REMOTE_AUTH_PASSWORD") or os.environ.get("ADMIN_PAROL") or default_password or "misa2026"
             self.set_password(env_pw)
 
         env_pin = os.environ.get("REMOTE_AUTH_PIN") or default_pin or "1234"

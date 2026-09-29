@@ -1,5 +1,5 @@
 # ========== test_v6_icon_engine.py ==========
-# Mikasa AI v6.0.0 — Vector Icon Engine Professional Quality & Visual QA Tests
+# Misa AI v6.0.0 — Vector Icon Engine Professional Quality & Visual QA Tests
 
 import os
 import unittest
@@ -151,7 +151,7 @@ class TestVectorIconEngine(unittest.TestCase):
         draw = ImageDraw.Draw(sheet)
 
         # Draw Title
-        draw.text((20, 14), "MIKASA AI — VECTOR ICON SYSTEM (CANONICAL 26)", fill="#F8FAFC")
+        draw.text((20, 14), "MISA AI — VECTOR ICON SYSTEM (CANONICAL 26)", fill="#F8FAFC")
         draw.text((20, 34), "Left: Dark Theme (#F8FAFC on #1E293B) | Right: Light Theme (#0F172A on #F1F5F9)", fill="#94A3B8")
 
         y = header_h

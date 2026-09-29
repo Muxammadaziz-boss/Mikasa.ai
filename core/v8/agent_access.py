@@ -1,5 +1,5 @@
 # ========== core/v8/agent_access.py ==========
-# Mikasa AI v8.0.0 — Phase 47: Full Agent Access & User Consent
+# Misa AI v8.0.0 — Phase 47: Full Agent Access & User Consent
 # Device-scoped full agent authority model with 4-step activation flow
 # WARNING ⇒ ACKNOWLEDGE ⇒ RE-AUTH ⇒ CONFIRM pipeline
 #
@@ -32,7 +32,7 @@ DEFAULT_POLICY_VERSION = "1.0.0"
 FULL_ACCESS_SECURITY_WARNING_TEXT = """
 ⚠️ TO'LIQ AGENT VAKOLATI (FULL AGENT ACCESS) OGOHLANTIRISHI ⚠️
 
-Siz Mikasa AI agentiga ushbu qurilma (device) uchun TO'LIQ VAKOLAT bermoqchisiz.
+Siz Misa AI agentiga ushbu qurilma (device) uchun TO'LIQ VAKOLAT bermoqchisiz.
 Bu degani agent quyidagilarni SIZNING TASDIQINGIZSIZ bajara oladi:
 
 • Fayllarni o'qish, yozish va o'chirish

@@ -4,7 +4,7 @@
 # Application Profiles: public.profiles (1:1 with auth.users.id UUID)
 # Production JWT Verification: JWKS caching (RS256/ES256) + strict HMAC fallback (HS256)
 # Strict Separation: Supabase Auth Session vs RemoteAuthSession (PC Agent control)
-# Zero Backend Password Storage: Mikasa never receives or stores passwords.
+# Zero Backend Password Storage: Misa never receives or stores passwords.
 
 import os
 import time
@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Tuple, List
 
 from core.v8.events import RemoteAuditLogger
-from core.v8.account_device import MikasaUser, Device, AccountDeviceManager
+from core.v8.account_device import MisaUser, Device, AccountDeviceManager
 
 logger = logging.getLogger("core.v8.account_auth")
 
@@ -247,7 +247,7 @@ class SupabaseJWKSClient:
         try:
             req = urllib.request.Request(
                 jwks_url,
-                headers={"User-Agent": "Mikasa-AI-Auth/8.0.0", "Accept": "application/json"}
+                headers={"User-Agent": "Misa-AI-Auth/8.0.0", "Accept": "application/json"}
             )
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 if resp.status == 200:
@@ -291,9 +291,9 @@ class SupabaseJWKSClient:
 
 class SupabaseAuthManager:
     """
-    Mikasa AI Supabase Auth integratsiya va JWT verifikatsiya dvigateli.
+    Misa AI Supabase Auth integratsiya va JWT verifikatsiya dvigateli.
     Supabase auth.users.id ni asosiy identity sifatida tekshiradi va
-    Mikasa public.profiles bilan 1:1 bog'laydi.
+    Misa public.profiles bilan 1:1 bog'laydi.
     """
     _default_instance: Optional["SupabaseAuthManager"] = None
     _instance: Optional["SupabaseAuthManager"] = None
@@ -575,9 +575,9 @@ class SupabaseAuthManager:
     # B. AUTHENTICATION & PROFILE RESOLUTION
     # ========================================================
 
-    def authenticate_token(self, token: str) -> Tuple[Optional[SupabaseSessionClaims], Optional[MikasaUser]]:
+    def authenticate_token(self, token: str) -> Tuple[Optional[SupabaseSessionClaims], Optional[MisaUser]]:
         """
-        Tokenni tekshirish va unga mos MikasaProfile (public.profiles) ni olish.
+        Tokenni tekshirish va unga mos MisaProfile (public.profiles) ni olish.
         Qaytaradi: (claims, profile) yoki (None, None).
         """
         ok, msg, claims = self.verify_supabase_jwt(token)
@@ -585,7 +585,7 @@ class SupabaseAuthManager:
             logger.debug(f"[SupabaseAuth] Token verifikatsiyasi muvaffaqiyatsiz: {msg}")
             return None, None
 
-        # Supabase auth.users -> Mikasa public.profiles avtomatik sinxronizatsiyasi
+        # Supabase auth.users -> Misa public.profiles avtomatik sinxronizatsiyasi
         profile = self.account_device_mgr.upsert_profile_from_supabase(
             user_id=claims.user_id,
             email=claims.email,
@@ -670,7 +670,7 @@ class SupabaseAuthManager:
     # D. MULTI-TENANT ISOLATION HELPERS
     # ========================================================
 
-    def get_user_profile(self, user_id: str) -> Optional[MikasaUser]:
+    def get_user_profile(self, user_id: str) -> Optional[MisaUser]:
         """Foydalanuvchi profilini Supabase UUID orqali olish"""
         return self.account_device_mgr.get_user(user_id)
 

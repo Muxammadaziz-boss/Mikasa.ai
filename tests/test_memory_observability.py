@@ -1,5 +1,5 @@
 # ========== test_memory_observability.py ==========
-# Mikasa AI 7.x — Phase 30: Context Observability & Memory Telemetry Unit Tests
+# Misa AI 7.x — Phase 30: Context Observability & Memory Telemetry Unit Tests
 # Comprehensive test cases covering retrieve_with_explanation, ContextTrace ring buffer,
 # Sensitive data redaction, MemoryMetrics telemetry, and Orchestrator integration.
 
@@ -89,13 +89,13 @@ class TestMemoryObservability(unittest.TestCase):
         item = MemoryItem(
             id="m_pinned",
             key="loyiha",
-            content="Mikasa AI desktop ilovasi",
+            content="Misa AI desktop ilovasi",
             importance=0.9,
             pinned=True,
         )
 
         items, explanations = MemoryRetriever.retrieve_with_explanation(
-            query="Mikasa loyihasi bo'yicha",
+            query="Misa loyihasi bo'yicha",
             items=[item],
             limit=1,
             task_entities=["desktop"],
@@ -105,7 +105,7 @@ class TestMemoryObservability(unittest.TestCase):
         det = explanations[0]["details"]
         self.assertTrue(det["pinned"])
         self.assertGreater(det["task_bonus"], 0.0)
-        self.assertIn("mikasa", det["matched_terms"])
+        self.assertIn("misa", det["matched_terms"])
         self.assertIn("qadalgan", explanations[0]["reason"].lower())
 
     # 3. Uzbek explanation string includes rationale

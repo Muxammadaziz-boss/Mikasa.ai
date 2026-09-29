@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase36.py ==========
-# Phase 36 — Mikasa AI v8.0.0 Remote PC Control Integration Test Suite
+# Phase 36 — Misa AI v8.0.0 Remote PC Control Integration Test Suite
 # Exactly 40 comprehensive tests covering:
 # Device (1-5), Heartbeat (6-10), WoL (11-15), Security (16-22),
 # Agent (23-27), Remote Pipeline (28-33), Confirmation (34-36), Telegram (37-40)
@@ -28,7 +28,7 @@ from core.v8 import (  # noqa: E402
     create_magic_packet,
     WakeRelay,
     EnvelopeManager,
-    MikasaPCAgent,
+    MisaPCAgent,
     TelegramRemoteGateway,
     MockTelegramTransport,
     RemoteOrchestrator
@@ -54,12 +54,12 @@ class MockWakeRelay(WakeRelay):
 
 class TestV8Phase36(unittest.TestCase):
     """
-    Phase 36: Real Telegram ↔ Mikasa ↔ Windows PC Agent Integration
+    Phase 36: Real Telegram ↔ Misa ↔ Windows PC Agent Integration
     40 ta talab bo'yicha to'liq test to'plami.
     """
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_v8_test_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_v8_test_")
         self.registry_path = os.path.join(self.test_dir, "devices.json")
         self.registry = DeviceRegistry(storage_path=self.registry_path)
         self.admin_id = "123456789"
@@ -87,7 +87,7 @@ class TestV8Phase36(unittest.TestCase):
         self.assertTrue(ident.device_id)
         self.assertTrue(ident.hostname)
         self.assertEqual(ident.agent_version, "8.0.0")
-        self.assertEqual(ident.mikasa_version, "8.0.0")
+        self.assertEqual(ident.misa_version, "8.0.0")
         self.assertTrue(ident.fingerprint)
         d = ident.to_dict()
         restored = DeviceIdentity.from_dict(d)
@@ -210,7 +210,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_09_reconnect(self):
         """9. Tarmoq uzilishidan so'ng agentning avtomatik qayta ulanishi (reconnect)"""
         async def _run():
-            agent = MikasaPCAgent(heartbeat_manager=self.heartbeat_mgr)
+            agent = MisaPCAgent(heartbeat_manager=self.heartbeat_mgr)
             await agent.register()
             self.assertTrue(agent.is_running)
 
@@ -385,7 +385,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_23_connect(self):
         """23. Agentning ishga tushishi, ro'yxatdan o'tishi va ONLINE bo'lishi"""
         async def _run():
-            agent = MikasaPCAgent(heartbeat_manager=self.heartbeat_mgr)
+            agent = MisaPCAgent(heartbeat_manager=self.heartbeat_mgr)
             res = await agent.register()
             self.assertTrue(res)
             self.assertEqual(agent.agent_state, "ONLINE")
@@ -396,7 +396,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_24_disconnect(self):
         """24. Agentning xavfsiz to'xtatilishi va OFFLINE holatiga o'tishi"""
         async def _run():
-            agent = MikasaPCAgent(heartbeat_manager=self.heartbeat_mgr)
+            agent = MisaPCAgent(heartbeat_manager=self.heartbeat_mgr)
             await agent.register()
             await agent.disconnect()
             self.assertEqual(agent.agent_state, "OFFLINE")
@@ -407,7 +407,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_25_reconnect(self):
         """25. Tarmoq tiklangach agentning qayta ulanishi va backoff tiklanishi"""
         async def _run():
-            agent = MikasaPCAgent(heartbeat_manager=self.heartbeat_mgr)
+            agent = MisaPCAgent(heartbeat_manager=self.heartbeat_mgr)
             agent._backoff = 8.0
             await agent.reconnect()
             self.assertEqual(agent._backoff, 1.0)
@@ -418,7 +418,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_26_command_receive(self):
         """26. Agent tomonidan xavfsiz buyruqning qabul qilinishi va bajarilishi"""
         async def _run():
-            agent = MikasaPCAgent(envelope_manager=self.envelope_mgr)
+            agent = MisaPCAgent(envelope_manager=self.envelope_mgr)
             await agent.register()
 
             env = self.envelope_mgr.create_envelope(
@@ -435,7 +435,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_27_command_result(self):
         """27. Buyruq natijasi formati va maxfiy ma'lumotlar oshkor bo'lmasligi"""
         async def _run():
-            agent = MikasaPCAgent(envelope_manager=self.envelope_mgr)
+            agent = MisaPCAgent(envelope_manager=self.envelope_mgr)
             await agent.register()
 
             env = self.envelope_mgr.create_envelope(
@@ -588,7 +588,7 @@ class TestV8Phase36(unittest.TestCase):
     def test_33_complete_task(self):
         """33. Kompyuter online bo'lgach asbob (calculator) orqali to'liq topshiriq bajarilishi"""
         async def _run():
-            agent = MikasaPCAgent(envelope_manager=self.envelope_mgr)
+            agent = MisaPCAgent(envelope_manager=self.envelope_mgr)
             await agent.register()
 
             env = self.envelope_mgr.create_envelope(
@@ -681,11 +681,11 @@ class TestV8Phase36(unittest.TestCase):
         self.assertEqual(self.gateway.parse_command("/pc")["action"], "status")
         self.assertEqual(self.gateway.parse_command("/status")["action"], "status")
         self.assertEqual(self.gateway.parse_command("🟢 PC Status")["action"], "status")
-        self.assertEqual(self.gateway.parse_command("Mikasa, kompyuterim yoqilganmi?")["action"], "status")
+        self.assertEqual(self.gateway.parse_command("Misa, kompyuterim yoqilganmi?")["action"], "status")
 
         self.assertEqual(self.gateway.parse_command("/wake")["action"], "wake")
         self.assertEqual(self.gateway.parse_command("⚡ Wake PC")["action"], "wake")
-        self.assertEqual(self.gateway.parse_command("Mikasa, kompyuterni yoq")["action"], "wake")
+        self.assertEqual(self.gateway.parse_command("Misa, kompyuterni yoq")["action"], "wake")
 
         self.assertEqual(self.gateway.parse_command("/restart")["action"], "restart")
         self.assertTrue(self.gateway.parse_command("/restart")["high_risk"])
@@ -749,7 +749,7 @@ class TestV8Phase36(unittest.TestCase):
             self.heartbeat_mgr.register_device(dev_id, initial_state=DeviceState.OFFLINE)
             self.assertFalse(self.heartbeat_mgr.is_online(dev_id))
 
-            # 2. Telegram foydalanuvchi "Mikasa, kompyuterni yoq" deb yozadi
+            # 2. Telegram foydalanuvchi "Misa, kompyuterni yoq" deb yozadi
             async def _wake_pc_agent():
                 await asyncio.sleep(0.1)
                 await orch.pc_agent.send_heartbeat()
@@ -759,7 +759,7 @@ class TestV8Phase36(unittest.TestCase):
             res = await orch.handle_message(
                 chat_id=500,
                 user_id=self.admin_id,
-                text="Mikasa, kompyuterni yoq"
+                text="Misa, kompyuterni yoq"
             )
             self.assertTrue(res.get("success"))
             self.assertEqual(res.get("state"), "online")

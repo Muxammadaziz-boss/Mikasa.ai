@@ -37,7 +37,7 @@ from core.v8 import (  # noqa: E402
     WakeOnLanManager,
     WakeRelay,
     EnvelopeManager,
-    MikasaPCAgent,
+    MisaPCAgent,
     TelegramRemoteGateway,
     MockTelegramTransport,
     RemoteOrchestrator,
@@ -70,7 +70,7 @@ class TestV8Phase37(unittest.TestCase):
     """
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_v8_p37_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_v8_p37_")
         self.registry_path = os.path.join(self.test_dir, "devices.json")
         self.registry = DeviceRegistry(storage_path=self.registry_path)
 
@@ -111,7 +111,7 @@ class TestV8Phase37(unittest.TestCase):
             mac_address=self.target_mac
         )
 
-        self.pc_agent = MikasaPCAgent(
+        self.pc_agent = MisaPCAgent(
             identity=self.target_device,
             envelope_manager=self.envelope_mgr,
             heartbeat_interval=0.1

@@ -17,7 +17,7 @@ from core.v8.device_enrollment import (
 )
 from core.v8.device_auth import DeviceAuthManager
 
-logger = logging.getLogger("mikasa.agent.crypto")
+logger = logging.getLogger("misa.agent.crypto")
 
 
 class AgentCrypto:

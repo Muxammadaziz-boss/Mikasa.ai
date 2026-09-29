@@ -33,7 +33,7 @@ class DeviceIdentity:
     local_ip: str = "127.0.0.1"
     fingerprint: str = ""
     agent_version: str = "8.0.0"
-    mikasa_version: str = "8.0.0"
+    misa_version: str = "8.0.0"
     last_seen: Optional[str] = None
     status: DeviceState = DeviceState.OFFLINE
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -68,7 +68,7 @@ class DeviceIdentity:
         valid_fields = {
             "device_id", "hostname", "username", "os_name", "os_version",
             "os_release", "architecture", "mac_address", "local_ip",
-            "fingerprint", "agent_version", "mikasa_version", "last_seen",
+            "fingerprint", "agent_version", "misa_version", "last_seen",
             "status", "metadata"
         }
         filtered = {k: v for k, v in data.items() if k in valid_fields}
@@ -136,7 +136,7 @@ class DeviceIdentityManager:
             local_ip=cls.get_local_ip(),
             fingerprint=fingerprint,
             agent_version="8.0.0",
-            mikasa_version="8.0.0",
+            misa_version="8.0.0",
             status=DeviceState.ONLINE
         )
 

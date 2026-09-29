@@ -1,5 +1,5 @@
 // ========== CommandsPage.tsx ==========
-// Mikasa AI 8.0.0 — Tizim va Avtomatlashtirish Buyruqlari Markazi
+// Misa AI v9.0.0 — Tizim va Avtomatlashtirish Buyruqlari Markazi
 // Real ToolRegistry vositalari (29 tool) va tezkor tizim buyruqlari integratsiyasi
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";

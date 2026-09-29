@@ -56,7 +56,7 @@ class Config:
             "logging": {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                "file_name": "mikasa.log",
+                "file_name": "misa.log",
                 "max_file_size": 10 * 1024 * 1024,  # 10MB
                 "backup_count": 5,
             },
@@ -158,7 +158,7 @@ class Config:
             except ImportError:
                 sens_filter = None
 
-            log_file = self.logs_dir / log_config.get("file_name", "mikasa.log")
+            log_file = self.logs_dir / log_config.get("file_name", "misa.log")
             formatter = logging.Formatter(log_config.get("format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 
             from logging.handlers import RotatingFileHandler

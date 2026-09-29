@@ -1,5 +1,5 @@
 // ========== ErrorBoundary.tsx ==========
-// Mikasa AI 7.x — Global React Error Boundary [Phase 21]
+// Misa AI v9.0.0 — Global React Error Boundary
 // Catches unhandled React rendering errors with structured 3-part messages
 
 import React, { Component, ErrorInfo } from "react";
@@ -8,6 +8,7 @@ import { RefreshIcon } from "./icons/Icons";
 interface Props {
   children: React.ReactNode;
   fallbackNavigate?: () => void;
+  onReset?: () => void;
 }
 
 interface State {
@@ -31,11 +32,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("[Mikasa ErrorBoundary]", error, errorInfo);
+    console.error("[Misa ErrorBoundary]", error, errorInfo);
   }
 
   handleRetry = () => {
     this.setState({ hasError: false, errorMessage: "", errorStack: "" });
+    this.props.onReset?.();
   };
 
   render() {

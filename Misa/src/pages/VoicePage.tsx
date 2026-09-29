@@ -1,9 +1,9 @@
 // ========== VoicePage.tsx ==========
-// Mikasa AI 7.0 — Ovozli Muloqot Sahifasi
-// Markaziy interaktiv MikasaOrb va real vaqtli STT/TTS ovoz boshqaruvi
+// Misa AI v9.0 — To'liq Ekranli Ovozli Muloqot Sahifasi
+// Markaziy interaktiv MisaAperture va real vaqtli STT/TTS ovoz boshqaruvi
 
 import React, { useState, useEffect } from "react";
-import { MikasaOrb } from "../components/MikasaOrb";
+import { MisaAperture } from "../components/MisaAperture";
 import {
   MicIcon,
   HomeIcon,
@@ -87,14 +87,14 @@ export const VoicePage: React.FC<VoicePageProps> = ({
       case "speaking":
         return "Misa gapirmoqda...";
       case "offline":
-        return "Ovoz tizimi hozirda mavjud emas. Backend serveriga ulanishda muammo. Qayta ulanish kutilmoqda...";
+        return "Ovoz tizimi hozirda mavjud emas. Backend serveriga ulanish kutilmoqda...";
       case "loading":
         return "Audio tizimiga ulanilmoqda...";
       case "error":
         return "Ovoz tizimida xatolik yuz berdi. Mikrofon ruxsatini tekshiring yoki qayta urinib ko'ring.";
       case "idle":
       default:
-        return "Muloqotni boshlash uchun tugmani bosing";
+        return "Muloqotni boshlash uchun optik linzani yoki pastdagi tugmani bosing";
     }
   };
 
@@ -106,21 +106,23 @@ export const VoicePage: React.FC<VoicePageProps> = ({
         flexDirection: "column",
         height: "100%",
         width: "100%",
+        maxWidth: "1320px",
+        margin: "0 auto",
+        padding: "12px 24px 28px 24px",
         position: "relative",
-        zIndex: 2,
+        zIndex: 5,
         overflow: "hidden",
       }}
     >
       {/* 1. Header */}
       <div
+        className="misa-glass-card"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 24px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          backgroundColor: "rgba(8, 12, 20, 0.65)",
-          backdropFilter: "blur(20px)",
+          padding: "12px 20px",
+          borderRadius: "20px",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -131,11 +133,11 @@ export const VoicePage: React.FC<VoicePageProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "32px",
-              height: "32px",
+              width: "34px",
+              height: "34px",
               borderRadius: "10px",
-              backgroundColor: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               color: "var(--text-secondary)",
               cursor: "pointer",
             }}
@@ -143,37 +145,38 @@ export const VoicePage: React.FC<VoicePageProps> = ({
             <HomeIcon size={16} />
           </button>
           <div>
-            <span style={{ fontSize: "15px", fontWeight: 700, color: "#FFFFFF" }}>
-              Ovozli muloqot
+            <span style={{ fontFamily: "var(--font-display)", fontSize: "15px", fontWeight: 700, color: "#FFFFFF" }}>
+              Misa Ovozli Muloqot Markazi
             </span>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-              {backendStatus.status === "online" ? "Python Audio Service Faol" : "Backendga ulanilmoqda..."}
+            <div style={{ fontSize: "11px", color: backendStatus.status === "online" ? "#4EDEA3" : "var(--text-muted)" }}>
+              {backendStatus.status === "online" ? "● Neural Audio Service Faol" : "Backendga ulanilmoqda..."}
             </div>
           </div>
         </div>
 
         <button
           onClick={onNavigateChat}
-          title="Matnli chatga o‘tish"
+          title="Matnli chatga o'tish"
           style={{
             display: "flex",
             alignItems: "center",
             gap: "6px",
-            padding: "6px 14px",
-            borderRadius: "10px",
-            backgroundColor: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            color: "var(--text-secondary)",
+            padding: "7px 14px",
+            borderRadius: "999px",
+            background: "rgba(147, 3, 197, 0.18)",
+            border: "1px solid rgba(192, 76, 253, 0.35)",
+            color: "#E8B3FF",
             fontSize: "12px",
+            fontWeight: 600,
             cursor: "pointer",
           }}
         >
-          <ChatIcon size={14} />
+          <ChatIcon size={14} color="#E8B3FF" />
           <span>Matnli suhbat</span>
         </button>
       </div>
 
-      {/* 2. Markaziy yirik Orb va Ovoz holati */}
+      {/* 2. Center Optical AI Aperture & Voice Controls */}
       <div
         style={{
           flex: 1,
@@ -182,34 +185,49 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           alignItems: "center",
           justifyContent: "center",
           padding: "32px",
-          gap: "24px",
+          gap: "26px",
           textAlign: "center",
           overflowY: "auto",
         }}
       >
-        <div
+        <MisaAperture
+          width="380px"
+          height="180px"
+          state={effectiveOrbState}
+          showStatusPill={true}
           onClick={handleToggleVoice}
-          style={{
-            cursor: "pointer",
-            transition: "transform 0.2s ease",
-            transform: voiceState === "listening" || voiceState === "speaking" ? "scale(1.05)" : "scale(1)",
-          }}
-          title={voiceState === "listening" ? "Tinglashni to'xtatish" : "Tinglashni boshlash"}
-        >
-          <MikasaOrb size={200} state={effectiveOrbState} />
-        </div>
+        />
 
         <div>
           <h2
-            className="text-metallic-gradient"
-            style={{ fontSize: "28px", fontWeight: 700, margin: "0 0 8px 0" }}
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "28px",
+              fontWeight: 700,
+              color: "#F5F0FF",
+              margin: "0 0 8px 0",
+            }}
           >
-            Salom, {userName || backendStatus.user || "Ustoz"}
+            Salom,{" "}
+            <span
+              style={{
+                background: "linear-gradient(90deg, #E8B3FF 0%, #C04CFD 55%, #9303C5 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              {userName || backendStatus.user || "Ustoz"}
+            </span>
           </h2>
           <p
             style={{
               fontSize: "15px",
-              color: voiceState === "listening" ? "var(--primary-glow)" : voiceState === "speaking" ? "#10B981" : "var(--text-secondary)",
+              color:
+                voiceState === "listening"
+                  ? "#4EDEA3"
+                  : voiceState === "speaking"
+                  ? "#E8B3FF"
+                  : "var(--text-secondary)",
               fontWeight: 500,
               margin: 0,
               transition: "color 0.2s ease",
@@ -219,68 +237,93 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           </p>
         </div>
 
-        {/* Foydalanuvchi aytgan so'z */}
+        {/* User spoken transcript */}
         {userTranscript && (
           <div
+            className="misa-glass-card"
             style={{
-              maxWidth: "520px",
+              maxWidth: "540px",
               width: "100%",
-              padding: "10px 16px",
-              borderRadius: "14px",
-              backgroundColor: "rgba(2, 132, 199, 0.15)",
-              border: "1px solid rgba(56, 189, 248, 0.3)",
+              padding: "12px 18px",
+              borderRadius: "16px",
+              border: "1px solid rgba(192, 76, 253, 0.38)",
               color: "#FFFFFF",
               fontSize: "13.5px",
               textAlign: "left",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600, marginBottom: "4px" }}>
-              <UserIcon size={13} color="var(--primary-glow)" />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11px",
+                color: "#E8B3FF",
+                fontWeight: 600,
+                marginBottom: "4px",
+              }}
+            >
+              <UserIcon size={13} color="#E8B3FF" />
               <span>Siz aytgan buyruq:</span>
             </div>
             {userTranscript}
           </div>
         )}
 
-        {/* So'nggi javob / transkript kartochkasi */}
+        {/* Misa Voice Response Card */}
         {lastTranscript && (
           <div
+            className="misa-ultra-glass"
             style={{
-              maxWidth: "520px",
+              maxWidth: "540px",
               width: "100%",
-              padding: "14px 18px",
-              borderRadius: "16px",
-              backgroundColor: "rgba(12, 18, 30, 0.72)",
-              backdropFilter: "blur(24px)",
-              border: "1px solid rgba(56, 189, 248, 0.25)",
+              padding: "16px 20px",
+              borderRadius: "18px",
               color: "#FFFFFF",
               fontSize: "13.5px",
-              lineHeight: 1.5,
+              lineHeight: 1.55,
               textAlign: "left",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "var(--primary-glow)", fontWeight: 600 }}>
-                <SparklesIcon size={13} color="var(--primary-glow)" />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "6px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "11.5px",
+                  color: "#E8B3FF",
+                  fontWeight: 700,
+                }}
+              >
+                <SparklesIcon size={13} color="#C04CFD" />
                 <span>Misa javobi:</span>
               </div>
               <button
                 onClick={handleReplayVoice}
                 title="Ovozni qayta tinglash"
                 style={{
-                  background: "rgba(255, 255, 255, 0.08)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: "6px",
-                  padding: "3px 8px",
-                  color: "#38BDF8",
+                  background: "rgba(147, 3, 197, 0.2)",
+                  border: "1px solid rgba(192, 76, 253, 0.35)",
+                  borderRadius: "999px",
+                  padding: "4px 10px",
+                  color: "#E8B3FF",
                   fontSize: "11px",
+                  fontWeight: 600,
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: "5px",
                 }}
               >
-                <RefreshIcon size={12} color="#38BDF8" />
+                <RefreshIcon size={12} color="#E8B3FF" />
                 <span>Qayta eshitish</span>
               </button>
             </div>
@@ -288,40 +331,38 @@ export const VoicePage: React.FC<VoicePageProps> = ({
           </div>
         )}
 
-        {/* Asosiy Ovoz Boshqaruv Tugmasi */}
+        {/* Main Voice Toggle Button */}
         <button
           onClick={handleToggleVoice}
+          className={voiceState === "listening" ? "" : "misa-btn-violet"}
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "12px",
             padding: "14px 36px",
-            borderRadius: "var(--radius-pill)",
+            borderRadius: "9999px",
             background:
               voiceState === "listening"
                 ? "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)"
-                : "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+                : undefined,
             border:
               voiceState === "listening"
                 ? "1px solid rgba(239, 68, 68, 0.55)"
-                : "1px solid rgba(56, 189, 248, 0.45)",
+                : undefined,
             boxShadow:
               voiceState === "listening"
                 ? "0 6px 28px rgba(239, 68, 68, 0.45)"
-                : "0 6px 28px rgba(2, 132, 199, 0.45)",
+                : undefined,
             color: "#FFFFFF",
-            fontSize: "15px",
+            fontSize: "14.5px",
             fontWeight: 600,
             cursor: "pointer",
-            transition: "all 0.15s ease",
-            marginTop: "12px",
+            marginTop: "8px",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
         >
           <MicIcon size={18} color="#FFFFFF" />
-          <span>{voiceState === "listening" ? "Tinglashni to‘xtatish" : "Tinglashni boshlash"}</span>
+          <span>{voiceState === "listening" ? "Tinglashni to'xtatish" : "Tinglashni boshlash"}</span>
         </button>
       </div>
     </div>

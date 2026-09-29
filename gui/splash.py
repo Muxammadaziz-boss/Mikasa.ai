@@ -1,5 +1,5 @@
 # ========== gui/splash.py ==========
-# Mikasa AI 7.0 — Premium Futuristic Desktop Splash Screen
+# Misa AI 7.0 — Premium Futuristic Desktop Splash Screen
 # Ultra-clean, dark, calm, intelligent startup interface
 
 import math
@@ -7,14 +7,14 @@ import logging
 import tkinter as tk
 import customtkinter as ctk
 from gui.theme import Colors, Fonts, Sizing
-from gui.orb import MikasaOrb
+from gui.orb import MisaOrb
 
 logger = logging.getLogger(__name__)
 
 
-class MikasaLoadingBar(ctk.CTkFrame):
+class MisaLoadingBar(ctk.CTkFrame):
     """
-    Mikasa 7.0 Sokin Progress Indikatori (180x2px).
+    Misa 7.0 Sokin Progress Indikatori (180x2px).
     Soxta foizlarsiz, sokin elektr-ko'k / sian nurli skaner-indikator.
     """
 
@@ -130,9 +130,9 @@ class MikasaLoadingBar(ctk.CTkFrame):
         super().destroy()
 
 
-class MikasaSplashScreen(ctk.CTkFrame):
+class MisaSplashScreen(ctk.CTkFrame):
     """
-    Mikasa AI 7.0 Splash Screen.
+    Misa AI 7.0 Splash Screen.
     To'liq oynani qamrab oluvchi, yuqori darajadagi minimal, sokin va intellektual startap qatlami.
     """
 
@@ -202,8 +202,8 @@ class MikasaSplashScreen(ctk.CTkFrame):
         self.inner_box = ctk.CTkFrame(self.center_container, fg_color="transparent")
         self.inner_box.place(relx=0.5, rely=0.48, anchor="center")
 
-        # 1. Mikasa AI Orb (Markaziy dominant intellekt yadrosi)
-        self.orb = MikasaOrb(
+        # 1. Misa AI Orb (Markaziy dominant intellekt yadrosi)
+        self.orb = MisaOrb(
             self.inner_box,
             size=210,
             state="loading",
@@ -211,7 +211,7 @@ class MikasaSplashScreen(ctk.CTkFrame):
         )
         self.orb.pack(pady=(0, 24))
 
-        # 2. MIKASA AI Brending
+        # 2. MISA AI Brending
         self.brand_title = ctk.CTkLabel(
             self.inner_box,
             text="MISA AI",
@@ -230,7 +230,7 @@ class MikasaSplashScreen(ctk.CTkFrame):
         self.subtitle.pack(pady=(0, 28))
 
         # 4. Sokin Progress Indikatori (180px x 2px)
-        self.progress_bar = MikasaLoadingBar(
+        self.progress_bar = MisaLoadingBar(
             self.inner_box,
             width=190,
             height=2,

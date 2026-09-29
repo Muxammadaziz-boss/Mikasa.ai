@@ -94,7 +94,7 @@ class Sandbox:
             os.makedirs(self.workspace_dir, exist_ok=True)
         except Exception as e:
             logger.warning(f"Workspace yaratish xatolik: {e}")
-            self.workspace_dir = tempfile.mkdtemp(prefix="mikasa_sandbox_")
+            self.workspace_dir = tempfile.mkdtemp(prefix="misa_sandbox_")
 
     def validate_code(self, code: str) -> Tuple[bool, Optional[str]]:
         """

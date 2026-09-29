@@ -1,6 +1,6 @@
 // ========== DeviceSelector.tsx ==========
-// Mikasa AI v8.0.0 — Phase 40: Multi-Device Selector Dropdown
-// Quick device switching and status indicator for header/navigation
+// Misa AI v9.0.0 - Multi-Device Selector Dropdown
+// Bioluminescent Void dizayn tizimiga mos — inline styles (Tailwind yo'q)
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { backendService, UserDevice } from "../services/backendService";
@@ -8,13 +8,26 @@ import { LaptopIcon, CheckIcon, ExternalLinkIcon } from "./icons/Icons";
 
 interface DeviceSelectorProps {
   onNavigateToDevices?: () => void;
+  onManageDevices?: () => void;
   className?: string;
 }
 
+const getStatusColor = (status: string): string => {
+  switch (status?.toLowerCase()) {
+    case "online":
+      return "#4EDEA3";
+    case "standby":
+      return "#F59E0B";
+    default:
+      return "#6B7280";
+  }
+};
+
 export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   onNavigateToDevices,
-  className = "",
+  onManageDevices,
 }) => {
+  const handleNavigate = onNavigateToDevices || onManageDevices;
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -36,7 +49,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   useEffect(() => {
     fetchDevices();
 
-    // WebSocket tinglovchisi orqali real-time sinxronlash
     const unsubscribe = backendService.subscribe((msg: any) => {
       if (
         msg.type === "DEVICE_SELECTED" ||
@@ -89,63 +101,147 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
     (d) => d.device_id === selectedDeviceId || d.id === selectedDeviceId
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "online":
-        return "bg-emerald-500 shadow-emerald-500/50";
-      case "standby":
-        return "bg-amber-500 shadow-amber-500/50";
-      default:
-        return "bg-neutral-500 shadow-neutral-500/50";
-    }
-  };
-
   return (
-    <div ref={dropdownRef} className={`relative inline-block text-left ${className}`}>
+    <div ref={dropdownRef} style={{ position: "relative", display: "inline-block" }}>
+      {/* ── Trigger tugmasi ── */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-700/60 text-xs font-medium text-neutral-200 transition-all duration-150 backdrop-blur-md focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
         title="Faol kompyuterni tanlash"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "7px",
+          padding: "5px 11px",
+          borderRadius: "9999px",
+          background: isOpen ? "rgba(147, 3, 197, 0.14)" : "rgba(255, 255, 255, 0.035)",
+          border: isOpen
+            ? "1px solid rgba(192, 76, 253, 0.35)"
+            : "1px solid rgba(255, 255, 255, 0.08)",
+          color: "var(--text-secondary)",
+          fontSize: "12px",
+          fontWeight: 500,
+          cursor: loading ? "wait" : "pointer",
+          transition: "all 0.2s ease",
+          backdropFilter: "blur(12px)",
+          opacity: loading ? 0.6 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!isOpen) {
+            e.currentTarget.style.background = "rgba(147, 3, 197, 0.14)";
+            e.currentTarget.style.borderColor = "rgba(192, 76, 253, 0.35)";
+            e.currentTarget.style.color = "#FFFFFF";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isOpen) {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.035)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }
+        }}
       >
-        <LaptopIcon size={14} className="text-emerald-400" />
-        <span className="max-w-[120px] truncate font-medium">
-          {selectedDevice ? selectedDevice.name : "Kompyuter tanlang"}
+        <LaptopIcon size={13} color="#4EDEA3" />
+        <span
+          style={{
+            maxWidth: "110px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 500,
+          }}
+        >
+          {selectedDevice ? selectedDevice.name : "Kompyuter"}
         </span>
         {selectedDevice && (
           <span
-            className={`w-2 h-2 rounded-full shadow-sm ${getStatusColor(
-              selectedDevice.status
-            )}`}
+            style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              backgroundColor: getStatusColor(selectedDevice.status),
+              boxShadow: `0 0 6px ${getStatusColor(selectedDevice.status)}80`,
+              flexShrink: 0,
+            }}
           />
         )}
         <svg
-          className={`w-3.5 h-3.5 text-neutral-400 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
+          width="11"
+          height="11"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          style={{
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s ease",
+            opacity: 0.6,
+          }}
         >
-          <path
-            fillRule="evenodd"
-            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
+          <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
+      {/* ── Dropdown menu ── */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 rounded-xl bg-neutral-900/95 border border-neutral-800 shadow-2xl backdrop-blur-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-2 border-b border-neutral-800/80 bg-neutral-950/40">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        <div
+          className="misa-ultra-glass"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 10px)",
+            right: 0,
+            width: "260px",
+            borderRadius: "18px",
+            background: "rgba(15, 11, 26, 0.94)",
+            backdropFilter: "blur(28px)",
+            WebkitBackdropFilter: "blur(28px)",
+            border: "1px solid rgba(232, 179, 255, 0.18)",
+            boxShadow:
+              "0 24px 60px rgba(2, 6, 14, 0.92), 0 0 30px rgba(147, 3, 197, 0.15)",
+            zIndex: 300,
+            animation: "misa-fade-in 0.16s ease-out",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              padding: "8px 12px 6px",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+              background: "rgba(2, 6, 14, 0.4)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--text-muted)",
+              }}
+            >
               Ulangan Kompyuterlar
             </span>
           </div>
 
-          <div className="max-h-56 overflow-y-auto p-1 divide-y divide-neutral-800/40">
+          {/* Device list */}
+          <div
+            style={{
+              maxHeight: "220px",
+              overflowY: "auto",
+              padding: "4px",
+            }}
+          >
             {devices.length === 0 ? (
-              <div className="px-3 py-3 text-center text-xs text-neutral-500">
+              <div
+                style={{
+                  padding: "16px 12px",
+                  textAlign: "center",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                }}
+              >
                 Ulangan kompyuterlar topilmadi
               </div>
             ) : (
@@ -157,30 +253,83 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                     key={dev.id}
                     type="button"
                     onClick={() => handleSelect(dev)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-emerald-950/40 text-emerald-300 font-medium"
-                        : "hover:bg-neutral-800/60 text-neutral-300"
-                    }`}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 10px",
+                      borderRadius: "12px",
+                      textAlign: "left",
+                      fontSize: "12px",
+                      background: isSelected ? "rgba(78, 222, 163, 0.1)" : "transparent",
+                      border: isSelected
+                        ? "1px solid rgba(78, 222, 163, 0.25)"
+                        : "1px solid transparent",
+                      color: isSelected ? "#4EDEA3" : "var(--text-primary)",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "transparent";
+                      }
+                    }}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "9px",
+                        minWidth: 0,
+                        flex: 1,
+                      }}
+                    >
                       <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(
-                          dev.status
-                        )}`}
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          backgroundColor: getStatusColor(dev.status),
+                          boxShadow: `0 0 5px ${getStatusColor(dev.status)}60`,
+                          flexShrink: 0,
+                        }}
                       />
-                      <div className="truncate">
-                        <div className="truncate font-medium text-neutral-200">
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                            color: isSelected ? "#FFFFFF" : "var(--text-primary)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {dev.name}
                         </div>
-                        <div className="text-[10px] text-neutral-500 truncate font-mono">
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--text-muted)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {dev.device_id}
                         </div>
                       </div>
                     </div>
 
                     {isSelected && (
-                      <CheckIcon size={14} className="text-emerald-400 flex-shrink-0" />
+                      <CheckIcon size={14} color="#4EDEA3" />
                     )}
                   </button>
                 );
@@ -188,18 +337,48 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
             )}
           </div>
 
-          {onNavigateToDevices && (
-            <div className="p-1 border-t border-neutral-800/80 bg-neutral-950/40">
+          {/* Footer — Boshqarish havolasi */}
+          {handleNavigate && (
+            <div
+              style={{
+                padding: "4px",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                background: "rgba(2, 6, 14, 0.4)",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
-                  onNavigateToDevices();
+                  handleNavigate();
                 }}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 transition-colors font-medium cursor-pointer"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "7px 10px",
+                  borderRadius: "10px",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                  color: "#4EDEA3",
+                  background: "transparent",
+                  border: "1px solid transparent",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(78, 222, 163, 0.08)";
+                  e.currentTarget.style.borderColor = "rgba(78, 222, 163, 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }}
               >
                 <span>Barcha qurilmalarni boshqarish</span>
-                <ExternalLinkIcon size={12} />
+                <ExternalLinkIcon size={11} color="currentColor" />
               </button>
             </div>
           )}

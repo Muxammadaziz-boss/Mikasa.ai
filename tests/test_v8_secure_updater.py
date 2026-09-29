@@ -1,5 +1,5 @@
 # ========== tests/test_v8_secure_updater.py ==========
-# Mikasa AI v8.0.0 — Phase 48: Secure Auto-Update & Release System Test Suite
+# Misa AI v8.0.0 — Phase 48: Secure Auto-Update & Release System Test Suite
 # Tests 25 critical security, cryptographic, staging, rollback and crash-recovery scenarios.
 
 import os
@@ -79,7 +79,7 @@ class TestUpdateCryptographicSecurity(unittest.TestCase):
     """Tests 6-9: Cryptographic Authenticity (Ed25519) and Integrity (SHA-256)."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_crypto_test_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_crypto_test_")
         # Generate temporary test Ed25519 keypair
         self.priv_key = ed25519.Ed25519PrivateKey.generate()
         self.pub_key = self.priv_key.public_key()
@@ -89,7 +89,7 @@ class TestUpdateCryptographicSecurity(unittest.TestCase):
         ).hex().lower()
 
         # Dummy artifact file
-        self.artifact_path = os.path.join(self.test_dir, "Mikasa-Test.exe")
+        self.artifact_path = os.path.join(self.test_dir, "Misa-Test.exe")
         self.artifact_content = b"MZ\x90\x00\x03\x00\x00\x00TEST_EXECUTABLE_BINARY_DATA_V810"
         with open(self.artifact_path, "wb") as f:
             f.write(self.artifact_content)
@@ -177,7 +177,7 @@ class TestTransportAndManifestSecurity(unittest.TestCase):
     def test_https_valid(self):
         """Scenario 11: Valid HTTPS transport URLs are accepted."""
         svc = UpdateService()
-        self.assertTrue(svc._validate_transport_url("https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/v8.1.0.exe"))
+        self.assertTrue(svc._validate_transport_url("https://github.com/Muxammadaziz-boss/Misa.ai/releases/v8.1.0.exe"))
         self.assertTrue(svc._validate_transport_url("http://127.0.0.1:18420/test"))  # Allowed for loopback tests
 
     def test_expired_or_stale_manifest_validation(self):
@@ -238,7 +238,7 @@ class TestUpdateStagingRollbackAndRecovery(unittest.TestCase):
     """Tests 16-20: Atomic staging, rollback, state persistence, duplicate checks."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp(prefix="mikasa_staging_test_")
+        self.test_dir = tempfile.mkdtemp(prefix="misa_staging_test_")
         self.staging_dir = os.path.join(self.test_dir, "staging")
         self.backup_dir = os.path.join(self.test_dir, "backups")
         self.state_file = os.path.join(self.test_dir, "update_state.json")
@@ -259,7 +259,7 @@ class TestUpdateStagingRollbackAndRecovery(unittest.TestCase):
         )
 
         # Mock binary
-        self.mock_binary = os.path.join(self.test_dir, "Mikasa-8.1.0.exe")
+        self.mock_binary = os.path.join(self.test_dir, "Misa-8.1.0.exe")
         self.mock_content = b"REAL_BINARY_V810_SIGNED_PAYLOAD"
         with open(self.mock_binary, "wb") as f:
             f.write(self.mock_content)
@@ -275,11 +275,11 @@ class TestUpdateStagingRollbackAndRecovery(unittest.TestCase):
         loop = asyncio.new_event_loop()
         try:
             artifact = UpdateArtifact(
-                name="Mikasa-8.1.0.exe",
+                name="Misa-8.1.0.exe",
                 size_bytes=len(self.mock_content),
                 sha256=self.mock_sha,
                 signature=self.mock_sig,
-                url="https://github.com/Muxammadaziz-boss/Mikasa.ai/releases/v8.1.0.exe"
+                url="https://github.com/Muxammadaziz-boss/Misa.ai/releases/v8.1.0.exe"
             )
             manifest_dict = {
                 "version": "8.1.0",
@@ -319,7 +319,7 @@ class TestUpdateStagingRollbackAndRecovery(unittest.TestCase):
         """Scenario 16: Crash-safe state machine loads persistent state after interruption."""
         # Set state to DOWNLOADING and save
         self.service.state_manager.transition_to(UpdateState.DOWNLOADING, {
-            "artifact_name": "Mikasa-8.1.0.exe",
+            "artifact_name": "Misa-8.1.0.exe",
             "download_progress": 45
         })
 
@@ -341,7 +341,7 @@ class TestUpdateStagingRollbackAndRecovery(unittest.TestCase):
 
     def test_rollback_on_failure(self):
         """Scenario 18: Restores executable from backup on rollback."""
-        current_exe = os.path.join(self.test_dir, "CurrentMikasa.exe")
+        current_exe = os.path.join(self.test_dir, "CurrentMisa.exe")
         with open(current_exe, "wb") as f:
             f.write(b"ORIGINAL_VERSION_800")
 
@@ -450,7 +450,7 @@ class TestUpdateApiIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self._orig_env = dict(os.environ)
-        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MISA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MISA_ENV"):
             os.environ.pop(k, None)
         from core.v8 import AccountAuthManager
         AccountAuthManager._instance = None

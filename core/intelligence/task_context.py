@@ -1,5 +1,5 @@
 # ========== task_context.py ==========
-# Mikasa AI 7.x — Active Task Context & Conversation Reference Continuity
+# Misa AI 7.x — Active Task Context & Conversation Reference Continuity
 # Contextual Coreferencing for Uzbek Pronouns ("shunga", "undagi", "o'sha")
 
 import re

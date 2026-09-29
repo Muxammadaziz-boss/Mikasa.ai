@@ -1,9 +1,9 @@
 # ========== main.py ===============================
-# Mikasa AI — Shaxsiy sun'iy intellekt yordamchi
+# Misa AI — Shaxsiy sun'iy intellekt yordamchi
 # Versiya: 8.0.0
 # ========== Ogohlantirishlarni yashirish ==========
 
-VERSION = "8.0.0"
+VERSION = "9.0.0"
 APP_NAME = "Misa AI"
 import os
 import logging
@@ -501,7 +501,7 @@ def kayfiyat_aniqla(matn):
 
 def ovoz_chiqar_tez(text):
     """
-    Mikasa AI 8.0.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
+    Misa AI 9.0.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
     Edge TTS (uz-UZ-MadinaNeural / uz-UZ-SardorNeural) orqali ovoz yaratadi
     va sounddevice / pygame orqali ijro etadi.
     """
@@ -2357,7 +2357,7 @@ def toza_musiqa_nomi(matn):
 
     # Boshidagi undov va platforma prefikslarini tozalash:
     patterns_head = [
-        r"^(?:(?:hey|salom|iltimos|menga|bitta|biror|bir|misajon|misa|mikasajon|mikasa)\s+)+",
+        r"^(?:(?:hey|salom|iltimos|menga|bitta|biror|bir|misajon|misa|misajon|misa)\s+)+",
         r"^(?:youtube|youtub|yutub|yutuq|yandex|yandeks|яндекс|spotify)(?:\s*music)?(?:\s*(?:dan|da|dagi|ga))?\s*",
         r"^(?:menga|iltimos|bitta|biror|bir)\s+",
     ]
@@ -2677,10 +2677,10 @@ def gui_ishga_tushir():
         from customtkinter.windows.widgets.core_rendering import DrawEngine
         DrawEngine.preferred_drawing_method = "circle_shapes"
 
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
 
         print("🔷 MISA AI — Yangi GUI ishga tushmoqda...")
-        app = MikasaApp(connect_backend=True)
+        app = MisaApp(connect_backend=True)
         app.mainloop()
     except ImportError:
         # Yangi GUI topilmasa — eski GUI

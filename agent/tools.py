@@ -49,7 +49,7 @@ class PathSecurityValidator:
 
     @staticmethod
     def get_default_sandbox() -> str:
-        return os.path.expanduser("~/MikasaSandbox")
+        return os.path.expanduser("~/MisaSandbox")
 
     @classmethod
     def validate_path(cls, path: str, allowed_dirs: List[str] = None) -> Tuple[bool, str, str]:

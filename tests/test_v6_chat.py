@@ -1,5 +1,5 @@
 # ========== test_v6_chat.py ==========
-# Mikasa AI v6.0.0 — Chat UI va Backend Routing testlari
+# Misa AI v6.0.0 — Chat UI va Backend Routing testlari
 
 import unittest
 from unittest.mock import MagicMock
@@ -76,7 +76,7 @@ class TestV6ChatUI(unittest.TestCase):
         page = ChatPage(self.root)
 
         # Xabar yuborish
-        page.add_message("Salom Mikasa", "user", "20:05")
+        page.add_message("Salom Misa", "user", "20:05")
         self.assertEqual(len(page._messages), 1)
 
         # Typing ko'rsatish
@@ -117,7 +117,7 @@ class TestV6ChatUI(unittest.TestCase):
         self.assertEqual(page.action_btn.cget("text_color"), Colors.PRIMARY)
 
         # 3. Matn yozilganda -> avtomatik yuborish (send) tugmasiga aylanadi
-        page._input_var.set("Salom Mikasa")
+        page._input_var.set("Salom Misa")
         self.assertEqual(page.action_btn._icon_name, "send")
         self.assertEqual(page._action_mode, "send")
         self.assertEqual(page.action_btn.cget("fg_color"), Colors.GLASS_HERO_BG)
@@ -328,9 +328,9 @@ class TestV6MediaAndMusicPlayback(unittest.TestCase):
         """O'chirilgan widgetlar ustida Tkinter callback TclError berishining oldini olish testi"""
         import tkinter as tk
         from unittest.mock import patch
-        from gui.app import MikasaApp
+        from gui.app import MisaApp
 
-        app = MikasaApp.__new__(MikasaApp)
+        app = MisaApp.__new__(MisaApp)
         # 1. bad window path name xatoligi xavfsiz o'tkazib yuborilishi kerak (crash bermaydi)
         err = tk.TclError('bad window path name ".!ctkentry.!entry"')
         with patch.object(tk.Tk, "report_callback_exception") as mock_super:

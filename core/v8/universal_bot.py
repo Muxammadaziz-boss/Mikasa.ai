@@ -1,5 +1,5 @@
 # ========== core/v8/universal_bot.py ==========
-# Phase 39 — Universal Telegram Bot ↔ Mikasa User App
+# Phase 39 — Universal Telegram Bot ↔ Misa User App
 # Multi-User Universal Telegram Bot Dispatcher
 # Strict isolation by numeric telegram_user_id, zero PC connection in Phase 39
 
@@ -18,7 +18,7 @@ logger = logging.getLogger("core.v8.universal_bot")
 class UniversalTelegramBot:
     """
     Universal Telegram Bot for multi-user identity resolution & account linking.
-    One bot serving many Telegram users and many Mikasa accounts.
+    One bot serving many Telegram users and many Misa accounts.
     Strictly isolated by canonical numeric Telegram user ID.
     """
 
@@ -29,12 +29,12 @@ class UniversalTelegramBot:
         transport: Optional[TelegramTransport] = None,
         identity_manager: Optional[TelegramIdentityManager] = None,
         account_device_manager: Optional[AccountDeviceManager] = None,
-        bot_username: str = "Mikasa_ai_agent_bot"
+        bot_username: str = "Misa_ai_agent_bot"
     ):
         self.transport: TelegramTransport = transport or MockTelegramTransport()
         self.identity_mgr: TelegramIdentityManager = identity_manager or TelegramIdentityManager.get_default_instance()
         self.account_device_mgr: AccountDeviceManager = account_device_manager or AccountDeviceManager.get_default_instance()
-        self.bot_username: str = (bot_username or "Mikasa_ai_agent_bot").lstrip("@").strip() or "Mikasa_ai_agent_bot"
+        self.bot_username: str = (bot_username or "Misa_ai_agent_bot").lstrip("@").strip() or "Misa_ai_agent_bot"
 
     def _get_link(self, tg_user_id: int):
         link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
@@ -43,7 +43,7 @@ class UniversalTelegramBot:
     def _get_active_device(self, link):
         if not link:
             return None
-        return self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        return self.account_device_mgr.get_selected_device(link.misa_user_id)
 
     @staticmethod
     def _format_error_msg(msg: str) -> str:
@@ -215,7 +215,7 @@ class UniversalTelegramBot:
         # Fallback for unrecognized text
         return await self._send_reply(
             chat_id,
-            "Tushunarsiz buyruq. Mikasa hisobingizni bog'lash uchun 6 xonali kodni yuboring yoki /help buyrug'idan foydalaning."
+            "Tushunarsiz buyruq. Misa hisobingizni bog'lash uchun 6 xonali kodni yuboring yoki /help buyrug'idan foydalaning."
         )
 
     async def _handle_start(
@@ -238,7 +238,7 @@ class UniversalTelegramBot:
             if ok and link:
                 text = (
                     "🎉 *Tabriklaymiz!*\n\n"
-                    f"Sizning Telegram hisobingiz Mikasa hisobingiz (`{link.mikasa_user_id}`) bilan "
+                    f"Sizning Telegram hisobingiz Misa hisobingiz (`{link.misa_user_id}`) bilan "
                     "muvaffaqiyatli bog'landi.\n\n"
                     "Holatni tekshirish uchun: /account"
                 )
@@ -252,11 +252,11 @@ class UniversalTelegramBot:
         name = str(first_name or "foydalanuvchi").replace("_", "\\_").replace("*", "\\*").replace("`", "")
         welcome_text = (
             f"👋 *Assalomu alaykum, {name}!*\n\n"
-            "Mikasa AI Universal Telegram Botiga xush kelibsiz.\n"
+            "Misa AI Universal Telegram Botiga xush kelibsiz.\n"
             f"🆔 Sizning Telegram ID: `{tg_user_id}`\n\n"
-            "Ushbu bot orqali Mikasa profilingizni xavfsiz bog'lashingiz mumkin.\n\n"
+            "Ushbu bot orqali Misa profilingizni xavfsiz bog'lashingiz mumkin.\n\n"
             "📱 *Bog'lash uchun:*\n"
-            "1. Mikasa ilovasida 'Telegram' bo'limiga o'ting.\n"
+            "1. Misa ilovasida 'Telegram' bo'limiga o'ting.\n"
             "2. 6 xonali ulanish kodini oling.\n"
             "3. Kodni ushbu botga to'g'ridan-to'g'ri yuboring (masalan: `123456`) "
             "yoki `/link 123456` buyrug'idan foydalaning.\n\n"
@@ -277,7 +277,7 @@ class UniversalTelegramBot:
             prompt_text = (
                 "ℹ️ *Tasdiqlash kodi talab qilinadi.*\n\n"
                 f"🆔 Sizning Telegram ID: `{tg_user_id}`\n"
-                "Iltimos, Mikasa ilovasida ko'rsatilgan 6 xonali tasdiqlash kodini kiriting:\n"
+                "Iltimos, Misa ilovasida ko'rsatilgan 6 xonali tasdiqlash kodini kiriting:\n"
                 "Misol: `/link 583921` yoki shunchaki `583921`"
             )
             return await self._send_reply(chat_id, prompt_text)
@@ -293,7 +293,7 @@ class UniversalTelegramBot:
         if ok and link:
             reply_text = (
                 "✅ *Hisob muvaffaqiyatli bog'landi!*\n\n"
-                f"👤 Mikasa User ID: `{link.mikasa_user_id}`\n"
+                f"👤 Misa User ID: `{link.misa_user_id}`\n"
                 f"🆔 Telegram ID: `{tg_user_id}`\n"
                 "🔒 Ulanish xavfsizlandi.\n\n"
                 "Hisob tafsilotlari: /account"
@@ -313,13 +313,13 @@ class UniversalTelegramBot:
         if unlinked:
             reply_text = (
                 "🔓 *Hisob uzildi.*\n\n"
-                "Sizning Telegram hisobingiz Mikasa ilovasidan muvaffaqiyatli uzildi.\n"
+                "Sizning Telegram hisobingiz Misa ilovasidan muvaffaqiyatli uzildi.\n"
                 "Qayta ulash uchun: `/link <kod>`"
             )
         else:
             reply_text = (
                 "ℹ️ *Bog'lanish topilmadi.*\n\n"
-                "Sizning Telegram hisobingiz Mikasa bilan bog'lanmagan."
+                "Sizning Telegram hisobingiz Misa bilan bog'lanmagan."
             )
         return await self._send_reply(chat_id, reply_text)
 
@@ -337,13 +337,13 @@ class UniversalTelegramBot:
         if link and link.is_active:
             linked_dt = datetime.fromtimestamp(link.linked_at).strftime("%Y-%m-%d %H:%M:%S")
             uname = f"`@{ident.username}`" if (ident and ident.username) else (f"`@{username}`" if username else "Mavjud emas")
-            devices = self.account_device_mgr.get_devices_for_user(link.mikasa_user_id, include_revoked=False)
-            selected = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+            devices = self.account_device_mgr.get_devices_for_user(link.misa_user_id, include_revoked=False)
+            selected = self.account_device_mgr.get_selected_device(link.misa_user_id)
             selected_str = f"{selected.name} (`{selected.device_id}`)" if selected else "Tanlanmagan"
 
             text = (
-                "👤 *Mikasa Hisob Ma'lumotlari:*\n\n"
-                f"• Mikasa User ID: `{link.mikasa_user_id}`\n"
+                "👤 *Misa Hisob Ma'lumotlari:*\n\n"
+                f"• Misa User ID: `{link.misa_user_id}`\n"
                 f"• Telegram ID: `{tg_user_id}`\n"
                 f"• Username: {uname}\n"
                 f"• Bog'langan vaqt: `{linked_dt}`\n"
@@ -358,8 +358,8 @@ class UniversalTelegramBot:
                 "👤 *Telegram Identifikatsiyasi:*\n\n"
                 f"• Telegram ID: `{tg_user_id}`\n"
                 f"• Holat: ⚪ Bog'lanmagan (Not Linked)\n\n"
-                "Mikasa ilovangiz bilan bog'lash uchun:\n"
-                "1. Mikasa ilovasida kod oling.\n"
+                "Misa ilovangiz bilan bog'lash uchun:\n"
+                "1. Misa ilovasida kod oling.\n"
                 "2. Botga `/link <kod>` yuboring."
             )
         return await self._send_reply(chat_id, text)
@@ -370,22 +370,22 @@ class UniversalTelegramBot:
         if not link or not link.is_active:
             text = (
                 "🔒 *Hisob bog'lanmagan.*\n\n"
-                "Qurilmalarni ko'rish uchun avval Mikasa hisobingizni bog'lang:\n"
-                "1. Mikasa ilovasidan 6 xonali kod oling.\n"
+                "Qurilmalarni ko'rish uchun avval Misa hisobingizni bog'lang:\n"
+                "1. Misa ilovasidan 6 xonali kod oling.\n"
                 "2. Botga `/link <kod>` yuboring."
             )
             return await self._send_reply(chat_id, text)
 
-        devices = self.account_device_mgr.get_devices_for_user(link.mikasa_user_id, include_revoked=False)
+        devices = self.account_device_mgr.get_devices_for_user(link.misa_user_id, include_revoked=False)
         if not devices:
             text = (
                 "💻 *Qurilmalar ro'yxati:*\n\n"
                 "Sizning hisobingizga hozircha birorta ham kompyuter ulanmagan.\n"
-                "Mikasa Desktop ilovasi orqali kompyuteringizni ro'yxatdan o'tkazing."
+                "Misa Desktop ilovasi orqali kompyuteringizni ro'yxatdan o'tkazing."
             )
             return await self._send_reply(chat_id, text)
 
-        selected = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        selected = self.account_device_mgr.get_selected_device(link.misa_user_id)
         selected_dev_id = selected.device_id if selected else None
 
         lines = ["💻 *Sizning Kompyuterlaringiz:*\n"]
@@ -416,7 +416,7 @@ class UniversalTelegramBot:
             )
             return await self._send_reply(chat_id, text)
 
-        ok, msg, dev = self.account_device_mgr.select_device_by_query(link.mikasa_user_id, query)
+        ok, msg, dev = self.account_device_mgr.select_device_by_query(link.misa_user_id, query)
         if ok and dev:
             text = (
                 f"✅ *Faol qurilma tanlandi:*\n\n"
@@ -435,7 +435,7 @@ class UniversalTelegramBot:
         """Handle /status — selected device state for linked users, bot health otherwise."""
         link = self.identity_mgr.get_link_by_telegram_user(tg_user_id)
         if link and link.is_active:
-            dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+            dev = self.account_device_mgr.get_selected_device(link.misa_user_id)
             if not dev:
                 text = (
                     "💻 *Qurilma holati:*\n\n"
@@ -472,7 +472,7 @@ class UniversalTelegramBot:
         active_links = self.identity_mgr.count_active_links()
         pending_reqs = self.identity_mgr.count_pending_requests()
         text = (
-            "🤖 *Mikasa Universal Telegram Bot Holati:*\n\n"
+            "🤖 *Misa Universal Telegram Bot Holati:*\n\n"
             "• Server: 🟢 Ishlamoqda (Online)\n"
             f"• Bot Username: `@{self.bot_username}`\n"
             f"• Faol ulanishlar: {active_links}\n"
@@ -490,7 +490,7 @@ class UniversalTelegramBot:
                 "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: `/link <kod>`"
             )
 
-        dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        dev = self.account_device_mgr.get_selected_device(link.misa_user_id)
         if not dev:
             return await self._send_reply(
                 chat_id,
@@ -499,7 +499,7 @@ class UniversalTelegramBot:
 
         from core.v8.auth_session import SessionManager
         session_mgr = SessionManager.get_default_instance()
-        session = session_mgr.get_active_session(link.mikasa_user_id, dev.device_id)
+        session = session_mgr.get_active_session(link.misa_user_id, dev.device_id)
 
         if session and session.is_valid():
             expires = datetime.fromtimestamp(session.expires_at).strftime("%Y-%m-%d %H:%M:%S")
@@ -515,7 +515,7 @@ class UniversalTelegramBot:
                 "🔐 *Masofaviy Boshqaruv Sessiyasi:*\n\n"
                 f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
                 "• Holat: ⚪ *Faol emas*\n\n"
-                "Masofaviy boshqaruv Mikasa Desktop/Web ilovasi orqali boshlanadi."
+                "Masofaviy boshqaruv Misa Desktop/Web ilovasi orqali boshlanadi."
             )
         return await self._send_reply(chat_id, text)
 
@@ -528,7 +528,7 @@ class UniversalTelegramBot:
                 "🔒 *Hisob bog'lanmagan.*\n\nAvval hisobingizni bog'lang: `/link <kod>`"
             )
 
-        dev = self.account_device_mgr.get_selected_device(link.mikasa_user_id)
+        dev = self.account_device_mgr.get_selected_device(link.misa_user_id)
         if not dev:
             return await self._send_reply(
                 chat_id,
@@ -537,13 +537,13 @@ class UniversalTelegramBot:
 
         from core.v8.auth_session import SessionManager
         session_mgr = SessionManager.get_default_instance()
-        closed = session_mgr.close_session(link.mikasa_user_id, dev.device_id)
+        closed = session_mgr.close_session(link.misa_user_id, dev.device_id)
 
         if closed:
             text = (
                 "🔓 *Masofaviy sessiya yopildi.*\n\n"
                 f"• Qurilma: *{dev.name}* (`{dev.device_id}`)\n"
-                "• Mikasa Web kirish sessiyasi saqlanib qoldi.\n\n"
+                "• Misa Web kirish sessiyasi saqlanib qoldi.\n\n"
                 "Holatni tekshirish: /session"
             )
         else:
@@ -558,7 +558,7 @@ class UniversalTelegramBot:
         """Phase 47: Show agent access level for active device."""
         link = self._get_link(tg_user_id)
         if not link:
-            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan. /link buyrug'idan foydalaning.")
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Misa'ga bog'lanmagan. /link buyrug'idan foydalaning.")
 
         dev = self._get_active_device(link)
         if not dev:
@@ -566,7 +566,7 @@ class UniversalTelegramBot:
 
         from core.v8.agent_access import AgentAccessManager
         access_mgr = AgentAccessManager.get_default_instance()
-        status = access_mgr.get_access_status(link.mikasa_user_id, dev.device_id)
+        status = access_mgr.get_access_status(link.misa_user_id, dev.device_id)
 
         level = status.get("access_level", "LIMITED")
         level_icon = "🟢" if level == "FULL" else ("🟡" if level == "CUSTOM" else "🔴")
@@ -588,7 +588,7 @@ class UniversalTelegramBot:
         """Phase 47: List all 15 permissions with status."""
         link = self._get_link(tg_user_id)
         if not link:
-            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan.")
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Misa'ga bog'lanmagan.")
 
         dev = self._get_active_device(link)
         if not dev:
@@ -596,7 +596,7 @@ class UniversalTelegramBot:
 
         from core.v8.permission_center import PermissionStore, STANDARD_PERMISSIONS
         store = PermissionStore.get_default_instance()
-        profile = store.get_profile(link.mikasa_user_id, dev.device_id)
+        profile = store.get_profile(link.misa_user_id, dev.device_id)
 
         lines = ["📋 *Ruxsatlar ro'yxati:*\n"]
         for perm in STANDARD_PERMISSIONS:
@@ -611,7 +611,7 @@ class UniversalTelegramBot:
         """Phase 47: Emergency revoke all agent access."""
         link = self._get_link(tg_user_id)
         if not link:
-            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Mikasa'ga bog'lanmagan.")
+            return await self._send_reply(chat_id, "❌ Telegram hisobingiz Misa'ga bog'lanmagan.")
 
         dev = self._get_active_device(link)
         if not dev:
@@ -619,7 +619,7 @@ class UniversalTelegramBot:
 
         from core.v8.agent_access import AgentAccessManager
         access_mgr = AgentAccessManager.get_default_instance()
-        ok, msg = access_mgr.emergency_revoke(link.mikasa_user_id, dev.device_id)
+        ok, msg = access_mgr.emergency_revoke(link.misa_user_id, dev.device_id)
 
         if ok:
             text = (
@@ -637,10 +637,10 @@ class UniversalTelegramBot:
     async def _handle_help(self, chat_id: Union[int, str], first_name: Optional[str]) -> Dict[str, Any]:
         """Handle /help command catalog."""
         help_text = (
-            "📖 *Mikasa Telegram Bot Buyruqlari:*\n\n"
+            "📖 *Misa Telegram Bot Buyruqlari:*\n\n"
             "• `/start` — Botni ishga tushirish va yo'riqnoma\n"
-            "• `/link <kod>` — Mikasa 6 xonali kodi orqali bog'lash\n"
-            "• `/unlink` — Telegram hisobini Mikasadan uzish\n"
+            "• `/link <kod>` — Misa 6 xonali kodi orqali bog'lash\n"
+            "• `/unlink` — Telegram hisobini Misadan uzish\n"
             "• `/account` — Bog'langan hisob va qurilmalar tafsilotlari\n"
             "• `/devices` — Sizning barcha kompyuterlaringiz ro'yxati\n"
             "• `/select <nom>` — Masofaviy boshqaruv uchun faol kompyuterni tanlash\n"

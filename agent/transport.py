@@ -5,12 +5,12 @@ from typing import Dict, Any, Optional, Tuple
 
 import aiohttp
 
-logger = logging.getLogger("mikasa.agent.transport")
+logger = logging.getLogger("misa.agent.transport")
 
 
 class SecureTransport:
     """
-    Mikasa Backend bilan aloqa uchun xavfsiz transport mijozi.
+    Misa Backend bilan aloqa uchun xavfsiz transport mijozi.
     - TLS verifikatsiyasi qat'iy yoqilgan (verify=False taqiqlangan).
     - DeviceSession tokenini avtomatik sarlavhalarga (headers) biriktiradi.
     """
@@ -71,12 +71,13 @@ class SecureTransport:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "Mikasa-PC-Agent/8.0.0"
+            "User-Agent": "Misa-PC-Agent/8.0.0"
         }
         effective_token = token or self._session_token
         if effective_token:
             headers["Authorization"] = f"Bearer {effective_token}"
-            headers["X-Mikasa-Device-Token"] = effective_token
+            headers["X-Misa-Device-Token"] = effective_token
+            headers["X-Misa-Device-Token"] = effective_token
         if self.device_id:
             headers["X-Device-ID"] = self.device_id
         if extra_headers:

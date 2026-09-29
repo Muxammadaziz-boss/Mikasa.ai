@@ -1,11 +1,11 @@
 # ========== test_v6_window_chrome.py ==========
-# Mikasa AI — Custom Premium Window Chrome & WindowControls Tests
+# Misa AI — Custom Premium Window Chrome & WindowControls Tests
 
 import unittest
 import customtkinter as ctk
 from gui.icons import get_vector_icon, VectorIconEngine
 from gui.components import WindowControls
-from gui.app import MikasaApp
+from gui.app import MisaApp
 
 
 class TestV6WindowChrome(unittest.TestCase):
@@ -66,18 +66,18 @@ class TestV6WindowChrome(unittest.TestCase):
 
         wc.destroy()
 
-    def test_mikasa_app_custom_chrome_integration(self):
-        """MikasaApp bilan Custom Window Chrome integratsiyasi"""
+    def test_misa_app_custom_chrome_integration(self):
+        """MisaApp bilan Custom Window Chrome integratsiyasi"""
         try:
             self.root.destroy()
         except Exception:
             pass
         VectorIconEngine.clear_cache()
 
-        app = MikasaApp(connect_backend=False)
+        app = MisaApp(connect_backend=False)
         app.update()
 
-        # 1. Title "MIKASA AI" (build versiyasiz)
+        # 1. Title "MISA AI" (build versiyasiz)
         self.assertEqual(app.title(), "MISA AI")
 
         # 2. Window controls mavjudligi

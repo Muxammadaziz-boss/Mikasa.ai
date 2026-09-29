@@ -15,7 +15,7 @@ from core.v8.device import DeviceIdentity
 from core.v8.telegram_gateway import MockTelegramTransport
 from core.v8.telegram_identity import TelegramIdentityManager
 from core.v8.account_device import (
-    MikasaUser,
+    MisaUser,
     Device,
     UserDeviceLink,
     UserDeviceContext,
@@ -53,9 +53,9 @@ class MockRequest:
 class TestPhase40Models(unittest.TestCase):
     """Scenarios 1-5: Models, Conversions, Data Integrity"""
 
-    def test_01_mikasa_user_model(self):
-        """Scenario 1: MikasaUser model serialization and defaults."""
-        user = MikasaUser(id="user_123", username="Alisher")
+    def test_01_misa_user_model(self):
+        """Scenario 1: MisaUser model serialization and defaults."""
+        user = MisaUser(id="user_123", username="Alisher")
         self.assertEqual(user.id, "user_123")
         self.assertEqual(user.username, "Alisher")
         self.assertTrue(user.is_active)
@@ -65,14 +65,14 @@ class TestPhase40Models(unittest.TestCase):
         self.assertEqual(data["id"], "user_123")
         self.assertEqual(data["username"], "Alisher")
 
-        restored = MikasaUser.from_dict(data)
+        restored = MisaUser.from_dict(data)
         self.assertEqual(restored.id, user.id)
         self.assertEqual(restored.username, user.username)
 
     def test_02_device_model(self):
         """Scenario 2: Device model creation, status properties, and heartbeat."""
         dev = Device(
-            mikasa_user_id="user_123",
+            misa_user_id="user_123",
             device_id="hw-dev-001",
             name="Uy Noutbuki",
             hostname="DESKTOP-ALI",
@@ -95,7 +95,7 @@ class TestPhase40Models(unittest.TestCase):
         restored = Device.from_dict(data)
         self.assertEqual(restored.device_id, dev.device_id)
         self.assertEqual(restored.name, "Uy Noutbuki")
-        self.assertEqual(restored.mikasa_user_id, "user_123")
+        self.assertEqual(restored.misa_user_id, "user_123")
 
     def test_03_device_identity_conversion(self):
         """Scenario 3: Device <-> DeviceIdentity conversion helpers."""
@@ -110,7 +110,7 @@ class TestPhase40Models(unittest.TestCase):
         self.assertEqual(dev.device_id, "hw-mac-001")
         self.assertEqual(dev.name, "Ishxona PC")
         self.assertEqual(dev.hostname, "WORKSTATION")
-        self.assertEqual(dev.mikasa_user_id, "user_abc")
+        self.assertEqual(dev.misa_user_id, "user_abc")
 
         # to_device_identity
         ident_out = dev.to_device_identity()
@@ -120,14 +120,14 @@ class TestPhase40Models(unittest.TestCase):
     def test_04_user_device_link_model(self):
         """Scenario 4: UserDeviceLink model serialization and lifecycle."""
         link = UserDeviceLink(
-            mikasa_user_id="user_1",
+            misa_user_id="user_1",
             device_id="hw-001",
             status="ACTIVE"
         )
         self.assertTrue(link.is_active)
         data = link.to_dict()
         restored = UserDeviceLink.from_dict(data)
-        self.assertEqual(restored.mikasa_user_id, "user_1")
+        self.assertEqual(restored.misa_user_id, "user_1")
         self.assertEqual(restored.device_id, "hw-001")
 
         link.status = "REVOKED"
@@ -161,7 +161,7 @@ class TestPhase40AccountDeviceManager(unittest.TestCase):
     """Scenarios 6-15: Manager logic, isolation, renaming, cascading revocation"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p40_")
         self.storage_file = os.path.join(self.temp_dir, "test_account_devices.json")
         self.sess_file = os.path.join(self.temp_dir, "test_sessions.json")
         self.perm_file = os.path.join(self.temp_dir, "test_perms.json")
@@ -217,7 +217,7 @@ class TestPhase40AccountDeviceManager(unittest.TestCase):
             status="online"
         )
         self.assertEqual(dev.name, "Asosiy PC")
-        self.assertEqual(dev.mikasa_user_id, "user_a")
+        self.assertEqual(dev.misa_user_id, "user_a")
 
         # Re-registering by same user updates device
         updated = self.adm.register_device(
@@ -346,7 +346,7 @@ class TestPhase40DeviceSelectionAndContext(unittest.TestCase):
     """Scenarios 16-22: Selection by query, context isolation, ambiguity, heartbeat"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_sel_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p40_sel_")
         self.storage_file = os.path.join(self.temp_dir, "test_sel.json")
         self.adm = AccountDeviceManager(storage_path=self.storage_file)
 
@@ -453,7 +453,7 @@ class TestPhase40UniversalTelegramBot(unittest.TestCase):
     """Scenarios 23-28: Telegram bot /devices and /select commands"""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_tg_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p40_tg_")
         self.tg_storage = os.path.join(self.temp_dir, "tg_links.json")
         self.adm_storage = os.path.join(self.temp_dir, "adm.json")
 
@@ -464,11 +464,11 @@ class TestPhase40UniversalTelegramBot(unittest.TestCase):
             identity_manager=self.identity_mgr,
             account_device_manager=self.adm,
             transport=self.transport,
-            bot_username="MikasaUniversalBot"
+            bot_username="MisaUniversalBot"
         )
 
-        # Register Mikasa user and link to Telegram user 888111
-        req, otp, _, _ = self.identity_mgr.create_link_request("mikasa_usr_1")
+        # Register Misa user and link to Telegram user 888111
+        req, otp, _, _ = self.identity_mgr.create_link_request("misa_usr_1")
         self.identity_mgr.verify_otp(otp, telegram_user_id=888111, username="testuser")
 
     def tearDown(self):
@@ -502,9 +502,9 @@ class TestPhase40UniversalTelegramBot(unittest.TestCase):
 
     def test_25_telegram_devices_listing(self):
         """Scenario 25: Linked user with devices sees list with online indicator and active badge."""
-        self.adm.register_device("mikasa_usr_1", "pc-1", "Uy Kompyuteri", status="online")
-        self.adm.register_device("mikasa_usr_1", "pc-2", "Ofis Noutbuki", status="standby")
-        self.adm.select_device("mikasa_usr_1", "pc-1")
+        self.adm.register_device("misa_usr_1", "pc-1", "Uy Kompyuteri", status="online")
+        self.adm.register_device("misa_usr_1", "pc-2", "Ofis Noutbuki", status="standby")
+        self.adm.select_device("misa_usr_1", "pc-1")
 
         update = {
             "message": {
@@ -522,8 +522,8 @@ class TestPhase40UniversalTelegramBot(unittest.TestCase):
 
     def test_26_telegram_select_by_name(self):
         """Scenario 26: Select device via Telegram /select <name>."""
-        self.adm.register_device("mikasa_usr_1", "pc-1", "Uy Kompyuteri", status="online")
-        self.adm.register_device("mikasa_usr_1", "pc-2", "Ofis Noutbuki", status="online")
+        self.adm.register_device("misa_usr_1", "pc-1", "Uy Kompyuteri", status="online")
+        self.adm.register_device("misa_usr_1", "pc-2", "Ofis Noutbuki", status="online")
 
         update = {
             "message": {
@@ -538,12 +538,12 @@ class TestPhase40UniversalTelegramBot(unittest.TestCase):
         self.assertIn("Faol qurilma tanlandi", text)
         self.assertIn("Ofis Noutbuki", text)
 
-        selected = self.adm.get_selected_device("mikasa_usr_1")
+        selected = self.adm.get_selected_device("misa_usr_1")
         self.assertEqual(selected.device_id, "pc-2")
 
     def test_27_telegram_select_by_id(self):
         """Scenario 27: Select device via Telegram /select <id>."""
-        self.adm.register_device("mikasa_usr_1", "pc-xyz-99", "Asosiy Server", status="online")
+        self.adm.register_device("misa_usr_1", "pc-xyz-99", "Asosiy Server", status="online")
 
         update = {
             "message": {
@@ -594,12 +594,12 @@ class TestPhase40RestAPI(unittest.TestCase):
 
     def setUp(self):
         self._orig_env = dict(os.environ)
-        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MISA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MISA_ENV"):
             os.environ.pop(k, None)
         from core.v8 import AccountAuthManager
         AccountAuthManager._instance = None
         AccountAuthManager._default_instance = None
-        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_api_")
+        self.temp_dir = tempfile.mkdtemp(prefix="misa_v8_p40_api_")
         self.adm_storage = os.path.join(self.temp_dir, "api_adm.json")
         self.adm = AccountDeviceManager.get_default_instance(storage_path=self.adm_storage)
         self.adm._users.clear()

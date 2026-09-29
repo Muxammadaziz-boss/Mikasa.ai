@@ -1,5 +1,5 @@
 # ========== context.py ==========
-# Mikasa AI 7.x — Context Engine 2.0 (Phase 29 Upgraded)
+# Misa AI 7.x — Context Engine 2.0 (Phase 29 Upgraded)
 # Selective, Bounded, Relevance-Ranked Context Assembly with Reference Continuity & Anti-Injection Guards
 
 import os

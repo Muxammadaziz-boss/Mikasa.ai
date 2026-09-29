@@ -66,7 +66,7 @@ def _reset_singletons():
 class TestPathSecurityValidator(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):
@@ -147,7 +147,7 @@ class TestPathSecurityValidator(unittest.TestCase):
 class TestAgentToolRegistry(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):
@@ -221,7 +221,7 @@ class TestAgentToolRegistry(unittest.TestCase):
 class TestRemoteCommandExecutor(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):
@@ -384,7 +384,7 @@ class TestRemoteCommandExecutor(unittest.TestCase):
 class TestCommandQueueManager(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):
@@ -490,7 +490,7 @@ class TestCommandQueueManager(unittest.TestCase):
 class TestPhase46Integration(unittest.TestCase):
     def setUp(self):
         self._orig_env = dict(os.environ)
-        os.environ.pop('MIKASA_REQUIRE_AUTH', None)
+        os.environ.pop('MISA_REQUIRE_AUTH', None)
         os.environ.pop('SUPABASE_URL', None)
 
     def tearDown(self):

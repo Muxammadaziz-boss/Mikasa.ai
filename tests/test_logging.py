@@ -11,12 +11,12 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from core.logger import (
-    get_mikasa_handler,
+    get_misa_handler,
     get_backend_handler,
     log_crash,
     sanitize_text,
     SensitiveDataFilter,
-    MIKASA_LOG_PATH,
+    MISA_LOG_PATH,
     BACKEND_LOG_PATH,
     CRASH_LOG_PATH,
 )
@@ -47,17 +47,17 @@ class TestLoggingSubsystem(unittest.TestCase):
         self.assertIn("***MASKED_TOKEN***", cleaned)
         self.assertIn('"***MASKED***"', cleaned)
 
-    def test_mikasa_log_writing(self):
-        """logs/mikasa.log fayliga yozish va filtr ishlashi"""
-        test_logger = logging.getLogger("TestMikasaLogger")
+    def test_misa_log_writing(self):
+        """logs/misa.log fayliga yozish va filtr ishlashi"""
+        test_logger = logging.getLogger("TestMisaLogger")
         test_logger.setLevel(logging.INFO)
-        test_logger.addHandler(get_mikasa_handler())
+        test_logger.addHandler(get_misa_handler())
 
         test_msg = "Phase 22 test logging message: AIzaSy1234567890abcdefghijklmnopqrstuvwxyz"
         test_logger.info(test_msg)
 
-        self.assertTrue(os.path.exists(MIKASA_LOG_PATH), "mikasa.log mavjud emas")
-        with open(MIKASA_LOG_PATH, "r", encoding="utf-8") as f:
+        self.assertTrue(os.path.exists(MISA_LOG_PATH), "misa.log mavjud emas")
+        with open(MISA_LOG_PATH, "r", encoding="utf-8") as f:
             content = f.read()
         self.assertIn("Phase 22 test logging message", content)
         self.assertNotIn("AIzaSy1234567890abcdefghijklmnopqrstuvwxyz", content)

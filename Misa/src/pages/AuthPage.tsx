@@ -1,6 +1,6 @@
 // ========== AuthPage.tsx ==========
-// Mikasa AI v8.0.0 — Phase 41: Account Registration & Authentication System
-// Glassmorphic Auth Gate for Login, Registration, Password Reset and Email Verification
+// Misa AI v9.0.0 — Account Registration & Authentication System
+// Ultra Glass Auth Gate for Login, Registration, Password Reset and Email Verification
 
 import React, { useState, useEffect } from "react";
 import {
@@ -20,6 +20,7 @@ import {
   AlertTriangleIcon,
   GoogleIcon,
 } from "../components/icons/Icons";
+import { MisaLogo } from "../components/MisaLogo";
 import { WindowControls } from "../components/WindowControls";
 
 interface AuthPageProps {
@@ -439,20 +440,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         justifyContent: "center",
         minHeight: "100vh",
         width: "100%",
-        backgroundColor: "var(--bg-darkest, #060913)",
+        backgroundColor: "var(--bg-darkest, #02060E)",
         color: "#F8FAFC",
-        fontFamily: "inherit",
+        fontFamily: "var(--font-sans)",
         position: "relative",
         overflow: "hidden",
         padding: "20px",
         boxSizing: "border-box",
       }}
     >
-      {/* Cinematic Abstract Wallpaper Layer */}
-      <div className="cinematic-bg" style={{ opacity: 0.92 }} />
-
-      {/* Subtle Atmospheric Vignette Overlay */}
-      <div className="cinematic-vignette" />
+      {/* Misa v9.0 Ultra Glass Background & Micro-Grid */}
+      <div className="misa-canvas-bg" />
+      <div className="misa-grid-overlay" />
 
       {/* ═══ TOP CHROME HEADER (Native Window Drag & Controls) ═══ */}
       <header
@@ -469,15 +468,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           padding: "0 10px 0 18px",
           zIndex: 1000,
           userSelect: "none",
-          background: "rgba(8, 14, 28, 0.55)",
+          background: "rgba(10, 14, 24, 0.65)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         }}
       >
         <div data-tauri-drag-region style={{ display: "flex", alignItems: "center", gap: "9px", cursor: "default" }}>
-          <SparklesIcon size={16} color="#38BDF8" />
-          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#E2E8F0", letterSpacing: "0.04em" }}>
+          <SparklesIcon size={16} color="#C04CFD" />
+          <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#E2E8F0", letterSpacing: "0.04em", fontFamily: "var(--font-display)" }}>
             MISA AI v9.0.0
           </span>
         </div>
@@ -494,7 +493,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           width: "480px",
           height: "480px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, rgba(99, 102, 241, 0.09) 50%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(147, 3, 197, 0.24) 0%, rgba(192, 76, 253, 0.1) 50%, transparent 70%)",
           filter: "blur(90px)",
           pointerEvents: "none",
           zIndex: 1,
@@ -508,63 +507,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           width: "520px",
           height: "520px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(192, 76, 253, 0.2) 0%, rgba(78, 222, 163, 0.08) 50%, transparent 70%)",
           filter: "blur(95px)",
           pointerEvents: "none",
           zIndex: 1,
         }}
       />
 
-      {/* Main Frosted Glass Card */}
+      {/* Main Ultra Glass Card */}
       <div
-        className="glass-panel"
+        className="misa-ultra-glass"
         style={{
           width: "100%",
           maxWidth: "460px",
-          background: "rgba(10, 16, 32, 0.65)",
-          backdropFilter: "blur(28px)",
-          WebkitBackdropFilter: "blur(28px)",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
+          background: "rgba(18, 22, 34, 0.62)",
+          backdropFilter: "blur(32px) saturate(180%)",
+          WebkitBackdropFilter: "blur(32px) saturate(180%)",
+          border: "1px solid rgba(192, 76, 253, 0.24)",
           borderRadius: "24px",
-          boxShadow: "0 24px 64px rgba(0, 0, 0, 0.65), 0 0 40px rgba(56, 189, 248, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.15)",
+          boxShadow: "0 24px 64px rgba(0, 0, 0, 0.65), 0 0 40px rgba(147, 3, 197, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14)",
           padding: "36px 32px",
           position: "relative",
           zIndex: 10,
         }}
       >
         {/* Header Branding */}
-        <div style={{ textAlign: "center", marginBottom: "26px" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "56px",
-              height: "56px",
-              borderRadius: "18px",
-              background: "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.2) 100%)",
-              border: "1px solid rgba(56, 189, 248, 0.35)",
-              boxShadow: "0 0 25px rgba(56, 189, 248, 0.3), inset 0 0 12px rgba(168, 85, 247, 0.2)",
-              marginBottom: "14px",
-            }}
-          >
-            <SparklesIcon size={26} color="#38BDF8" />
+        <div style={{ textAlign: "center", marginBottom: "26px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ marginBottom: "12px" }}>
+            <MisaLogo size={42} showText={true} showBadge={true} />
           </div>
-          <h1
-            style={{
-              margin: "0 0 6px",
-              fontSize: "23px",
-              fontWeight: 800,
-              letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg, #FFFFFF 30%, #38BDF8 70%, #C084FC 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            Misa AI
-          </h1>
           <p style={{ margin: 0, fontSize: "13px", color: "#94A3B8" }}>
-            Avtonom AI Yordamchi & Masofaviy Boshqaruv
+            Avtonom Intellektual Ish Maydoni & Masofaviy Boshqaruv
           </p>
         </div>
 
@@ -587,15 +560,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             style={{
               flex: 1,
               padding: "10px 0",
-              border: activeTab === "login" ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid transparent",
+              border: activeTab === "login" ? "1px solid rgba(192, 76, 253, 0.45)" : "1px solid transparent",
               borderRadius: "9px",
-              background: activeTab === "login" ? "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.18) 100%)" : "transparent",
+              background: activeTab === "login" ? "linear-gradient(135deg, rgba(147, 3, 197, 0.35) 0%, rgba(192, 76, 253, 0.22) 100%)" : "transparent",
               color: activeTab === "login" ? "#FFFFFF" : "#94A3B8",
               fontSize: "13.5px",
               fontWeight: activeTab === "login" ? 700 : 500,
               cursor: "pointer",
               transition: "all 0.2s ease",
-              boxShadow: activeTab === "login" ? "0 2px 10px rgba(56, 189, 248, 0.2)" : "none",
+              boxShadow: activeTab === "login" ? "0 2px 12px rgba(147, 3, 197, 0.28)" : "none",
             }}
           >
             Kirish
@@ -606,15 +579,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             style={{
               flex: 1,
               padding: "10px 0",
-              border: activeTab === "register" ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid transparent",
+              border: activeTab === "register" ? "1px solid rgba(192, 76, 253, 0.45)" : "1px solid transparent",
               borderRadius: "9px",
-              background: activeTab === "register" ? "linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(168, 85, 247, 0.18) 100%)" : "transparent",
+              background: activeTab === "register" ? "linear-gradient(135deg, rgba(147, 3, 197, 0.35) 0%, rgba(192, 76, 253, 0.22) 100%)" : "transparent",
               color: activeTab === "register" ? "#FFFFFF" : "#94A3B8",
               fontSize: "13.5px",
               fontWeight: activeTab === "register" ? 700 : 500,
               cursor: "pointer",
               transition: "all 0.2s ease",
-              boxShadow: activeTab === "register" ? "0 2px 10px rgba(56, 189, 248, 0.2)" : "none",
+              boxShadow: activeTab === "register" ? "0 2px 12px rgba(147, 3, 197, 0.28)" : "none",
             }}
           >
             Ro'yxatdan o'tish
@@ -819,9 +792,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading && !oauthWaiting) {
                   e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                  e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+                  e.currentTarget.style.borderColor = "rgba(192, 76, 253, 0.45)";
                   e.currentTarget.style.transform = "translateY(-1.5px)";
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(56, 189, 248, 0.25)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(147, 3, 197, 0.28)";
                 }
               }}
               onMouseLeave={(e) => {
@@ -877,8 +850,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#38BDF8";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                    e.target.style.borderColor = "#C04CFD";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -903,7 +876,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     background: "none",
                     border: "none",
                     padding: 0,
-                    color: "#38BDF8",
+                    color: "#E8B3FF",
                     fontSize: "12px",
                     fontWeight: 500,
                     cursor: "pointer",
@@ -935,8 +908,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#38BDF8";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                    e.target.style.borderColor = "#C04CFD";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -955,26 +928,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               style={{
                 marginTop: "8px",
                 padding: "13px 20px",
-                background: "linear-gradient(135deg, #0284C7 0%, #38BDF8 50%, #818CF8 100%)",
+                background: "linear-gradient(135deg, #9303C5 0%, #C04CFD 60%, #7C3AED 100%)",
                 border: "none",
                 borderRadius: "12px",
                 color: "#FFFFFF",
                 fontSize: "14.5px",
                 fontWeight: 700,
                 cursor: loading || oauthLoading ? "default" : "pointer",
-                boxShadow: "0 4px 20px rgba(56, 189, 248, 0.35)",
+                boxShadow: "0 4px 20px rgba(147, 3, 197, 0.4)",
                 transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.7 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading) {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(56, 189, 248, 0.45)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(192, 76, 253, 0.5)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 20px rgba(56, 189, 248, 0.35)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(147, 3, 197, 0.4)";
               }}
             >
               {loading ? "Kirilmoqda..." : "Tizimga kirish"}
@@ -1015,9 +988,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading && !oauthWaiting) {
                   e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                  e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.4)";
+                  e.currentTarget.style.borderColor = "rgba(192, 76, 253, 0.45)";
                   e.currentTarget.style.transform = "translateY(-1.5px)";
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(56, 189, 248, 0.25)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(147, 3, 197, 0.28)";
                 }
               }}
               onMouseLeave={(e) => {
@@ -1073,8 +1046,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#38BDF8";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                    e.target.style.borderColor = "#C04CFD";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -1112,8 +1085,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#38BDF8";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  e.target.style.borderColor = "#C04CFD";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -1149,8 +1122,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#38BDF8";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                    e.target.style.borderColor = "#C04CFD";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -1189,8 +1162,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#38BDF8";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.22)";
+                  e.target.style.borderColor = "#C04CFD";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(192, 76, 253, 0.22)";
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -1205,26 +1178,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               style={{
                 marginTop: "8px",
                 padding: "13px 20px",
-                background: "linear-gradient(135deg, #0284C7 0%, #38BDF8 50%, #818CF8 100%)",
+                background: "linear-gradient(135deg, #9303C5 0%, #C04CFD 60%, #7C3AED 100%)",
                 border: "none",
                 borderRadius: "12px",
                 color: "#FFFFFF",
                 fontSize: "14.5px",
                 fontWeight: 700,
                 cursor: loading || oauthLoading ? "default" : "pointer",
-                boxShadow: "0 4px 20px rgba(56, 189, 248, 0.35)",
+                boxShadow: "0 4px 20px rgba(147, 3, 197, 0.4)",
                 transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 opacity: loading || oauthLoading ? 0.7 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!loading && !oauthLoading) {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(56, 189, 248, 0.45)";
+                  e.currentTarget.style.boxShadow = "0 6px 24px rgba(192, 76, 253, 0.5)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 20px rgba(56, 189, 248, 0.35)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(147, 3, 197, 0.4)";
               }}
             >
               {loading ? "Yaratilmoqda..." : "Hisob yaratish"}
@@ -1618,10 +1591,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <ShieldIcon size={14} color="#10B981" />
-            <span style={{ color: "#34D399", fontWeight: 500 }}>Secured by Supabase Auth</span>
+            <ShieldIcon size={14} color="#4EDEA3" />
+            <span style={{ color: "#4EDEA3", fontWeight: 500 }}>Secured by Supabase Auth</span>
           </div>
-          <span style={{ color: "#94A3B8" }}>v8.0.0 Dev</span>
+          <span style={{ color: "#E8B3FF", fontWeight: 600 }}>v9.0.0 Ultra Glass</span>
         </div>
       </div>
     </div>

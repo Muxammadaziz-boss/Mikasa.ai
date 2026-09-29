@@ -1,5 +1,5 @@
 # ========== audio_service.py ==========
-# Mikasa AI v6.0.0 — Modulli Audio va Tezkor VAD (Voice Activity Detection) Xizmati
+# Misa AI v6.0.0 — Modulli Audio va Tezkor VAD (Voice Activity Detection) Xizmati
 # Past kechikish (Low-latency) va real-vaqt to'lqin monitoringi
 
 import os
@@ -37,7 +37,7 @@ except ImportError:
 
 class AudioService:
     """
-    Mikasa AI uchun professional audio yozish va VAD xizmati.
+    Misa AI uchun professional audio yozish va VAD xizmati.
     Statik 5 soniya kutish o'rniga dinamik ovoz faolligini aniqlaydi.
     """
 

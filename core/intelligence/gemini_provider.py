@@ -1,5 +1,5 @@
 # ========== gemini_provider.py ==========
-# Mikasa AI 7.x — Google Gemini AI Provider Implementation
+# Misa AI 7.x — Google Gemini AI Provider Implementation
 # Native REST Integration with Model Fallbacks, Search Grounding and Response Normalization
 
 import os
