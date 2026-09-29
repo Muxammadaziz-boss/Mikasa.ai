@@ -60,7 +60,7 @@ def execute_system_status(params: Dict[str, Any]) -> Dict[str, Any]:
         "hostname": socket.gethostname(),
         "platform": platform.platform(),
         "timestamp": time.time(),
-        "agent_version": "8.0.0"
+        "agent_version": "9.0.0"
     }
 
 

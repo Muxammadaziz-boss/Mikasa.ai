@@ -1,5 +1,5 @@
 # ========== tests/test_v8_phase36.py ==========
-# Phase 36 — Misa AI v8.0.0 Remote PC Control Integration Test Suite
+# Phase 36 — Misa AI v9.0.0 Remote PC Control Integration Test Suite
 # Exactly 40 comprehensive tests covering:
 # Device (1-5), Heartbeat (6-10), WoL (11-15), Security (16-22),
 # Agent (23-27), Remote Pipeline (28-33), Confirmation (34-36), Telegram (37-40)
@@ -86,8 +86,8 @@ class TestV8Phase36(unittest.TestCase):
         ident = DeviceIdentityManager.create_local_identity()
         self.assertTrue(ident.device_id)
         self.assertTrue(ident.hostname)
-        self.assertEqual(ident.agent_version, "8.0.0")
-        self.assertEqual(ident.misa_version, "8.0.0")
+        self.assertEqual(ident.agent_version, "9.0.0")
+        self.assertEqual(ident.misa_version, "9.0.0")
         self.assertTrue(ident.fingerprint)
         d = ident.to_dict()
         restored = DeviceIdentity.from_dict(d)
@@ -174,7 +174,7 @@ class TestV8Phase36(unittest.TestCase):
         payload = HeartbeatPayload(
             device_id="node_6",
             timestamp=time.time(),
-            agent_version="8.0.0",
+            agent_version="9.0.0",
             state=DeviceState.ONLINE,
             metrics={"cpu": 22.5, "ram": 55.0}
         )

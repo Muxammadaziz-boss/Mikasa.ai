@@ -284,7 +284,7 @@ async def handle_status(request):
     return web.json_response({
         "status": "online",
         "app": "MISA AI",
-        "version": "8.0.0",
+        "version": "9.0.0",
         "user": user,
         "ai_available": ai_ok,
         "voice_state": _voice_state,
@@ -1986,10 +1986,10 @@ async def handle_account_get(request):
         "ai_mode": ai_cfg.get("mode", "balanced"),
         "thinking_enabled": ai_cfg.get("thinking_enabled", True),
         "has_gemini_key": has_gemini,
-        "version": "8.0.0",
+        "version": "9.0.0",
         "app_info": {
             "name": "Misa AI",
-            "version": "8.0.0",
+            "version": "9.0.0",
             "codename": "Quiet Intelligence",
             "engine": "Tauri 2.0 (Native Rust) + Python 3.11+",
             "architecture": "Windows x64 Native Desktop",
@@ -3361,12 +3361,12 @@ async def handle_health(request):
         and "placeholder-project" not in supabase_url
         and supabase_key not in ("placeholder-anon-key", "placeholder-publishable-key")
     )
-    env_name = os.environ.get("ENVIRONMENT", "development")
+    env_name = os.environ.get("MISA_ENV") or os.environ.get("ENVIRONMENT", "development")
 
     return web.json_response({
         "status": "ok",
         "app": "Misa AI",
-        "version": "8.0.0",
+        "version": "9.0.0",
         "supabase": "configured" if is_supabase_configured else "not_configured",
         "environment": env_name,
         "timestamp": time.time()
@@ -4325,7 +4325,7 @@ async def handle_device_heartbeat(request):
     except Exception:
         body = {}
 
-    agent_version = str(body.get("agent_version", "8.0.0"))
+    agent_version = str(body.get("agent_version", "9.0.0"))
     state_str = str(body.get("state", "online")).lower()
     metrics = body.get("metrics", {})
 
@@ -4887,7 +4887,7 @@ async def handle_ws(request):
         "data": {
             "status": "online",
             "voice_state": _voice_state,
-            "version": "8.0.0"
+            "version": "9.0.0"
         },
         "timestamp": datetime.now().isoformat()
     }))

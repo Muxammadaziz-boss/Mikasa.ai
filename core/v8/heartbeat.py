@@ -23,7 +23,7 @@ class DeviceState(str, Enum):
 class HeartbeatPayload:
     device_id: str
     timestamp: float
-    agent_version: str = "8.0.0"
+    agent_version: str = "9.0.0"
     state: DeviceState = DeviceState.ONLINE
     metrics: Dict[str, Any] = field(default_factory=dict)
 
@@ -44,7 +44,7 @@ class HeartbeatPayload:
         return cls(
             device_id=data["device_id"],
             timestamp=float(data.get("timestamp", time.time())),
-            agent_version=data.get("agent_version", "8.0.0"),
+            agent_version=data.get("agent_version", "9.0.0"),
             state=state_val,
             metrics=data.get("metrics", {})
         )

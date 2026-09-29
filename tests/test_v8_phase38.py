@@ -217,7 +217,7 @@ class TestPhase38RemoteOrchestration(unittest.TestCase):
             mac_address="00:11:22:33:44:55",
             local_ip="192.168.1.100",
             hostname="TestPC",
-            agent_version="8.0.0"
+            agent_version="9.0.0"
         )
         self.registry = DeviceRegistry()
         self.registry.register_or_update(self.device)
@@ -253,7 +253,7 @@ class TestPhase38RemoteOrchestration(unittest.TestCase):
         self.heartbeat.record_heartbeat(HeartbeatPayload(
             device_id="test_pc",
             timestamp=time.time(),
-            agent_version="8.0.0",
+            agent_version="9.0.0",
             state=DeviceState.ONLINE,
             metrics={"cpu": 10.0, "ram": 20.0}
         ))

@@ -1757,7 +1757,7 @@ class BackendService {
         theme: "dark",
         tts_speed: 2.0,
         ai_model: "gemini",
-        version: "8.0.0",
+        version: "9.0.0",
         voices_available: [
           { id: "ayol", name: "Madina (Ayol)", lang: "uz-UZ-MadinaNeural" },
           { id: "erkak", name: "Sardor (Erkak)", lang: "uz-UZ-SardorNeural" },

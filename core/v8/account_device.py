@@ -71,7 +71,7 @@ class Device:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     hostname: str = ""
     platform: str = "windows"
-    agent_version: str = "8.0.0"
+    agent_version: str = "9.0.0"
     status: str = "offline"  # online, offline, standby, revoked
     created_at: float = field(default_factory=time.time)
     last_seen_at: Optional[float] = None
@@ -401,7 +401,7 @@ class AccountDeviceManager:
         name: Optional[str] = None,
         hostname: str = "",
         platform: str = "windows",
-        agent_version: str = "8.0.0",
+        agent_version: str = "9.0.0",
         status: str = "offline",
         metadata: Optional[Dict[str, Any]] = None
     ) -> Device:

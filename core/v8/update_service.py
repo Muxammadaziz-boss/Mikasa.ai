@@ -29,8 +29,8 @@ DEFAULT_TRUSTED_PUBLIC_KEY = "b4be839fd62657c0e786e1a2ad590c05c45c511371d041137c
 
 # Default update repository / manifest endpoints
 DEFAULT_GITHUB_OWNER = "Muxammadaziz-boss"
-DEFAULT_GITHUB_REPO = "Misa.ai"
-DEFAULT_MANIFEST_URL = f"https://raw.githubusercontent.com/{DEFAULT_GITHUB_OWNER}/{DEFAULT_GITHUB_REPO}/dev-v8.0.0/release/v8.0.0/version_manifest.json"
+DEFAULT_GITHUB_REPO = "Misa"
+DEFAULT_MANIFEST_URL = f"https://raw.githubusercontent.com/{DEFAULT_GITHUB_OWNER}/{DEFAULT_GITHUB_REPO}/main/release/v9.0.0/version_manifest.json"
 
 # Auto-check minimum interval: 6 hours (21600 seconds)
 MIN_AUTO_CHECK_INTERVAL_SEC = 6 * 3600
@@ -430,7 +430,7 @@ class UpdateStateManager:
             self._current_state = UpdateState.IDLE
             self._state_data = {
                 "state": UpdateState.IDLE.value,
-                "current_version": "8.0.0",
+                "current_version": "9.0.0",
                 "target_version": None,
                 "download_progress": 0,
                 "updated_at": time.time()
@@ -509,7 +509,7 @@ class UpdateService:
 
     def __init__(
         self,
-        current_version: str = "8.0.0",
+        current_version: str = "9.0.0",
         channel: str = "stable",
         manifest_url: Optional[str] = None,
         trusted_public_key: Optional[str] = None,

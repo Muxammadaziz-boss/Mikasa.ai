@@ -26,7 +26,7 @@ class AgentConfig:
     reconnect_max_delay: float = 60.0
     reconnect_jitter: bool = True
     protocol_version: str = "1.0"
-    agent_version: str = "8.0.0"
+    agent_version: str = "9.0.0"
     vault_dir: Optional[str] = None
     config_path: Optional[str] = None
     ca_cert_path: Optional[str] = None
@@ -136,7 +136,7 @@ class AgentConfig:
             reconnect_max_delay=reconnect_max_delay,
             reconnect_jitter=file_data.get("reconnect_jitter", True),
             protocol_version="1.0",
-            agent_version="8.0.0",
+            agent_version="9.0.0",
             vault_dir=vault_dir,
             config_path=cfg_file
         )

@@ -97,8 +97,8 @@ class AgentIdentityManager:
             mac_address=mac,
             local_ip=DeviceIdentityManager.get_local_ip(),
             fingerprint=fingerprint,
-            agent_version="8.0.0",
-            misa_version="8.0.0",
+            agent_version="9.0.0",
+            misa_version="9.0.0",
             status=DeviceState.ONLINE,
             metadata={
                 "friendly_name": friendly_name or hostname,

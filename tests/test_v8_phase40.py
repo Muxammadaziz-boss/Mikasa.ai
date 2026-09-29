@@ -77,7 +77,7 @@ class TestPhase40Models(unittest.TestCase):
             name="Uy Noutbuki",
             hostname="DESKTOP-ALI",
             platform="windows",
-            agent_version="8.0.0",
+            agent_version="9.0.0",
             status="offline"
         )
         self.assertFalse(dev.is_online)
@@ -102,7 +102,7 @@ class TestPhase40Models(unittest.TestCase):
         ident = DeviceIdentity(
             device_id="hw-mac-001",
             hostname="WORKSTATION",
-            agent_version="8.0.0",
+            agent_version="9.0.0",
             metadata={"ip": "192.168.1.50"}
         )
         # from_device_identity
@@ -115,7 +115,7 @@ class TestPhase40Models(unittest.TestCase):
         # to_device_identity
         ident_out = dev.to_device_identity()
         self.assertEqual(ident_out.device_id, "hw-mac-001")
-        self.assertEqual(ident_out.agent_version, "8.0.0")
+        self.assertEqual(ident_out.agent_version, "9.0.0")
 
     def test_04_user_device_link_model(self):
         """Scenario 4: UserDeviceLink model serialization and lifecycle."""

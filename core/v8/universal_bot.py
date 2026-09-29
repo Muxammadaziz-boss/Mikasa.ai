@@ -477,7 +477,7 @@ class UniversalTelegramBot:
             f"• Bot Username: `@{self.bot_username}`\n"
             f"• Faol ulanishlar: {active_links}\n"
             f"• Kutilayotgan so'rovlar: {pending_reqs}\n"
-            "• Versiya: `v8.0.0 Phase 39 / Phase 40`"
+            "• Versiya: `v9.0.0 Phase 39 / Phase 40`"
         )
         return await self._send_reply(chat_id, text)
 

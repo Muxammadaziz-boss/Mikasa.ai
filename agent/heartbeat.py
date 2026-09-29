@@ -37,7 +37,7 @@ class AgentHeartbeat:
         transport: SecureTransport,
         device_id: str,
         interval_seconds: float = 15.0,
-        agent_version: str = "8.0.0"
+        agent_version: str = "9.0.0"
     ):
         self.transport = transport
         self.device_id = device_id

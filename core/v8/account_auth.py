@@ -247,7 +247,7 @@ class SupabaseJWKSClient:
         try:
             req = urllib.request.Request(
                 jwks_url,
-                headers={"User-Agent": "Misa-AI-Auth/8.0.0", "Accept": "application/json"}
+                headers={"User-Agent": "Misa-AI-Auth/9.0.0", "Accept": "application/json"}
             )
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 if resp.status == 200:

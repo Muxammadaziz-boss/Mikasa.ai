@@ -32,8 +32,8 @@ class DeviceIdentity:
     mac_address: str = "00:00:00:00:00:00"
     local_ip: str = "127.0.0.1"
     fingerprint: str = ""
-    agent_version: str = "8.0.0"
-    misa_version: str = "8.0.0"
+    agent_version: str = "9.0.0"
+    misa_version: str = "9.0.0"
     last_seen: Optional[str] = None
     status: DeviceState = DeviceState.OFFLINE
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -135,8 +135,8 @@ class DeviceIdentityManager:
             mac_address=mac,
             local_ip=cls.get_local_ip(),
             fingerprint=fingerprint,
-            agent_version="8.0.0",
-            misa_version="8.0.0",
+            agent_version="9.0.0",
+            misa_version="9.0.0",
             status=DeviceState.ONLINE
         )
 

@@ -538,7 +538,7 @@ class TelegramRemoteGateway:
             f"• **Tizim:** {os_info}\n"
             f"• **IP / MAC:** `{device_info.get('local_ip', '127.0.0.1')}` / `{device_info.get('mac_address', 'N/A')}`\n"
             f"• **Oxirgi faollik:** `{last_seen}`\n"
-            f"• **Versiya:** Misa v8.0.0"
+            f"• **Versiya:** Misa v9.0.0"
         )
 
     # ========================================================

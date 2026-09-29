@@ -233,7 +233,7 @@ def handle_system_status(params: Dict[str, Any]) -> Dict[str, Any]:
         "ram_percent": ram_pct,
         "ram_used_mb": ram_used,
         "timestamp": int(time.time()),
-        "agent_version": "8.0.0"
+        "agent_version": "9.0.0"
     }
 
 def handle_system_info(params: Dict[str, Any]) -> Dict[str, Any]:

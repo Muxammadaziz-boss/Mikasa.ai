@@ -1,5 +1,5 @@
 # ========== core/v8/__init__.py ==========
-# Misa AI v8.0.0 — Phase 38: Misa Online Remote Control + User Permission Center
+# Misa AI v9.0.0 — Phase 38: Misa Online Remote Control + User Permission Center
 # Package initialization, versioning & exports
 
 from core.v8.device import (
@@ -116,7 +116,7 @@ from core.v8.update_service import (
     DEFAULT_TRUSTED_PUBLIC_KEY
 )
 
-__version__ = "8.0.0"
+__version__ = "9.0.0"
 PHASE = 48
 
 __all__ = [

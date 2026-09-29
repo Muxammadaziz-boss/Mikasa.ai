@@ -1,5 +1,5 @@
 # ========== test_v8_remote.py ==========
-# Phase 35 — Misa AI v8.0.0 Remote PC Control Test Suite
+# Phase 35 — Misa AI v9.0.0 Remote PC Control Test Suite
 # Tests: Device Identity, Heartbeat, WoL, Envelope, Telegram Gateway, PCAgent, Planning DAG
 
 import os
@@ -56,8 +56,8 @@ class TestV8RemoteControl(unittest.TestCase):
         self.assertTrue(ident.device_id)
         self.assertTrue(ident.hostname)
         self.assertTrue(ident.username)
-        self.assertEqual(ident.agent_version, "8.0.0")
-        self.assertEqual(ident.misa_version, "8.0.0")
+        self.assertEqual(ident.agent_version, "9.0.0")
+        self.assertEqual(ident.misa_version, "9.0.0")
         self.assertTrue(ident.fingerprint)
         d = ident.to_dict()
         self.assertEqual(d["device_id"], ident.device_id)

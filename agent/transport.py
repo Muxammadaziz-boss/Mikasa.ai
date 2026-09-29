@@ -71,7 +71,7 @@ class SecureTransport:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "Misa-PC-Agent/8.0.0"
+            "User-Agent": "Misa-PC-Agent/9.0.0"
         }
         effective_token = token or self._session_token
         if effective_token:

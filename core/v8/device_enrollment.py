@@ -326,7 +326,7 @@ class DeviceEnrollmentManager:
                 name=name or hostname or "Mening Kompyuterim",
                 hostname=hostname,
                 platform=platform_name.lower(),
-                agent_version="8.0.0",
+                agent_version="9.0.0",
                 status="online"
             )
 
