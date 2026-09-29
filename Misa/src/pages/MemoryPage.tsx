@@ -221,15 +221,17 @@ export const MemoryPage: React.FC<MemoryPageProps> = () => {
     const seenKeys = new Set<string>();
 
     // 1. Structured facts
-    (memory.structured_facts || []).forEach((item: StructuredMemoryItem) => {
+    const structuredFacts = Array.isArray(memory.structured_facts) ? memory.structured_facts : [];
+    structuredFacts.forEach((item: StructuredMemoryItem) => {
+      if (!item || !item.key) return;
       seenKeys.add(item.key);
       const meta = cardMetadata[item.key] || {};
-      const cat = meta.category || inferCategory(item.key, String(item.value));
+      const cat = meta.category || inferCategory(item.key, String(item.value ?? ""));
       cards.push({
         id: item.id || `fact_${item.key}`,
         key: item.key,
         title: meta.title || item.key.replace(/_/g, " "),
-        content: String(item.value),
+        content: String(item.value ?? ""),
         category: cat,
         pinned: meta.pinned ?? (item.importance ? item.importance >= 0.8 : false),
         updatedAt: item.updated_at ? item.updated_at.slice(0, 16).replace("T", " ") : "Bugun",
@@ -239,42 +241,77 @@ export const MemoryPage: React.FC<MemoryPageProps> = () => {
     });
 
     // 2. Legacy / plain facts dictionary
-    Object.entries(memory.facts || {}).forEach(([k, v]) => {
-      if (seenKeys.has(k)) return;
-      seenKeys.add(k);
-      const meta = cardMetadata[k] || {};
-      const cat = meta.category || inferCategory(k, String(v));
-      cards.push({
-        id: `fact_${k}`,
-        key: k,
-        title: meta.title || k.replace(/_/g, " "),
-        content: String(v),
-        category: cat,
-        pinned: Boolean(meta.pinned),
-        updatedAt: "Faol xotira",
-        source: "Foydalanuvchi xotirasi",
-        rawType: "fact",
+    if (memory.facts && typeof memory.facts === "object" && !Array.isArray(memory.facts)) {
+      Object.entries(memory.facts).forEach(([k, v]) => {
+        if (!k || seenKeys.has(k)) return;
+        seenKeys.add(k);
+        const meta = cardMetadata[k] || {};
+        const valStr = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v ?? "");
+        const cat = meta.category || inferCategory(k, valStr);
+        cards.push({
+          id: `fact_${k}`,
+          key: k,
+          title: meta.title || k.replace(/_/g, " "),
+          content: valStr,
+          category: cat,
+          pinned: Boolean(meta.pinned),
+          updatedAt: "Faol xotira",
+          source: "Foydalanuvchi xotirasi",
+          rawType: "fact",
+        });
       });
-    });
+    }
 
-    // 3. Profile items
-    (memory.profile || []).forEach((item: StructuredMemoryItem) => {
-      const pKey = `prof_${item.key}`;
-      if (seenKeys.has(pKey)) return;
-      seenKeys.add(pKey);
-      const meta = cardMetadata[pKey] || {};
-      cards.push({
-        id: item.id || pKey,
-        key: item.key,
-        title: meta.title || `Profil: ${item.key}`,
-        content: String(item.value),
-        category: meta.category || "Shaxsiy",
-        pinned: meta.pinned ?? true,
-        updatedAt: item.updated_at ? item.updated_at.slice(0, 10) : "Doimiy",
-        source: "Foydalanuvchi profili",
-        rawType: "profile",
+    // 3. Profile items (supports both Array<StructuredMemoryItem> and Record<string, any>)
+    if (Array.isArray(memory.profile)) {
+      memory.profile.forEach((item: StructuredMemoryItem) => {
+        if (!item || !item.key) return;
+        const pKey = `prof_${item.key}`;
+        if (seenKeys.has(pKey)) return;
+        seenKeys.add(pKey);
+        const meta = cardMetadata[pKey] || {};
+        cards.push({
+          id: item.id || pKey,
+          key: item.key,
+          title: meta.title || `Profil: ${item.key.replace(/_/g, " ")}`,
+          content: String(item.value ?? ""),
+          category: meta.category || "Shaxsiy",
+          pinned: meta.pinned ?? true,
+          updatedAt: item.updated_at ? item.updated_at.slice(0, 10) : "Doimiy",
+          source: "Foydalanuvchi profili",
+          rawType: "profile",
+        });
       });
-    });
+    } else if (memory.profile && typeof memory.profile === "object") {
+      Object.entries(memory.profile).forEach(([k, v]) => {
+        if (!k || v === undefined || v === null || v === "") return;
+        const pKey = `prof_${k}`;
+        if (seenKeys.has(pKey)) return;
+        seenKeys.add(pKey);
+        const meta = cardMetadata[pKey] || {};
+        const rawVal =
+          typeof v === "object" && v !== null && "value" in (v as any)
+            ? (v as any).value
+            : typeof v === "object"
+            ? JSON.stringify(v)
+            : v;
+        const updatedAt =
+          typeof v === "object" && v !== null && "updated_at" in (v as any) && (v as any).updated_at
+            ? String((v as any).updated_at).slice(0, 10)
+            : "Doimiy";
+        cards.push({
+          id: pKey,
+          key: k,
+          title: meta.title || `Profil: ${k.replace(/_/g, " ")}`,
+          content: String(rawVal ?? ""),
+          category: meta.category || "Shaxsiy",
+          pinned: meta.pinned ?? true,
+          updatedAt,
+          source: "Foydalanuvchi profili",
+          rawType: "profile",
+        });
+      });
+    }
 
     // Sort pinned first
     return cards.sort((a, b) => Number(b.pinned) - Number(a.pinned));
@@ -1129,13 +1166,13 @@ export const MemoryPage: React.FC<MemoryPageProps> = () => {
           <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF", marginBottom: "12px" }}>
             Joriy Suhbat Konteksti (Working RAM)
           </h3>
-          {(memory.working_memory || []).length === 0 ? (
+          {(!Array.isArray(memory.working_memory) || memory.working_memory.length === 0) ? (
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
               Joriy sessiyada faol RAM elementlari mavjud emas.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {(memory.working_memory || []).map((w, i) => (
+              {memory.working_memory.map((w, i) => (
                 <div
                   key={i}
                   style={{
@@ -1172,9 +1209,9 @@ export const MemoryPage: React.FC<MemoryPageProps> = () => {
             }}
           >
             <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#FFFFFF" }}>
-              Suhbatlar Arxivi ({memory.conversations?.length || 0})
+              Suhbatlar Arxivi ({Array.isArray(memory.conversations) ? memory.conversations.length : 0})
             </h3>
-            {(memory.conversations?.length || 0) > 0 && (
+            {Array.isArray(memory.conversations) && memory.conversations.length > 0 && (
               <button
                 type="button"
                 onClick={async () => {
@@ -1196,13 +1233,13 @@ export const MemoryPage: React.FC<MemoryPageProps> = () => {
               </button>
             )}
           </div>
-          {(memory.conversations || []).length === 0 ? (
+          {(!Array.isArray(memory.conversations) || memory.conversations.length === 0) ? (
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
               Saqlangan suhbat epizodlari mavjud emas.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {(memory.conversations || []).slice(-30).reverse().map((ep, idx) => (
+              {memory.conversations.slice(-30).reverse().map((ep, idx) => (
                 <div
                   key={idx}
                   style={{

@@ -79,32 +79,26 @@ export const AccountPage: React.FC<AccountPageProps> = ({
   const [fullName, setFullName] = useState<string>(
     () =>
       localStorage.getItem("misa_user_name") ||
-      localStorage.getItem("misa_user_name") ||
       currentUser?.username ||
-      "Azizbek Rahimov"
-  );
-  const [usernameHandle, setUsernameHandle] = useState<string>(
-    () => localStorage.getItem("misa_user_handle") || "@azizbek_dev"
+      (currentUser?.email ? currentUser.email.split("@")[0] : "") ||
+      "Ustoz"
   );
   const [email, setEmail] = useState<string>(
-    () => currentUser?.email || localStorage.getItem("misa_user_email") || "azizbek@misa.ai"
+    () => currentUser?.email || localStorage.getItem("misa_user_email") || ""
   );
   const [phone, setPhone] = useState<string>(
-    () => localStorage.getItem("misa_user_phone") || "+998 90 123 45 67"
+    () => localStorage.getItem("misa_user_phone") || ""
   );
   const [roleTitle, setRoleTitle] = useState<string>(
-    () => localStorage.getItem("misa_user_role") || "Senior AI Architect & Product Designer"
+    () => localStorage.getItem("misa_user_role") || "Misa AI Foydalanuvchisi"
   );
   const [bio, setBio] = useState<string>(
     () =>
       localStorage.getItem("misa_user_bio") ||
-      "Sun'iy intellekt tizimlari, neyron arxitektura va zamonaviy interfeyslar ustida ishlayman. Misa yordamida kundalik jarayonlar va murakkab loyihalarni avtomatlashtiraman."
+      "Misa AI yordamida kundalik vazifalar va loyihalarni avtomatlashtiraman."
   );
   const [avatarStyle, setAvatarStyle] = useState<string>(
-    () =>
-      localStorage.getItem("misa_user_avatar") ||
-      localStorage.getItem("misa_user_avatar") ||
-      "violet"
+    () => localStorage.getItem("misa_user_avatar") || "violet"
   );
 
   // 2. Misa AI Personalization & API State
@@ -163,12 +157,20 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     setTimeout(() => setToastMsg(null), 3200);
   };
 
+  // Sync currentUser prop if it arrives/updates
+  useEffect(() => {
+    if (currentUser?.email && (!email || email === "user@misa.ai" || email === "azizbek@misa.ai")) {
+      setEmail(currentUser.email);
+    }
+    if (currentUser?.username && (!fullName || fullName === "Ustoz" || fullName === "Azizbek Rahimov")) {
+      setFullName(currentUser.username);
+    }
+  }, [currentUser]);
+
   // Load initial account, appearance, telegram, and devices
   useEffect(() => {
     try {
-      const rawApp =
-        localStorage.getItem("misa_appearance_settings") ||
-        localStorage.getItem("misa_appearance_settings");
+      const rawApp = localStorage.getItem("misa_appearance_settings");
       if (rawApp) {
         const parsed = JSON.parse(rawApp);
         if (parsed.theme) setThemeMode(parsed.theme);
@@ -182,11 +184,21 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
     backendService
       .getAccount()
-      .then((data) => {
+      .then((data: any) => {
         if (data.ok) {
-          if (data.name) setFullName(data.name);
-          if (data.email) setEmail(data.email);
-          if (data.role) setRoleTitle(data.role);
+          if (data.name && data.name !== "Ustoz") {
+            setFullName(data.name);
+          } else if (!localStorage.getItem("misa_user_name") && currentUser?.username) {
+            setFullName(currentUser.username);
+          }
+          if (data.email && data.email !== "user@misa.ai" && data.email !== "user@mikasa.ai") {
+            setEmail(data.email);
+          } else if (currentUser?.email) {
+            setEmail(currentUser.email);
+          }
+          if (data.phone) setPhone(data.phone);
+          if (data.role && data.role !== "Dasturchi / Foydalanuvchi") setRoleTitle(data.role);
+          if (data.bio) setBio(data.bio);
           if (data.avatar) setAvatarStyle(data.avatar);
           if (data.api_key_masked) setApiKeyMasked(data.api_key_masked);
           if (data.settings) {
@@ -237,7 +249,6 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     try {
       const serialized = JSON.stringify(next);
       localStorage.setItem("misa_appearance_settings", serialized);
-      localStorage.setItem("misa_appearance_settings", serialized);
     } catch {}
 
     applyMisaAppearanceSettings();
@@ -247,20 +258,20 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     if (e) e.preventDefault();
     setSavingProfile(true);
     try {
-      localStorage.setItem("misa_user_name", fullName.trim());
-      localStorage.setItem("misa_user_name", fullName.trim());
-      localStorage.setItem("misa_user_handle", usernameHandle.trim());
+      const cleanName = fullName.trim() || currentUser?.username || "Ustoz";
+      localStorage.setItem("misa_user_name", cleanName);
       localStorage.setItem("misa_user_email", email.trim());
       localStorage.setItem("misa_user_phone", phone.trim());
       localStorage.setItem("misa_user_role", roleTitle.trim());
       localStorage.setItem("misa_user_bio", bio.trim());
       localStorage.setItem("misa_user_avatar", avatarStyle);
-      localStorage.setItem("misa_user_avatar", avatarStyle);
 
       await backendService.updateAccount({
-        name: fullName.trim(),
+        name: cleanName,
         email: email.trim(),
+        phone: phone.trim(),
         role: roleTitle.trim(),
+        bio: bio.trim(),
         avatar: avatarStyle,
         ...(geminiApiKey.trim() ? { gemini_api_key: geminiApiKey.trim() } : {}),
         settings: {
@@ -268,17 +279,17 @@ export const AccountPage: React.FC<AccountPageProps> = ({
           notifications: inAppNotif,
           theme: themeMode,
         },
-      });
+      } as any);
 
       if (onProfileChange) {
-        onProfileChange(fullName.trim(), avatarStyle);
+        onProfileChange(cleanName, avatarStyle);
       }
       if (geminiApiKey.trim()) {
         setGeminiApiKey("");
       }
-      showToast("Profil va sozlamalar muvaffaqiyatli saqlandi ✓");
+      showToast("Shaxsiy ma'lumotlar muvaffaqiyatli saqlandi ✓");
     } catch {
-      showToast("Profil ma'lumotlari saqlandi ✓");
+      showToast("Shaxsiy ma'lumotlar saqlandi ✓");
     } finally {
       setSavingProfile(false);
     }
@@ -316,7 +327,6 @@ export const AccountPage: React.FC<AccountPageProps> = ({
         app: "Misa AI v9.0 Ultra Glass",
         profile: {
           fullName,
-          usernameHandle,
           email,
           phone,
           roleTitle,
@@ -720,18 +730,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="misa-glass-input"
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
-                  Foydalanuvchi nomi
-                </label>
-                <input
-                  type="text"
-                  value={usernameHandle}
-                  onChange={(e) => setUsernameHandle(e.target.value)}
+                  placeholder="Ismingizni kiriting"
                   className="misa-glass-input"
                   style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
                 />
@@ -744,6 +743,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="sizning@email.uz"
                   className="misa-glass-input"
                   style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
                 />
@@ -756,23 +756,24 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+998 90 123 45 67"
                   className="misa-glass-input"
                   style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
                 />
               </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
-                Kasb / Lavozim
-              </label>
-              <input
-                type="text"
-                value={roleTitle}
-                onChange={(e) => setRoleTitle(e.target.value)}
-                className="misa-glass-input"
-                style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
-              />
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "5px" }}>
+                  Kasb / Lavozim
+                </label>
+                <input
+                  type="text"
+                  value={roleTitle}
+                  onChange={(e) => setRoleTitle(e.target.value)}
+                  placeholder="Masalan: Dasturchi / Muhandis"
+                  className="misa-glass-input"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px" }}
+                />
+              </div>
             </div>
 
             <div>
@@ -783,6 +784,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                 rows={3}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
+                placeholder="O'zingiz va qiziqishlaringiz haqida qisqacha ma'lumot..."
                 className="misa-glass-input"
                 style={{
                   width: "100%",

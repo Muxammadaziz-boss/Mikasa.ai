@@ -93,7 +93,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [_voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
@@ -475,66 +475,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleToggleVoice = async () => {
-    if (voiceState === "listening") {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
-      await backendService.stopVoice();
-      setVoiceState("idle");
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-        recognition.lang = "uz-UZ";
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-
-        setVoiceState("listening");
-        let finalTranscribed = "";
-
-        recognition.onresult = (event: any) => {
-          let interim = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscribed += transcript;
-            } else {
-              interim += transcript;
-            }
-          }
-          setInputText(finalTranscribed || interim);
-        };
-
-        recognition.onerror = () => {
-          setVoiceState("idle");
-          backendService.startVoice();
-        };
-
-        recognition.onend = () => {
-          setVoiceState("idle");
-          if (finalTranscribed.trim()) {
-            setInputText("");
-            handleSend(finalTranscribed.trim());
-          }
-        };
-
-        recognition.start();
-        return;
-      } catch {}
-    }
-
-    await backendService.startVoice();
   };
 
   const handleCopy = (id: string, text: string) => {
@@ -1708,30 +1648,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                 }}
               />
 
-              {/* Right Controls: Mic & Send */}
+              {/* Right Controls: Send */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={handleToggleVoice}
-                  title="Ovoz bilan yozish"
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background:
-                      voiceState === "listening"
-                        ? "rgba(239, 68, 68, 0.24)"
-                        : "rgba(255, 255, 255, 0.04)",
-                    color: voiceState === "listening" ? "#FF716C" : "var(--text-secondary)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <MicIcon size={16} color="currentColor" />
-                </button>
-
                 <button
                   type="button"
                   onClick={() => handleSend()}

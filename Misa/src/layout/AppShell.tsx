@@ -10,7 +10,6 @@ import {
   DatabaseIcon,
   SchedulerIcon,
   PluginsIcon,
-  SettingsIcon,
   RemoteControlIcon,
   LaptopIcon,
   TelegramIcon,
@@ -147,10 +146,11 @@ export const AppShell: React.FC<AppShellProps> = ({
           position: "relative",
           zIndex: 100,
           width: "100%",
-          padding: "10px 12px 6px 12px",
+          padding: "10px 14px 6px 14px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
+          gap: "10px",
           flexShrink: 0,
           userSelect: "none",
           boxSizing: "border-box",
@@ -161,12 +161,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           className="misa-ultra-glass mikasa-glass-topnav"
           aria-label="Asosiy navigatsiya"
           style={{
-            width: "100%",
-            maxWidth: "1440px",
+            flex: 1,
+            maxWidth: "1320px",
             minWidth: 0,
+            margin: "0 auto",
             height: "52px",
             borderRadius: "9999px",
-            padding: "0 6px 0 14px",
+            padding: "0 10px 0 14px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -445,7 +446,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             </div>
           </div>
 
-          {/* ── RIGHT: Search Pill (Ctrl+K), Device Selector, Profile Pill & Window Controls ── */}
+          {/* ── RIGHT: Search Pill (Ctrl+K), Device Selector & Profile Pill ── */}
           <div
             className="misa-topnav-right"
             style={{
@@ -508,7 +509,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             <DeviceSelector onManageDevices={() => onNavigate("/devices")} />
 
-            {/* User Profile & Settings Pill */}
+            {/* User Profile Pill (without extra settings gear icon) */}
             <button
               type="button"
               onClick={() => onNavigate("/account")}
@@ -517,8 +518,8 @@ export const AppShell: React.FC<AppShellProps> = ({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
-                padding: "4px 6px 4px 10px",
+                gap: "8px",
+                padding: "4px 6px 4px 12px",
                 borderRadius: "9999px",
                 background:
                   activePath === "/account"
@@ -575,22 +576,12 @@ export const AppShell: React.FC<AppShellProps> = ({
                   }}
                 />
               </div>
-              <SettingsIcon size={13} color={activePath === "/account" ? "#E8B3FF" : "var(--text-secondary)"} />
             </button>
-
-            <div
-              style={{
-                width: "1px",
-                height: "18px",
-                background: "rgba(255, 255, 255, 0.08)",
-                marginLeft: "1px",
-                flexShrink: 0,
-              }}
-            />
-
-            <WindowControls />
           </div>
         </nav>
+
+        {/* Detached Native Window Controls (outside nav pill, always visible) */}
+        <WindowControls />
       </header>
 
       {/* 4. FULL-BLEED WORKSPACE STAGE */}

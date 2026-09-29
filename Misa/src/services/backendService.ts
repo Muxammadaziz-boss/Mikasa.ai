@@ -1740,7 +1740,11 @@ class BackendService {
   public async getAccount(): Promise<AccountSettings> {
     const cachedName = localStorage.getItem("misa_user_name") || "Ustoz";
     try {
-      const res = await fetch(`${API_BASE}/api/account`, { method: "GET" });
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/account`, {
+        method: "GET",
+        headers: { ...authHeaders },
+      });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data: AccountSettings = await res.json();
       if (data.name) {
@@ -1795,9 +1799,10 @@ class BackendService {
       } catch {}
     }
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(data),
       });
       const result = await res.json();
@@ -1823,9 +1828,10 @@ class BackendService {
     apiKey?: string
   ): Promise<{ ok: boolean; valid?: boolean; message?: string; error?: string; error_code?: string; status_code?: number }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/ai/test-key`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ api_key: apiKey || "" }),
       });
       return await res.json();
@@ -1878,10 +1884,28 @@ class BackendService {
   // ========== Phase 38: Masofaviy Boshqaruv & Ruxsatlar Markazi ==========
   public async getRemoteDevices(): Promise<{ ok: boolean; devices: RemoteDevice[]; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/devices`, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
-      return await res.json();
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.devices) && isLocalhostUrl(API_BASE) && authHeaders.Authorization) {
+        const anyUnpaired = data.devices.some((d: RemoteDevice) => !d.is_paired);
+        if (anyUnpaired) {
+          try {
+            const tgAcc = await this.getTelegramAccount();
+            if (tgAcc?.ok && tgAcc?.is_linked) {
+              const tgUid = tgAcc.link?.telegram_user_id ? String(tgAcc.link.telegram_user_id) : undefined;
+              data.devices = data.devices.map((d: RemoteDevice) => ({
+                ...d,
+                is_paired: true,
+                telegram_user_id: d.telegram_user_id || tgUid,
+              }));
+            }
+          } catch {}
+        }
+      }
+      return data;
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
     }
@@ -1889,11 +1913,12 @@ class BackendService {
 
   public async getDevicePermissions(deviceId: string, userId?: string): Promise<DevicePermissionsResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/permissions?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/remote/permissions/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -1907,12 +1932,17 @@ class BackendService {
     capabilities?: string[]
   ): Promise<{ ok: boolean; message?: string; profile?: PermissionProfileData; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/remote/permissions/${deviceId}`, {
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/remote/permissions/${encodeURIComponent(deviceId)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ permissions, capabilities }),
       });
-      return await res.json();
+      const data = await res.json();
+      if (data?.ok && isLocalhostUrl(API_BASE) && authHeaders.Authorization) {
+        this.syncDevicesToCloud({ permissions: { [deviceId]: permissions } }).catch(() => {});
+      }
+      return data;
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -1920,9 +1950,10 @@ class BackendService {
 
   public async generatePairingCode(deviceId: string = "local_pc"): Promise<PairingCodeResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/pair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ action: "generate", device_id: deviceId }),
       });
       return await res.json();
@@ -1933,9 +1964,10 @@ class BackendService {
 
   public async unpairTelegram(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/unpair`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1946,9 +1978,10 @@ class BackendService {
 
   public async lockRemoteSession(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/session/lock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1959,9 +1992,10 @@ class BackendService {
 
   public async logoutRemoteSession(deviceId: string): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/session/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ device_id: deviceId }),
       });
       return await res.json();
@@ -1972,8 +2006,9 @@ class BackendService {
 
   public async getRemoteAudit(): Promise<{ ok: boolean; total: number; events: RemoteAuditItem[]; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/remote/audit`, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -1993,6 +2028,23 @@ class BackendService {
       } catch {}
     }
     return this.getAuthHeaders();
+  }
+
+  private async syncDevicesToCloud(payload: {
+    devices?: UserDevice[];
+    selected_device_id?: string | null;
+    permissions?: Record<string, Record<string, boolean>>;
+  }): Promise<void> {
+    if (!isLocalhostUrl(API_BASE)) return;
+    try {
+      const authHeaders = await this.getFreshAuthHeaders();
+      if (!authHeaders.Authorization) return;
+      await fetch(`${PRODUCTION_API_URL}/api/devices/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(payload),
+      });
+    } catch {}
   }
 
   public async startTelegramLink(misaUserId?: string): Promise<TelegramLinkStartResponse> {
@@ -2155,11 +2207,19 @@ class BackendService {
 
   public async getDevices(userId?: string): Promise<DevicesListResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId ? `${API_BASE}/api/devices?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/devices`;
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
-      return await res.json();
+      const data: DevicesListResponse = await res.json();
+      if (data?.ok && Array.isArray(data.devices) && data.devices.length > 0 && isLocalhostUrl(API_BASE) && authHeaders.Authorization) {
+        this.syncDevicesToCloud({
+          devices: data.devices,
+          selected_device_id: data.selected_device_id,
+        }).catch(() => {});
+      }
+      return data;
     } catch (err: any) {
       return { ok: false, devices: [], error: String(err) };
     }
@@ -2167,11 +2227,12 @@ class BackendService {
 
   public async getDevice(deviceId: string, userId?: string): Promise<DeviceDetailResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2181,15 +2242,20 @@ class BackendService {
 
   public async renameDevice(deviceId: string, name: string, userId?: string): Promise<DeviceRenameResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ name }),
       });
-      return await res.json();
+      const data: DeviceRenameResponse = await res.json();
+      if (data?.ok && data.device && isLocalhostUrl(API_BASE) && authHeaders.Authorization) {
+        this.syncDevicesToCloud({ devices: [data.device] }).catch(() => {});
+      }
+      return data;
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -2197,12 +2263,13 @@ class BackendService {
 
   public async revokeDevice(deviceId: string, userId?: string): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}`;
       const res = await fetch(url, {
         method: "DELETE",
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2212,14 +2279,22 @@ class BackendService {
 
   public async selectDevice(deviceId: string, userId?: string): Promise<DeviceSelectResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/select`;
       const res = await fetch(url, {
         method: "POST",
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
-      return await res.json();
+      const data: DeviceSelectResponse = await res.json();
+      if (data?.ok && data.selected_device && isLocalhostUrl(API_BASE) && authHeaders.Authorization) {
+        this.syncDevicesToCloud({
+          devices: [data.selected_device],
+          selected_device_id: data.selected_device.device_id,
+        }).catch(() => {});
+      }
+      return data;
     } catch (err: any) {
       return { ok: false, error: String(err) };
     }
@@ -2227,9 +2302,10 @@ class BackendService {
 
   public async getAccountSessions(userId?: string): Promise<AccountSessionsResponse> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId ? `${API_BASE}/api/account/sessions?user_id=${encodeURIComponent(userId)}` : `${API_BASE}/api/account/sessions`;
       const res = await fetch(url, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2239,12 +2315,13 @@ class BackendService {
 
   public async logoutAllSessions(userId?: string): Promise<{ ok: boolean; message?: string; terminated_count?: number; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const url = userId
         ? `${API_BASE}/api/account/sessions/logout-all?user_id=${encodeURIComponent(userId)}`
         : `${API_BASE}/api/account/sessions/logout-all`;
       const res = await fetch(url, {
         method: "POST",
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2260,9 +2337,10 @@ class BackendService {
     origin: string = "web"
   ): Promise<{ ok: boolean; command_id?: string; state?: string; confirmation_token?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ tool_id: toolId, params, origin }),
       });
       return await res.json();
@@ -2277,9 +2355,10 @@ class BackendService {
     token: string
   ): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ token }),
       });
       return await res.json();
@@ -2293,9 +2372,10 @@ class BackendService {
     commandId: string
   ): Promise<{ ok: boolean; message?: string; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/${encodeURIComponent(commandId)}/cancel`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...this.getAuthHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {
@@ -2305,8 +2385,9 @@ class BackendService {
 
   public async getDeviceCommandHistory(deviceId: string): Promise<{ ok: boolean; history: any[]; error?: string }> {
     try {
+      const authHeaders = await this.getFreshAuthHeaders();
       const res = await fetch(`${API_BASE}/api/devices/${encodeURIComponent(deviceId)}/commands/history`, {
-        headers: { ...this.getAuthHeaders() },
+        headers: { ...authHeaders },
       });
       return await res.json();
     } catch (err: any) {

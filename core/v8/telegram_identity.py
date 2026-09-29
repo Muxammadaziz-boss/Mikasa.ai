@@ -381,8 +381,7 @@ class TelegramIdentityManager:
         if (
             os.environ.get("RAILWAY_ENVIRONMENT")
             or os.environ.get("RAILWAY_PROJECT_ID")
-            or os.environ.get("ENVIRONMENT", "").lower() == "production"
-            or os.environ.get("MISA_ENV", "").lower() == "production"
+            or os.environ.get("MISA_API_HOST", "").strip() == "0.0.0.0"
         ):
             return ""
         cloud_url = (

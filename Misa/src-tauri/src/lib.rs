@@ -245,7 +245,9 @@ pub fn ensure_backend_running(state: &SupervisorState) {
             .env("MISA_API_HOST", "127.0.0.1")
             .env("MISA_API_PORT", "18420")
             .env("PORT", "18420")
-            .env("ENVIRONMENT", "production");
+            .env("ENVIRONMENT", "desktop")
+            .env("SUPABASE_URL", "https://bfpffefwsewsfhlbsetd.supabase.co")
+            .env("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_52822f9I67t2c-7nJ33nCA_3p_p6n1v");
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(creation_flags);

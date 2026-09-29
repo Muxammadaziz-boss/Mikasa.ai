@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { MisaAperture, OrbState } from "../components/MisaAperture";
 import { MarkdownView } from "../components/MarkdownView";
 import {
-  MicIcon,
   ArrowUpIcon,
+  MicIcon,
   SparklesIcon,
   VolumeIcon,
   CloseIcon,
@@ -1049,46 +1049,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               }}
             />
 
-            {/* Right Actions: Voice Input & Send */}
+            {/* Right Actions: Send */}
             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={handleToggleVoice}
-                title={voiceState === "listening" ? "Tinglashni to'xtatish" : "Ovozli kiritish"}
-                aria-label="Ovozli kiritish"
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background:
-                    voiceState === "listening" ? "rgba(239, 68, 68, 0.22)" : "transparent",
-                  border:
-                    voiceState === "listening"
-                      ? "1px solid rgba(239, 68, 68, 0.5)"
-                      : "1px solid transparent",
-                  color: voiceState === "listening" ? "#FF716C" : "var(--text-secondary)",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (voiceState !== "listening") {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                    e.currentTarget.style.color = "#FFFFFF";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (voiceState !== "listening") {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }
-                }}
-              >
-                <MicIcon size={17} color="currentColor" />
-              </button>
-
               <button
                 type="submit"
                 disabled={!queryText.trim() && attachedFiles.length === 0}

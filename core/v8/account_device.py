@@ -427,6 +427,14 @@ class AccountDeviceManager:
             existing_uuid = self._devices_by_hw_id[hw_id]
             existing_device = self._devices.get(existing_uuid)
             if existing_device:
+                if existing_device.misa_user_id in ("local_user", "Ustoz") and uid not in ("local_user", "Ustoz"):
+                    old_owner = existing_device.misa_user_id
+                    if old_owner in self._user_devices and existing_device.id in self._user_devices[old_owner]:
+                        self._user_devices[old_owner].remove(existing_device.id)
+                    existing_device.misa_user_id = uid
+                    self._user_devices.setdefault(uid, [])
+                    if existing_device.id not in self._user_devices[uid]:
+                        self._user_devices[uid].append(existing_device.id)
                 # Boshqa foydalanuvchiga tegishli va bekor qilinmagan bo'lsa - xatolik
                 if existing_device.misa_user_id != uid and not existing_device.is_revoked:
                     raise ValueError(
@@ -440,8 +448,10 @@ class AccountDeviceManager:
                         existing_device.hostname = hostname
                     existing_device.platform = platform
                     existing_device.agent_version = agent_version
-                    if existing_device.is_revoked:
+                    if status:
                         existing_device.status = status
+                    if metadata and isinstance(metadata, dict):
+                        existing_device.metadata.update(metadata)
                     existing_device.last_seen_at = time.time()
                     self.save()
                     return existing_device

@@ -1953,6 +1953,7 @@ async def handle_account_get(request):
     name = user_name or user_cfg.get("name") or mem_profile.get("ism", "Ustoz")
     avatar = user_cfg.get("avatar") or mem_profile.get("avatar", "emerald")
     role = user_cfg.get("role") or mem_profile.get("kasb", "Dasturchi / Muhandis")
+    phone = user_cfg.get("phone") or mem_profile.get("telefon", "")
     bio = user_cfg.get("bio") or mem_profile.get("bio", "Misa AI shaxsiy sun'iy intellekt yordamchisi")
     language = user_cfg.get("language") or mem_profile.get("til", "uz")
 
@@ -1970,6 +1971,7 @@ async def handle_account_get(request):
         "name": name,
         "avatar": avatar,
         "role": role,
+        "phone": phone,
         "bio": bio,
         "language": language,
         "voice_type": voice_type or user_cfg.get("voice_type", "ayol"),
@@ -2069,6 +2071,7 @@ async def handle_account_update(request):
     new_name = body.get("name", "").strip() if "name" in body and body["name"] is not None else None
     new_avatar = body.get("avatar", "").strip() if "avatar" in body and body["avatar"] is not None else None
     new_role = body.get("role", "").strip() if "role" in body and body["role"] is not None else None
+    new_phone = body.get("phone", "").strip() if "phone" in body and body["phone"] is not None else None
     new_bio = body.get("bio", "").strip() if "bio" in body and body["bio"] is not None else None
     new_lang = body.get("language", "").strip() if "language" in body and body["language"] is not None else None
 
@@ -2098,6 +2101,14 @@ async def handle_account_update(request):
         if mem:
             try:
                 mem.set_profile("kasb", new_role)
+            except Exception:
+                pass
+
+    if new_phone is not None:
+        cfg["user"]["phone"] = new_phone
+        if mem:
+            try:
+                mem.set_profile("telefon", new_phone)
             except Exception:
                 pass
 
@@ -2252,41 +2263,123 @@ async def handle_remote_devices(request):
     user_id, user, session, err = resolve_auth_identity(request, required=True)
     if err:
         return err
-    from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, DeviceIdentityManager
+    from core.v8 import (
+        DeviceRegistry,
+        HeartbeatManager,
+        UserLinkingStore,
+        DeviceIdentityManager,
+        AccountDeviceManager,
+        TelegramIdentityManager,
+    )
     reg = DeviceRegistry.get_default_instance()
     hb = HeartbeatManager()
     linking = UserLinkingStore.get_default_instance()
+    adm = AccountDeviceManager.get_default_instance()
+    tg_mgr = TelegramIdentityManager.get_default_instance()
+    auth_token = get_auth_token_from_request(request)
+
+    tg_link = tg_mgr.get_link_by_misa_user(user_id, auth_token=auth_token, refresh=False)
+    tg_paired = bool(tg_link and tg_link.is_active)
+    tg_uid_str = str(tg_link.telegram_user_id) if tg_link and tg_link.telegram_user_id else None
+
+    local_ident = DeviceIdentityManager.create_local_identity() if not _is_production_mode() else None
+    adm_devices = adm.get_devices_for_user(user_id, include_revoked=False)
+    if not adm_devices and local_ident:
+        try:
+            dev = adm.register_device(
+                user_id=user_id,
+                device_id=local_ident.device_id,
+                name=f"{local_ident.hostname or 'Asosiy Kompyuter'} (Joriy kompyuter)",
+                hostname=local_ident.hostname,
+                platform=local_ident.os_name.lower(),
+                agent_version=local_ident.agent_version,
+                status="online",
+            )
+            adm.select_device(user_id, dev.device_id)
+            adm_devices = [dev]
+        except Exception:
+            pass
 
     devices = []
-    for d in reg.list_devices():
+    seen_ids = set()
+
+    for d in adm_devices:
+        seen_ids.add(d.device_id)
+        reg_dev = reg.get_device(d.device_id)
         link = linking.get_link_by_device(d.device_id)
-        state = hb.get_device_state(d.device_id)
+        legacy_paired = bool(link and link.is_active)
+        is_local = bool(
+            local_ident
+            and (
+                d.device_id == local_ident.device_id
+                or (d.hostname and local_ident.hostname and d.hostname.lower() == local_ident.hostname.lower())
+            )
+        )
+        meta_metrics = (d.metadata or {}).get("latest_metrics") or {}
+        os_str = (
+            meta_metrics.get("os")
+            or (f"{reg_dev.os_name} {reg_dev.os_release}".strip() if reg_dev else "")
+            or (f"{local_ident.os_name} {local_ident.os_release}".strip() if is_local and local_ident else "")
+            or d.platform.capitalize()
+        )
+        mac_str = (
+            meta_metrics.get("mac_address")
+            or (reg_dev.mac_address if reg_dev else "")
+            or (local_ident.mac_address if is_local and local_ident else "00:00:00:00:00:00")
+        )
+        ip_str = (
+            meta_metrics.get("local_ip")
+            or (reg_dev.local_ip if reg_dev else "")
+            or (local_ident.local_ip if is_local and local_ident else "127.0.0.1")
+        )
+        state_val = "online" if (is_local or d.status == "online") else d.status
         devices.append({
             "device_id": d.device_id,
-            "hostname": d.hostname,
-            "os": f"{d.os_name} {d.os_release}".strip(),
-            "mac_address": d.mac_address,
-            "local_ip": d.local_ip,
-            "state": state.value,
-            "agent_version": d.agent_version,
-            "is_paired": link is not None and link.is_active,
-            "telegram_user_id": link.telegram_user_id if link else None
+            "name": d.name,
+            "hostname": d.hostname or d.name,
+            "os": os_str,
+            "mac_address": mac_str,
+            "local_ip": ip_str,
+            "state": state_val,
+            "agent_version": d.agent_version or "9.0.0",
+            "is_paired": bool(tg_paired or legacy_paired),
+            "telegram_user_id": tg_uid_str or (link.telegram_user_id if link else None),
         })
 
-    # Agar ro'yxat bo'sh bo'lsa, lokal qurilmani qo'shish
-    if not devices:
-        local_ident = DeviceIdentityManager.create_local_identity()
+    if not _is_production_mode():
+        for d in reg.list_devices():
+            if d.device_id in seen_ids:
+                continue
+            seen_ids.add(d.device_id)
+            link = linking.get_link_by_device(d.device_id)
+            state = hb.get_device_state(d.device_id)
+            devices.append({
+                "device_id": d.device_id,
+                "name": d.hostname,
+                "hostname": d.hostname,
+                "os": f"{d.os_name} {d.os_release}".strip(),
+                "mac_address": d.mac_address,
+                "local_ip": d.local_ip,
+                "state": "online" if (local_ident and d.device_id == local_ident.device_id) else state.value,
+                "agent_version": d.agent_version,
+                "is_paired": bool(tg_paired or (link is not None and link.is_active)),
+                "telegram_user_id": tg_uid_str or (link.telegram_user_id if link else None),
+            })
+
+    # Agar ro'yxat bo'sh bo'lsa va lokal desktop rejimida bo'lsak, lokal qurilmani qo'shish
+    if not devices and local_ident:
         reg.register_or_update(local_ident)
         devices.append({
             "device_id": local_ident.device_id,
+            "name": local_ident.hostname,
             "hostname": local_ident.hostname,
             "os": f"{local_ident.os_name} {local_ident.os_release}".strip(),
             "mac_address": local_ident.mac_address,
             "local_ip": local_ident.local_ip,
             "state": "online",
             "agent_version": local_ident.agent_version,
-            "is_paired": False,
-            "telegram_user_id": None
+            "is_paired": tg_paired,
+            "telegram_user_id": tg_uid_str,
         })
 
     return web.json_response({"ok": True, "devices": devices})
@@ -2297,26 +2390,43 @@ async def handle_remote_device_detail(request):
     user_id, user, session, err = resolve_auth_identity(request, required=True)
     if err:
         return err
-    dev_id = request.match_info.get("id", "")
-    from core.v8 import DeviceRegistry, HeartbeatManager, UserLinkingStore, PermissionStore
+    dev_id = urllib.parse.unquote(request.match_info.get("id", ""))
+    from core.v8 import (
+        DeviceRegistry,
+        HeartbeatManager,
+        UserLinkingStore,
+        PermissionStore,
+        AccountDeviceManager,
+        TelegramIdentityManager,
+    )
     reg = DeviceRegistry.get_default_instance()
+    adm = AccountDeviceManager.get_default_instance()
     dev = reg.get_device(dev_id)
-    if not dev:
+    adm_dev = adm.get_device(dev_id, user_id=user_id)
+    if not dev and not adm_dev:
         return web.json_response({"ok": False, "error": f"Qurilma topilmadi: {dev_id}"}, status=404)
 
     linking = UserLinkingStore.get_default_instance()
     link = linking.get_link_by_device(dev_id)
+    tg_mgr = TelegramIdentityManager.get_default_instance()
+    tg_link = tg_mgr.get_link_by_misa_user(user_id, auth_token=get_auth_token_from_request(request), refresh=False)
     hb = HeartbeatManager()
     perm_store = PermissionStore.get_default_instance()
     profile = perm_store.get_profile(user_id, dev_id)
 
+    base_dict = dev.to_dict() if dev else adm_dev.to_dict()
+    is_paired = bool((tg_link and tg_link.is_active) or (link and link.is_active))
+    tg_uid = (str(tg_link.telegram_user_id) if tg_link and tg_link.telegram_user_id else None) or (
+        link.telegram_user_id if link else None
+    )
+
     return web.json_response({
         "ok": True,
         "device": {
-            **dev.to_dict(),
-            "state": hb.get_device_state(dev_id).value,
-            "is_paired": link is not None and link.is_active,
-            "telegram_user_id": link.telegram_user_id if link else None,
+            **base_dict,
+            "state": "online" if (adm_dev and adm_dev.status == "online") else hb.get_device_state(dev_id).value,
+            "is_paired": is_paired,
+            "telegram_user_id": tg_uid,
             "permissions": profile.permissions
         }
     })
@@ -2327,7 +2437,7 @@ async def handle_remote_permissions_get(request):
     user_id, user, session, err = resolve_auth_identity(request, required=True)
     if err:
         return err
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     from core.v8 import PermissionStore
     store = PermissionStore.get_default_instance()
     profile = store.get_profile(user_id, dev_id)
@@ -2345,7 +2455,7 @@ async def handle_remote_permissions_put(request):
     user_id, user, session, err = resolve_auth_identity(request, required=True)
     if err:
         return err
-    dev_id = request.match_info.get("device_id", "")
+    dev_id = urllib.parse.unquote(request.match_info.get("device_id", ""))
     try:
         body = await request.json()
     except Exception:
@@ -2357,6 +2467,10 @@ async def handle_remote_permissions_put(request):
     from core.v8 import PermissionStore
     store = PermissionStore.get_default_instance()
     updated = store.update_permissions(user_id, dev_id, new_perms, new_caps)
+
+    auth_token = get_auth_token_from_request(request)
+    if not _is_production_mode() and auth_token:
+        asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
 
     await broadcast_ws("permission_changed", {
         "device_id": dev_id,
@@ -2371,7 +2485,7 @@ async def handle_remote_permissions_put(request):
 
 
 async def handle_remote_pair(request):
-    """POST /api/remote/pair - Kod generatsiya qilish (MK-XXXXXX) yoki bog'lash"""
+    """POST /api/remote/pair - Kod generatsiya qilish (6-xonali OTP / MK-XXXXXX) yoki bog'lash"""
     user_id, user, session, err = resolve_auth_identity(request, required=True)
     if err:
         return err
@@ -2382,27 +2496,58 @@ async def handle_remote_pair(request):
 
     action = body.get("action", "generate")
     dev_id = body.get("device_id", "local_pc")
+    auth_token = get_auth_token_from_request(request)
 
-    from core.v8 import UserLinkingStore
+    from core.v8 import UserLinkingStore, TelegramIdentityManager
     linking = UserLinkingStore.get_default_instance()
+    tg_mgr = TelegramIdentityManager.get_default_instance()
 
     if action == "generate":
-        code = linking.generate_pairing_code(user_id, dev_id, ttl=300.0)
+        mk_code = linking.generate_pairing_code(user_id, dev_id, ttl=300.0)
+        bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Misa_ai_agent_bot").strip() or "Misa_ai_agent_bot"
+        req, otp, deep_link, _ = tg_mgr.create_link_request(
+            misa_user_id=user_id,
+            bot_username=bot_username,
+            auth_token=auth_token
+        )
+        primary_code = otp if otp else mk_code
+        if not _is_production_mode() and auth_token:
+            asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
+
         await broadcast_ws("pairing_code_generated", {
             "device_id": dev_id,
-            "code": code,
+            "code": primary_code,
+            "mk_code": mk_code,
             "expires_in": 300
         })
         return web.json_response({
             "ok": True,
-            "code": code,
+            "code": primary_code,
+            "otp": otp,
+            "mk_code": mk_code,
+            "deep_link": deep_link,
+            "request_id": req.request_id if req else None,
             "expires_in": 300,
-            "instruction": f"Telegram botingizda quyidagicha yuboring: /pair {code}"
+            "instruction": f"Telegram botingizda quyidagicha yuboring: /link {primary_code}"
         })
     elif action == "redeem":
-        code = body.get("code", "")
+        code = str(body.get("code", "")).strip()
         tg_id = body.get("telegram_user_id", "")
-        ok, msg, link = linking.redeem_pairing_code(code, tg_id)
+        if code.isdigit() and len(code) == 6 and str(tg_id).isdigit():
+            ok_otp, msg_otp, tg_link = tg_mgr.verify_otp(
+                otp=code,
+                telegram_user_id=int(tg_id),
+                auth_token=auth_token,
+                expected_misa_user_id=user_id if user_id != "admin" else None
+            )
+            if ok_otp and tg_link:
+                await broadcast_ws("device_paired", {
+                    "device_id": dev_id,
+                    "telegram_user_id": str(tg_link.telegram_user_id)
+                })
+                return web.json_response({"ok": True, "message": msg_otp, "link": tg_link.to_dict()})
+
+        ok, msg, link = linking.redeem_pairing_code(code, str(tg_id))
         if ok and link:
             await broadcast_ws("device_paired", {
                 "device_id": link.device_id,
@@ -2425,11 +2570,14 @@ async def handle_remote_unpair(request):
         body = {}
 
     dev_id = body.get("device_id", "")
-    from core.v8 import UserLinkingStore, DeviceRegistry
+    auth_token = get_auth_token_from_request(request)
+    from core.v8 import UserLinkingStore, DeviceRegistry, TelegramIdentityManager
     linking = UserLinkingStore.get_default_instance()
     reg = DeviceRegistry.get_default_instance()
+    tg_mgr = TelegramIdentityManager.get_default_instance()
 
-    unpaired = linking.unlink_telegram(dev_id)
+    unpaired_legacy = linking.unlink_telegram(dev_id)
+    unpaired_tg = tg_mgr.unlink(misa_user_id=user_id, auth_token=auth_token)
     reg.unpair_device(dev_id)
 
     await broadcast_ws("device_unpaired", {"device_id": dev_id})
@@ -2437,7 +2585,7 @@ async def handle_remote_unpair(request):
         "ok": True,
         "message": "Bog'lanish bekor qilindi",
         "device_id": dev_id,
-        "unpaired": unpaired
+        "unpaired": bool(unpaired_legacy or unpaired_tg)
     })
 
 
@@ -2894,6 +3042,11 @@ def resolve_auth_identity(
             }, status=403)
             return None, None, None, err_resp
 
+        if not _is_production_mode():
+            _last_active_desktop_auth["user_id"] = authenticated_user_id
+            _last_active_desktop_auth["token"] = token
+            _last_active_desktop_auth["updated_at"] = time.time()
+
         return authenticated_user_id, user, session, None
 
     # Token yo'q holat
@@ -2924,6 +3077,13 @@ def resolve_auth_identity(
     return local_id, None, None, None
 
 
+_last_active_desktop_auth: Dict[str, Any] = {
+    "user_id": None,
+    "token": None,
+    "updated_at": 0.0,
+}
+
+
 def get_authenticated_user(request) -> Tuple[Optional[Any], Optional[Any]]:
     """Token orqali haqiqiy foydalanuvchi va uning sessiyasini aniqlash.
     Qaytaradi: (session, user) yoki (None, None).
@@ -2946,6 +3106,408 @@ def _get_request_user_id(request) -> str:
     return uid or "local_user"
 
 
+def _collect_local_device_metrics(loc: Any) -> Dict[str, Any]:
+    """Lokal kompyuterning jonli telemetriya ko'rsatkichlarini yig'ish."""
+    metrics: Dict[str, Any] = {
+        "os": f"{getattr(loc, 'os_name', 'Windows')} {getattr(loc, 'os_release', '')}".strip(),
+        "local_ip": getattr(loc, "local_ip", "127.0.0.1"),
+        "mac_address": getattr(loc, "mac_address", "00:00:00:00:00:00"),
+        "updated_at": time.time(),
+    }
+    try:
+        from core.v8.remote_tools import RemoteToolRegistry
+        reg = RemoteToolRegistry.get_default_instance()
+        sys_res = reg.execute("system.info", {})
+        if sys_res.get("ok") and isinstance(sys_res.get("data"), dict):
+            sdata = sys_res["data"]
+            metrics["cpu_percent"] = sdata.get("cpu_usage_percent", 0.0)
+            metrics["cpu_usage_percent"] = sdata.get("cpu_usage_percent", 0.0)
+            metrics["ram_used_gb"] = sdata.get("ram_used_gb", 0.0)
+            metrics["ram_total_gb"] = sdata.get("ram_total_gb", 0.0)
+            metrics["disk_free_gb"] = sdata.get("disk_free_gb", 0.0)
+        app_res = reg.execute("app.list", {})
+        if app_res.get("ok") and isinstance(app_res.get("data"), dict):
+            metrics["apps"] = (app_res["data"].get("apps") or [])[:25]
+    except Exception:
+        pass
+    return metrics
+
+
+def _execute_local_remote_command(cmd_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Bulutdan kelgan masofaviy buyruqni lokal Windows kompyuterida xavfsiz bajarish."""
+    cmd_id = str(cmd_dict.get("command_id") or "")
+    tool_id = str(cmd_dict.get("tool_id") or "")
+    params = cmd_dict.get("params") if isinstance(cmd_dict.get("params"), dict) else {}
+
+    try:
+        from core.v8.remote_tools import RemoteToolRegistry
+        reg = RemoteToolRegistry.get_default_instance()
+        res = reg.execute(tool_id, params)
+        ok = bool(res.get("ok"))
+        data = res.get("data") if isinstance(res.get("data"), dict) else {}
+        err = res.get("error")
+
+        # Windows desktopda xavfsiz dasturlarni haqiqatan ishga tushirish
+        if ok and tool_id == "app.launch" and sys.platform == "win32":
+            app_name = str(params.get("app_name") or "").strip().lower()
+            win_map = {
+                "calculator": ["calc.exe"],
+                "calc": ["calc.exe"],
+                "notepad": ["notepad.exe"],
+                "explorer": ["explorer.exe"],
+                "browser": ["cmd", "/c", "start", "https://www.google.com"],
+                "taskmgr": ["taskmgr.exe"],
+            }
+            if app_name in win_map:
+                try:
+                    import subprocess
+                    subprocess.Popen(win_map[app_name], shell=False)
+                    data["launched_real"] = True
+                except Exception as launch_err:
+                    logger.debug(f"app.launch real process warning: {launch_err}")
+
+        if ok and tool_id == "app.close" and sys.platform == "win32":
+            app_name = str(params.get("app_name") or "").strip().lower()
+            close_map = {
+                "calculator": "CalculatorApp.exe",
+                "calc": "CalculatorApp.exe",
+                "notepad": "notepad.exe",
+            }
+            target_exe = close_map.get(app_name)
+            if target_exe:
+                try:
+                    import subprocess
+                    subprocess.run(["taskkill", "/IM", target_exe, "/F"], capture_output=True, timeout=5)
+                except Exception:
+                    pass
+
+        return {
+            "command_id": cmd_id,
+            "tool_id": tool_id,
+            "success": ok,
+            "data": data,
+            "error": err,
+        }
+    except Exception as exc:
+        return {
+            "command_id": cmd_id,
+            "tool_id": tool_id,
+            "success": False,
+            "data": {},
+            "error": str(exc),
+        }
+
+
+def _format_telegram_command_result(tool_id: str, dev_name: str, res_item: Dict[str, Any]) -> str:
+    """Bajarilgan masofaviy buyruq natijasini Telegram xabari uchun chiroyli formatlash."""
+    success = bool(res_item.get("success"))
+    data = res_item.get("data") if isinstance(res_item.get("data"), dict) else {}
+    err = res_item.get("error") or "Noma'lum xatolik"
+
+    if not success:
+        return (
+            f"❌ *Buyruq bajarilmadi ({dev_name})*\n\n"
+            f"• Amal: `{tool_id}`\n"
+            f"• Xatolik: `{err}`"
+        )
+
+    if tool_id == "system.info":
+        return (
+            f"📊 *Tizim Ma'lumotlari — {dev_name}*\n\n"
+            f"• Tizim: `{data.get('os', 'Windows')}`\n"
+            f"• CPU: `{data.get('cpu_usage_percent', 0)}%`\n"
+            f"• RAM: `{data.get('ram_used_gb', 0)} GB / {data.get('ram_total_gb', 0)} GB`\n"
+            f"• Bo'sh disk: `{data.get('disk_free_gb', 0)} GB`"
+        )
+    if tool_id == "app.list":
+        apps = data.get("apps") or []
+        lines = [f"🧩 *Ishlayotgan dasturlar — {dev_name}:*\n"]
+        for idx, a in enumerate(apps[:20], start=1):
+            aname = a.get("name") if isinstance(a, dict) else str(a)
+            lines.append(f"{idx}. `{aname}`")
+        return "\n".join(lines)
+    if tool_id == "file.list":
+        entries = data.get("entries") or []
+        lines = [f"📂 *Fayllar ro'yxati — {dev_name}:*\n`{data.get('directory', '')}`\n"]
+        for item in entries[:25]:
+            icon = "📁" if item.get("type") == "dir" else "📄"
+            lines.append(f"{icon} `{item.get('name')}`")
+        return "\n".join(lines)
+    if tool_id in ("app.launch", "app.close", "system.screenshot", "power.sleep", "power.restart", "power.shutdown"):
+        msg = data.get("message") or "Amal muvaffaqiyatli bajarildi."
+        extra = f"\n• Fayl: `{data.get('path')}`" if data.get("path") else ""
+        return (
+            f"✅ *Buyruq bajarildi — {dev_name}*\n\n"
+            f"• Amal: `{tool_id}`\n"
+            f"• Natija: {msg}{extra}"
+        )
+
+    return (
+        f"✅ *Buyruq bajarildi — {dev_name}*\n\n"
+        f"• Amal: `{tool_id}`\n"
+        f"• Holat: Muvaffaqiyatli"
+    )
+
+
+async def _sync_user_devices_to_cloud(user_id: Optional[str], auth_token: Optional[str]) -> None:
+    """Lokal desktopdagi qurilma, ruxsatlar va telemetriyani Railway serveriga sinxronlash
+    hamda navbatdagi masofaviy buyruqlarni bajarish."""
+    if _is_production_mode() or not user_id or not auth_token or user_id in ("admin", "local_user"):
+        return
+
+    from core.v8.telegram_identity import TelegramIdentityManager, UserTelegramLink
+    tg_mgr = TelegramIdentityManager.get_default_instance()
+    cloud_base = tg_mgr._resolve_cloud_api_url()
+    if not cloud_base:
+        return
+
+    try:
+        from core.v8 import AccountDeviceManager, PermissionStore
+        from core.v8.device import DeviceIdentityManager
+        adm = AccountDeviceManager.get_default_instance()
+        perm_store = PermissionStore.get_default_instance()
+        loc = DeviceIdentityManager.create_local_identity()
+
+        devices = adm.get_devices_for_user(user_id, include_revoked=False)
+        if not devices:
+            return
+
+        live_metrics = await asyncio.to_thread(_collect_local_device_metrics, loc)
+        payload_devices = []
+        permissions_map: Dict[str, Any] = {}
+
+        for d in devices:
+            is_local = (
+                d.device_id == loc.device_id
+                or (bool(d.hostname) and bool(loc.hostname) and d.hostname.lower() == loc.hostname.lower())
+            )
+            if is_local:
+                d.status = "online"
+                d.last_seen_at = time.time()
+                d.last_heartbeat_at = time.time()
+                d.metadata = dict(d.metadata or {})
+                d.metadata["latest_metrics"] = live_metrics
+            d_dict = d.to_dict()
+            payload_devices.append(d_dict)
+            prof = perm_store.get_profile(user_id, d.device_id)
+            if prof:
+                permissions_map[d.device_id] = prof.permissions
+
+        adm.save()
+        selected = adm.get_selected_device(user_id)
+        local_tg_link = tg_mgr.get_link_by_misa_user(user_id)
+        sync_body: Dict[str, Any] = {
+            "user_id": user_id,
+            "devices": payload_devices,
+            "selected_device_id": selected.device_id if selected else (devices[0].device_id if devices else None),
+            "permissions": permissions_map,
+            "telegram_link": local_tg_link.to_dict() if (local_tg_link and local_tg_link.is_active) else None,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {auth_token}",
+            "X-Misa-User-Id": str(user_id),
+        }
+
+        def _post_sync(body_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            resp = requests.post(
+                f"{cloud_base}/api/devices/sync",
+                json=body_data,
+                headers=headers,
+                timeout=6.0,
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            return None
+
+        resp_data = await asyncio.to_thread(_post_sync, sync_body)
+        if not isinstance(resp_data, dict):
+            return
+
+        remote_link_data = resp_data.get("telegram_link")
+        if isinstance(remote_link_data, dict) and remote_link_data.get("telegram_user_id") and remote_link_data.get("misa_user_id") == user_id:
+            try:
+                remote_link = UserTelegramLink.from_dict(remote_link_data)
+                if remote_link.is_active:
+                    existing_local = tg_mgr.get_link_by_misa_user(user_id)
+                    if not existing_local or not existing_local.is_active or existing_local.telegram_user_id != remote_link.telegram_user_id:
+                        tg_mgr._links_by_tg[remote_link.telegram_user_id] = remote_link
+                        tg_mgr._links_by_misa[user_id] = remote_link
+                        tg_mgr.save()
+                        await broadcast_ws("device_paired", {
+                            "device_id": sync_body.get("selected_device_id"),
+                            "telegram_user_id": str(remote_link.telegram_user_id),
+                        })
+            except Exception as link_err:
+                logger.debug(f"[_sync_user_devices_to_cloud] Telegram link sync warning: {link_err}")
+
+        pending_cmds = resp_data.get("pending_commands") or []
+        if pending_cmds and isinstance(pending_cmds, list):
+            cmd_results = []
+            for cmd_item in pending_cmds:
+                if isinstance(cmd_item, dict) and cmd_item.get("command_id"):
+                    res_obj = await asyncio.to_thread(_execute_local_remote_command, cmd_item)
+                    cmd_results.append(res_obj)
+            if cmd_results:
+                await asyncio.to_thread(
+                    _post_sync,
+                    {
+                        "user_id": user_id,
+                        "command_results": cmd_results,
+                    },
+                )
+    except Exception as e:
+        logger.debug(f"[_sync_user_devices_to_cloud] Cloud sync skipped: {e}")
+
+
+async def handle_devices_sync(request):
+    """POST /api/devices/sync - Desktop ilovasidan qurilmalar, ruxsatlar va buyruq natijalarini qabul qilish"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise ValueError("JSON object expected")
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    from core.v8 import AccountDeviceManager, PermissionStore, DeviceRegistry, DeviceIdentity, TelegramIdentityManager
+    from core.v8.telegram_identity import UserTelegramLink
+    from core.v8.command_queue import CommandQueueManager
+    adm = AccountDeviceManager.get_default_instance()
+    perm_store = PermissionStore.get_default_instance()
+    reg = DeviceRegistry.get_default_instance()
+    cmd_mgr = CommandQueueManager.get_default_instance()
+    tg_mgr = TelegramIdentityManager.get_default_instance()
+
+    raw_devices = body.get("devices") if isinstance(body.get("devices"), list) else []
+    synced_devices = []
+    now = time.time()
+
+    for item in raw_devices:
+        if not isinstance(item, dict):
+            continue
+        hw_id = str(item.get("device_id") or "").strip()
+        if not hw_id:
+            continue
+        dev_name = str(item.get("name") or item.get("hostname") or "Kompyuter").strip()
+        hostname = str(item.get("hostname") or dev_name).strip()
+        platform_str = str(item.get("platform") or "windows").strip().lower()
+        agent_ver = str(item.get("agent_version") or "9.0.0").strip()
+        status_str = str(item.get("status") or "online").strip().lower()
+        meta = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+
+        try:
+            dev = adm.register_device(
+                user_id=user_id,
+                device_id=hw_id,
+                name=dev_name,
+                hostname=hostname,
+                platform=platform_str,
+                agent_version=agent_ver,
+                status=status_str,
+                metadata=meta,
+            )
+            dev.status = status_str
+            dev.last_seen_at = now
+            dev.last_heartbeat_at = now
+            if meta:
+                dev.metadata = dict(dev.metadata or {})
+                dev.metadata.update(meta)
+            synced_devices.append(dev.to_dict())
+
+            latest_m = meta.get("latest_metrics") if isinstance(meta.get("latest_metrics"), dict) else {}
+            reg.register_or_update(
+                DeviceIdentity(
+                    device_id=hw_id,
+                    hostname=hostname,
+                    os_name=str(latest_m.get("os") or platform_str.capitalize()),
+                    mac_address=str(latest_m.get("mac_address") or "00:00:00:00:00:00"),
+                    local_ip=str(latest_m.get("local_ip") or "127.0.0.1"),
+                    agent_version=agent_ver,
+                    metadata=meta,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"[handle_devices_sync] Device register warning ({hw_id}): {e}")
+
+    selected_id = str(body.get("selected_device_id") or "").strip()
+    if selected_id:
+        adm.select_device(user_id, selected_id)
+    elif synced_devices and not adm.get_selected_device(user_id):
+        adm.select_device(user_id, synced_devices[0]["device_id"])
+
+    adm.save()
+
+    perms_map = body.get("permissions")
+    if isinstance(perms_map, dict):
+        for dev_id, p_dict in perms_map.items():
+            if isinstance(p_dict, dict):
+                perm_store.update_permissions(user_id, str(dev_id), p_dict)
+
+    incoming_tg_link = body.get("telegram_link")
+    if isinstance(incoming_tg_link, dict) and incoming_tg_link.get("telegram_user_id") and incoming_tg_link.get("misa_user_id") == user_id:
+        try:
+            curr_link = tg_mgr.get_link_by_misa_user(user_id)
+            if not curr_link or not curr_link.is_active:
+                restored_link = UserTelegramLink.from_dict(incoming_tg_link)
+                if restored_link.is_active:
+                    tg_mgr._links_by_tg[restored_link.telegram_user_id] = restored_link
+                    tg_mgr._links_by_misa[user_id] = restored_link
+                    tg_mgr.save()
+        except Exception as tg_sync_err:
+            logger.debug(f"[handle_devices_sync] Telegram link restore skipped: {tg_sync_err}")
+
+    # Bajarilgan masofaviy buyruq natijalarini qabul qilish va Telegram foydalanuvchiga yuborish
+    cmd_results = body.get("command_results")
+    if isinstance(cmd_results, list):
+        tg_svc = request.app.get("telegram_webhook_service")
+        for res_item in cmd_results:
+            if not isinstance(res_item, dict):
+                continue
+            cid = str(res_item.get("command_id") or "").strip()
+            if not cid:
+                continue
+            cmd_obj = cmd_mgr.get_command(cid)
+            if not cmd_obj or (cmd_obj.user_id and cmd_obj.user_id != user_id):
+                continue
+            cmd_mgr.record_result(cid, res_item)
+            if cmd_obj.telegram_user_id and tg_svc and getattr(tg_svc, "transport", None):
+                dev_obj = adm.get_device(cmd_obj.device_id, user_id=user_id)
+                dev_label = dev_obj.name if dev_obj else cmd_obj.device_id
+                msg_text = _format_telegram_command_result(cmd_obj.tool_id, dev_label, res_item)
+                try:
+                    await tg_svc.transport.send_message(
+                        chat_id=int(cmd_obj.telegram_user_id) if str(cmd_obj.telegram_user_id).isdigit() else cmd_obj.telegram_user_id,
+                        text=msg_text,
+                        parse_mode="Markdown",
+                    )
+                except Exception as tg_err:
+                    logger.warning(f"[handle_devices_sync] Telegram notify error: {tg_err}")
+
+    # Ushbu foydalanuvchining barcha qurilmalari uchun kutilayotgan buyruqlarni yig'ish
+    pending_commands: List[Dict[str, Any]] = []
+    user_devs = adm.get_devices_for_user(user_id, include_revoked=False)
+    for udev in user_devs:
+        dev_pending = cmd_mgr.get_pending_commands(udev.device_id)
+        for pcmd in dev_pending:
+            pcmd["device_id"] = udev.device_id
+            pending_commands.append(pcmd)
+
+    active_tg_link = tg_mgr.get_link_by_misa_user(user_id)
+    return web.json_response({
+        "ok": True,
+        "user_id": user_id,
+        "synced_count": len(synced_devices),
+        "devices": synced_devices,
+        "pending_commands": pending_commands,
+        "telegram_link": active_tg_link.to_dict() if (active_tg_link and active_tg_link.is_active) else None,
+    })
+
+
 async def handle_devices_list(request):
     """GET /api/devices and GET /api/account/devices - Foydalanuvchining ulangan kompyuterlari ro'yxati"""
     user_id, user, session, err = resolve_auth_identity(request, required=True)
@@ -2954,12 +3516,13 @@ async def handle_devices_list(request):
     from core.v8 import AccountDeviceManager
     from core.v8.device import DeviceIdentityManager
     mgr = AccountDeviceManager.get_default_instance()
-    loc = DeviceIdentityManager.create_local_identity()
+    is_prod = _is_production_mode()
+    loc = DeviceIdentityManager.create_local_identity() if not is_prod else None
 
     devices = mgr.get_devices_for_user(user_id, include_revoked=False)
 
-    # 1. Agar ro'yxat bo'sh bo'lsa, lokal kompyuterni kiritish
-    if not devices:
+    # 1. Agar ro'yxat bo'sh bo'lsa (faqat lokal desktopda!), lokal kompyuterni kiritish
+    if not devices and loc:
         host_label = loc.hostname or "Asosiy Kompyuter"
         dev = mgr.register_device(
             user_id=user_id,
@@ -2974,7 +3537,7 @@ async def handle_devices_list(request):
         mgr.select_device(user_id, dev.device_id)
 
     # 2. Agar mavjud yagona qurilma eski dummy (dev-sess-1) bo'lsa, uni joriy kompyuter bilan bog'lash
-    if len(devices) == 1 and devices[0].device_id == "dev-sess-1":
+    if loc and len(devices) == 1 and devices[0].device_id == "dev-sess-1":
         d0 = devices[0]
         if not d0.name or d0.name == "dev-sess-1":
             d0.name = f"{loc.hostname or 'Asosiy Kompyuter'} (Joriy kompyuter)"
@@ -2986,32 +3549,33 @@ async def handle_devices_list(request):
         mgr._devices_by_hw_id[loc.device_id] = d0.id
         mgr.save()
 
-    # 3. Joriy kompyuterni belgilash va yangilash
+    # 3. Joriy kompyuterni belgilash va yangilash (faqat lokal desktopda)
     local_dev = None
-    for d in devices:
-        if d.device_id == loc.device_id or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower()):
-            local_dev = d
-            d.status = "online"
-            d.last_seen_at = time.time()
-            d.hostname = loc.hostname
-            d.platform = loc.os_name.lower()
-            d.agent_version = loc.agent_version
-            mgr._devices_by_hw_id[loc.device_id] = d.id
-            break
+    if loc:
+        for d in devices:
+            if d.device_id == loc.device_id or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower()):
+                local_dev = d
+                d.status = "online"
+                d.last_seen_at = time.time()
+                d.hostname = loc.hostname
+                d.platform = loc.os_name.lower()
+                d.agent_version = loc.agent_version
+                mgr._devices_by_hw_id[loc.device_id] = d.id
+                break
 
-    # Agar ro'yxatda faqat 1 ta qurilma bo'lsa va local_dev topilmagan bo'lsa, ushbu yagona qurilma joriy desktop qurilmasi deb hisoblanadi
-    if not local_dev and len(devices) == 1:
-        local_dev = devices[0]
-        local_dev.status = "online"
-        local_dev.last_seen_at = time.time()
-        local_dev.hostname = loc.hostname
-        local_dev.platform = loc.os_name.lower()
-        local_dev.agent_version = loc.agent_version
-        mgr._devices_by_hw_id[loc.device_id] = local_dev.id
-        mgr.save()
+        # Agar ro'yxatda faqat 1 ta qurilma bo'lsa va local_dev topilmagan bo'lsa, ushbu yagona qurilma joriy desktop qurilmasi deb hisoblanadi
+        if not local_dev and len(devices) == 1:
+            local_dev = devices[0]
+            local_dev.status = "online"
+            local_dev.last_seen_at = time.time()
+            local_dev.hostname = loc.hostname
+            local_dev.platform = loc.os_name.lower()
+            local_dev.agent_version = loc.agent_version
+            mgr._devices_by_hw_id[loc.device_id] = local_dev.id
+            mgr.save()
 
     selected = mgr.get_selected_device(user_id)
-    if not selected or selected.is_revoked:
+    if (not selected or selected.is_revoked) and devices:
         sel_target = local_dev or devices[0]
         mgr.select_device(user_id, sel_target.device_id)
         selected = sel_target
@@ -3020,10 +3584,12 @@ async def handle_devices_list(request):
     enriched_devices = []
     for d in devices:
         d_dict = d.to_dict()
-        is_curr = (
-            (local_dev and (d.id == local_dev.id or d.device_id == local_dev.device_id))
-            or d.device_id == loc.device_id
-            or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower())
+        is_curr = bool(
+            loc and (
+                (local_dev and (d.id == local_dev.id or d.device_id == local_dev.device_id))
+                or d.device_id == loc.device_id
+                or (bool(d.hostname) and d.hostname.lower() == loc.hostname.lower())
+            )
         )
         d_dict["is_current"] = bool(is_curr)
         if is_curr:
@@ -3032,12 +3598,16 @@ async def handle_devices_list(request):
 
     enriched_devices.sort(key=lambda x: 0 if x.get("is_current") else 1)
 
+    auth_token = get_auth_token_from_request(request)
+    if not is_prod and auth_token:
+        asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
+
     return web.json_response({
         "ok": True,
         "user_id": user_id,
         "devices": enriched_devices,
         "selected_device_id": selected.device_id if selected else (local_dev.device_id if local_dev else None),
-        "current_device_id": local_dev.device_id if local_dev else None
+        "current_device_id": local_dev.device_id if local_dev else (selected.device_id if selected else None)
     })
 
 
@@ -3084,7 +3654,7 @@ async def handle_device_rename(request):
     from core.v8 import AccountDeviceManager
     from core.v8.device import DeviceIdentityManager
     mgr = AccountDeviceManager.get_default_instance()
-    loc = DeviceIdentityManager.create_local_identity()
+    loc = DeviceIdentityManager.create_local_identity() if not _is_production_mode() else None
 
     ok, msg, dev = mgr.rename_device(dev_id, user_id=user_id, new_name=new_name)
     if not ok or not dev:
@@ -3092,13 +3662,19 @@ async def handle_device_rename(request):
         return web.json_response({"ok": False, "error": msg}, status=status_code)
 
     dev_dict = dev.to_dict()
-    is_curr = (
-        dev.device_id == loc.device_id
-        or (bool(dev.hostname) and dev.hostname.lower() == loc.hostname.lower())
+    is_curr = bool(
+        loc and (
+            dev.device_id == loc.device_id
+            or (bool(dev.hostname) and dev.hostname.lower() == loc.hostname.lower())
+        )
     )
     dev_dict["is_current"] = bool(is_curr)
     if is_curr:
         dev_dict["status"] = "online"
+
+    auth_token = get_auth_token_from_request(request)
+    if not _is_production_mode() and auth_token:
+        asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
 
     await broadcast_ws("DEVICE_RENAMED", {
         "user_id": user_id,
@@ -3125,6 +3701,10 @@ async def handle_device_revoke(request):
     if not ok:
         return web.json_response({"ok": False, "error": msg}, status=404)
 
+    auth_token = get_auth_token_from_request(request)
+    if not _is_production_mode() and auth_token:
+        asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
+
     await broadcast_ws("DEVICE_REVOKED", {
         "user_id": user_id,
         "device_id": dev_id
@@ -3149,6 +3729,10 @@ async def handle_device_select(request):
     ok, msg, dev = mgr.select_device(user_id=user_id, device_id_or_uuid=dev_id)
     if not ok or not dev:
         return web.json_response({"ok": False, "error": msg}, status=404)
+
+    auth_token = get_auth_token_from_request(request)
+    if not _is_production_mode() and auth_token:
+        asyncio.create_task(_sync_user_devices_to_cloud(user_id, auth_token))
 
     await broadcast_ws("DEVICE_SELECTED", {
         "user_id": user_id,
@@ -5212,6 +5796,7 @@ def create_app():
     # Phase 40: Universal Account & Multi-Device Management
     app.router.add_get("/api/account/devices", handle_devices_list)
     app.router.add_get("/api/devices", handle_devices_list)
+    app.router.add_post("/api/devices/sync", handle_devices_sync)
     app.router.add_get("/api/devices/{device_id}", handle_device_detail)
     app.router.add_patch("/api/devices/{device_id}", handle_device_rename)
     app.router.add_delete("/api/devices/{device_id}", handle_device_revoke)
@@ -5327,6 +5912,7 @@ def run_server(host=None, port=None):
 
         # Auxiliary ports (1420, 140) - local desktop OAuth fallback only (never on cloud/Railway)
         is_cloud = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"))
+        sync_task = None
         if not is_cloud and resolved_host in ("127.0.0.1", "localhost"):
             for aux_port in (1420, 140):
                 if resolved_port != aux_port:
@@ -5336,6 +5922,21 @@ def run_server(host=None, port=None):
                         logger.info(f"Qo'shimcha OAuth tinglovchisi ishga tushdi: http://{resolved_host}:{aux_port}")
                     except Exception as e:
                         logger.debug(f"Port {aux_port} band yoki ulanib bo'lmadi: {e}")
+
+            async def _desktop_cloud_sync_loop():
+                while True:
+                    try:
+                        await asyncio.sleep(5.0)
+                        uid = _last_active_desktop_auth.get("user_id")
+                        tok = _last_active_desktop_auth.get("token")
+                        if uid and tok:
+                            await _sync_user_devices_to_cloud(uid, tok)
+                    except asyncio.CancelledError:
+                        break
+                    except Exception:
+                        pass
+
+            sync_task = asyncio.create_task(_desktop_cloud_sync_loop())
 
         stop_event = asyncio.Event()
 
@@ -5350,6 +5951,8 @@ def run_server(host=None, port=None):
                 signal.signal(sig, lambda s, f: _request_shutdown())
 
         await stop_event.wait()
+        if sync_task:
+            sync_task.cancel()
         logger.info("Graceful shutdown boshlandi — active handlerlar tugashini kutmoqda...")
         await runner.cleanup()
         logger.info("API Server to'xtatildi")
