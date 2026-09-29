@@ -310,11 +310,23 @@ class TelegramWebhookService:
         import aiohttp
 
         api_url = f"{TELEGRAM_API_BASE}{self.bot_token}/getWebhookInfo"
+        me_url = f"{TELEGRAM_API_BASE}{self.bot_token}/getMe"
+        result: Dict[str, Any] = {}
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                     data = await resp.json()
-                    return data.get("result", {}) if data.get("ok") else {"ok": False}
+                    if data.get("ok") and isinstance(data.get("result"), dict):
+                        result.update(data["result"])
+                async with session.get(me_url, timeout=aiohttp.ClientTimeout(total=10)) as me_resp:
+                    me_data = await me_resp.json()
+                    if me_data.get("ok") and isinstance(me_data.get("result"), dict):
+                        result["_bot_me"] = {
+                            "id": me_data["result"].get("id"),
+                            "username": me_data["result"].get("username"),
+                            "first_name": me_data["result"].get("first_name"),
+                        }
+            return result if result else {"ok": False}
         except Exception as exc:
             return {"ok": False, "error": type(exc).__name__}
 
@@ -371,6 +383,20 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _resolve_public_webhook_base_url() -> str:
+    """Resolve the public HTTPS base URL for Telegram webhook registration, prioritizing explicit MISA_PUBLIC_URL."""
+    public_url = (
+        os.environ.get("MISA_PUBLIC_URL", "").strip()
+        or os.environ.get("MISA_BACKEND_URL", "").strip()
+        or os.environ.get("TELEGRAM_WEBHOOK_URL", "").strip()
+        or os.environ.get("MIKASA_PUBLIC_URL", "").strip()
+        or os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    )
+    if public_url and not public_url.startswith("http"):
+        public_url = f"https://{public_url}"
+    return public_url
+
+
 def build_telegram_webhook_service() -> Optional[TelegramWebhookService]:
     """Factory: returns None when Telegram bot is not configured."""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -411,10 +437,18 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
 
     async def handle_ready(request: web.Request) -> web.Response:
         import sys
-        svc = app.get("telegram_webhook_service")
+        from urllib.parse import urlparse
+        svc: Optional[TelegramWebhookService] = app.get("telegram_webhook_service")
         use_webhook = _env_bool("TELEGRAM_USE_WEBHOOK", default=True)
         bot_configured = bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip())
-        backend_url = os.environ.get("MISA_BACKEND_URL", "").strip() or os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+        backend_url = _resolve_public_webhook_base_url()
+
+        if svc and request.query.get("refresh") in ("1", "true", "yes"):
+            if backend_url and use_webhook:
+                ok, msg = await svc.register_webhook(backend_url)
+                app["telegram_webhook_registration"] = {"ok": ok, "message": msg}
+            info = await svc.verify_webhook_info()
+            app["telegram_webhook_info"] = info
 
         checks: Dict[str, Any] = {
             "telegram_bot": "configured" if bot_configured else "missing",
@@ -425,6 +459,7 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
 
         if backend_url:
             checks["backend_url"] = "configured"
+            checks["backend_host"] = urlparse(backend_url).netloc or backend_url
 
         reg_state = app.get("telegram_webhook_registration")
         if isinstance(reg_state, dict):
@@ -435,11 +470,16 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
 
         wh_info = app.get("telegram_webhook_info")
         if isinstance(wh_info, dict) and wh_info:
+            raw_wh_url = str(wh_info.get("url", ""))
+            wh_host = urlparse(raw_wh_url).netloc if raw_wh_url else ""
             checks["webhook_info"] = {
+                "webhook_host": wh_host,
                 "pending_update_count": wh_info.get("pending_update_count", 0),
                 "last_error_message": sanitize_sensitive_string(str(wh_info.get("last_error_message", ""))),
                 "has_custom_certificate": bool(wh_info.get("has_custom_certificate", False)),
             }
+            if isinstance(wh_info.get("_bot_me"), dict):
+                checks["bot_info"] = wh_info["_bot_me"]
 
         supabase_url = os.environ.get("SUPABASE_URL", "")
         supabase_key = (
@@ -492,14 +532,7 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
         await polling.start()
 
     if svc and use_webhook:
-        public_url = (
-            os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
-            or os.environ.get("MISA_PUBLIC_URL", "").strip()
-            or os.environ.get("MISA_BACKEND_URL", "").strip()
-            or os.environ.get("TELEGRAM_WEBHOOK_URL", "").strip()
-        )
-        if public_url and not public_url.startswith("http"):
-            public_url = f"https://{public_url}"
+        public_url = _resolve_public_webhook_base_url()
         if public_url:
             ok, msg = await svc.register_webhook(public_url)
             app["telegram_webhook_registration"] = {"ok": ok, "message": msg}
@@ -508,7 +541,7 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
                 app["telegram_webhook_info"] = info
         else:
             logger.warning(
-                "[TelegramWebhook] RAILWAY_PUBLIC_DOMAIN / MISA_PUBLIC_URL not set — "
+                "[TelegramWebhook] MISA_PUBLIC_URL / RAILWAY_PUBLIC_DOMAIN not set — "
                 "skipping automatic setWebhook (register manually after deploy)"
             )
 
