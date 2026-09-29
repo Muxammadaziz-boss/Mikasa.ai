@@ -94,7 +94,7 @@ class TestV8MultiTenantIsolation(unittest.TestCase):
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.text)
             self.assertEqual(data.get("status"), "ok")
-            self.assertEqual(data.get("app"), "Mikasa AI")
+            self.assertEqual(data.get("app"), "Misa AI")
             self.assertEqual(data.get("version"), "8.0.0")
             self.assertIn(data.get("supabase"), ["configured", "not_configured"])
             self.assertIn("environment", data)
@@ -141,7 +141,7 @@ class TestV8MultiTenantIsolation(unittest.TestCase):
             resp = loop.run_until_complete(handle_oauth_callback(req))
             self.assertEqual(resp.status, 200)
             self.assertEqual(resp.content_type, "text/html")
-            self.assertIn("Mikasa AI", resp.text)
+            self.assertIn("Misa AI", resp.text)
             self.assertIn("access_token", resp.text)
             self.assertIn("/api/auth/callback/session", resp.text)
         finally:

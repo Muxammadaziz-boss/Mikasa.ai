@@ -9,6 +9,9 @@ __pycache__
 .pytest_cache
 .env
 *.log
+Misa/node_modules
+Misa/dist
+Misa/src-tauri/target
 mikasa-7/node_modules
 mikasa-7/dist
 mikasa-7/src-tauri/target

@@ -119,7 +119,7 @@ class TestV7SplashScreen(unittest.TestCase):
         self.assertEqual(splash.orb.get_state(), "loading")
 
         self.assertTrue(hasattr(splash, "brand_title"))
-        self.assertEqual(splash.brand_title.cget("text"), "MIKASA AI")
+        self.assertEqual(splash.brand_title.cget("text"), "MISA AI")
 
         self.assertTrue(hasattr(splash, "subtitle"))
         self.assertEqual(splash.subtitle.cget("text"), "Sizning shaxsiy AI yordamchingiz")
@@ -175,7 +175,7 @@ class TestV7MikasaAppStartupIntegration(unittest.TestCase):
         # Splash birinchi kadrda mavjud
         self.assertIsNotNone(app.splash)
         self.assertTrue(app.splash.winfo_exists())
-        self.assertEqual(app.splash.brand_title.cget("text"), "MIKASA AI")
+        self.assertEqual(app.splash.brand_title.cget("text"), "MISA AI")
 
         # Asosiy shell ham tayyor bo'lib turadi
         self.assertTrue(hasattr(app, "titlebar"))

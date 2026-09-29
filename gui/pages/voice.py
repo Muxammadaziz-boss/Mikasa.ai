@@ -41,7 +41,7 @@ class VoicePage(ctk.CTkFrame):
         # "Mikasa" sarlavhasi
         ctk.CTkLabel(
             orb_container,
-            text="Mikasa",
+            text="Misa",
             font=(Fonts.FAMILY, 15, "bold"),
             text_color=Colors.TEXT_MUTED,
         ).pack(pady=(0, 16))
@@ -275,7 +275,7 @@ class VoicePage(ctk.CTkFrame):
                 image=get_vector_icon("circle", size=7, color=Colors.TEXT_MUTED, fallback="circle")
             )
             self.voice_status.configure(text="Oflayn", text_color=Colors.TEXT_MUTED)
-            self.orb_text.configure(text="Mikasa oflayn", text_color=Colors.TEXT_MUTED)
+            self.orb_text.configure(text="Misa oflayn", text_color=Colors.TEXT_MUTED)
         else:  # idle
             self._is_listening = False
             self.mic_btn.configure(
@@ -326,7 +326,7 @@ class VoicePage(ctk.CTkFrame):
         row = ctk.CTkFrame(self.transcript_list, fg_color="transparent")
         row.pack(fill="x", pady=(4, 6))
 
-        sender = "Siz" if is_user else "Mikasa"
+        sender = "Siz" if is_user else "Misa"
         sender_color = Colors.TEXT_MUTED if is_user else Colors.PRIMARY
 
         header = ctk.CTkFrame(row, fg_color="transparent")
@@ -357,7 +357,7 @@ class VoicePage(ctk.CTkFrame):
 
         try:
             self.transcript_text.configure(state="normal")
-            prefix = "Siz: " if role == "user" else "Mikasa: "
+            prefix = "Siz: " if role == "user" else "Misa: "
             self.transcript_text.insert("end", f"{prefix}{text}\n")
             self.transcript_text.see("end")
             self.transcript_text.configure(state="disabled")

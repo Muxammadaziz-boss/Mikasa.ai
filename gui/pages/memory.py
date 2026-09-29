@@ -103,7 +103,7 @@ class MemoryPage(ctk.CTkFrame):
         summary = ElevatedCard(
             scroll,
             title="Profil holati",
-            subtitle="Mikasa sizni to'g'ri taniy olishi uchun asosiy ma'lumotlarni saqlang.",
+            subtitle="Misa sizni to'g'ri taniy olishi uchun asosiy ma'lumotlarni saqlang.",
             accent_color=Colors.INFO,
         )
         summary.pack(fill="x", padx=16, pady=(16, 12))
@@ -467,7 +467,7 @@ class MemoryPage(ctk.CTkFrame):
                 self._history_scroll,
                 icon="chat",
                 title="Tarix bo'sh",
-                description="Mikasa bilan suhbat boshlang. Yangi dialoglar shu yerda paydo bo'ladi.",
+                description="Misa bilan suhbat boshlang. Yangi dialoglar shu yerda paydo bo'ladi.",
             ).pack(fill="x", pady=24)
             return
 
@@ -491,7 +491,7 @@ class MemoryPage(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 row.content,
-                text=f"Mikasa: {ai_text[:260]}",
+                text=f"Misa: {ai_text[:260]}",
                 font=Fonts.SMALL,
                 text_color=Colors.TEXT_SECONDARY,
                 anchor="w",

@@ -39,7 +39,7 @@ class SystemAgent(BaseAgent):
         }
 
     def _build_system_prompt(self) -> str:
-        return """Sen SystemAgent — Mikasa AI tizimining kompyuter resurslari va operatsion tizim boshqaruvchisisan.
+        return """Sen SystemAgent — Misa AI tizimining kompyuter resurslari va operatsion tizim boshqaruvchisisan.
 
 Vazifalaring:
 1. Kompyuterning joriy holatini (RAM, CPU, Disk) tahlil qilish

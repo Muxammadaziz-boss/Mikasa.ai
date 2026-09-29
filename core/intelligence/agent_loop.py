@@ -361,7 +361,7 @@ class AgentLoop:
 
     def _generate_plan_via_llm(self, goal: str, request: AIRequest) -> Optional[List[PlanStep]]:
         """LLM orqali qat'iy JSON formatdagi reja taklifini olish"""
-        plan_system_prompt = f"""Siz Mikasa AI Agentik Rejalashtiruvchisiz.
+        plan_system_prompt = f"""Siz Misa AI Agentik Rejalashtiruvchisiz.
 Foydalanuvchi maqsadi uchun KICHIK, MINIMAL va KETMA-KET reja tuzing.
 
 Mavjud asboblar:

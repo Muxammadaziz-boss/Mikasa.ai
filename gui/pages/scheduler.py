@@ -263,7 +263,7 @@ class SchedulerPage(ctk.CTkFrame):
                 self.tasks_scroll,
                 icon="scheduler",
                 title="Task yo'q",
-                description="Yuqoridagi formadan yangi vazifa qo'shing. Mikasa uni kerakli vaqtda eslatadi.",
+                description="Yuqoridagi formadan yangi vazifa qo'shing. Misa uni kerakli vaqtda eslatadi.",
             ).pack(fill="x", pady=24)
             self.task_count_chip.set_text("0 ta aktiv vazifa")
             self.next_task_chip.set_text("Keyingi task yo'q")

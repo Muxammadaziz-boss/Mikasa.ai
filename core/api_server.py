@@ -96,6 +96,8 @@ def load_runtime_dotenv() -> None:
             root_env = os.path.join(root, ".env")
             if os.path.isfile(root_env):
                 load_dotenv(root_env, override=False)
+            frontend_env = os.path.join(root, "Misa", ".env")
+        if not os.path.isfile(frontend_env):
             frontend_env = os.path.join(root, "mikasa-7", ".env")
             if os.path.isfile(frontend_env):
                 load_dotenv(frontend_env, override=False)
@@ -283,7 +285,7 @@ async def handle_status(request):
     
     return web.json_response({
         "status": "online",
-        "app": "MIKASA AI",
+        "app": "MISA AI",
         "version": "8.0.0",
         "user": user,
         "ai_available": ai_ok,
@@ -1953,7 +1955,7 @@ async def handle_account_get(request):
     name = user_name or user_cfg.get("name") or mem_profile.get("ism", "Ustoz")
     avatar = user_cfg.get("avatar") or mem_profile.get("avatar", "emerald")
     role = user_cfg.get("role") or mem_profile.get("kasb", "Dasturchi / Muhandis")
-    bio = user_cfg.get("bio") or mem_profile.get("bio", "Mikasa AI shaxsiy sun'iy intellekt yordamchisi")
+    bio = user_cfg.get("bio") or mem_profile.get("bio", "Misa AI shaxsiy sun'iy intellekt yordamchisi")
     language = user_cfg.get("language") or mem_profile.get("til", "uz")
 
     has_gemini = bool(os.environ.get("GEMINI_API_KEY") or ai_cfg.get("gemini_api_key"))
@@ -1988,12 +1990,12 @@ async def handle_account_get(request):
         "has_gemini_key": has_gemini,
         "version": "8.0.0",
         "app_info": {
-            "name": "Mikasa AI",
+            "name": "Misa AI",
             "version": "8.0.0",
             "codename": "Quiet Intelligence",
             "engine": "Tauri 2.0 (Native Rust) + Python 3.11+",
             "architecture": "Windows x64 Native Desktop",
-            "developer": "Mikasa Core Team",
+            "developer": "Misa Core Team",
             "license": "Personal / Commercial AI Assistant"
         },
         "notifications": {
@@ -2038,7 +2040,7 @@ async def handle_account_get(request):
             },
             {
                 "id": "local",
-                "name": "Mikasa Local Dispatcher",
+                "name": "Misa Local Dispatcher",
                 "provider": "Mahalliy Tizim",
                 "badge": "Oflayn",
                 "desc": "Internetga ulanmasdan tizim buyruqlarini boshqarish"
@@ -3365,7 +3367,7 @@ async def handle_health(request):
 
     return web.json_response({
         "status": "ok",
-        "app": "Mikasa AI",
+        "app": "Misa AI",
         "version": "8.0.0",
         "supabase": "configured" if is_supabase_configured else "not_configured",
         "environment": env_name,
@@ -3435,7 +3437,7 @@ async def handle_oauth_callback(request):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
-  <title>Mikasa AI — Kirish muvaffaqiyatli</title>
+  <title>Misa AI — Kirish muvaffaqiyatli</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -3490,7 +3492,7 @@ async def handle_oauth_callback(request):
 <body>
   <div class="card">
     <div class="icon">✨</div>
-    <h1>Mikasa AI</h1>
+    <h1>Misa AI</h1>
     <p id="msg">Google orqali autentifikatsiya yakunlanmoqda...</p>
     <div id="badge" class="status">Kutilmoqda...</div>
   </div>
@@ -3586,7 +3588,7 @@ async def handle_oauth_callback(request):
             badgeEl.className = "status error";
             return;
           }
-          msgEl.innerHTML = "Tizimga muvaffaqiyatli kirdingiz!<br>Ushbu oynani yopib, Mikasa ilovasiga qaytishingiz mumkin.";
+          msgEl.innerHTML = "Tizimga muvaffaqiyatli kirdingiz!<br>Ushbu oynani yopib, Misa ilovasiga qaytishingiz mumkin.";
           badgeEl.textContent = "Tasdiqlandi ✓";
           setTimeout(function() {
             try { window.close(); } catch(e) {}
@@ -4161,7 +4163,7 @@ async def handle_device_pairing_complete(request):
 
     # 2. Qurilma identifikatsiyasini aniqlash
     dev_id = dev_info.get("device_id")
-    hostname = dev_info.get("hostname", "Mikasa-PC")
+    hostname = dev_info.get("hostname", "Misa-PC")
     platform_name = dev_info.get("platform", "Windows")
     os_version = dev_info.get("os_version", "10")
     fingerprint = dev_info.get("fingerprint", "")
@@ -5308,7 +5310,7 @@ def run_server(host=None, port=None):
             resolved_port = 18420
 
     logger.info(
-        f"MIKASA AI 8.0.0 Background API Server boshlanmoqda: "
+        f"MISA AI 9.0.0 Background API Server boshlanmoqda: "
         f"http://{resolved_host}:{resolved_port}"
     )
     get_modules()

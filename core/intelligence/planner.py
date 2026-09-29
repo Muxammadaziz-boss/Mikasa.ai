@@ -401,7 +401,7 @@ class GoalDecomposer:
         max_steps: int
     ) -> Optional[List[PlanStep]]:
         """LLM orqali qat'iy JSON formatdagi strukturaviy reja olish"""
-        prompt = f"""Siz Mikasa AI Aqlli Rejalashtiruvchisiz.
+        prompt = f"""Siz Misa AI Aqlli Rejalashtiruvchisiz.
 Foydalanuvchi maqsadi uchun bog'liqliklari (dependencies) bilan minimal reja tuzing.
 
 Mavjud qobiliyatlar:

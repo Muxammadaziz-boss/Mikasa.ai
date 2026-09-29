@@ -62,7 +62,7 @@ class ProviderManager:
 
             if any(w in query_lower for w in ["salom", "qodir", "nima", "qila ol", "kim", "yordam", "imkon"]):
                 resp_text = (
-                    "Assalomu alaykum! Men Mikasa — sizning shaxsiy sun'iy intellekt yordamchingizman.\n\n"
+                    "Assalomu alaykum! Men Misa — sizning shaxsiy sun'iy intellekt yordamchingizman.\n\n"
                     "Men quyidagi asosiy vazifalarni bajara olaman:\n"
                     "• 💻 Kompyuterni boshqarish (dasturlarni ochish, oynalar va skrinshot)\n"
                     "• 📊 Tizim holati (CPU, RAM va real vaqtdagi harorat monitoringi)\n"
@@ -72,7 +72,7 @@ class ProviderManager:
                 )
             else:
                 resp_text = (
-                    "Mikasa mahalliy yordamchi rejimida ishlamoqda. Buyruqlaringizni bajarishga tayyorman!\n\n"
+                    "Misa mahalliy yordamchi rejimida ishlamoqda. Buyruqlaringizni bajarishga tayyorman!\n\n"
                     "Erkin tahlil va suhbatlar uchun Hisob sozlamalaridan Gemini API kalitini sozlashingiz mumkin."
                 )
 

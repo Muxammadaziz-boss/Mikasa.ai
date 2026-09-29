@@ -83,7 +83,7 @@ class TestWindowsQA(unittest.TestCase):
 
     def test_high_dpi_css_tokens(self):
         """CSS fayllarida High-DPI (100%, 125%, 150%, 200%) uchun font-smoothing va elastik birliklar mavjudligi"""
-        css_path = os.path.join(BASE_DIR, "mikasa-7", "src", "styles", "globals.css")
+        css_path = os.path.join(BASE_DIR, "Misa", "src", "styles", "globals.css")
         self.assertTrue(os.path.exists(css_path), "globals.css mavjud emas")
 
         with open(css_path, "r", encoding="utf-8") as f:
@@ -94,7 +94,7 @@ class TestWindowsQA(unittest.TestCase):
 
     def test_tauri_config_window_bounds(self):
         """tauri.conf.json dagi oyna chegaralari (1024x700 min) Windows talablariga mos"""
-        tauri_conf_path = os.path.join(BASE_DIR, "mikasa-7", "src-tauri", "tauri.conf.json")
+        tauri_conf_path = os.path.join(BASE_DIR, "Misa", "src-tauri", "tauri.conf.json")
         self.assertTrue(os.path.exists(tauri_conf_path))
 
         with open(tauri_conf_path, "r", encoding="utf-8") as f:

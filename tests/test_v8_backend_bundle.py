@@ -35,7 +35,7 @@ def ensure_backend_extracted():
             for member in zf.namelist():
                 if member.startswith("backend/"):
                     zf.extract(member, REPO_ROOT / "release" / "v8.0.0")
-    tauri_backend_exe = REPO_ROOT / "mikasa-7" / "src-tauri" / "backend" / "mikasa_backend.exe"
+    tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "mikasa_backend.exe"
     if not tauri_backend_exe.exists() and backend_exe.exists():
         tauri_backend_exe.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(backend_exe.parent, tauri_backend_exe.parent, dirs_exist_ok=True)
@@ -54,11 +54,11 @@ class TestBackendBundleStructure(unittest.TestCase):
         self.assertGreater(size_mb, 1.0, f"Executable size too small: {size_mb:.2f} MB")
 
     def test_backend_deployed_to_tauri_resources(self):
-        tauri_backend_exe = REPO_ROOT / "mikasa-7" / "src-tauri" / "backend" / "mikasa_backend.exe"
+        tauri_backend_exe = REPO_ROOT / "Misa" / "src-tauri" / "backend" / "mikasa_backend.exe"
         self.assertTrue(tauri_backend_exe.exists(), f"Tauri resource backend not found at: {tauri_backend_exe}")
 
     def test_tauri_conf_includes_backend_resources(self):
-        tauri_conf_path = REPO_ROOT / "mikasa-7" / "src-tauri" / "tauri.conf.json"
+        tauri_conf_path = REPO_ROOT / "Misa" / "src-tauri" / "tauri.conf.json"
         self.assertTrue(tauri_conf_path.exists())
         with open(tauri_conf_path, "r", encoding="utf-8") as f:
             conf = json.load(f)
@@ -100,7 +100,7 @@ class TestBackendRuntimeAndHealth(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data.get("status"), "ok")
-        self.assertEqual(data.get("app"), "Mikasa AI")
+        self.assertIn(data.get("app"), ("Misa AI", "Mikasa AI"))
         self.assertEqual(data.get("version"), "8.0.0")
 
     def test_oauth_callback_html(self):
@@ -109,7 +109,7 @@ class TestBackendRuntimeAndHealth(unittest.TestCase):
         res = requests.get("http://127.0.0.1:18420/api/auth/callback", timeout=3)
         self.assertEqual(res.status_code, 200)
         self.assertIn("text/html", res.headers.get("Content-Type", ""))
-        self.assertIn("Mikasa AI", res.text)
+        self.assertTrue("Misa AI" in res.text or "Mikasa AI" in res.text)
         self.assertIn("/api/auth/callback/session", res.text)
 
     def test_oauth_session_save_and_retrieve(self):
@@ -146,7 +146,7 @@ class TestSupervisorArchitecture(unittest.TestCase):
 
     def test_supervisor_source_code_integrity(self):
         """Validates that src-tauri/src/lib.rs implements all required supervisor guarantees."""
-        lib_rs = REPO_ROOT / "mikasa-7" / "src-tauri" / "src" / "lib.rs"
+        lib_rs = REPO_ROOT / "Misa" / "src-tauri" / "src" / "lib.rs"
         self.assertTrue(lib_rs.exists())
         with open(lib_rs, "r", encoding="utf-8") as f:
             content = f.read()

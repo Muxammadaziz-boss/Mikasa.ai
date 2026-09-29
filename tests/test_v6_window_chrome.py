@@ -78,7 +78,7 @@ class TestV6WindowChrome(unittest.TestCase):
         app.update()
 
         # 1. Title "MIKASA AI" (build versiyasiz)
-        self.assertEqual(app.title(), "MIKASA AI")
+        self.assertEqual(app.title(), "MISA AI")
 
         # 2. Window controls mavjudligi
         self.assertTrue(hasattr(app, "window_controls"))

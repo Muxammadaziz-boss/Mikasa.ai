@@ -1,6 +1,6 @@
-# 🛠️ Mikasa AI v8.0.0 — O'rnatish va Sozlash Qo'llanmasi
+# 🛠️ Misa AI (sobiq Mikasa AI) — O'rnatish va Sozlash Qo'llanmasi
 
-Ushbu qo'llanma **Mikasa AI v8.0.0 (Level 8 Autonomous Desktop Assistant & Intelligence Hub)** tizimini Windows tizimida to'g'ri o'rnatish, sozlash va ishga tushirish bo'yicha to'liq qo'llanmadir.
+Ushbu qo'llanma **Misa AI v9.0.0+ (sobiq Mikasa AI v8.0.0 — Autonomous Desktop Assistant & Intelligence Hub)** tizimini Windows tizimida to'g'ri o'rnatish, sozlash va ishga tushirish bo'yicha to'liq qo'llanmadir.
 
 ---
 
@@ -10,7 +10,7 @@ Ushbu qo'llanma **Mikasa AI v8.0.0 (Level 8 Autonomous Desktop Assistant & Intel
 * **Python**: 3.11.x (3.11 tavsiya etiladi)
 * **Node.js**: 20.x yoki undan yuqori
 * **RAM**: Kamida 4 GB (8 GB yoki 16 GB tavsiya etiladi)
-* **Mikrofon va Dinamik**: Ovozli boshqaruv va Mikasa Orb uchun
+* **Mikrofon va Dinamik**: Ovozli boshqaruv va Misa Orb uchun
 * **Internet**: Google Gemini, Supabase Auth va Telegram masofaviy boshqaruvi uchun
 
 ---
@@ -30,7 +30,7 @@ Hech qanday dasturlash muhiti yoki kutubxonalarni o'rnatish shart emas:
 ```bash
 git clone https://github.com/Muxammadaziz-boss/Mikasa.ai.git
 cd Mikasa.ai
-git checkout dev-v8.0.0
+git checkout dev-v9.0.0
 ```
 
 #### 2-qadam: Python 3.11 Virtual Muhiti
@@ -46,9 +46,9 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-#### 3-qadam: Frontend Interfeysini O'rnatish (mikasa-7)
+#### 3-qadam: Frontend Interfeysini O'rnatish (Misa)
 ```bash
-cd mikasa-7
+cd Misa
 npm install
 npm run build
 cd ..
@@ -92,13 +92,13 @@ python main.py
 
 ### 2. Desktop Interfeysini Ishga Tushirish (Vite + Tauri):
 ```bash
-cd mikasa-7
+cd Misa
 npm run desktop
 ```
 
 ### 3. Brauzer / Ishlab chiqish rejimida:
 ```bash
-cd mikasa-7
+cd Misa
 npm run dev
 ```
 
@@ -116,7 +116,7 @@ python -m unittest discover tests/ "test_*.py"
 python -m unittest tests/test_v8_secure_updater.py
 
 # 3. Frontend Birlik va Stress Testlari (15 ta test)
-cd mikasa-7
+cd Misa
 npm test
 ```
 

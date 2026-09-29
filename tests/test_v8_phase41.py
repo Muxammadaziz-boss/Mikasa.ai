@@ -625,7 +625,7 @@ class TestAPISupabaseAuthAndSessionDecoupling(unittest.TestCase):
     def test_30_env_configuration_security(self):
         """Scenario 30: Frontend .env never contains service role or JWT secrets, root .env does."""
         root_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.example")
-        frontend_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mikasa-7", ".env.example")
+        frontend_env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Misa", ".env.example")
 
         self.assertTrue(os.path.exists(root_env_path))
         self.assertTrue(os.path.exists(frontend_env_path))

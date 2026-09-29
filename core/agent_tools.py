@@ -2560,7 +2560,7 @@ TOOL_WINDOW_MANAGER = Tool(
 
 # --- 26. NOTIFICATION (Eslatma) ---
 def _notification(
-    title: str = "Mikasa AI", message: str = "", duration: int = 5
+    title: str = "Misa AI", message: str = "", duration: int = 5
 ) -> dict:
     """Windows notification yuborish"""
     try:
@@ -2587,7 +2587,7 @@ TOOL_NOTIFICATION = Tool(
     parameters={
         "title": {
             "type": "string",
-            "description": "Eslatma sarlavhasi. Default: 'Mikasa AI'",
+            "description": "Eslatma sarlavhasi. Default: 'Misa AI'",
             "required": False,
         },
         "message": {"type": "string", "description": "Eslatma matni", "required": True},

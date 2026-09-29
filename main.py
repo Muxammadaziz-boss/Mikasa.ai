@@ -4,7 +4,7 @@
 # ========== Ogohlantirishlarni yashirish ==========
 
 VERSION = "8.0.0"
-APP_NAME = "Mikasa AI"
+APP_NAME = "Misa AI"
 import os
 import logging
 import webbrowser
@@ -2146,10 +2146,10 @@ def _intent_bajar(intent, params=None, matn="", foydalanuvchi_ismi=""):
         elif intent == "identity":
             ism = foydalanuvchi_ismi or "Do'stim"
             gui_ga_xabar_yuborish(
-                f"🤖 Men Mikasa AI yordamchiman! {ism} uchun yaratilganman."
+                f"🤖 Men Misa AI yordamchiman! {ism} uchun yaratilganman."
             )
             ovoz_chiqar_tez(
-                f"Men Mikasa, sun'iy intellektga ega shaxsiy yordamchiman. "
+                f"Men Misa, sun'iy intellektga ega shaxsiy yordamchiman. "
                 f"{ism}, siz uchun har doim xizmatdaman!"
             )
 
@@ -2357,7 +2357,7 @@ def toza_musiqa_nomi(matn):
 
     # Boshidagi undov va platforma prefikslarini tozalash:
     patterns_head = [
-        r"^(?:(?:hey|salom|iltimos|menga|bitta|biror|bir|mikasajon|mikasa)\s+)+",
+        r"^(?:(?:hey|salom|iltimos|menga|bitta|biror|bir|misajon|misa|mikasajon|mikasa)\s+)+",
         r"^(?:youtube|youtub|yutub|yutuq|yandex|yandeks|яндекс|spotify)(?:\s*music)?(?:\s*(?:dan|da|dagi|ga))?\s*",
         r"^(?:menga|iltimos|bitta|biror|bir)\s+",
     ]
@@ -2679,7 +2679,7 @@ def gui_ishga_tushir():
 
         from gui.app import MikasaApp
 
-        print("🔷 MIKASA AI — Yangi GUI ishga tushmoqda...")
+        print("🔷 MISA AI — Yangi GUI ishga tushmoqda...")
         app = MikasaApp(connect_backend=True)
         app.mainloop()
     except ImportError:

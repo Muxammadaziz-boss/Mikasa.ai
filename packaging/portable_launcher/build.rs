@@ -4,7 +4,7 @@ use std::env;
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     let out_dir = env::var("OUT_DIR").unwrap();
-    let icon_path = "../../mikasa-7/src-tauri/icons/icon.ico".replace('\\', "/");
+    let icon_path = "../../Misa/src-tauri/icons/icon.ico".replace('\\', "/");
     let rc_content = format!("1 ICON \"{}\"\n", icon_path);
     let rc_path = format!("{}/app.rc", out_dir);
     let res_path = format!("{}/app.res", out_dir);

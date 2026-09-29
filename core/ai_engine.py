@@ -211,7 +211,7 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
                 a = c.get("agent", "").strip()
                 if u and a:
                     tarix_lines.append(f"Foydalanuvchi: {u}")
-                    tarix_lines.append(f"Mikasa: {a}")
+                    tarix_lines.append(f"Misa: {a}")
             if tarix_lines:
                 enriched_prompt += f"\nSO'NGGI SUHBAT TARIXI (Kontekst uchun):\n" + "\n".join(tarix_lines) + "\n"
     except Exception:

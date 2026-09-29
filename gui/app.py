@@ -59,7 +59,7 @@ class MikasaApp(ctk.CTk):
         self._apply_ui_preferences(initial=True)
 
         # Oyna sozlamalari
-        self.title("MIKASA AI")
+        self.title("MISA AI")
         self.configure(fg_color=Colors.BG_DARK)
         self._apply_window_mode()
 
@@ -571,7 +571,7 @@ class MikasaApp(ctk.CTk):
 
         self.logo_label = ctk.CTkLabel(
             self.titlebar,
-            text="  MIKASA" if self._compact_mode else "  MIKASA AI",
+            text="  MISA" if self._compact_mode else "  MISA AI",
             image=logo_icon,
             compound="left",
             font=(Fonts.FAMILY, 13, "bold"),
@@ -661,7 +661,7 @@ class MikasaApp(ctk.CTk):
         # Nav elementlar bo'limlari
         nav_sections = [
             (
-                "MIKASA",
+                "MISA",
                 [
                     ("home", "home", "Bosh sahifa"),
                     ("voice", Icons.VOICE, "Ovozli muloqot"),
@@ -738,7 +738,7 @@ class MikasaApp(ctk.CTk):
         
         self._ai_status_label = ctk.CTkLabel(
             status_left,
-            text="Mikasa kutmoqda",
+            text="Misa kutmoqda",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         )
@@ -1059,7 +1059,7 @@ class MikasaApp(ctk.CTk):
         self._status_state = {"status": status, "text": text or status.capitalize()}
         display_text = self._status_state["text"]
         is_listening = status == "listening"
-        self.update_ai_control_bar(f"Mikasa: {display_text}", is_listening)
+        self.update_ai_control_bar(f"Misa: {display_text}", is_listening)
 
     def _get_user_name(self):
         try:
@@ -1087,7 +1087,7 @@ class MikasaApp(ctk.CTk):
             "plugins": "Plaginlar",
             "settings": "Sozlamalar",
         }
-        return titles.get(page_id, "Mikasa AI")
+        return titles.get(page_id, "Misa AI")
 
     # ========== YOPISH ==========
 

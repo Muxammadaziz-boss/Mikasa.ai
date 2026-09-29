@@ -1,4 +1,4 @@
-name: Mikasa AI Windows Desktop Release
+name: Misa AI Windows Desktop Release
 
 on:
   push:
@@ -34,10 +34,10 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: 'mikasa-7/package.json'
+          cache-dependency-path: 'Misa/package.json'
 
       - name: Install Frontend Dependencies
-        working-directory: mikasa-7
+        working-directory: Misa
         run: npm install
 
       - name: Run Backend Tests
@@ -46,22 +46,25 @@ jobs:
           python -m unittest tests/test_v8_backend_bundle.py
 
       - name: Run Frontend Tests
-        working-directory: mikasa-7
+        working-directory: Misa
         run: npm test
 
       - name: Build Frontend Application
-        working-directory: mikasa-7
+        working-directory: Misa
         run: npm run build
 
       - name: Check / Build Tauri Desktop Application
         run: |
           $tag = "${{ github.ref_name }}"
-          $exePath = "release/$tag/Mikasa-AI-$tag.exe"
+          $exePath = "release/$tag/Misa-AI-$tag.exe"
+          if (-not (Test-Path $exePath)) {
+              $exePath = "release/$tag/Mikasa-AI-$tag.exe"
+          }
           if (Test-Path $exePath) {
               Write-Host "Pre-compiled desktop binaries found at $exePath. Skipping recompilation."
           } else {
               Write-Host "No pre-compiled binaries found for $tag. Building Tauri desktop application..."
-              cd mikasa-7
+              cd Misa
               npm run build:desktop
               node scripts/package_release.cjs
               cd ..

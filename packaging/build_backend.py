@@ -109,7 +109,7 @@ def build():
     logger.info(f"✔ Successfully compiled backend: {exe_file}")
 
     # Destination 1: mikasa-7/src-tauri/backend/ (for Tauri bundle.resources)
-    tauri_backend_dir = root_dir / "mikasa-7" / "src-tauri" / "backend"
+    tauri_backend_dir = root_dir / "Misa" / "src-tauri" / "backend"
     if tauri_backend_dir.exists():
         shutil.rmtree(tauri_backend_dir, ignore_errors=True)
     shutil.copytree(built_dir, tauri_backend_dir)

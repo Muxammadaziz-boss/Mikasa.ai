@@ -49,6 +49,8 @@ packaging/portable_launcher/target/
 build/
 dist/
 *.spec
+Misa/src-tauri/target/
+Misa/src-tauri/backend/
 mikasa-7/src-tauri/target/
 mikasa-7/src-tauri/backend/
 release/**/backend/

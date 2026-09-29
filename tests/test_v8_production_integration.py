@@ -367,7 +367,7 @@ class TestGoogleOAuthRedirectAndSecurity(AioHTTPTestCase):
 
     def test_frontend_environment_separation_blocks_localhost_140_and_preserves_tauri(self):
         backend_service_path = os.path.join(
-            BASE_DIR, "mikasa-7", "src", "services", "backendService.ts"
+            BASE_DIR, "Misa", "src", "services", "backendService.ts"
         )
         with open(backend_service_path, "r", encoding="utf-8") as f:
             ts_code = f.read()
@@ -428,13 +428,13 @@ class TestTelegramOTPCompleteAuditSuite(AioHTTPTestCase):
         self.assertIsNone(err)
         self.assertTrue(deep_link.startswith("https://t.me/Mikasa_ai_agent_bot?start="))
 
-        tg_page_path = os.path.join(BASE_DIR, "mikasa-7", "src", "pages", "TelegramIntegrationPage.tsx")
+        tg_page_path = os.path.join(BASE_DIR, "Misa", "src", "pages", "TelegramIntegrationPage.tsx")
         with open(tg_page_path, "r", encoding="utf-8") as f:
             tg_page_code = f.read()
         self.assertIn("Mikasa_ai_agent_bot", tg_page_code)
         self.assertNotIn("MikasaUniversalBot", tg_page_code)
 
-        bs_path = os.path.join(BASE_DIR, "mikasa-7", "src", "services", "backendService.ts")
+        bs_path = os.path.join(BASE_DIR, "Misa", "src", "services", "backendService.ts")
         with open(bs_path, "r", encoding="utf-8") as f:
             bs_code = f.read()
         self.assertIn("Mikasa_ai_agent_bot", bs_code)
@@ -968,7 +968,7 @@ class TestRailwayLinuxAndWebhookOTPReadiness(AioHTTPTestCase):
 
     def test_09_frontend_sends_authorization_bearer_header(self):
         """9. Frontend Authorization: Bearer yuborishi."""
-        bs_path = os.path.join(BASE_DIR, "mikasa-7", "src", "services", "backendService.ts")
+        bs_path = os.path.join(BASE_DIR, "Misa", "src", "services", "backendService.ts")
         with open(bs_path, "r", encoding="utf-8") as f:
             content = f.read()
 

@@ -1,6 +1,12 @@
-# Mikasa AI — Loyiha O'zgarishlar Tarixi (Changelog)
+# Misa AI (sobiq Mikasa AI) — Loyiha O'zgarishlar Tarixi (Changelog)
 
 Barcha o'zgarishlar va relizlar Semantic Versioning (SemVer) qoidalariga muvofiq yuritiladi.
+
+---
+
+## [9.0.0] — 2026-09-29 (Misa AI Rebranding & Level 9 Foundation)
+
+- **Rasmiy Rebranding (`Mikasa AI` ➔ `Misa AI`)**: 9.0.0 versiyadan boshlab loyiha, desktop interfeysi (`Misa/`), ovozli yordamchi chaqiruvi ("Salom Misa"), tizim yadrosi va hujjatlar **Misa (`Misa AI`)** nomi bilan yuritiladi. Oldingi versiyalar (v8.0.0 va undan avvalgilar) tarixiy **Mikasa AI** nomi ostida o'zgarishsiz saqlab qolindi.
 
 ---
 

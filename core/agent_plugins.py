@@ -27,7 +27,7 @@ AVAILABLE_TEMPLATES = [
         "url": "https://github.com/search?q={query}&type=repositories",
         "parameters": {"query": {"type": "string", "description": "Qidiruv so'rovi"}},
         "version": "1.2.0",
-        "author": "Mikasa AI Team",
+        "author": "Misa AI Team",
     },
     {
         "name": "wikipedia_lookup",
@@ -37,7 +37,7 @@ AVAILABLE_TEMPLATES = [
         "url": "https://uz.wikipedia.org/wiki/{topic}",
         "parameters": {"topic": {"type": "string", "description": "Mavzu yoki atama"}},
         "version": "1.1.0",
-        "author": "Mikasa AI Team",
+        "author": "Misa AI Team",
     },
     {
         "name": "telegram_sender",
@@ -57,7 +57,7 @@ AVAILABLE_TEMPLATES = [
         "url": "https://google.com/search?q={query}",
         "parameters": {"query": {"type": "string", "description": "Qidiruv so'zi"}},
         "version": "1.0.0",
-        "author": "Mikasa AI Team",
+        "author": "Misa AI Team",
     },
     {
         "name": "run_my_script",
@@ -67,7 +67,7 @@ AVAILABLE_TEMPLATES = [
         "command": "python -c \"print('Mikasa script executed:', '{arg1}')\"",
         "parameters": {"arg1": {"type": "string", "description": "Parametr qiymati"}},
         "version": "1.0.0",
-        "author": "Mikasa AI Team",
+        "author": "Misa AI Team",
     },
 ]
 
@@ -397,7 +397,7 @@ class PluginManager:
                     "type": tpl.get("type", "url"),
                     "status": "available",
                     "enabled": False,
-                    "author": tpl.get("author", "Mikasa AI Team"),
+                    "author": tpl.get("author", "Misa AI Team"),
                 })
 
         # Statistika hisoblash

@@ -216,7 +216,7 @@ class ContextEngine:
 
         # 6. Yagona Tizim Ko'rsatmasini (System Prompt) Shakllantirish
         prompt_parts = [
-            f"""Sen — "Mikasa AI", foydalanuvchining shaxsiy aqlli yordamchisi va do'stisan.
+            f"""Sen — "Misa AI", foydalanuvchining shaxsiy aqlli yordamchisi va do'stisan.
 Foydalanuvchi ismi: {user_name}.
 Tiling: O'ZBEK tili. Javoblaring samimiy, aniq, lo'nda va do'stona bo'lsin.
 

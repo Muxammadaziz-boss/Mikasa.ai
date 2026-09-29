@@ -1,7 +1,7 @@
 {
   "app": {
-    "version": "8.0.0",
-    "name": "Mikasa AI",
+    "version": "9.0.0",
+    "name": "Misa AI",
     "debug": false
   },
   "audio": {
@@ -14,7 +14,7 @@
     "vad_enabled": true,
     "vad_threshold": 0.015,
     "silence_duration": 1.2,
-    "tts_speed": 1.0,
+    "tts_speed": 1.8,
     "tts_engine": "edge_tts",
     "auto_speak": true
   },
@@ -23,7 +23,7 @@
     "color_scheme": "green",
     "compact_mode": true,
     "window_size": "1100x800",
-    "compact_window_size": "1056x700+26+26",
+    "compact_window_size": "1072x700+26+26",
     "font_family": "Segoe UI",
     "font_size": 12,
     "color": "green",
@@ -51,21 +51,21 @@
     "backup_count": 5
   },
   "user": {
-    "name": "Muxammadaziz",
+    "name": "test",
     "voice_type": "erkak",
     "avatar": "emerald",
     "role": "Dasturchi / Muhandis",
-    "bio": "Mikasa AI shaxsiy sun'iy intellekt yordamchisi",
+    "bio": "Misa AI shaxsiy sun'iy intellekt yordamchisi",
     "language": "uz"
   },
   "voice": {
     "tts_engine": "edge_tts",
     "silero_model": "uz-UZ-MadinaNeural",
-    "speed": 1.0,
+    "speed": 1.8,
     "sample_rate": 44100
   },
   "ai": {
-    "model": "gemini",
+    "model": "openrouter",
     "timeout": 15,
     "mode": "creative",
     "thinking_enabled": true,
@@ -74,7 +74,7 @@
   "notifications": {
     "scheduler": true,
     "voice": true,
-    "sound_effects": true,
+    "sound_effects": false,
     "system_status": true
   },
   "privacy": {

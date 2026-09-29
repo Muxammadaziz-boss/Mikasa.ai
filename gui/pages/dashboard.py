@@ -64,7 +64,7 @@ class DashboardPage(ctk.CTkFrame):
         # Subtitle
         self.subtitle_label = ctk.CTkLabel(
             self.greeting_frame,
-            text="Mikasa AI shaxsiy assistenti barcha vazifalarga tayyor",
+            text="Misa AI shaxsiy assistenti barcha vazifalarga tayyor",
             font=Fonts.BODY,
             text_color=Colors.TEXT_SECONDARY,
             anchor="w",
@@ -122,7 +122,7 @@ class DashboardPage(ctk.CTkFrame):
 
         self.orb_status = ctk.CTkLabel(
             status_row,
-            text="Mikasa AI tayyor va kutmoqda",
+            text="Misa AI tayyor va kutmoqda",
             font=(Fonts.FAMILY, 14, "bold"),
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
@@ -330,7 +330,7 @@ class DashboardPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             inner,
-            text="Mikasa AI v8.0.0 muvaffaqiyatli ishga tushdi",
+            text="Misa AI v9.0.0 muvaffaqiyatli ishga tushdi",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
@@ -361,7 +361,7 @@ class DashboardPage(ctk.CTkFrame):
             stats = self.app.bridge.get_memory_stats()
             count = stats.get("suhbatlar_soni", 0)
             self.orb_status.configure(
-                text=f"Mikasa AI tayyor  |  {count} ta suhbat saqlangan"
+                text=f"Misa AI tayyor  |  {count} ta suhbat saqlangan"
             )
 
     def _get_user_name(self):

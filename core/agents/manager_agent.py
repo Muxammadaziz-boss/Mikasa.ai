@@ -51,7 +51,7 @@ class ManagerAgent(BaseAgent):
             logger.error(f"Sub-agents init xatolik: {e}")
 
     def _build_system_prompt(self) -> str:
-        return """Sen ManagerAgent — Mikasa AI'ning asosiy koordinatoris.
+        return """Sen ManagerAgent — Misa AI'ning asosiy koordinatorisan.
 
 Senning vazifang:
 1. Kelgan vazifalarni tahlil qilish

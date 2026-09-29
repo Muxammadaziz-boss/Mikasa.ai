@@ -55,7 +55,7 @@ class AgentActivityGroup(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.header_row,
-            text="Mikasa",
+            text="Misa",
             font=Fonts.SMALL_BOLD,
             text_color=Colors.PRIMARY,
             anchor="w",
@@ -426,7 +426,7 @@ class ChatPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self._welcome_frame,
-            text="Mikasa",
+            text="Misa",
             font=Fonts.HEADING_1,
             text_color=Colors.TEXT_PRIMARY,
         ).pack(pady=(4, 2))
@@ -546,7 +546,7 @@ class ChatPage(ctk.CTkFrame):
         self.input_entry = ctk.CTkEntry(
             self.input_frame,
             textvariable=self._input_var,
-            placeholder_text="Mikasa ga xabar yozing...",
+            placeholder_text="Misa ga xabar yozing...",
             font=Fonts.BODY,
             fg_color="transparent",
             border_width=0,
@@ -916,7 +916,7 @@ class ChatPage(ctk.CTkFrame):
                     size=avatar_size,
                 )
                 asst_avatar.pack(side="left", padx=(4, 8), anchor="n")
-                attach_tooltip(asst_avatar, "Mikasa AI")
+                attach_tooltip(asst_avatar, "Misa AI")
             else:
                 spacer = ctk.CTkFrame(msg_row, width=spacer_width, height=1, fg_color="transparent")
                 spacer.pack(side="left")

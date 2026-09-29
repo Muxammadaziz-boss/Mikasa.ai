@@ -214,7 +214,7 @@ class MikasaSplashScreen(ctk.CTkFrame):
         # 2. MIKASA AI Brending
         self.brand_title = ctk.CTkLabel(
             self.inner_box,
-            text="MIKASA AI",
+            text="MISA AI",
             font=(Fonts.FAMILY, 30, "bold"),
             text_color=Colors.TEXT_PRIMARY,
         )
@@ -240,7 +240,7 @@ class MikasaSplashScreen(ctk.CTkFrame):
         # 5. Holat matni
         self.status_label = ctk.CTkLabel(
             self.inner_box,
-            text="Mikasa tayyorlanmoqda...",
+            text="Misa tayyorlanmoqda...",
             font=(Fonts.FAMILY, 12),
             text_color=Colors.TEXT_MUTED,
         )
@@ -251,7 +251,7 @@ class MikasaSplashScreen(ctk.CTkFrame):
 
         self.error_title = ctk.CTkLabel(
             self.error_frame,
-            text="MIKASA ishga tushmadi",
+            text="MISA ishga tushmadi",
             font=(Fonts.FAMILY, 15, "bold"),
             text_color=Colors.DANGER,
         )

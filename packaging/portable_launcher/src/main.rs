@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const APP_VERSION: &str = "v8.0.0";
-static APP_CORE_BYTES: &[u8] = include_bytes!("../../../mikasa-7/src-tauri/target/release/mikasa-7.exe");
-static WEBVIEW2_BYTES: &[u8] = include_bytes!("../../../mikasa-7/src-tauri/target/release/WebView2Loader.dll");
+static APP_CORE_BYTES: &[u8] = include_bytes!("../../../Misa/src-tauri/target/release/mikasa-7.exe");
+static WEBVIEW2_BYTES: &[u8] = include_bytes!("../../../Misa/src-tauri/target/release/WebView2Loader.dll");
 
 fn main() {
     let parent_dir = env::current_exe()

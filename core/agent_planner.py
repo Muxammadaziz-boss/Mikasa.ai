@@ -49,7 +49,7 @@ FOYDALANUVCHI HAQIDA bilimlar:
 Bu ma'lumotlarni suhbatda ishlatib, shaxsiylashtirilgan javoblar ber.
 """
 
-    return f"""Sen — "Mikasa AI Agent", aqlli va MUSTAQIL kompyuter yordamchisi.
+    return f"""Sen — "Misa AI Agent", aqlli va MUSTAQIL kompyuter yordamchisi.
 Sen haqiqiy AI agent san — o'zing FIKRLAB, REJALASHTIR, qaror qilib, vositalarni (tool) ishlatib, ISTALGAN vazifani bajarasan.
 
 ASOSIY QOIDALAR:

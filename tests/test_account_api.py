@@ -84,7 +84,7 @@ class TestAccountAPI(unittest.TestCase):
             self.assertIn("local", model_ids)
 
             # App info
-            self.assertEqual(data["app_info"]["name"], "Mikasa AI")
+            self.assertEqual(data["app_info"]["name"], "Misa AI")
             self.assertEqual(data["app_info"]["version"], "8.0.0")
 
         asyncio.run(_run())

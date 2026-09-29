@@ -710,7 +710,7 @@ class MessageBubble(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 meta_row,
-                text="Mikasa",
+                text="Misa",
                 font=Fonts.SMALL_BOLD,
                 text_color=Colors.PRIMARY,
                 anchor="w",
@@ -785,7 +785,7 @@ class MessageBubble(ctk.CTkFrame):
 class TypingBubble(ctk.CTkFrame):
     """Animatsiyali 3-nuqta yozish indikatori"""
 
-    def __init__(self, master, prefix="Mikasa o'ylamoqda", **kwargs):
+    def __init__(self, master, prefix="Misa o'ylamoqda", **kwargs):
         if "bg_color" not in kwargs:
             kwargs["bg_color"] = "transparent"
 
@@ -1829,7 +1829,7 @@ class ToastNotification(ctk.CTkFrame):
         self,
         master,
         message: str,
-        title: str = "Mikasa AI",
+        title: str = "Misa AI",
         duration: int = 4000,
         toast_type: str = "info",
         action_label: str = None,
@@ -1912,7 +1912,7 @@ class ToastNotification(ctk.CTkFrame):
             pass
 
 
-def show_toast(root_widget, message: str, title: str = "Mikasa AI", duration: int = 4000, toast_type: str = "info"):
+def show_toast(root_widget, message: str, title: str = "Misa AI", duration: int = 4000, toast_type: str = "info"):
     """Xavfsiz Toast chiqarish funksiyasi"""
     try:
         root_widget.after(0, lambda: ToastNotification(root_widget, message, title=title, duration=duration, toast_type=toast_type))
@@ -2001,7 +2001,7 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
     def __init__(self, app):
         super().__init__(app)
         self.app = app
-        self.title("Mikasa Command Palette")
+        self.title("Misa Command Palette")
         self.geometry("560x360")
         self.resizable(False, False)
         self.configure(fg_color=Colors.BG_DARKEST)
@@ -2025,7 +2025,7 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
-            placeholder_text="Mikasa'dan so'rang...",
+            placeholder_text="Misa'dan so'rang...",
             font=Fonts.BODY,
             fg_color="transparent",
             border_width=0,
@@ -2045,7 +2045,7 @@ class CommandPaletteOverlay(ctk.CTkToplevel):
 
         # Standart amallar ro'yxati
         self._commands = [
-            ("voice", "Ovozli muloqot", "Mikasa bilan ovozli dialog ochish", "mic"),
+            ("voice", "Ovozli muloqot", "Misa bilan ovozli dialog ochish", "mic"),
             ("chat", "AI Suhbat", "Matnli xabar yozish va maslahat olish", "chat"),
             ("commands", "Buyruqlar & Asboblar", "Barcha 29 ta tool va funksiyalar katalogi", "commands"),
             ("memory", "Xotira markazi", "Profil faktlari va muloqotlar tarixi", "memory"),
