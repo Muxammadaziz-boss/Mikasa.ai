@@ -196,6 +196,12 @@ class TelegramIdentityManager:
         self._requests: Dict[str, TelegramLinkRequest] = {}  # request_id -> req
         self._requests_by_token: Dict[str, TelegramLinkRequest] = {}  # link_token -> req
         self._generation_history: Dict[str, List[float]] = {}  # mikasa_user_id -> timestamps
+        
+        # XAVFSIZLIK: Telegram foydalanuvchi uchun noto'g'ri OTP urinishlari limiti (brute-force oldini olish)
+        self._telegram_otp_failures: Dict[int, List[float]] = {}  # telegram_user_id -> [timestamp, ...]
+        self.MAX_TELEGRAM_OTP_FAILURES = 5  # Har 10 daqiqada maksimal noto'g'ri urinishlar
+        self.TELEGRAM_OTP_FAILURE_WINDOW = 600.0  # 10 daqiqa
+        
         self._audit = RemoteAuditLogger.get_instance()
         self.load()
 
@@ -326,23 +332,32 @@ class TelegramIdentityManager:
 
     def register_synced_request(
         self,
-        req_data: Dict[str, Any],
-        auth_token: Optional[str] = None
+        req_data: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,
+        **kwargs: Any
     ) -> Optional[TelegramLinkRequest]:
         """
         Register or update a hashed TelegramLinkRequest received from a Desktop/Web client
         so the cloud webhook server can verify the OTP even before or without service_role key.
         """
-        if not isinstance(req_data, dict):
-            return None
-        req_id = str(req_data.get("request_id") or "").strip()
-        uid = str(req_data.get("mikasa_user_id") or "").strip()
-        otp_hash = str(req_data.get("otp_hash") or "").strip()
-        salt = str(req_data.get("salt") or "").strip()
+        payload: Dict[str, Any] = {}
+        if isinstance(req_data, dict):
+            nested = req_data.get("request")
+            if isinstance(nested, dict):
+                payload.update(nested)
+            else:
+                payload.update(req_data)
+        if kwargs:
+            payload.update(kwargs)
+
+        req_id = str(payload.get("request_id") or "").strip()
+        uid = str(payload.get("mikasa_user_id") or "").strip()
+        otp_hash = str(payload.get("otp_hash") or "").strip()
+        salt = str(payload.get("salt") or "").strip()
         if not req_id or not uid or not otp_hash or not salt:
             return None
 
-        req = TelegramLinkRequest.from_dict(req_data)
+        req = TelegramLinkRequest.from_dict(payload)
         if auth_token:
             req._transient_auth_token = auth_token
 
@@ -355,23 +370,37 @@ class TelegramIdentityManager:
         if req.link_token:
             self._requests_by_token[req.link_token] = req
         self.save()
+        if self._auto_supabase or auth_token:
+            self.sync_request_to_supabase(req, auth_token=auth_token)
         return req
 
-    def _sync_request_to_cloud_api(self, req_obj: TelegramLinkRequest, auth_token: Optional[str] = None):
-        """
-        If running on a local desktop instance and MIKASA_CLOUD_API_URL is configured (or default Railway URL
-        when not running on Railway itself), push the hashed request to /api/telegram/link/sync.
-        """
-        if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("ENVIRONMENT", "").lower() == "production":
-            return
+    DEFAULT_CLOUD_API_URL = "https://mikasa-v8-api-production.up.railway.app"
+
+    def _resolve_cloud_api_url(self) -> str:
+        """Resolve cloud API URL for Desktop <-> Railway OTP synchronization."""
+        if (
+            os.environ.get("RAILWAY_ENVIRONMENT")
+            or os.environ.get("RAILWAY_PROJECT_ID")
+            or os.environ.get("ENVIRONMENT", "").lower() == "production"
+            or os.environ.get("MIKASA_ENV", "").lower() == "production"
+        ):
+            return ""
         cloud_url = (
             os.environ.get("MIKASA_CLOUD_API_URL")
             or os.environ.get("MIKASA_BACKEND_URL")
-            or ""
+            or (self.DEFAULT_CLOUD_API_URL if self._auto_supabase else "")
         ).strip().rstrip("/")
         if not cloud_url or "127.0.0.1" in cloud_url or "localhost" in cloud_url:
-            return
-        if not auth_token:
+            return ""
+        return cloud_url
+
+    def _sync_request_to_cloud_api(self, req_obj: TelegramLinkRequest, auth_token: Optional[str] = None):
+        """
+        If running on a local desktop instance, push the hashed request to /api/telegram/link/sync
+        on Railway so the cloud webhook handler can verify the OTP immediately.
+        """
+        cloud_url = self._resolve_cloud_api_url()
+        if not cloud_url or not auth_token:
             return
 
         endpoint = f"{cloud_url}/api/telegram/link/sync"
@@ -379,19 +408,74 @@ class TelegramIdentityManager:
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
         }
+        payload_bytes = json.dumps({"request": req_obj.to_dict()}).encode("utf-8")
+        req_id = req_obj.request_id
+
+        def _do_sync():
+            try:
+                import urllib.request
+                http_req = urllib.request.Request(
+                    endpoint,
+                    data=payload_bytes,
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(http_req, timeout=3.5) as resp:
+                    if resp.status in (200, 201):
+                        logger.info(f"[TelegramIdentity] Cloud API ga request sinxronlandi: req={req_id}")
+            except Exception as e:
+                logger.debug(f"[TelegramIdentity] Cloud API sync o'tkazib yuborildi: {e}")
+
+        try:
+            import asyncio
+            import threading
+            asyncio.get_running_loop()
+            threading.Thread(target=_do_sync, daemon=True).start()
+        except RuntimeError:
+            _do_sync()
+
+    def _pull_status_from_cloud_api(self, request_id: str, auth_token: Optional[str] = None):
+        """Pull verified OTP status and link from Railway Cloud API when polling on local desktop."""
+        cloud_url = self._resolve_cloud_api_url()
+        if not cloud_url or not auth_token or not request_id:
+            return
+        endpoint = f"{cloud_url}/api/telegram/link/status?request_id={request_id}"
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Accept": "application/json",
+        }
         try:
             import urllib.request
-            http_req = urllib.request.Request(
-                endpoint,
-                data=json.dumps({"request": req_obj.to_dict()}).encode("utf-8"),
-                headers=headers,
-                method="POST"
-            )
+            http_req = urllib.request.Request(endpoint, headers=headers, method="GET")
             with urllib.request.urlopen(http_req, timeout=3.0) as resp:
-                if resp.status in (200, 201):
-                    logger.info(f"[TelegramIdentity] Cloud API ga request sinxronlandi: req={req_obj.request_id}")
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if not isinstance(data, dict) or not data.get("ok"):
+                        return
+                    remote_status = str(data.get("status") or "").strip().upper()
+                    remote_attempts = int(data.get("attempt_count") or 0)
+                    req = self._requests.get(request_id)
+                    changed = False
+                    if req:
+                        if remote_attempts > req.attempt_count:
+                            req.attempt_count = remote_attempts
+                            changed = True
+                        if req.status == "PENDING" and remote_status in ("VERIFIED", "EXPIRED", "FAILED"):
+                            req.status = remote_status
+                            if data.get("telegram_user_id"):
+                                _, tg_uid = TelegramIdentity.validate_user_id(data.get("telegram_user_id"))
+                                req.telegram_user_id = tg_uid
+                            changed = True
+                    link_data = data.get("link")
+                    if isinstance(link_data, dict) and link_data.get("telegram_user_id") and link_data.get("mikasa_user_id"):
+                        link_obj = UserTelegramLink.from_dict(link_data)
+                        self._links_by_tg[link_obj.telegram_user_id] = link_obj
+                        self._links_by_mikasa[link_obj.mikasa_user_id] = link_obj
+                        changed = True
+                    if changed:
+                        self.save()
         except Exception as e:
-            logger.debug(f"[TelegramIdentity] Cloud API sync o'tkazib yuborildi: {e}")
+            logger.debug(f"[TelegramIdentity] Cloud status pull o'tkazib yuborildi: {e}")
 
     def get_request(self, request_id: str, auth_token: Optional[str] = None, refresh: bool = False) -> Optional[TelegramLinkRequest]:
         req_id = str(request_id).strip()
@@ -400,6 +484,9 @@ class TelegramIdentityManager:
             effective_token = auth_token or (getattr(req, "_transient_auth_token", None) if req else None)
             self.load_requests_from_supabase(auth_token=effective_token, request_id=req_id)
             req = self._requests.get(req_id)
+            if refresh and (req is None or req.status == "PENDING") and effective_token:
+                self._pull_status_from_cloud_api(req_id, auth_token=effective_token)
+                req = self._requests.get(req_id)
         return req
 
     def get_request_by_token(self, link_token: str, auth_token: Optional[str] = None) -> Optional[TelegramLinkRequest]:
@@ -450,6 +537,14 @@ class TelegramIdentityManager:
         if not candidate_otp.isdigit() or len(candidate_otp) != 6:
             return False, "INVALID_FORMAT: OTP 6 xonali raqam bo'lishi shart", None
 
+        # XAVFSIZLIK: Telegram user uchun brute-force himoyasi
+        tg_failures = self._telegram_otp_failures.get(tg_int, [])
+        # Eskirganlarni tozalash
+        tg_failures = [t for t in tg_failures if t > now - self.TELEGRAM_OTP_FAILURE_WINDOW]
+        self._telegram_otp_failures[tg_int] = tg_failures
+        if len(tg_failures) >= self.MAX_TELEGRAM_OTP_FAILURES:
+            return False, "RATE_LIMITED: Juda ko'p noto'g'ri urinishlar. 10 daqiqadan keyin qayta urinib ko'ring", None
+
         expected_uid = str(expected_mikasa_user_id).strip() if expected_mikasa_user_id else None
 
         # Resolve candidate request
@@ -498,6 +593,10 @@ class TelegramIdentityManager:
                             req = sorted(matching_reqs, key=lambda x: x.created_at, reverse=True)[0]
 
         if not req:
+            # Noto'g'ri urinishni qayd qilish
+            if tg_int not in self._telegram_otp_failures:
+                self._telegram_otp_failures[tg_int] = []
+            self._telegram_otp_failures[tg_int].append(now)
             return False, "INVALID_OR_EXPIRED_CODE: Bog'lanish kodi topilmadi yoki muddati tugagan", None
 
         effective_auth_token = auth_token or getattr(req, "_transient_auth_token", None)
@@ -557,6 +656,9 @@ class TelegramIdentityManager:
         # Constant-time comparison
         is_match = self.verify_otp_hash(candidate_otp, req.salt, req.otp_hash)
         if not is_match:
+            if tg_int not in self._telegram_otp_failures:
+                self._telegram_otp_failures[tg_int] = []
+            self._telegram_otp_failures[tg_int].append(now)
             req.attempt_count += 1
             remaining = max(0, self.MAX_ATTEMPTS - req.attempt_count)
             if req.attempt_count >= self.MAX_ATTEMPTS:
@@ -1001,6 +1103,89 @@ class TelegramIdentityManager:
         ).strip()
         return url, anon, secret
 
+    def _build_supabase_headers(
+        self,
+        auth_token: Optional[str] = None,
+        prefer: Optional[str] = None,
+        content_type: Optional[str] = None,
+        prefer_user_token: bool = False,
+    ) -> Optional[Dict[str, str]]:
+        """
+        Supabase REST API uchun to'g'ri sarlavhalarni yaratish.
+        MUHIM: Supabase yangi API key arxitekturasida (sb_publishable_... va sb_secret_...):
+        - Agar `secret` (sb_secret_...) ishlatilsa, `apikey` va `Authorization: Bearer` IKKALASI HAM
+          `secret` bo'lishi SHART! Aks holda (`apikey=sb_publishable_...`, `Authorization=Bearer sb_secret_...`)
+          Supabase Gateway PGRST301 ('Expected 3 parts in JWT; got 1') 401 xatosini qaytaradi.
+        - Agar foydalanuvchi JWT (`auth_token`, 3 qismli) ishlatilsa, `apikey` = `anon` (`sb_publishable_...`)
+          va `Authorization` = `Bearer <auth_token>` bo'ladi.
+        """
+        url, anon, secret = self._get_supabase_config()
+        if not url:
+            return None
+
+        clean_auth = str(auth_token or "").strip()
+        is_user_jwt = clean_auth.count(".") == 2
+
+        if prefer_user_token and is_user_jwt and (anon or secret):
+            api_key = anon or secret
+            bearer = clean_auth
+        elif secret:
+            api_key = secret
+            bearer = secret
+        elif is_user_jwt and anon:
+            api_key = anon
+            bearer = clean_auth
+        elif anon:
+            api_key = anon
+            bearer = anon
+        elif is_user_jwt:
+            api_key = clean_auth
+            bearer = clean_auth
+        else:
+            return None
+
+        headers: Dict[str, str] = {
+            "apikey": api_key,
+            "Authorization": f"Bearer {bearer}",
+        }
+        if content_type:
+            headers["Content-Type"] = content_type
+        if prefer:
+            headers["Prefer"] = prefer
+        return headers
+
+    def _ensure_supabase_profile(self, user_id: str, auth_token: Optional[str] = None) -> None:
+        """Ensure public.profiles row exists for user_id to prevent 23503 FK errors on pairing/links."""
+        url, _, _ = self._get_supabase_config()
+        if not url:
+            return
+        headers = self._build_supabase_headers(
+            auth_token=auth_token,
+            prefer="resolution=ignore-duplicates",
+            content_type="application/json",
+        )
+        if not headers:
+            return
+        uid_clean = str(user_id).strip()
+        short_id = uid_clean.replace("-", "")[:8] or "user"
+        payload = {
+            "id": uid_clean,
+            "username": f"user_{short_id}",
+            "display_name": f"User {short_id}",
+        }
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                f"{url}/rest/v1/profiles?on_conflict=id",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=3.5):
+                pass
+        except Exception:
+            pass
+
     @staticmethod
     def _parse_iso_timestamp(val: Any, fallback: Optional[float] = None) -> Optional[float]:
         if val is None:
@@ -1021,7 +1206,7 @@ class TelegramIdentityManager:
         Telegram OTP bog'lanish so'rovini Supabase public.device_pairing_sessions jadvaliga sinxronlash.
         DIQQAT: Ochiq matnli OTP (plaintext_otp) hech qachon saqlanmaydi — faqat salted SHA-256 xesh saqlanadi.
         """
-        url, anon, secret = self._get_supabase_config()
+        url, _, _ = self._get_supabase_config()
         if not url:
             return
 
@@ -1031,14 +1216,17 @@ class TelegramIdentityManager:
             uuid.UUID(uid_str)
             uuid.UUID(req_id_str)
         except (ValueError, AttributeError):
-            logger.debug(f"[TelegramIdentity] user_id yoki request_id UUID emas, Supabase request sync o'tkazib yuborildi.")
+            logger.debug("[TelegramIdentity] user_id yoki request_id UUID emas, Supabase request sync o'tkazib yuborildi.")
             return
 
-        bearer_token = secret or auth_token or anon
-        if not bearer_token:
+        headers = self._build_supabase_headers(
+            auth_token=auth_token,
+            prefer="resolution=merge-duplicates",
+            content_type="application/json",
+        )
+        if not headers:
             return
 
-        api_key = anon or secret or bearer_token
         created_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(req_obj.created_at))
         expires_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(req_obj.expires_at))
         used_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(req_obj.used_at)) if req_obj.used_at else None
@@ -1066,24 +1254,43 @@ class TelegramIdentityManager:
         }
 
         endpoint = f"{url}/rest/v1/device_pairing_sessions?on_conflict=id"
-        headers = {
-            "apikey": api_key,
-            "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": "application/json",
-            "Prefer": "resolution=merge-duplicates"
-        }
+        payload_bytes = json.dumps(payload).encode("utf-8")
 
         try:
             import urllib.request
+            import urllib.error
             http_req = urllib.request.Request(
                 endpoint,
-                data=json.dumps(payload).encode("utf-8"),
+                data=payload_bytes,
                 headers=headers,
                 method="POST"
             )
-            with urllib.request.urlopen(http_req, timeout=4.0) as resp:
-                if resp.status in (200, 201, 204):
-                    logger.info(f"[TelegramIdentity] Supabase device_pairing_sessions ga saqlandi: req={req_id_str}, status={req_obj.status}")
+            try:
+                with urllib.request.urlopen(http_req, timeout=4.0) as resp:
+                    if resp.status in (200, 201, 204):
+                        logger.info(f"[TelegramIdentity] Supabase device_pairing_sessions ga saqlandi: req={req_id_str}, status={req_obj.status}")
+            except urllib.error.HTTPError as he:
+                if he.code == 409:
+                    # 23503 Foreign Key (profiles) ehtimoli — profilni yaratib qayta urinamiz
+                    self._ensure_supabase_profile(uid_str, auth_token=auth_token)
+                    retry_req = urllib.request.Request(endpoint, data=payload_bytes, headers=headers, method="POST")
+                    with urllib.request.urlopen(retry_req, timeout=4.0) as resp:
+                        if resp.status in (200, 201, 204):
+                            logger.info(f"[TelegramIdentity] Supabase device_pairing_sessions ga (profile auto-heal bilan) saqlandi: req={req_id_str}")
+                elif he.code in (401, 403) and auth_token:
+                    alt_headers = self._build_supabase_headers(
+                        auth_token=auth_token,
+                        prefer="resolution=merge-duplicates",
+                        content_type="application/json",
+                        prefer_user_token=True,
+                    )
+                    if alt_headers and alt_headers != headers:
+                        retry_req = urllib.request.Request(endpoint, data=payload_bytes, headers=alt_headers, method="POST")
+                        with urllib.request.urlopen(retry_req, timeout=4.0) as resp:
+                            if resp.status in (200, 201, 204):
+                                logger.info(f"[TelegramIdentity] Supabase device_pairing_sessions ga user token bilan saqlandi: req={req_id_str}")
+                else:
+                    raise
         except Exception as e:
             logger.debug(f"[TelegramIdentity] Supabase request sync xatolik: {e}")
 
@@ -1094,15 +1301,14 @@ class TelegramIdentityManager:
         user_id: Optional[str] = None
     ):
         """Supabase public.device_pairing_sessions dan Telegram OTP so'rovlarini tortib olish."""
-        url, anon, secret = self._get_supabase_config()
+        url, _, _ = self._get_supabase_config()
         if not url:
             return
 
-        bearer_token = secret or auth_token or anon
-        if not bearer_token:
+        headers = self._build_supabase_headers(auth_token=auth_token)
+        if not headers:
             return
 
-        api_key = anon or secret or bearer_token
         query_parts = ["device_id=eq.telegram_otp", "select=*", "order=created_at.desc", "limit=50"]
         if request_id:
             try:
@@ -1118,100 +1324,112 @@ class TelegramIdentityManager:
                 pass
 
         endpoint = f"{url}/rest/v1/device_pairing_sessions?{'&'.join(query_parts)}"
-        headers = {
-            "apikey": api_key,
-            "Authorization": f"Bearer {bearer_token}",
-        }
 
         try:
             import urllib.request
+            import urllib.error
             http_req = urllib.request.Request(endpoint, headers=headers, method="GET")
-            with urllib.request.urlopen(http_req, timeout=4.0) as resp:
-                if resp.status == 200:
-                    rows = json.loads(resp.read().decode("utf-8"))
-                    updated_any = False
-                    for row in rows:
-                        req_id = str(row.get("id") or "").strip()
-                        uid = str(row.get("user_id") or "").strip()
-                        otp_hash = str(row.get("pairing_code_hash") or "").strip()
-                        salt = str(row.get("pairing_code_salt") or "").strip()
-                        if not req_id or not uid or not otp_hash or not salt:
-                            continue
+            raw_body = None
+            try:
+                with urllib.request.urlopen(http_req, timeout=4.0) as resp:
+                    if resp.status == 200:
+                        raw_body = resp.read().decode("utf-8")
+            except urllib.error.HTTPError as he:
+                if he.code in (401, 403) and auth_token:
+                    alt_headers = self._build_supabase_headers(auth_token=auth_token, prefer_user_token=True)
+                    if alt_headers and alt_headers != headers:
+                        retry_req = urllib.request.Request(endpoint, headers=alt_headers, method="GET")
+                        with urllib.request.urlopen(retry_req, timeout=4.0) as resp:
+                            if resp.status == 200:
+                                raw_body = resp.read().decode("utf-8")
+                else:
+                    raise
 
-                        meta = row.get("request_metadata")
-                        if not isinstance(meta, dict):
-                            meta = {}
+            if raw_body is not None:
+                rows = json.loads(raw_body)
+                updated_any = False
+                for row in rows:
+                    req_id = str(row.get("id") or "").strip()
+                    uid = str(row.get("user_id") or "").strip()
+                    otp_hash = str(row.get("pairing_code_hash") or "").strip()
+                    salt = str(row.get("pairing_code_salt") or "").strip()
+                    if not req_id or not uid or not otp_hash or not salt:
+                        continue
 
-                        created_at = self._parse_iso_timestamp(
-                            meta.get("created_at_epoch") or row.get("created_at"),
-                            time.time()
-                        ) or time.time()
-                        expires_at = self._parse_iso_timestamp(
-                            meta.get("expires_at_epoch") or row.get("expires_at"),
-                            created_at + self.DEFAULT_TTL
-                        ) or (created_at + self.DEFAULT_TTL)
-                        used_at = self._parse_iso_timestamp(
-                            meta.get("used_at_epoch") or row.get("used_at"),
-                            None
+                    meta = row.get("request_metadata")
+                    if not isinstance(meta, dict):
+                        meta = {}
+
+                    created_at = self._parse_iso_timestamp(
+                        meta.get("created_at_epoch") or row.get("created_at"),
+                        time.time()
+                    ) or time.time()
+                    expires_at = self._parse_iso_timestamp(
+                        meta.get("expires_at_epoch") or row.get("expires_at"),
+                        created_at + self.DEFAULT_TTL
+                    ) or (created_at + self.DEFAULT_TTL)
+                    used_at = self._parse_iso_timestamp(
+                        meta.get("used_at_epoch") or row.get("used_at"),
+                        None
+                    )
+
+                    link_token = str(meta.get("link_token") or "").strip()
+                    tg_uid = meta.get("telegram_user_id")
+                    if tg_uid is not None:
+                        _, tg_uid = TelegramIdentity.validate_user_id(tg_uid)
+                    exp_tg_uid = meta.get("expected_telegram_user_id")
+                    if exp_tg_uid is not None:
+                        _, exp_tg_uid = TelegramIdentity.validate_user_id(exp_tg_uid)
+
+                    remote_status = str(row.get("status") or "PENDING").strip().upper()
+                    remote_attempts = int(row.get("attempt_count") or 0)
+
+                    existing = self._requests.get(req_id)
+                    if existing is None:
+                        new_req = TelegramLinkRequest(
+                            request_id=req_id,
+                            mikasa_user_id=uid,
+                            otp_hash=otp_hash,
+                            salt=salt,
+                            created_at=created_at,
+                            expires_at=expires_at,
+                            status=remote_status,
+                            attempt_count=remote_attempts,
+                            telegram_user_id=tg_uid,
+                            used_at=used_at,
+                            link_token=link_token or secrets.token_urlsafe(24),
+                            expected_telegram_user_id=exp_tg_uid
                         )
-
-                        link_token = str(meta.get("link_token") or "").strip()
-                        tg_uid = meta.get("telegram_user_id")
-                        if tg_uid is not None:
-                            _, tg_uid = TelegramIdentity.validate_user_id(tg_uid)
-                        exp_tg_uid = meta.get("expected_telegram_user_id")
-                        if exp_tg_uid is not None:
-                            _, exp_tg_uid = TelegramIdentity.validate_user_id(exp_tg_uid)
-
-                        remote_status = str(row.get("status") or "PENDING").strip().upper()
-                        remote_attempts = int(row.get("attempt_count") or 0)
-
-                        existing = self._requests.get(req_id)
-                        if existing is None:
-                            new_req = TelegramLinkRequest(
-                                request_id=req_id,
-                                mikasa_user_id=uid,
-                                otp_hash=otp_hash,
-                                salt=salt,
-                                created_at=created_at,
-                                expires_at=expires_at,
-                                status=remote_status,
-                                attempt_count=remote_attempts,
-                                telegram_user_id=tg_uid,
-                                used_at=used_at,
-                                link_token=link_token or secrets.token_urlsafe(24),
-                                expected_telegram_user_id=exp_tg_uid
-                            )
-                            self._requests[req_id] = new_req
-                            if new_req.link_token:
-                                self._requests_by_token[new_req.link_token] = new_req
+                        self._requests[req_id] = new_req
+                        if new_req.link_token:
+                            self._requests_by_token[new_req.link_token] = new_req
+                        updated_any = True
+                    else:
+                        # Merge remote state if remote is terminal or has higher attempt count
+                        if existing.status == "PENDING" and remote_status != "PENDING":
+                            existing.status = remote_status
                             updated_any = True
-                        else:
-                            # Merge remote state if remote is terminal or has higher attempt count
-                            if existing.status == "PENDING" and remote_status != "PENDING":
-                                existing.status = remote_status
-                                updated_any = True
-                            if remote_attempts > existing.attempt_count:
-                                existing.attempt_count = remote_attempts
-                                updated_any = True
-                            if tg_uid and not existing.telegram_user_id:
-                                existing.telegram_user_id = tg_uid
-                                updated_any = True
-                            if used_at and not existing.used_at:
-                                existing.used_at = used_at
-                                updated_any = True
-                            if link_token and link_token not in self._requests_by_token:
-                                existing.link_token = link_token
-                                self._requests_by_token[link_token] = existing
+                        if remote_attempts > existing.attempt_count:
+                            existing.attempt_count = remote_attempts
+                            updated_any = True
+                        if tg_uid and not existing.telegram_user_id:
+                            existing.telegram_user_id = tg_uid
+                            updated_any = True
+                        if used_at and not existing.used_at:
+                            existing.used_at = used_at
+                            updated_any = True
+                        if link_token and link_token not in self._requests_by_token:
+                            existing.link_token = link_token
+                            self._requests_by_token[link_token] = existing
 
-                    if updated_any:
-                        self.save()
+                if updated_any:
+                    self.save()
         except Exception as e:
             logger.debug(f"[TelegramIdentity] Supabase dan so'rovlarni yuklashda xatolik: {e}")
 
     def sync_link_to_supabase(self, link: UserTelegramLink, auth_token: Optional[str] = None):
         """Telegram bog'lanishini Supabase public.telegram_links jadvaliga sinxronlash."""
-        url, anon, secret = self._get_supabase_config()
+        url, _, _ = self._get_supabase_config()
         if not url:
             return
 
@@ -1222,11 +1440,13 @@ class TelegramIdentityManager:
             logger.debug(f"[TelegramIdentity] mikasa_user_id '{uid_str}' UUID emas, Supabase sync o'tkazib yuborildi.")
             return
 
-        bearer_token = secret or auth_token or anon
-        if not bearer_token:
+        headers = self._build_supabase_headers(
+            auth_token=auth_token,
+            prefer="resolution=merge-duplicates",
+            content_type="application/json",
+        )
+        if not headers:
             return
-
-        api_key = anon or secret or bearer_token
 
         payload = {
             "user_id": uid_str,
@@ -1237,43 +1457,56 @@ class TelegramIdentityManager:
         }
 
         endpoint = f"{url}/rest/v1/telegram_links?on_conflict=telegram_user_id"
-        headers = {
-            "apikey": api_key,
-            "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": "application/json",
-            "Prefer": "resolution=merge-duplicates"
-        }
+        payload_bytes = json.dumps(payload).encode("utf-8")
 
         try:
             import urllib.request
+            import urllib.error
             req = urllib.request.Request(
                 endpoint,
-                data=json.dumps(payload).encode("utf-8"),
+                data=payload_bytes,
                 headers=headers,
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                if resp.status in (200, 201, 204):
-                    logger.info(f"[TelegramIdentity] Supabase public.telegram_links ga muvaffaqiyatli saqlandi: tg={link.telegram_user_id} -> user={uid_str}")
+            try:
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    if resp.status in (200, 201, 204):
+                        logger.info(f"[TelegramIdentity] Supabase public.telegram_links ga muvaffaqiyatli saqlandi: tg={link.telegram_user_id} -> user={uid_str}")
+            except urllib.error.HTTPError as he:
+                if he.code == 409:
+                    self._ensure_supabase_profile(uid_str, auth_token=auth_token)
+                    retry_req = urllib.request.Request(endpoint, data=payload_bytes, headers=headers, method="POST")
+                    with urllib.request.urlopen(retry_req, timeout=5.0) as resp:
+                        if resp.status in (200, 201, 204):
+                            logger.info(f"[TelegramIdentity] Supabase public.telegram_links ga (profile auto-heal bilan) saqlandi: tg={link.telegram_user_id}")
+                elif he.code in (401, 403) and auth_token:
+                    alt_headers = self._build_supabase_headers(
+                        auth_token=auth_token,
+                        prefer="resolution=merge-duplicates",
+                        content_type="application/json",
+                        prefer_user_token=True,
+                    )
+                    if alt_headers and alt_headers != headers:
+                        retry_req = urllib.request.Request(endpoint, data=payload_bytes, headers=alt_headers, method="POST")
+                        with urllib.request.urlopen(retry_req, timeout=5.0) as resp:
+                            if resp.status in (200, 201, 204):
+                                logger.info(f"[TelegramIdentity] Supabase public.telegram_links ga user token bilan saqlandi: tg={link.telegram_user_id}")
+                else:
+                    raise
         except Exception as e:
             logger.warning(f"[TelegramIdentity] Supabase ga sinxronlashda xatolik: {e}")
 
     def delete_link_from_supabase(self, telegram_user_id: int, auth_token: Optional[str] = None):
         """Telegram bog'lanishini Supabase public.telegram_links jadvalidan o'chirish."""
-        url, anon, secret = self._get_supabase_config()
+        url, _, _ = self._get_supabase_config()
         if not url:
             return
 
-        bearer_token = secret or auth_token or anon
-        if not bearer_token:
+        headers = self._build_supabase_headers(auth_token=auth_token)
+        if not headers:
             return
 
-        api_key = anon or secret or bearer_token
         endpoint = f"{url}/rest/v1/telegram_links?telegram_user_id=eq.{telegram_user_id}"
-        headers = {
-            "apikey": api_key,
-            "Authorization": f"Bearer {bearer_token}",
-        }
 
         try:
             import urllib.request
@@ -1286,15 +1519,14 @@ class TelegramIdentityManager:
 
     def load_from_supabase(self, auth_token: Optional[str] = None, user_id: Optional[str] = None):
         """Server yuklanganda yoki so'rov bo'yicha Supabase dan mavjud telegram_links ni tortib olish."""
-        url, anon, secret = self._get_supabase_config()
+        url, _, _ = self._get_supabase_config()
         if not url:
             return
 
-        bearer_token = secret or auth_token or anon
-        if not bearer_token:
+        headers = self._build_supabase_headers(auth_token=auth_token)
+        if not headers:
             return
 
-        api_key = anon or secret or bearer_token
         query = "select=*"
         if user_id:
             try:
@@ -1304,58 +1536,71 @@ class TelegramIdentityManager:
                 pass
 
         endpoint = f"{url}/rest/v1/telegram_links?{query}"
-        headers = {
-            "apikey": api_key,
-            "Authorization": f"Bearer {bearer_token}",
-        }
 
         try:
             import urllib.request
+            import urllib.error
             req = urllib.request.Request(endpoint, headers=headers, method="GET")
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                if resp.status == 200:
-                    rows = json.loads(resp.read().decode("utf-8"))
-                    count = 0
-                    for row in rows:
-                        tg_id = int(row.get("telegram_user_id"))
-                        row_user_id = str(row.get("user_id"))
-                        username = row.get("telegram_username")
-                        first_name = row.get("first_name")
+            raw_body = None
+            try:
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    if resp.status == 200:
+                        raw_body = resp.read().decode("utf-8")
+            except urllib.error.HTTPError as he:
+                if he.code in (401, 403) and auth_token:
+                    alt_headers = self._build_supabase_headers(auth_token=auth_token, prefer_user_token=True)
+                    if alt_headers and alt_headers != headers:
+                        retry_req = urllib.request.Request(endpoint, headers=alt_headers, method="GET")
+                        with urllib.request.urlopen(retry_req, timeout=5.0) as resp:
+                            if resp.status == 200:
+                                raw_body = resp.read().decode("utf-8")
+                else:
+                    raise
 
-                        meta = {}
-                        if username:
-                            meta["username"] = username
-                        if first_name:
-                            meta["first_name"] = first_name
+            if raw_body is not None:
+                rows = json.loads(raw_body)
+                count = 0
+                for row in rows:
+                    tg_id = int(row.get("telegram_user_id"))
+                    row_user_id = str(row.get("user_id"))
+                    username = row.get("telegram_username")
+                    first_name = row.get("first_name")
 
-                        linked_ts = self._parse_iso_timestamp(row.get("created_at"), time.time()) or time.time()
-                        verified_ts = self._parse_iso_timestamp(row.get("updated_at"), linked_ts) or linked_ts
+                    meta = {}
+                    if username:
+                        meta["username"] = username
+                    if first_name:
+                        meta["first_name"] = first_name
 
-                        link = UserTelegramLink(
-                            mikasa_user_id=row_user_id,
-                            telegram_user_id=tg_id,
-                            linked_at=linked_ts,
-                            last_verified_at=verified_ts,
-                            status="ACTIVE",
-                            metadata=meta
-                        )
-                        self._links_by_tg[tg_id] = link
-                        self._links_by_mikasa[row_user_id] = link
+                    linked_ts = self._parse_iso_timestamp(row.get("created_at"), time.time()) or time.time()
+                    verified_ts = self._parse_iso_timestamp(row.get("updated_at"), linked_ts) or linked_ts
 
-                        ident = TelegramIdentity(
-                            telegram_user_id=tg_id,
-                            first_name=first_name,
-                            username=username,
-                            created_at=linked_ts,
-                            last_seen_at=verified_ts,
-                            is_verified=True,
-                            is_linked=True
-                        )
-                        self._identities[tg_id] = ident
-                        count += 1
-                    if count > 0:
-                        self.save()
-                        logger.info(f"[TelegramIdentity] Supabase dan {count} ta telegram link yuklandi.")
+                    link = UserTelegramLink(
+                        mikasa_user_id=row_user_id,
+                        telegram_user_id=tg_id,
+                        linked_at=linked_ts,
+                        last_verified_at=verified_ts,
+                        status="ACTIVE",
+                        metadata=meta
+                    )
+                    self._links_by_tg[tg_id] = link
+                    self._links_by_mikasa[row_user_id] = link
+
+                    ident = TelegramIdentity(
+                        telegram_user_id=tg_id,
+                        first_name=first_name,
+                        username=username,
+                        created_at=linked_ts,
+                        last_seen_at=verified_ts,
+                        is_verified=True,
+                        is_linked=True
+                    )
+                    self._identities[tg_id] = ident
+                    count += 1
+                if count > 0:
+                    self.save()
+                    logger.info(f"[TelegramIdentity] Supabase dan {count} ta telegram link yuklandi.")
         except Exception as e:
             logger.debug(f"[TelegramIdentity] Supabase dan yuklashda xatolik (offline yoki kalit cheklovi): {e}")
+
 

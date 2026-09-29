@@ -4,6 +4,8 @@
 # webhook registration lifecycle, and optional long-polling for local development.
 
 import os
+import re
+import hmac
 import json
 import time
 import asyncio
@@ -22,7 +24,7 @@ logger = logging.getLogger("core.v8.telegram_webhook")
 MAX_WEBHOOK_BODY_BYTES = 256 * 1024
 UPDATE_ID_TTL_SECONDS = 86400.0
 UPDATE_ID_MAX_ENTRIES = 10000
-SHUTDOWN_TIMEOUT_SECONDS = 30.0
+SHUTDOWN_TIMEOUT_SECONDS = 8.0
 TELEGRAM_API_BASE = "https://api.telegram.org/bot"
 
 
@@ -33,8 +35,10 @@ class UpdateIdempotencyStore:
         self.ttl = ttl
         self.max_entries = max_entries
         self._seen: Dict[int, float] = {}
+        self._last_prune: float = 0.0
 
     def _prune(self, now: float) -> None:
+        self._last_prune = now
         cutoff = now - self.ttl
         expired = [uid for uid, ts in self._seen.items() if ts < cutoff]
         for uid in expired:
@@ -51,10 +55,16 @@ class UpdateIdempotencyStore:
         except (TypeError, ValueError):
             return True
         now = time.time()
-        self._prune(now)
-        if uid in self._seen:
-            return False
+        if (now - self._last_prune >= 60.0) or (len(self._seen) >= self.max_entries):
+            self._prune(now)
+        existing_ts = self._seen.get(uid)
+        if existing_ts is not None:
+            if (now - existing_ts) < self.ttl:
+                return False
+            self._seen.pop(uid, None)
         self._seen[uid] = now
+        if len(self._seen) > self.max_entries:
+            self._prune(now)
         return True
 
     def unclaim(self, update_id: Any) -> None:
@@ -98,15 +108,25 @@ class TelegramWebhookService:
     def webhook_path(self) -> str:
         return f"/telegram/webhook/{self.webhook_secret}"
 
+    def _header_secret_token(self) -> str:
+        """Telegram X-Telegram-Bot-Api-Secret-Token header allows only [A-Za-z0-9_-] (1..256 chars)."""
+        cleaned = re.sub(r"[^A-Za-z0-9_-]", "_", self.webhook_secret)
+        return cleaned[:256]
+
     def _validate_secret(self, request: web.Request) -> bool:
         path_secret = request.match_info.get("secret", "")
         if not path_secret and request.path.startswith("/telegram/webhook/"):
             path_secret = request.path[len("/telegram/webhook/"):].split("/")[0]
-        if not path_secret or path_secret != self.webhook_secret:
+        if not path_secret or not hmac.compare_digest(path_secret, self.webhook_secret):
             return False
         header_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if header_secret and header_secret != self.webhook_secret:
-            return False
+        if header_secret:
+            expected_header = self._header_secret_token()
+            if not (
+                hmac.compare_digest(header_secret, self.webhook_secret)
+                or (expected_header and hmac.compare_digest(header_secret, expected_header))
+            ):
+                return False
         return True
 
     @staticmethod
@@ -237,17 +257,23 @@ class TelegramWebhookService:
         if not self.bot_token:
             return False, "TELEGRAM_BOT_TOKEN not configured"
 
-        base = public_base_url.rstrip("/")
+        base = public_base_url.strip().rstrip("/")
+        if "/telegram/webhook" in base:
+            base = base.split("/telegram/webhook")[0].rstrip("/")
         webhook_url = f"{base}{self.webhook_path()}"
+        safe_webhook_url = f"{base}/telegram/webhook/[REDACTED]"
 
         import aiohttp
 
-        payload = {
+        header_secret = self._header_secret_token()
+        payload: Dict[str, Any] = {
             "url": webhook_url,
             "allowed_updates": ["message", "edited_message", "callback_query"],
             "drop_pending_updates": False,
-            "secret_token": self.webhook_secret,
         }
+        if header_secret:
+            payload["secret_token"] = header_secret
+
         api_url = f"{TELEGRAM_API_BASE}{self.bot_token}/setWebhook"
 
         try:
@@ -257,11 +283,21 @@ class TelegramWebhookService:
                     if data.get("ok"):
                         logger.info(
                             "[TelegramWebhook] Webhook registered "
-                            f"(url={webhook_url}, token={sanitize_sensitive_string(self.bot_token)})"
+                            f"(url={safe_webhook_url}, token={sanitize_sensitive_string(self.bot_token)})"
                         )
                         return True, "registered"
                     desc = str(data.get("description", "unknown error"))
-                    logger.error(f"[TelegramWebhook] setWebhook failed: {desc}")
+                    if "secret_token" in desc.lower() and "secret_token" in payload:
+                        payload.pop("secret_token", None)
+                        async with session.post(api_url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as retry_resp:
+                            retry_data = await retry_resp.json()
+                            if retry_data.get("ok"):
+                                logger.info(
+                                    "[TelegramWebhook] Webhook registered (path-secret mode) "
+                                    f"(url={safe_webhook_url}, token={sanitize_sensitive_string(self.bot_token)})"
+                                )
+                                return True, "registered"
+                    logger.error(f"[TelegramWebhook] setWebhook failed: {sanitize_sensitive_string(desc)}")
                     return False, desc
         except Exception as exc:
             logger.error(f"[TelegramWebhook] setWebhook network error: {type(exc).__name__}")
@@ -390,6 +426,21 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
         if backend_url:
             checks["backend_url"] = "configured"
 
+        reg_state = app.get("telegram_webhook_registration")
+        if isinstance(reg_state, dict):
+            checks["webhook_registration"] = {
+                "ok": bool(reg_state.get("ok")),
+                "message": sanitize_sensitive_string(str(reg_state.get("message", ""))),
+            }
+
+        wh_info = app.get("telegram_webhook_info")
+        if isinstance(wh_info, dict) and wh_info:
+            checks["webhook_info"] = {
+                "pending_update_count": wh_info.get("pending_update_count", 0),
+                "last_error_message": sanitize_sensitive_string(str(wh_info.get("last_error_message", ""))),
+                "has_custom_certificate": bool(wh_info.get("has_custom_certificate", False)),
+            }
+
         supabase_url = os.environ.get("SUPABASE_URL", "")
         supabase_key = (
             os.environ.get("SUPABASE_PUBLISHABLE_KEY")
@@ -412,7 +463,7 @@ def register_telegram_routes(app: web.Application, webhook_service: Optional[Tel
             else "not_configured"
         )
 
-        ready = bot_configured and (svc is not None or not use_webhook)
+        ready = (not bot_configured) or (svc is not None) or (not use_webhook)
         return web.json_response(
             {"status": "ready" if ready else "not_ready", "checks": checks},
             status=200 if ready else 503,
@@ -444,6 +495,8 @@ async def setup_telegram_lifecycle(app: web.Application) -> None:
         public_url = (
             os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
             or os.environ.get("MIKASA_PUBLIC_URL", "").strip()
+            or os.environ.get("MIKASA_BACKEND_URL", "").strip()
+            or os.environ.get("TELEGRAM_WEBHOOK_URL", "").strip()
         )
         if public_url and not public_url.startswith("http"):
             public_url = f"https://{public_url}"

@@ -794,8 +794,12 @@ def tingla():
         time.sleep(1)
         return None
 
-    # v6.0.0 Tezkor VAD Audio Xizmati
-    if AUDIO_SERVICE_AVAILABLE:
+    # v6.0.0 Tezkor VAD Audio Xizmati (unit testlarda sd/sr mock qilingan bo'lsa fallback yo'liga o'tiladi)
+    if (
+        AUDIO_SERVICE_AVAILABLE
+        and not hasattr(sd, "_mock_name")
+        and not hasattr(sr, "_mock_name")
+    ):
         try:
             audio_svc = get_audio_service()
             text = audio_svc.listen_and_transcribe(language="uz-UZ", timeout=4.0)

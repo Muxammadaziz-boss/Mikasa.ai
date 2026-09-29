@@ -295,5 +295,200 @@ class TestRailwayHealthEndpoints(unittest.TestCase):
         self.assertIn("/telegram/webhook/", svc.webhook_path())
 
 
+class TestRailwayProductionFixes(unittest.TestCase):
+    """Regression tests for Railway Telegram OTP linking, Supabase PGRST301, webhook secret redaction, and OAuth state errors."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="mikasa_prod_fixes_")
+        self.tg_storage = os.path.join(self.temp_dir, "tg_local.json")
+        self.cloud_storage = os.path.join(self.temp_dir, "tg_cloud.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        TelegramIdentityManager._default_instance = None
+
+    def test_supabase_headers_never_mix_publishable_with_sb_secret(self):
+        mgr = TelegramIdentityManager(storage_path=self.tg_storage)
+        with patch.object(
+            mgr,
+            "_get_supabase_config",
+            return_value=("https://example.supabase.co", "sb_publishable_anon123", "sb_secret_srv456"),
+        ):
+            # Service-role / sb_secret mode (no user JWT): apikey MUST match sb_secret
+            h_srv = mgr._build_supabase_headers(auth_token=None, prefer_user_token=False)
+            self.assertEqual(h_srv["apikey"], "sb_secret_srv456")
+            self.assertEqual(h_srv["Authorization"], "Bearer sb_secret_srv456")
+
+            # Valid 3-part user JWT with prefer_user_token=True: apikey=anon, Authorization=Bearer <jwt>
+            fake_jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.c2lnbmF0dXJl"
+            h_jwt = mgr._build_supabase_headers(auth_token=fake_jwt, prefer_user_token=True)
+            self.assertEqual(h_jwt["apikey"], "sb_publishable_anon123")
+            self.assertEqual(h_jwt["Authorization"], f"Bearer {fake_jwt}")
+
+    def test_link_sync_nested_payload_and_cloud_otp_verification(self):
+        from core.api_server import handle_telegram_link_sync
+
+        local_mgr = TelegramIdentityManager(storage_path=self.tg_storage)
+        cloud_mgr = TelegramIdentityManager(storage_path=self.cloud_storage)
+        TelegramIdentityManager._default_instance = cloud_mgr
+
+        req_obj, raw_otp, _, _ = local_mgr.create_link_request("user-sync-1")
+        nested_payload = {"request": req_obj.to_dict()}
+
+        async def _run():
+            mock_req = MagicMock()
+            mock_req.headers = {}
+            mock_req.json = AsyncMock(return_value=nested_payload)
+            with patch(
+                "core.api_server.resolve_auth_identity",
+                return_value=("user-sync-1", {"id": "user-sync-1"}, None, None),
+            ):
+                resp = await handle_telegram_link_sync(mock_req)
+            self.assertEqual(resp.status, 200)
+
+            ok, msg, acc = cloud_mgr.verify_otp(
+                raw_otp,
+                telegram_user_id=777888999,
+                username="railway_tester",
+                first_name="Tester",
+            )
+            self.assertTrue(ok, f"Expected OTP verification to succeed after sync, got: {msg}")
+            self.assertIsNotNone(acc)
+            self.assertEqual(acc.mikasa_user_id, "user-sync-1")
+
+        asyncio.run(_run())
+
+    def test_webhook_registration_redacts_secret_in_logs(self):
+        transport = MockTelegramTransport()
+        bot = UniversalTelegramBot(transport=transport)
+        secret = "super_sensitive_webhook_secret_999"
+        svc = TelegramWebhookService(
+            bot=bot,
+            transport=transport,
+            webhook_secret=secret,
+            bot_token="123456:AAFakeToken",
+        )
+
+        mock_resp = MagicMock()
+        mock_resp.json = AsyncMock(return_value={"ok": True})
+        mock_post_cm = MagicMock()
+        mock_post_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_post_cm.__aexit__ = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_post_cm)
+        mock_session_cm = MagicMock()
+        mock_session_cm.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_cm.__aexit__ = AsyncMock(return_value=None)
+
+        async def _run():
+            with patch("aiohttp.ClientSession", return_value=mock_session_cm):
+                with self.assertLogs("core.v8.telegram_webhook", level="INFO") as cm:
+                    ok, _ = await svc.register_webhook("https://mikasa-v8-api-production.up.railway.app")
+                    self.assertTrue(ok)
+            combined_logs = "\n".join(cm.output)
+            self.assertNotIn(secret, combined_logs)
+            self.assertIn("[REDACTED]", combined_logs)
+
+        asyncio.run(_run())
+
+    def test_otp_bruteforce_rate_limit_per_telegram_user(self):
+        mgr = TelegramIdentityManager(storage_path=self.tg_storage)
+        mgr.create_link_request("victim_user")
+        attacker_tg_id = 666555444
+
+        for i in range(5):
+            ok, msg, _ = mgr.verify_otp(f"{100000 + i}", telegram_user_id=attacker_tg_id)
+            self.assertFalse(ok)
+
+        ok6, msg6, _ = mgr.verify_otp("999999", telegram_user_id=attacker_tg_id)
+        self.assertFalse(ok6)
+        self.assertIn("RATE_LIMITED", msg6)
+
+    def test_oauth_callback_bad_oauth_state_returns_clear_message(self):
+        from core.api_server import handle_oauth_callback
+
+        async def _run():
+            req = MagicMock()
+            req.query = {
+                "error": "invalid_request",
+                "error_code": "bad_oauth_state",
+                "error_description": "OAuth state not found or expired",
+            }
+            req.headers = {"Host": "mikasa-v8-api-production.up.railway.app"}
+            resp = await handle_oauth_callback(req)
+            self.assertEqual(resp.status, 200)
+            self.assertIn("bad_oauth_state", resp.text)
+            self.assertIn("muddati tugagan", resp.text)
+
+        asyncio.run(_run())
+
+    def test_oauth_state_creation_storage_and_retrieval_consistency(self):
+        import json
+        from core.api_server import (
+            handle_oauth_session_save,
+            handle_oauth_session_get,
+            _pending_oauth_sessions,
+            _pending_oauth_lock,
+        )
+
+        with _pending_oauth_lock:
+            _pending_oauth_sessions.clear()
+
+        async def _run():
+            state_id = "oauth_state_lifecycle_test_001"
+
+            # 1. Pre-register state (creation: action="init")
+            init_req = MagicMock()
+            init_req.query = {}
+            init_req.json = AsyncMock(return_value={"state": state_id, "action": "init"})
+            init_resp = await handle_oauth_session_save(init_req)
+            self.assertEqual(init_resp.status, 200)
+            init_body = json.loads(init_resp.text)
+            self.assertEqual(init_body["status"], "pending")
+            self.assertEqual(init_body["state"], state_id)
+
+            # 2. Early poll BEFORE callback completes must return 404 (pending) and MUST NOT pop the state!
+            early_get = MagicMock()
+            early_get.query = {"state": state_id}
+            early_resp = await handle_oauth_session_get(early_get)
+            self.assertEqual(early_resp.status, 404)
+            early_body = json.loads(early_resp.text)
+            self.assertEqual(early_body["status"], "pending")
+            self.assertIn(state_id, _pending_oauth_sessions)
+
+            # 3. Callback arrives WITHOUT state (e.g., Supabase stripped ?state=... on redirect):
+            #    It must bind to the pre-registered pending state_id!
+            cb_req = MagicMock()
+            cb_req.query = {}
+            cb_req.json = AsyncMock(
+                return_value={
+                    "state": "",
+                    "access_token": "tok_bound_to_pending_123",
+                    "refresh_token": "ref_bound_123",
+                }
+            )
+            cb_resp = await handle_oauth_session_save(cb_req)
+            self.assertEqual(cb_resp.status, 200)
+            cb_body = json.loads(cb_resp.text)
+            self.assertEqual(cb_body["state"], state_id)
+
+            # 4. Subsequent poll with state_id retrieves the completed session and pops it (one-time use)
+            final_get = MagicMock()
+            final_get.query = {"state": state_id}
+            final_resp = await handle_oauth_session_get(final_get)
+            self.assertEqual(final_resp.status, 200)
+            final_body = json.loads(final_resp.text)
+            self.assertTrue(final_body["ok"])
+            self.assertEqual(final_body["session"]["access_token"], "tok_bound_to_pending_123")
+
+            # 5. Replay poll with same state_id returns 404
+            replay_resp = await handle_oauth_session_get(final_get)
+            self.assertEqual(replay_resp.status, 404)
+
+        asyncio.run(_run())
+
+
 if __name__ == "__main__":
     unittest.main()
+
+

@@ -49,6 +49,9 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   const [manualOtp, setManualOtp] = useState<string>("");
   const [manualTgId, setManualTgId] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [isRechecking, setIsRechecking] = useState<boolean>(false);
+  const [attemptCount, setAttemptCount] = useState<number>(0);
+  const [lastErrorMsg, setLastErrorMsg] = useState<string | null>(null);
 
   const countdownTimerRef = useRef<any>(null);
 
@@ -99,30 +102,49 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
     return () => unsub();
   }, [loadStatus]);
 
+  const checkCurrentRequestStatus = useCallback(
+    async (manual: boolean = false) => {
+      if (!requestId) {
+        await loadStatus();
+        return;
+      }
+      if (manual) setIsRechecking(true);
+      try {
+        const res = await backendService.getTelegramLinkStatus(requestId);
+        const reqStatus = (res as any).request_status || res.status;
+        if (typeof res.attempt_count === "number") {
+          setAttemptCount(res.attempt_count);
+        }
+        if (res.ok && (res.is_linked || reqStatus === "VERIFIED" || res.status === "CONNECTED")) {
+          showToast("🎉 Telegram hisobingiz muvaffaqiyatli bog'landi!");
+          await loadStatus();
+        } else if (reqStatus === "EXPIRED") {
+          setPairingState("EXPIRED");
+        } else if (reqStatus === "FAILED") {
+          setLastErrorMsg("Maksimal 5 ta noto'g'ri urinish qayd etildi. Iltimos, yangi kod oling.");
+          setPairingState("FAILED");
+        } else if (manual) {
+          showToast("Hali tasdiqlanmadi — botga 6 xonali kodni yuboring");
+        }
+      } catch {
+        if (manual) showToast("Holatni tekshirishda xatolik yuz berdi");
+      } finally {
+        if (manual) setIsRechecking(false);
+      }
+    },
+    [requestId, loadStatus]
+  );
+
   // Fallback polling during WAITING_FOR_OTP to detect mobile Telegram verification even if WebSocket drops
   useEffect(() => {
     if (pairingState !== "WAITING_FOR_OTP" || !requestId) return;
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await backendService.getTelegramLinkStatus(requestId);
-        const reqStatus = (res as any).request_status || res.status;
-        if (res.ok && (res.is_linked || reqStatus === "VERIFIED" || res.status === "CONNECTED")) {
-          clearInterval(pollInterval);
-          showToast("🎉 Telegram hisobingiz muvaffaqiyatli bog'landi!");
-          loadStatus();
-        } else if (reqStatus === "EXPIRED") {
-          clearInterval(pollInterval);
-          setPairingState("EXPIRED");
-        } else if (reqStatus === "FAILED") {
-          clearInterval(pollInterval);
-          setPairingState("FAILED");
-        }
-      } catch {}
+    const pollInterval = setInterval(() => {
+      checkCurrentRequestStatus(false);
     }, 3000);
 
     return () => clearInterval(pollInterval);
-  }, [pairingState, requestId, loadStatus]);
+  }, [pairingState, requestId, checkCurrentRequestStatus]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -149,6 +171,8 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
   // Start link flow
   const handleStartLink = async () => {
     setPairingState("PAIRING");
+    setAttemptCount(0);
+    setLastErrorMsg(null);
     try {
       const res = await backendService.startTelegramLink();
       if (res.ok && res.otp && res.request_id) {
@@ -173,11 +197,15 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
         setPairingState("WAITING_FOR_OTP");
         showToast("6 xonali tasdiqlash kodi tayyorlandi");
       } else {
-        showToast(res.error || "Ulanish kodini olishda xatolik");
+        const errText = res.error || "Ulanish kodini olishda xatolik";
+        setLastErrorMsg(errText);
+        showToast(errText);
         setPairingState("FAILED");
       }
     } catch {
-      showToast("Server bilan bog'lanishda xatolik");
+      const errText = "Server bilan bog'lanishda xatolik";
+      setLastErrorMsg(errText);
+      showToast(errText);
       setPairingState("FAILED");
     }
   };
@@ -434,6 +462,44 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
           </div>
         </div>
 
+        {/* State 0: LOADING or PAIRING */}
+        {(pairingState === "LOADING" || pairingState === "PAIRING") && (
+          <div
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.8)",
+              border: "1px solid rgba(56, 189, 248, 0.25)",
+              borderRadius: "16px",
+              padding: "40px 32px",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "14px",
+                backgroundColor: "rgba(56, 189, 248, 0.12)",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px auto",
+                color: "#38BDF8",
+              }}
+            >
+              <TelegramIcon size={28} />
+            </div>
+            <h2 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 8px 0" }}>
+              {pairingState === "PAIRING"
+                ? "6 xonali tasdiqlash kodi tayyorlanmoqda..."
+                : "Telegram bog'lanish holati tekshirilmoqda..."}
+            </h2>
+            <p style={{ fontSize: "13px", color: "#94A3B8", margin: 0 }}>
+              Iltimos, bir necha soniya kuting...
+            </p>
+          </div>
+        )}
+
         {/* State 1: CONNECTED */}
         {pairingState === "CONNECTED" && accountInfo?.link && (
           <div
@@ -445,7 +511,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               boxShadow: "0 8px 32px rgba(16, 185, 129, 0.08)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ display: "flex", gap: "16px" }}>
                 <div
                   style={{
@@ -462,7 +528,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
                   <ShieldCheckIcon size={26} />
                 </div>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                     <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
                       Telegram Hisobi Ulangan
                     </h2>
@@ -555,22 +621,41 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             }}
           >
             <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 14px",
-                  borderRadius: "20px",
-                  backgroundColor: "rgba(245, 158, 11, 0.15)",
-                  color: "#F59E0B",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  marginBottom: "12px",
-                }}
-              >
-                <ClockIcon size={14} />
-                <span>Qolgan vaqt: {formatTimer(remainingSeconds)}</span>
+              <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "4px 14px",
+                    borderRadius: "20px",
+                    backgroundColor: "rgba(245, 158, 11, 0.15)",
+                    color: "#F59E0B",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <ClockIcon size={14} />
+                  <span>Qolgan vaqt: {formatTimer(remainingSeconds)}</span>
+                </div>
+                {attemptCount > 0 && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "4px 14px",
+                      borderRadius: "20px",
+                      backgroundColor: "rgba(239, 68, 68, 0.15)",
+                      color: "#F87171",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <AlertTriangleIcon size={14} />
+                    <span>Noto'g'ri kod urinishlari: {attemptCount}/5</span>
+                  </div>
+                )}
               </div>
               <h2 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 8px 0" }}>
                 Telegram Botda Kodni Kiriting
@@ -588,6 +673,7 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
                 justifyContent: "center",
                 gap: "14px",
                 marginBottom: "28px",
+                flexWrap: "wrap",
               }}
             >
               <div
@@ -628,13 +714,12 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
               </button>
             </div>
 
-            {/* Action Buttons: Open Telegram or Cancel */}
-            <div style={{ display: "flex", justifyContent: "center", gap: "16px", marginBottom: "32px" }}>
+            {/* Action Buttons: Open Telegram, Recheck Status, or Cancel */}
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "32px" }}>
               {deepLink && (
-                <a
-                  href={deepLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => backendService.openExternalUrl(deepLink)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -645,17 +730,41 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
                     borderRadius: "10px",
                     fontWeight: 600,
                     fontSize: "14px",
-                    textDecoration: "none",
+                    border: "none",
+                    cursor: "pointer",
                     boxShadow: "0 4px 14px rgba(2, 132, 199, 0.35)",
                   }}
                 >
                   <TelegramIcon size={18} />
                   <span>Telegram orqali ochish</span>
                   <ExternalLinkIcon size={14} />
-                </a>
+                </button>
               )}
 
               <button
+                type="button"
+                onClick={() => checkCurrentRequestStatus(true)}
+                disabled={isRechecking}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "12px 20px",
+                  backgroundColor: "rgba(16, 185, 129, 0.12)",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  borderRadius: "10px",
+                  color: "#10B981",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: isRechecking ? "wait" : "pointer",
+                }}
+              >
+                <RefreshIcon size={14} />
+                <span>{isRechecking ? "Tekshirilmoqda..." : "Holatni tekshirish"}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setPairingState("NOT_CONNECTED")}
                 style={{
                   padding: "12px 20px",
@@ -730,23 +839,39 @@ export const TelegramIntegrationPage: React.FC<TelegramIntegrationPageProps> = (
             <p style={{ fontSize: "14px", color: "#94A3B8", margin: "0 0 24px 0" }}>
               {pairingState === "EXPIRED"
                 ? "5 daqiqalik ulanish kodi eskirgan. Yangi kod olish uchun quyidagi tugmani bosing."
-                : "Kod noto'g'ri kiritilgan yoki maksimal urinishlar soni tugagan."}
+                : lastErrorMsg || "Kod noto'g'ri kiritilgan yoki maksimal urinishlar soni tugagan."}
             </p>
-            <button
-              onClick={handleStartLink}
-              style={{
-                padding: "12px 24px",
-                backgroundColor: "#10B981",
-                border: "none",
-                borderRadius: "10px",
-                color: "#0B0F17",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Yangi Kod Olish
-            </button>
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                onClick={handleStartLink}
+                style={{
+                  padding: "12px 24px",
+                  backgroundColor: "#10B981",
+                  border: "none",
+                  borderRadius: "10px",
+                  color: "#0B0F17",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Yangi Kod Olish
+              </button>
+              <button
+                onClick={loadStatus}
+                style={{
+                  padding: "12px 20px",
+                  backgroundColor: "rgba(255, 255, 255, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  borderRadius: "10px",
+                  color: "#E2E8F0",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+              >
+                Holatni qayta tekshirish
+              </button>
+            </div>
           </div>
         )}
 

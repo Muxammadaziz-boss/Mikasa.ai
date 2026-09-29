@@ -104,6 +104,8 @@ export function formatAuthError(err: any): string {
   }
   if (
     msg.includes("bad_oauth_state") ||
+    msg.includes("OAuth state not found or expired") ||
+    msg.includes("invalid_oauth_state") ||
     msg.includes("state mismatch") ||
     msg.includes("state expired") ||
     msg.includes("Noto'g'ri OAuth state") ||
@@ -1995,7 +1997,27 @@ class BackendService {
       const res = await fetch(url, {
         headers: { ...authHeaders },
       });
-      return await res.json();
+      const localData: TelegramLinkStatusResponse = await res.json();
+      if (
+        isLocalhostUrl(API_BASE) &&
+        !localData?.is_linked &&
+        localData?.status !== "VERIFIED" &&
+        authHeaders.Authorization
+      ) {
+        try {
+          const cloudUrl = queryString
+            ? `${PRODUCTION_API_URL}/api/telegram/link/status?${queryString}`
+            : `${PRODUCTION_API_URL}/api/telegram/link/status`;
+          const cloudRes = await fetch(cloudUrl, { headers: { ...authHeaders } });
+          if (cloudRes.ok) {
+            const cloudData: TelegramLinkStatusResponse = await cloudRes.json();
+            if (cloudData?.is_linked || cloudData?.status === "VERIFIED" || (cloudData?.attempt_count || 0) > (localData?.attempt_count || 0)) {
+              return cloudData;
+            }
+          }
+        } catch {}
+      }
+      return localData;
     } catch (err: any) {
       return { ok: false, status: "ERROR", is_linked: false, error: String(err) };
     }
@@ -2031,7 +2053,23 @@ class BackendService {
       const res = await fetch(url, {
         headers: { ...authHeaders },
       });
-      return await res.json();
+      const localData: TelegramAccountResponse = await res.json();
+      if (isLocalhostUrl(API_BASE) && !localData?.is_linked && authHeaders.Authorization) {
+        try {
+          let cloudUrl = `${PRODUCTION_API_URL}/api/telegram/account`;
+          if (mikasaUserId && mikasaUserId !== "admin") {
+            cloudUrl += `?mikasa_user_id=${encodeURIComponent(mikasaUserId)}`;
+          }
+          const cloudRes = await fetch(cloudUrl, { headers: { ...authHeaders } });
+          if (cloudRes.ok) {
+            const cloudData: TelegramAccountResponse = await cloudRes.json();
+            if (cloudData?.is_linked) {
+              return cloudData;
+            }
+          }
+        } catch {}
+      }
+      return localData;
     } catch (err: any) {
       return { ok: false, is_linked: false, error: String(err) };
     }
@@ -2266,6 +2304,23 @@ class BackendService {
     return headers;
   }
 
+  public handleUnauthorizedResponse(status: number): void {
+    if (status === 401 && this.authToken) {
+      this.setAuthToken(null);
+      this.notifyAuthChange(null);
+    }
+  }
+
+  public async authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const headers = {
+      ...this.getAuthHeaders(),
+      ...(init?.headers || {}),
+    };
+    const response = await fetch(input, { ...init, headers });
+    this.handleUnauthorizedResponse(response.status);
+    return response;
+  }
+
   public onAuthChange(cb: (user: MikasaAuthUser | null) => void): () => void {
     this.authListeners.add(cb);
     return () => this.authListeners.delete(cb);
@@ -2458,6 +2513,35 @@ class BackendService {
     };
   }
 
+  private async preRegisterOAuthState(
+    state: string,
+    callbackBase: string,
+    action: "init" | "link" = "init"
+  ): Promise<void> {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem("mikasa_oauth_state", state);
+      }
+    } catch {}
+
+    const payload = JSON.stringify({ state, action, timestamp: Date.now() });
+    try {
+      await fetch(`${callbackBase}/api/auth/callback/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      });
+    } catch {}
+
+    if (isLocalhostUrl(callbackBase)) {
+      fetch(`${PRODUCTION_API_URL}/api/auth/callback/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).catch(() => {});
+    }
+  }
+
   public async signInWithGoogle(customState?: string): Promise<{ ok: boolean; error?: string; url?: string; state?: string; redirectTo?: string }> {
     if (!isSupabaseConfigured) {
       return {
@@ -2490,6 +2574,7 @@ class BackendService {
       this.activeOAuthState = state;
       this.activeOAuthCallbackBase = callbackBase;
       this.oauthPollFailures = 0;
+      await this.preRegisterOAuthState(state, callbackBase, "init");
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -2524,7 +2609,13 @@ class BackendService {
     fatal?: boolean;
     serverUnreachable?: boolean;
   }> {
-    const targetState = (state || this.activeOAuthState || "").trim();
+    let savedState = "";
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        savedState = window.localStorage.getItem("mikasa_oauth_state") || "";
+      }
+    } catch {}
+    const targetState = (state || this.activeOAuthState || savedState || "").trim();
     if (targetState && !OAUTH_STATE_REGEX.test(targetState)) {
       return {
         ok: false,
@@ -2532,6 +2623,14 @@ class BackendService {
         fatal: true,
       };
     }
+    const clearStoredOAuthState = () => {
+      this.activeOAuthState = null;
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.removeItem("mikasa_oauth_state");
+        }
+      } catch {}
+    };
     const callbackBase = this.activeOAuthCallbackBase || resolveOAuthCallbackBase();
     try {
       const url = targetState
@@ -2546,20 +2645,45 @@ class BackendService {
       if (res.ok) {
         const data = await res.json();
         if (data?.ok && data?.session) {
-          this.activeOAuthState = null;
+          clearStoredOAuthState();
+          return data;
         }
-        return data;
-      }
-      if (res.status === 400) {
+      } else if (res.status === 400) {
         const errData = await res.json().catch(() => ({}));
         const rawErr = errData?.oauth_error || errData?.error || "Google orqali kirishda xatolik yuz berdi";
-        this.activeOAuthState = null;
+        clearStoredOAuthState();
         return {
           ok: false,
           error: formatAuthError(rawErr),
           fatal: true,
         };
       }
+
+      if (isLocalhostUrl(callbackBase) && targetState) {
+        try {
+          const cloudUrl = `${PRODUCTION_API_URL}/api/auth/callback/session?state=${encodeURIComponent(targetState)}`;
+          const cloudRes = await fetch(cloudUrl, { headers: { Accept: "application/json" } });
+          if (cloudRes.ok) {
+            const cloudData = await cloudRes.json();
+            if (cloudData?.ok && cloudData?.session) {
+              clearStoredOAuthState();
+              return cloudData;
+            }
+          } else if (cloudRes.status === 400) {
+            const cloudErr = await cloudRes.json().catch(() => ({}));
+            const rawCloudErr = cloudErr?.oauth_error || cloudErr?.error;
+            if (rawCloudErr) {
+              clearStoredOAuthState();
+              return {
+                ok: false,
+                error: formatAuthError(rawCloudErr),
+                fatal: true,
+              };
+            }
+          }
+        } catch {}
+      }
+
       return { ok: false };
     } catch {
       this.oauthPollFailures += 1;
@@ -2652,6 +2776,7 @@ class BackendService {
       this.activeOAuthState = state;
       this.activeOAuthCallbackBase = callbackBase;
       this.oauthPollFailures = 0;
+      await this.preRegisterOAuthState(state, callbackBase, "link");
 
       const { data, error } = await supabase.auth.linkIdentity({
         provider: "google",

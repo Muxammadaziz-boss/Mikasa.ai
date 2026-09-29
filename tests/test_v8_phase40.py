@@ -594,6 +594,11 @@ class TestPhase40RestAPI(unittest.TestCase):
 
     def setUp(self):
         self._orig_env = dict(os.environ)
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+            os.environ.pop(k, None)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
         self.temp_dir = tempfile.mkdtemp(prefix="mikasa_v8_p40_api_")
         self.adm_storage = os.path.join(self.temp_dir, "api_adm.json")
         self.adm = AccountDeviceManager.get_default_instance(storage_path=self.adm_storage)

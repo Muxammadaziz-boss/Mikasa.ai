@@ -308,3 +308,95 @@ test('Telegram OTP Linking: Bot username, deep-link, and status polling contract
   assert.equal(isStatusVerified({ linked: false, request_status: 'VERIFIED' }), true);
   assert.equal(isStatusExpired({ linked: false, status: 'EXPIRED' }), true);
 });
+
+// 10. OAUTH STATE ERROR FORMATTING & FRESH RE-OPEN CONTRACT
+test('OAuth Error Formatting: bad_oauth_state and OAuth state not found or expired mapped to Uzbek message', () => {
+  const formatOAuthStateError = (rawMessage) => {
+    const lower = String(rawMessage || '').toLowerCase();
+    if (
+      lower.includes('bad_oauth_state') ||
+      lower.includes('oauth state not found or expired') ||
+      lower.includes('invalid_oauth_state')
+    ) {
+      return "OAuth holati eskirgan yoki topilmadi. Iltimos, 'Google bilan davom etish' tugmasini qaytadan bosing.";
+    }
+    return rawMessage;
+  };
+
+  assert.equal(
+    formatOAuthStateError('bad_oauth_state: OAuth state not found or expired'),
+    "OAuth holati eskirgan yoki topilmadi. Iltimos, 'Google bilan davom etish' tugmasini qaytadan bosing."
+  );
+  assert.equal(
+    formatOAuthStateError('OAuth state not found or expired'),
+    "OAuth holati eskirgan yoki topilmadi. Iltimos, 'Google bilan davom etish' tugmasini qaytadan bosing."
+  );
+});
+
+// 11. OAUTH STATE CREATION -> STORAGE -> RETRIEVAL CONSISTENCY CONTRACT
+test('OAuth State Lifecycle: Pre-registration, pending preservation, stateless binding, and 404 cloud fallback', () => {
+  const store = new Map();
+  const isCompleted = (entry) =>
+    Boolean(entry && (entry.access_token || entry.code || entry.error || entry.user !== undefined));
+
+  // 1. Creation & pre-registration
+  const preRegister = (state, action = 'init') => {
+    store.set(state, { state, action, status: 'pending', timestamp: Date.now() });
+  };
+
+  // 2. Callback save (even when Supabase strips state on redirect or returns bad_oauth_state without state)
+  const saveCallback = (rawState, payload) => {
+    let targetState = rawState;
+    if (!targetState) {
+      for (const [k, v] of store.entries()) {
+        if (k !== 'default' && !isCompleted(v)) {
+          targetState = k;
+          break;
+        }
+      }
+      if (!targetState) targetState = 'default';
+    }
+    const record = { ...payload, state: targetState, status: payload.error ? 'error' : 'completed' };
+    store.set(targetState, record);
+    if (!rawState) store.set('default', record);
+    return targetState;
+  };
+
+  // 3. Retrieval (does not pop pending state; pops once completed)
+  const getSession = (reqState) => {
+    const item = store.get(reqState);
+    if (item && isCompleted(item)) {
+      store.delete(reqState);
+      store.delete('default');
+      return { status: 200, ok: true, session: item };
+    }
+    const defItem = store.get('default');
+    if (defItem && isCompleted(defItem)) {
+      store.delete('default');
+      store.delete(reqState);
+      return { status: 200, ok: true, session: defItem };
+    }
+    return { status: 404, ok: false, pending: Boolean(item && !isCompleted(item)) };
+  };
+
+  const stateId = 'oauth_state_contract_999';
+  preRegister(stateId, 'init');
+
+  // Early poll before callback does NOT delete pending state
+  const earlyPoll = getSession(stateId);
+  assert.equal(earlyPoll.status, 404);
+  assert.equal(earlyPoll.pending, true);
+  assert.equal(store.has(stateId), true);
+
+  // Stateless callback binds to pre-registered stateId
+  const boundState = saveCallback('', { access_token: 'jwt_tok_123' });
+  assert.equal(boundState, stateId);
+
+  // Subsequent poll retrieves session and consumes state
+  const finalPoll = getSession(stateId);
+  assert.equal(finalPoll.status, 200);
+  assert.equal(finalPoll.session.access_token, 'jwt_tok_123');
+  assert.equal(store.has(stateId), false);
+});
+
+

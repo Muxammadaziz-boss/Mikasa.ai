@@ -89,14 +89,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   // Poll backend session when waiting for OAuth completion in browser
   useEffect(() => {
     if (!oauthWaiting) return;
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     let isCancelled = false;
+    let inFlight = false;
+    let shouldContinue = true;
     const startedAt = Date.now();
     const MAX_WAIT_MS = 5 * 60 * 1000; // 5 daqiqa
 
     const poll = async () => {
-      if (isCancelled) return;
+      if (isCancelled || inFlight) return;
       if (Date.now() - startedAt > MAX_WAIT_MS) {
+        shouldContinue = false;
         setOauthWaiting(false);
         setOauthState(null);
         setSuccessMsg(null);
@@ -104,11 +107,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         return;
       }
 
+      inFlight = true;
       try {
         const res = await backendService.checkPendingOAuthSession(oauthState || undefined);
         if (isCancelled) return;
 
         if (res.fatal || res.serverUnreachable) {
+          shouldContinue = false;
           setOauthWaiting(false);
           setOauthState(null);
           setSuccessMsg(null);
@@ -128,6 +133,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               refresh_token: refresh_token || access_token,
             });
             if (sessErr) {
+              shouldContinue = false;
               setOauthWaiting(false);
               setOauthState(null);
               setSuccessMsg(null);
@@ -140,6 +146,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             setSuccessMsg("Hisobingiz tasdiqlandi! Tizimga kirilmoqda...");
             const { data, error: codeErr } = await supabase.auth.exchangeCodeForSession(code);
             if (codeErr) {
+              shouldContinue = false;
               setOauthWaiting(false);
               setOauthState(null);
               setSuccessMsg(null);
@@ -155,6 +162,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           }
 
           if (sessionUser && !isCancelled) {
+            shouldContinue = false;
             const u: MikasaAuthUser = {
               id: sessionUser.id,
               username:
@@ -179,9 +187,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         }
       } catch {
         // Continue polling
-      }
-      if (!isCancelled) {
-        timer = setTimeout(poll, 1200);
+      } finally {
+        inFlight = false;
+        if (!isCancelled && shouldContinue) {
+          timer = setTimeout(poll, 1200);
+        }
       }
     };
 
@@ -194,8 +204,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   }, [oauthWaiting, oauthState, onAuthSuccess]);
 
   // Google OAuth handler
-  const handleGoogleSignIn = async () => {
-    if (loading || oauthLoading || oauthWaiting) return;
+  const handleGoogleSignIn = async (forceRestartOrEvent?: boolean | React.MouseEvent<HTMLButtonElement>) => {
+    const forceRestart = forceRestartOrEvent === true;
+    if (loading || oauthLoading || (oauthWaiting && !forceRestart)) return;
+    if (forceRestart) {
+      setOauthWaiting(false);
+    }
     setOauthLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -720,7 +734,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               {oauthUrl && (
                 <button
                   type="button"
-                  onClick={() => backendService.openExternalUrl(oauthUrl)}
+                  onClick={() => handleGoogleSignIn(true)}
                   style={{
                     width: "100%",
                     padding: "11px 16px",

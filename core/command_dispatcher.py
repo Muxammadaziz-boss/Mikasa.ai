@@ -484,9 +484,12 @@ class CommandDispatcher:
                 return True, "🎮 **Videokartangiz (GPU):**\n• Standart video adapter"
 
         # RAM (Tezkor xotira) so'ralganda ("ram", "ramchi?", "operativka", "operativkachi?")
-        is_ram_query = any(w in clean_text for w in [
-            "ram", "ramchi", "operativka", "operativkachi", "tezkor xotira", "xotirachi"
-        ]) and (
+        is_ram_query = bool(
+            re.search(
+                r"\b(ram|ramchi|operativka|operativkachi|tezkor xotira|xotirachi)\b",
+                clean_text,
+            )
+        ) and (
             any(p in clean_text for p in [
                 "qancha", "qanaqa", "nechi", "haqida", "ma'lumot", "kerak", "ayt",
                 "band", "bo'sh", "hajm", "chi", "?"

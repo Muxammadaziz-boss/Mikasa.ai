@@ -63,10 +63,17 @@ class TestProductionAPIServerIntegration(AioHTTPTestCase):
     """Integration test suite for aiohttp API Server with production middleware."""
 
     async def get_application(self):
+        self._orig_env = dict(os.environ)
         os.environ["ENVIRONMENT"] = "production"
         os.environ["RAILWAY_ENVIRONMENT"] = "production"
         os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
         return create_app()
+
+    def tearDown(self):
+        super().tearDown()
+        if hasattr(self, "_orig_env"):
+            os.environ.clear()
+            os.environ.update(self._orig_env)
 
     @unittest_run_loop
     async def test_health_endpoint_200(self):
@@ -229,9 +236,19 @@ class TestGoogleOAuthRedirectAndSecurity(AioHTTPTestCase):
     """Tests for Google OAuth redirect chain, environment separation, state validation, and token security."""
 
     async def get_application(self):
+        self._orig_env = dict(os.environ)
+        os.environ.pop("RAILWAY_ENVIRONMENT", None)
+        os.environ.pop("RAILWAY_PROJECT_ID", None)
+        os.environ.pop("MIKASA_ENV", None)
         os.environ["ENVIRONMENT"] = "production"
         os.environ["MIKASA_ALLOW_REMOTE_API"] = "true"
         return create_app()
+
+    def tearDown(self):
+        super().tearDown()
+        if hasattr(self, "_orig_env"):
+            os.environ.clear()
+            os.environ.update(self._orig_env)
 
     @unittest_run_loop
     async def test_oauth_callback_html_scrubs_tokens_and_sets_no_store_headers(self):

@@ -5,7 +5,7 @@ import unittest
 import customtkinter as ctk
 
 from gui.theme import Colors
-from gui.components import GlassButton, CircleIconButton, GlowButton, SecondaryButton
+from gui.components import Button, GlassButton, CircleIconButton, GlowButton, SecondaryButton
 from gui.pages.dashboard import DashboardPage
 from gui.pages.voice import VoicePage
 from gui.pages.chat import ChatPage
@@ -89,7 +89,7 @@ class TestV6AllPagesGlassButtons(unittest.TestCase):
 
         page._build_tools_grid([
             {"name": "test_tool", "description": "Tavsif", "category": "utility", "icon": "🔧", "color": "#30D158"}
-        ])
+        ], immediate=True)
         self.root.update()
 
         def find_buttons(widget):
@@ -101,8 +101,10 @@ class TestV6AllPagesGlassButtons(unittest.TestCase):
             return btns
 
         btns = find_buttons(page)
-        self.assertEqual(btns[0].cget("text"), "Foydalanish")
-        self.assertEqual(btns[0]._icon_name, "send")
+        self.assertGreaterEqual(len(btns), 1)
+        self.assertIsInstance(page.view_btn, Button)
+        self.assertEqual(page.view_btn._icon_name, "dashboard")
+        self.assertIn("test_tool", page._tool_cards)
 
         page.pack_forget()
         page.destroy()

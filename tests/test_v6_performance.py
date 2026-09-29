@@ -25,6 +25,8 @@ class TestV6AppLazyLoading(unittest.TestCase):
     def tearDown(self):
         if self.app:
             try:
+                if hasattr(self.app, "bridge") and self.app.bridge:
+                    self.app.bridge.stop()
                 for timer_attr in ["_lazy_nav_job", "_clock_job", "_stats_job"]:
                     job = getattr(self.app, timer_attr, None)
                     if job:
@@ -38,24 +40,24 @@ class TestV6AppLazyLoading(unittest.TestCase):
         IconEngine.clear_cache()
 
     def test_lazy_initialization_on_startup(self):
-        """Verify that app startup only initializes voice and does NOT instantiate all 8 pages"""
-        self.app = MikasaApp(connect_backend=False)
+        """Verify that app startup only initializes home and does NOT instantiate all pages"""
+        self.app = MikasaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
-        # On startup, only initial page (voice) should be instantiated
-        self.assertIn("voice", self.app._pages)
-        self.assertEqual(len(self.app._pages), 1, "Only initial page (voice) should be loaded at startup")
+        # On startup, only initial page (home) should be instantiated
+        self.assertIn("home", self.app._pages)
+        self.assertEqual(len(self.app._pages), 1, "Only initial page (home) should be loaded at startup")
 
         # Other pages must NOT exist in _pages yet
-        for page_id in ["dashboard", "chat", "commands", "memory", "scheduler", "plugins", "settings"]:
+        for page_id in ["voice", "dashboard", "chat", "commands", "memory", "scheduler", "plugins", "settings"]:
             self.assertNotIn(page_id, self.app._pages, f"{page_id} should NOT be initialized at startup")
 
-        self.assertEqual(self.app._current_page, "voice")
+        self.assertEqual(self.app._current_page, "home")
         self.assertEqual(self.app._nav_state, "READY")
 
     def test_lazy_navigation_and_page_caching(self):
         """Verify lazy creation on first navigation and instant caching on subsequent visits"""
-        self.app = MikasaApp(connect_backend=False)
+        self.app = MikasaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
         self.assertEqual(len(self.app._pages), 1)
 
@@ -69,9 +71,9 @@ class TestV6AppLazyLoading(unittest.TestCase):
         cmd_page_ref = self.app._pages["commands"]
         self.assertIsInstance(cmd_page_ref, CommandsPage)
 
-        # 2. Navigation back to 'voice'
-        self.app.navigate_to("voice", sync=True)
-        self.assertEqual(self.app._current_page, "voice")
+        # 2. Navigation back to 'home'
+        self.app.navigate_to("home", sync=True)
+        self.assertEqual(self.app._current_page, "home")
         self.assertEqual(len(self.app._pages), 2)
 
         # 3. Navigation again to 'commands' — must reuse cached instance!
@@ -80,7 +82,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_rapid_navigation_cancels_pending_lazy_jobs(self):
         """Verify rapid navigation cancels earlier lazy jobs without crashing or orphaned widgets"""
-        self.app = MikasaApp(connect_backend=False)
+        self.app = MikasaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
         # Rapid clicks without sync (asynchronous path)
@@ -98,7 +100,7 @@ class TestV6AppLazyLoading(unittest.TestCase):
 
     def test_navigation_generation_token_drops_stale_callback(self):
         """Verify stale navigation callback from an earlier requested page is rejected"""
-        self.app = MikasaApp(connect_backend=False)
+        self.app = MikasaApp(connect_backend=False, show_splash=False)
         self.app.withdraw()
 
         initial_gen = self.app._nav_generation

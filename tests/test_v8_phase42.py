@@ -82,6 +82,12 @@ class MockRequest:
 class BasePhase42Test(unittest.TestCase):
     """Base setup for Phase 42 tests with isolated temporary directories."""
     def setUp(self):
+        self._orig_env = dict(os.environ)
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+            os.environ.pop(k, None)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
         self.temp_dir = tempfile.mkdtemp(prefix="mikasa_phase42_test_")
         self.pairing_storage = os.path.join(self.temp_dir, "pairing.json")
         self.device_storage = os.path.join(self.temp_dir, "devices.json")
@@ -105,6 +111,11 @@ class BasePhase42Test(unittest.TestCase):
         self.user_b = self.account_mgr.register_or_get_user("user-uuid-bob", username="bob")
 
     def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._orig_env)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
         DevicePairingManager._default_instance = None
         AccountDeviceManager._default_instance = None
         DeviceEnrollmentManager._default_instance = None

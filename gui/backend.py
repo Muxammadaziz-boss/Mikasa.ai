@@ -49,10 +49,6 @@ class BackendBridge:
         self._proactive_watcher = None
         self._ready = False
 
-    @property
-    def is_ready(self) -> bool:
-        return self._ready
-
         # Duplikat xabar himoyasi (thread-safe)
         self._pending_lock = threading.Lock()
         self._pending_user_texts = set()
@@ -66,6 +62,10 @@ class BackendBridge:
             self._ui_job = self.app.after(40, self._process_ui_queue)
         except Exception:
             pass
+
+    @property
+    def is_ready(self) -> bool:
+        return self._ready
 
     def _queue_ui(self, callback):
         """Background thread lardan UI ishlarini main thread ga uzatish."""

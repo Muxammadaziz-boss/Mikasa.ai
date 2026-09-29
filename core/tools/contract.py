@@ -105,13 +105,13 @@ class ToolResult:
         message = data.get("message", "")
         # Extract payload
         if "result" in data:
+            extra = {k: v for k, v in data.items() if k not in ("success", "error", "message", "result")}
             if isinstance(data["result"], dict):
-                result_data = data["result"]
+                result_data = {**data["result"], **extra} if extra else data["result"]
+            elif extra:
+                result_data = {"result": data["result"], **extra}
             else:
-                result_data = {
-                    "result": data["result"],
-                    **{k: v for k, v in data.items() if k not in ("success", "error", "message", "result")}
-                }
+                result_data = data["result"]
         else:
             result_data = {k: v for k, v in data.items() if k not in ("success", "error", "message")}
         if not result_data and "message" in data:

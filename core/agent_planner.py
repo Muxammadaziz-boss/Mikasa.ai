@@ -412,10 +412,11 @@ class ReActAgent:
                         }
                     )
                 else:
+                    serializable_res = result.to_dict() if hasattr(result, "to_dict") else result
                     history.append(
                         {
                             "role": "user",
-                            "content": f"Tool natijasi: {json.dumps(result, ensure_ascii=False)}",
+                            "content": f"Tool natijasi: {json.dumps(serializable_res, ensure_ascii=False, default=str)}",
                         }
                     )
 

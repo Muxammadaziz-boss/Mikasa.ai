@@ -449,6 +449,12 @@ class TestUpdateApiIntegration(unittest.IsolatedAsyncioTestCase):
     """Integration tests for backend HTTP update endpoints in core/api_server.py."""
 
     async def asyncSetUp(self):
+        self._orig_env = dict(os.environ)
+        for k in ("SUPABASE_URL", "VITE_SUPABASE_URL", "MIKASA_REQUIRE_AUTH", "RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "MIKASA_ENV"):
+            os.environ.pop(k, None)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
         from aiohttp.test_utils import TestClient, TestServer
         from core.api_server import create_app
         self.app = create_app()
@@ -458,6 +464,11 @@ class TestUpdateApiIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.client.close()
+        os.environ.clear()
+        os.environ.update(self._orig_env)
+        from core.v8 import AccountAuthManager
+        AccountAuthManager._instance = None
+        AccountAuthManager._default_instance = None
 
     async def test_api_update_status(self):
         """GET /api/updates/status returns valid state."""
