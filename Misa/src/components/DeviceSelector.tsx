@@ -144,15 +144,18 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
       >
         <LaptopIcon size={13} color="#4EDEA3" />
         <span
+          className="misa-device-name"
           style={{
-            maxWidth: "110px",
+            maxWidth: "96px",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             fontWeight: 500,
           }}
         >
-          {selectedDevice ? selectedDevice.name : "Kompyuter"}
+          {selectedDevice
+            ? (selectedDevice.name || "").replace(/\s*\(Joriy kompyuter\)/i, "").trim() || "Kompyuter"
+            : "Kompyuter"}
         </span>
         {selectedDevice && (
           <span

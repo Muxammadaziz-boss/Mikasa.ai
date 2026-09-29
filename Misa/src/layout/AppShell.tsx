@@ -56,6 +56,22 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const activeExtraItem = EXTRA_NAV_ITEMS.find((item) => item.path === activePath);
 
+  const handleStartResize = async (direction: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("app_start_resize", { direction });
+    } catch {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        await (getCurrentWindow() as any).startResizeDragging(direction);
+      } catch {
+        // Browser fallback
+      }
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
@@ -76,12 +92,48 @@ export const AppShell: React.FC<AppShellProps> = ({
         flexDirection: "column",
         width: "100vw",
         height: "100vh",
-        backgroundColor: "var(--bg-darkest, #02060E)",
+        backgroundColor: "var(--bg-darkest, #06030C)",
         color: "var(--text-primary)",
         overflow: "hidden",
         position: "relative",
+        border: "1px solid rgba(232, 179, 255, 0.14)",
+        boxSizing: "border-box",
       }}
     >
+      {/* 0. Native 8-Direction Window Resize Grips (Borderless Window) */}
+      <div
+        onMouseDown={(e) => handleStartResize("North", e)}
+        style={{ position: "fixed", top: 0, left: 10, right: 10, height: 5, cursor: "ns-resize", zIndex: 9999 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("South", e)}
+        style={{ position: "fixed", bottom: 0, left: 10, right: 10, height: 6, cursor: "ns-resize", zIndex: 9999 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("West", e)}
+        style={{ position: "fixed", left: 0, top: 10, bottom: 10, width: 5, cursor: "ew-resize", zIndex: 9999 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("East", e)}
+        style={{ position: "fixed", right: 0, top: 10, bottom: 10, width: 6, cursor: "ew-resize", zIndex: 9999 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("NorthWest", e)}
+        style={{ position: "fixed", top: 0, left: 0, width: 10, height: 10, cursor: "nwse-resize", zIndex: 10000 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("NorthEast", e)}
+        style={{ position: "fixed", top: 0, right: 0, width: 10, height: 10, cursor: "nesw-resize", zIndex: 10000 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("SouthWest", e)}
+        style={{ position: "fixed", bottom: 0, left: 0, width: 10, height: 10, cursor: "nesw-resize", zIndex: 10000 }}
+      />
+      <div
+        onMouseDown={(e) => handleStartResize("SouthEast", e)}
+        style={{ position: "fixed", bottom: 0, right: 0, width: 10, height: 10, cursor: "nwse-resize", zIndex: 10000 }}
+      />
+
       {/* 1. Deep Midnight Canvas & Ambient Violet Glows */}
       <div className="cinematic-bg misa-canvas-bg" />
 
@@ -95,12 +147,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           position: "relative",
           zIndex: 100,
           width: "100%",
-          padding: "12px 16px 6px 16px",
+          padding: "10px 12px 6px 12px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
           userSelect: "none",
+          boxSizing: "border-box",
         }}
       >
         <nav
@@ -110,13 +163,15 @@ export const AppShell: React.FC<AppShellProps> = ({
           style={{
             width: "100%",
             maxWidth: "1440px",
-            height: "54px",
+            minWidth: 0,
+            height: "52px",
             borderRadius: "9999px",
-            padding: "0 8px 0 16px",
+            padding: "0 6px 0 14px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "12px",
+            gap: "8px",
+            boxSizing: "border-box",
             background: "rgba(24, 13, 36, var(--misa-glass-opacity, 0.62))",
             backdropFilter: "blur(24px) saturate(180%)",
             WebkitBackdropFilter: "blur(24px) saturate(180%)",
@@ -130,16 +185,17 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "14px",
+              gap: "10px",
               flexShrink: 0,
               ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
             }}
           >
             <MisaLogo onClick={() => onNavigate("/")} showVersion={true} />
             <div
+              className="misa-topnav-divider"
               style={{
                 width: "1px",
-                height: "20px",
+                height: "18px",
                 background: "rgba(255, 255, 255, 0.1)",
               }}
             />
@@ -151,11 +207,13 @@ export const AppShell: React.FC<AppShellProps> = ({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "4px",
+              gap: "3px",
               padding: "4px",
               borderRadius: "9999px",
               background: "rgba(2, 6, 14, 0.48)",
               border: "1px solid rgba(255, 255, 255, 0.06)",
+              minWidth: 0,
+              flexShrink: 1,
               ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
             }}
           >
@@ -167,13 +225,15 @@ export const AppShell: React.FC<AppShellProps> = ({
                   key={item.path}
                   onClick={() => onNavigate(item.path)}
                   aria-current={isActive ? "page" : undefined}
+                  title={item.label}
+                  className={`misa-nav-pill ${isActive ? "is-active" : ""}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "7px",
-                    padding: "7px 16px",
+                    gap: "6px",
+                    padding: "6px 12px",
                     borderRadius: "9999px",
-                    fontSize: "12.5px",
+                    fontSize: "12px",
                     fontWeight: isActive ? 600 : 500,
                     color: isActive ? "#FFFFFF" : "var(--text-secondary)",
                     background: isActive
@@ -186,6 +246,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     cursor: "pointer",
                     transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                     whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
@@ -207,19 +268,20 @@ export const AppShell: React.FC<AppShellProps> = ({
             })}
 
             {/* More / System Centers Dropdown Pill */}
-            <div ref={moreMenuRef} style={{ position: "relative" }}>
+            <div ref={moreMenuRef} style={{ position: "relative", flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => setMoreMenuOpen((prev) => !prev)}
                 aria-expanded={moreMenuOpen}
                 title="Boshqa bo'limlar va vositalar"
+                className={`misa-nav-pill ${activeExtraItem ? "is-active" : ""}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "6px",
-                  padding: "7px 14px",
+                  gap: "5px",
+                  padding: "6px 11px",
                   borderRadius: "9999px",
-                  fontSize: "12.5px",
+                  fontSize: "12px",
                   fontWeight: activeExtraItem ? 600 : 500,
                   color: activeExtraItem || moreMenuOpen ? "#FFFFFF" : "var(--text-secondary)",
                   background: activeExtraItem
@@ -385,11 +447,13 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           {/* ── RIGHT: Search Pill (Ctrl+K), Device Selector, Profile Pill & Window Controls ── */}
           <div
+            className="misa-topnav-right"
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "6px",
               flexShrink: 0,
+              minWidth: 0,
               ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
             }}
           >
@@ -398,11 +462,12 @@ export const AppShell: React.FC<AppShellProps> = ({
               type="button"
               onClick={onOpenCommandPalette}
               title="Tezkor qidiruv va buyruqlar (Ctrl+K)"
+              className="misa-search-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
-                padding: "6px 12px",
+                gap: "6px",
+                padding: "5px 10px",
                 borderRadius: "9999px",
                 background: "rgba(255, 255, 255, 0.035)",
                 border: "1px solid rgba(255, 255, 255, 0.08)",
@@ -410,6 +475,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 fontSize: "12px",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "rgba(147, 3, 197, 0.14)";
@@ -423,8 +489,9 @@ export const AppShell: React.FC<AppShellProps> = ({
               }}
             >
               <SearchIcon size={13} color="currentColor" />
-              <span className="misa-topnav-label">Qidirish...</span>
+              <span className="misa-search-text">Qidirish...</span>
               <kbd
+                className="misa-search-kbd"
                 style={{
                   fontSize: "10px",
                   fontFamily: "var(--font-mono)",
@@ -446,11 +513,12 @@ export const AppShell: React.FC<AppShellProps> = ({
               type="button"
               onClick={() => onNavigate("/account")}
               title="Profil va Sozlamalar"
+              className="misa-profile-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
-                padding: "4px 6px 4px 12px",
+                gap: "6px",
+                padding: "4px 6px 4px 10px",
                 borderRadius: "9999px",
                 background:
                   activePath === "/account"
@@ -462,6 +530,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     : "1px solid rgba(255, 255, 255, 0.1)",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 if (activePath !== "/account") {
@@ -477,12 +546,12 @@ export const AppShell: React.FC<AppShellProps> = ({
               }}
             >
               <span
-                className="misa-topnav-label"
+                className="misa-user-name-label"
                 style={{
                   fontSize: "12px",
                   fontWeight: 600,
                   color: "#F5F0FF",
-                  maxWidth: "110px",
+                  maxWidth: "85px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -514,7 +583,8 @@ export const AppShell: React.FC<AppShellProps> = ({
                 width: "1px",
                 height: "18px",
                 background: "rgba(255, 255, 255, 0.08)",
-                marginLeft: "2px",
+                marginLeft: "1px",
+                flexShrink: 0,
               }}
             />
 

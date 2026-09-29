@@ -1,6 +1,6 @@
 // ========== package_release.cjs ==========
-// Mikasa AI 8.0 — Release Packaging and Version Management Script
-// Places every built version into: yordamchi_8.0.0/release/v<version>/
+// Misa AI 9.0 — Release Packaging and Version Management Script
+// Places every built version into: yordamchi_9.0.0/release/v<version>/
 
 const fs = require("fs");
 const path = require("path");
@@ -9,16 +9,16 @@ const crypto = require("crypto");
 // 1. Get current version from package.json
 const packageJsonPath = path.resolve(__dirname, "../package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-const version = packageJson.version || "8.0.0";
+const version = packageJson.version || "9.0.0";
 const versionName = `v${version}`;
 
-// 2. Define release target directory inside yordamchi_8.0.0/release/v<version>
+// 2. Define release target directory inside yordamchi_9.0.0/release/v<version>
 const projectRoot = path.resolve(__dirname, "../../");
 const releaseBaseDir = path.resolve(projectRoot, "release");
 const releaseVersionDir = path.join(releaseBaseDir, versionName);
 
 console.log(`========================================`);
-console.log(`📦 MIKASA AI Release Packaging: ${versionName}`);
+console.log(`📦 MISA AI Release Packaging: ${versionName}`);
 console.log(`Katalog: ${releaseVersionDir}`);
 console.log(`========================================`);
 
@@ -35,6 +35,9 @@ const tauriBundleDir = path.join(tauriReleaseDir, "bundle");
 
 let exeSource = path.join(tauriReleaseDir, "mikasa-7.exe");
 const candidateExes = [
+  path.join(tauriReleaseDir, "Misa AI.exe"),
+  path.join(tauriReleaseDir, "Misa-AI.exe"),
+  path.join(tauriReleaseDir, "misa.exe"),
   path.join(tauriReleaseDir, "mikasa-7.exe"),
   path.join(tauriReleaseDir, "Mikasa AI.exe"),
   path.join(tauriReleaseDir, "Mikasa-AI.exe"),
@@ -46,10 +49,10 @@ for (const cand of candidateExes) {
     break;
   }
 }
-const exeTarget = path.join(releaseVersionDir, `Mikasa-AI-${versionName}.exe`);
+const exeTarget = path.join(releaseVersionDir, `Misa-AI-${versionName}.exe`);
 
 const manifest = {
-  app: "Mikasa AI",
+  app: "Misa AI",
   version: version,
   version_name: versionName,
   release_date: new Date().toISOString(),
@@ -89,20 +92,26 @@ function copyFileWithLog(src, dest, friendlyName) {
 copyFileWithLog(exeSource, exeTarget, "Mustaqil (.exe)");
 
 // 4.1 Copy WebView2Loader.dll (required for native Windows execution on MinGW)
-const dllSource = path.join(tauriReleaseDir, "WebView2Loader.dll");
+const dllSource = fs.existsSync(path.join(tauriReleaseDir, "WebView2Loader.dll"))
+  ? path.join(tauriReleaseDir, "WebView2Loader.dll")
+  : path.resolve(__dirname, "../src-tauri/WebView2Loader.dll");
 const dllTarget = path.join(releaseVersionDir, "WebView2Loader.dll");
 copyFileWithLog(dllSource, dllTarget, "WebView2 Loader DLL");
 
 // 4.2 Copy Bundled Backend Runtime (if exists)
 const backendSrcCandidates = [
-  path.join(releaseVersionDir, "backend"),
-  path.join(projectRoot, "release", versionName, "backend"),
-  path.join(__dirname, "../src-tauri/backend"),
+  path.resolve(__dirname, "../src-tauri/backend"),
+  path.join(projectRoot, "release", "v8.0.0", "backend"),
   path.join(projectRoot, "dist/backend_build/mikasa_backend"),
+  path.join(releaseVersionDir, "backend"),
 ];
 let backendSourceDir = null;
 for (const cand of backendSrcCandidates) {
-  if (fs.existsSync(path.join(cand, "mikasa_backend.exe"))) {
+  if (
+    (fs.existsSync(path.join(cand, "mikasa_backend.exe")) ||
+      fs.existsSync(path.join(cand, "misa_backend.exe"))) &&
+    fs.existsSync(path.join(cand, "_internal", "python311.dll"))
+  ) {
     backendSourceDir = cand;
     break;
   }
@@ -112,10 +121,10 @@ if (backendSourceDir && backendSourceDir !== backendTargetDir) {
   if (!fs.existsSync(backendTargetDir)) {
     fs.mkdirSync(backendTargetDir, { recursive: true });
   }
-  fs.cpSync(backendSourceDir, backendTargetDir, { recursive: true });
-  console.log(`✔ Bundled Backend Runtime joylandi: ${path.basename(backendTargetDir)}`);
-} else if (fs.existsSync(path.join(backendTargetDir, "mikasa_backend.exe"))) {
-  console.log(`✔ Bundled Backend Runtime mavjud: ${path.basename(backendTargetDir)}`);
+  fs.cpSync(backendSourceDir, backendTargetDir, { recursive: true, force: true });
+  console.log(`✔ Bundled Backend Runtime (_internal bilan) joylandi: ${path.basename(backendTargetDir)}`);
+} else if (fs.existsSync(path.join(backendTargetDir, "_internal", "python311.dll"))) {
+  console.log(`✔ Bundled Backend Runtime (_internal bilan) mavjud: ${path.basename(backendTargetDir)}`);
 }
 
 // 5. Copy MSI Installer if exists
@@ -131,7 +140,7 @@ if (fs.existsSync(msiDir)) {
     });
   if (msiFiles.length > 0) {
     const srcMsi = path.join(msiDir, msiFiles[0]);
-    const destMsi = path.join(releaseVersionDir, `Mikasa-AI-${versionName}.msi`);
+    const destMsi = path.join(releaseVersionDir, `Misa-AI-${versionName}.msi`);
     copyFileWithLog(srcMsi, destMsi, "MSI Installer");
   }
 }
@@ -149,24 +158,24 @@ if (fs.existsSync(nsisDir)) {
     });
   if (nsisFiles.length > 0) {
     const srcNsis = path.join(nsisDir, nsisFiles[0]);
-    const destNsis = path.join(releaseVersionDir, `Mikasa-AI-Setup-${versionName}.exe`);
+    const destNsis = path.join(releaseVersionDir, `Misa-AI-Setup-${versionName}.exe`);
     copyFileWithLog(srcNsis, destNsis, "NSIS Setup (.exe)");
   }
 }
 
 // 7. Write Quick One-Click Launcher (run_portable.bat)
 const launcherBatContent = `@echo off
-title Mikasa AI ${versionName} Launcher
+title Misa AI ${versionName} Launcher
 cd /d "%~dp0"
 echo ========================================================
-echo   MIKASA AI ${versionName} - Launching Portable Desktop...
+echo   MISA AI ${versionName} - Launching Portable Desktop...
 echo ========================================================
 
 REM 1. Check if backend is already listening on port 18420
-powershell -NoProfile -Command "$conn = Test-NetConnection -ComputerName 127.0.0.1 -Port 18420 -WarningAction SilentlyContinue -InformationLevel Quiet; if (-not $conn) { Write-Host 'Starting Mikasa Backend Service (127.0.0.1:18420)...' -ForegroundColor Cyan; if (Test-Path '.\\\\backend\\\\mikasa_backend.exe') { Start-Process -FilePath '.\\\\backend\\\\mikasa_backend.exe' -WorkingDirectory '.\\\\backend' -WindowStyle Hidden; Start-Sleep -Milliseconds 1200 } else { $workDir = if (Test-Path '.\\\\core\\\\api_server.py') { (Resolve-Path '.').Path } elseif (Test-Path '..\\\\..\\\\core\\\\api_server.py') { (Resolve-Path '..\\\\..').Path } else { (Resolve-Path '.').Path }; $cands = @('.\\\\python\\\\python.exe', '.\\\\runtime\\\\python.exe', (Join-Path $workDir '.venv\\\\Scripts\\\\python.exe'), 'python'); $chosen = 'python'; foreach ($c in $cands) { if ($c -eq 'python') { $chosen = 'python'; break } elseif (Test-Path $c) { $chosen = (Resolve-Path $c).Path; break } } Start-Process -FilePath $chosen -ArgumentList 'core\\\\api_server.py' -WorkingDirectory $workDir -WindowStyle Hidden; Start-Sleep -Seconds 2 } }"
+powershell -NoProfile -Command "$conn = Test-NetConnection -ComputerName 127.0.0.1 -Port 18420 -WarningAction SilentlyContinue -InformationLevel Quiet; if (-not $conn) { Write-Host 'Starting Misa Backend Service (127.0.0.1:18420)...' -ForegroundColor Cyan; if (Test-Path '.\\\\backend\\\\mikasa_backend.exe') { Start-Process -FilePath '.\\\\backend\\\\mikasa_backend.exe' -WorkingDirectory '.\\\\backend' -WindowStyle Hidden; Start-Sleep -Milliseconds 1200 } else { $workDir = if (Test-Path '.\\\\core\\\\api_server.py') { (Resolve-Path '.').Path } elseif (Test-Path '..\\\\..\\\\core\\\\api_server.py') { (Resolve-Path '..\\\\..').Path } else { (Resolve-Path '.').Path }; $cands = @('.\\\\python\\\\python.exe', '.\\\\runtime\\\\python.exe', (Join-Path $workDir '.venv\\\\Scripts\\\\python.exe'), 'python'); $chosen = 'python'; foreach ($c in $cands) { if ($c -eq 'python') { $chosen = 'python'; break } elseif (Test-Path $c) { $chosen = (Resolve-Path $c).Path; break } } Start-Process -FilePath $chosen -ArgumentList 'core\\\\api_server.py' -WorkingDirectory $workDir -WindowStyle Hidden; Start-Sleep -Seconds 2 } }"
 
 REM 2. Start Desktop App
-start "" "Mikasa-AI-${versionName}.exe"
+start "" "Misa-AI-${versionName}.exe"
 `;
 
 const batPath = path.join(releaseVersionDir, "run_portable.bat");
@@ -174,8 +183,8 @@ fs.writeFileSync(batPath, launcherBatContent, "utf-8");
 console.log(`✔ Ishga tushirish fayli: run_portable.bat`);
 
 // 7.1 Build Complete Self-Contained Portable ZIP
-const zipTarget = path.join(releaseVersionDir, `Mikasa-AI-${versionName}-Portable.zip`);
-const tempZipStaging = path.join(releaseVersionDir, `Mikasa-AI-${versionName}-Portable`);
+const zipTarget = path.join(releaseVersionDir, `Misa-AI-${versionName}-Portable.zip`);
+const tempZipStaging = path.join(releaseVersionDir, `Misa-AI-${versionName}-Portable`);
 try {
   if (fs.existsSync(tempZipStaging)) {
     fs.rmSync(tempZipStaging, { recursive: true, force: true });
@@ -183,7 +192,7 @@ try {
   fs.mkdirSync(tempZipStaging, { recursive: true });
 
   if (fs.existsSync(exeTarget)) {
-    fs.copyFileSync(exeTarget, path.join(tempZipStaging, `Mikasa-AI-${versionName}.exe`));
+    fs.copyFileSync(exeTarget, path.join(tempZipStaging, `Misa-AI-${versionName}.exe`));
   }
   if (fs.existsSync(dllTarget)) {
     fs.copyFileSync(dllTarget, path.join(tempZipStaging, "WebView2Loader.dll"));
@@ -209,7 +218,9 @@ with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:
 `;
   const pyScript = path.join(releaseVersionDir, "_make_zip.py");
   fs.writeFileSync(pyScript, pyCode, "utf-8");
-  const pyExe = fs.existsSync("d:\\\\Ishchi stoli\\\\Mikasa\\\\.venv\\\\Scripts\\\\python.exe")
+  const pyExe = fs.existsSync("d:\\\\Ishchi stoli\\\\Misa\\\\.venv\\\\Scripts\\\\python.exe")
+    ? '"d:\\\\Ishchi stoli\\\\Misa\\\\.venv\\\\Scripts\\\\python.exe"'
+    : fs.existsSync("d:\\\\Ishchi stoli\\\\Mikasa\\\\.venv\\\\Scripts\\\\python.exe")
     ? '"d:\\\\Ishchi stoli\\\\Mikasa\\\\.venv\\\\Scripts\\\\python.exe"'
     : "python";
   const { execSync } = require("child_process");
@@ -245,16 +256,16 @@ if (fs.existsSync(releasesMdPath)) {
 }
 
 const releaseEntry = `### [${versionName}] — ${new Date().toLocaleDateString("uz-UZ")}
-- **Desktop Ilova**: \`${versionName}/Mikasa-AI-${versionName}.exe\`
-- **Windows MSI**: \`${versionName}/Mikasa-AI-${versionName}.msi\`
-- **NSIS Setup**: \`${versionName}/Mikasa-AI-Setup-${versionName}.exe\`
+- **Desktop Ilova**: \`${versionName}/Misa-AI-${versionName}.exe\`
+- **Windows MSI**: \`${versionName}/Misa-AI-${versionName}.msi\`
+- **NSIS Setup**: \`${versionName}/Misa-AI-Setup-${versionName}.exe\`
 - **Manifest**: \`${versionName}/version_manifest.json\`
 - **Backend**: Python API Server (\`http://127.0.0.1:18420\`)
 
 `;
 
 if (!existingReleases.includes(`### [${versionName}]`)) {
-  const newReleasesMd = `# 🚀 Mikasa AI Versiyalar Arxiv (Releases Archive)\n\n` + releaseEntry + existingReleases.replace("# 🚀 Mikasa AI Versiyalar Arxiv (Releases Archive)\n\n", "");
+  const newReleasesMd = `# 🚀 Misa AI Versiyalar Arxiv (Releases Archive)\n\n` + releaseEntry + existingReleases.replace(/^# 🚀 (Mikasa|Misa) AI Versiyalar Arxiv \(Releases Archive\)\r?\n\r?\n/, "");
   fs.writeFileSync(releasesMdPath, newReleasesMd, "utf-8");
 }
 

@@ -16,13 +16,14 @@
         "title": "MISA AI v9.0.0",
         "width": 1280,
         "height": 800,
-        "minWidth": 1024,
-        "minHeight": 700,
+        "minWidth": 720,
+        "minHeight": 520,
         "resizable": true,
         "center": true,
         "decorations": false,
         "transparent": false,
-        "shadow": true,
+        "shadow": false,
+        "backgroundColor": "#06030C",
         "theme": "Dark"
       }
     ],

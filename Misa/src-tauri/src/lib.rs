@@ -371,6 +371,24 @@ fn app_is_maximized(window: tauri::Window) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn app_start_resize(window: tauri::Window, direction: String) -> Result<(), String> {
+    let canonical = match direction.as_str() {
+        "North" | "N" => "North",
+        "South" | "S" => "South",
+        "East" | "E" => "East",
+        "West" | "W" => "West",
+        "NorthEast" | "NE" => "NorthEast",
+        "NorthWest" | "NW" => "NorthWest",
+        "SouthEast" | "SE" => "SouthEast",
+        "SouthWest" | "SW" => "SouthWest",
+        _ => return Err(format!("Invalid resize direction: {}", direction)),
+    };
+    let dir = serde_json::from_value(serde_json::Value::String(canonical.to_string()))
+        .map_err(|e| e.to_string())?;
+    window.start_resize_dragging(dir).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn backend_get_status(state: tauri::State<SupervisorState>) -> serde_json::Value {
     // Check if tracked child process has exited unexpectedly
     if let Ok(mut lock) = state.backend_child.lock() {
@@ -438,7 +456,11 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(supervisor_state)
-        .setup(move |_app| {
+        .setup(move |app| {
+            use tauri::Manager;
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_background_color(Some(tauri::window::Color(6, 3, 12, 255)));
+            }
             std::thread::spawn(move || {
                 ensure_backend_running(&state_for_setup);
             });
@@ -456,6 +478,7 @@ pub fn run() {
             app_toggle_maximize,
             app_close,
             app_is_maximized,
+            app_start_resize,
             backend_get_status,
             backend_restart
         ])

@@ -165,20 +165,59 @@ h1, h2, h3, h4, .font-headline {
 }
 
 /* ── Top Floating Navigation Bar Responsive Rules ── */
-@media (max-width: 1120px) {
+@media (max-width: 1280px) {
+  .misa-search-kbd {
+    display: none !important;
+  }
+  .misa-nav-pill {
+    padding: 6px 10px !important;
+  }
+  .misa-device-name {
+    max-width: 80px !important;
+  }
+}
+
+@media (max-width: 1150px) {
+  .misa-user-name-label {
+    display: none !important;
+  }
+  .misa-profile-btn {
+    padding: 4px 6px !important;
+  }
+  .misa-search-text {
+    display: none !important;
+  }
+  .misa-search-btn {
+    padding: 6px 8px !important;
+  }
   .misa-topnav-center,
   .mikasa-topnav-center {
     gap: 2px !important;
   }
-  .misa-topnav-center span,
-  .mikasa-topnav-center span {
-    font-size: 12px !important;
+  .misa-nav-pill {
+    padding: 6px 9px !important;
+    font-size: 11.5px !important;
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 980px) {
+  .misa-device-name {
+    display: none !important;
+  }
+  .misa-nav-pill:not(.is-active) .misa-topnav-label {
+    display: none !important;
+  }
+  .misa-nav-pill:not(.is-active) {
+    padding: 6px 9px !important;
+  }
+  .misa-topnav-divider {
+    display: none !important;
+  }
+}
+
+@media (max-width: 780px) {
   .misa-topnav-label {
-    display: none;
+    display: none !important;
   }
 }
 

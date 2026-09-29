@@ -43,7 +43,7 @@ if (process.platform === 'win32' && workingDir.includes(' ')) {
       if (!parent.includes(' ')) break;
       spaceAncestor = parent;
     }
-    const junctionBase = path.join(rootDrive, 'mikasa_ws');
+    const junctionBase = path.join(rootDrive, 'misa_ws');
     try {
       if (!fs.existsSync(junctionBase)) {
         execSync(`cmd /c mklink /J "${junctionBase}" "${spaceAncestor}"`, { stdio: 'ignore' });

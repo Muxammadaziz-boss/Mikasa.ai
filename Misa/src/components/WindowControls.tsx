@@ -95,9 +95,10 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
       style={{
         display: "flex",
         alignItems: "center",
-        height: "36px",
-        paddingRight: "8px",
+        height: "34px",
+        paddingRight: "4px",
         gap: "2px",
+        flexShrink: 0,
         ...({ WebkitAppRegion: "no-drag" } as React.CSSProperties),
       }}
     >
@@ -109,7 +110,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        <MinimizeIcon size={12} color="rgba(255, 255, 255, 0.75)" />
+        <MinimizeIcon size={12} color="rgba(255, 255, 255, 0.82)" />
       </button>
 
       <button
@@ -121,9 +122,9 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         {isMaximized ? (
-          <RestoreIcon size={12} color="rgba(255, 255, 255, 0.75)" />
+          <RestoreIcon size={12} color="rgba(255, 255, 255, 0.82)" />
         ) : (
-          <MaximizeIcon size={12} color="rgba(255, 255, 255, 0.75)" />
+          <MaximizeIcon size={12} color="rgba(255, 255, 255, 0.82)" />
         )}
       </button>
 
@@ -140,10 +141,10 @@ export const WindowControls: React.FC<WindowControlsProps> = ({ className = "" }
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = "transparent";
           const svg = e.currentTarget.querySelector("svg");
-          if (svg) svg.style.stroke = "rgba(255, 255, 255, 0.75)";
+          if (svg) svg.style.stroke = "rgba(255, 255, 255, 0.82)";
         }}
       >
-        <CloseIcon size={12} color="rgba(255, 255, 255, 0.75)" />
+        <CloseIcon size={12} color="rgba(255, 255, 255, 0.82)" />
       </button>
     </div>
   );
@@ -153,9 +154,10 @@ const buttonStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: "36px",
+  width: "30px",
   height: "28px",
-  borderRadius: "6px",
+  borderRadius: "9999px",
   transition: "all 0.15s ease",
   cursor: "pointer",
+  flexShrink: 0,
 };
