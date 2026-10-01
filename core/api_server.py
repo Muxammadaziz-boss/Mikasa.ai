@@ -616,9 +616,9 @@ async def handle_chat(request):
                 except Exception:
                     pass
 
-            if speak_out and m and hasattr(m, "ovoz_chiqar_tez"):
+            if speak_out:
                 sync_broadcast("voice_state", {"state": "speaking"}, loop)
-                m.ovoz_chiqar_tez(reply_text)
+                speak_out_loud(reply_text)
 
             return reply_text
         except Exception as e:
@@ -987,6 +987,52 @@ async def handle_voice_stop(request):
     return web.json_response({"ok": True, "status": "stopped"})
 
 
+def speak_out_loud(text: str) -> bool:
+    """Misa ovozli ijro chaqiruvi — main.py orqali yoki to'g'ridan-to'g'ri mustaqil fallback"""
+    m, _, _, _, _, _ = get_modules()
+    if m and hasattr(m, "ovoz_chiqar_tez"):
+        try:
+            m.ovoz_chiqar_tez(text)
+            return True
+        except Exception as e:
+            logger.warning(f"m.ovoz_chiqar_tez chaqirishda xato: {e}")
+
+    try:
+        from main import ovoz_chiqar_tez
+        ovoz_chiqar_tez(text)
+        return True
+    except Exception:
+        pass
+
+    def _standalone_speak():
+        try:
+            import edge_tts, ctypes, tempfile, uuid
+            voice = "uz-UZ-MadinaNeural"
+            if get_current_voice_type() == "erkak":
+                voice = "uz-UZ-SardorNeural"
+            clean_text = re.sub(r"\[.*?\]\(.*?\)", "", text)
+            clean_text = re.sub(r"```[\s\S]*?```", "", clean_text)
+            clean_text = re.sub(r"`.*?`", "", clean_text)
+            clean_text = re.sub(r"[\*\_~#>]", "", clean_text)
+            clean_text = re.sub(r"[🎤🗣️📝🎯✅❌⚠️💡📊🎵▶️⏸️🔊🔉🔇📌🤖✨🔹👋]", "", clean_text).strip()
+            if not clean_text:
+                return
+            fn = os.path.join(tempfile.gettempdir(), f"misa_sa_{uuid.uuid4().hex}.mp3")
+            asyncio.run(edge_tts.Communicate(clean_text, voice).save(fn))
+            alias = f"sa_{uuid.uuid4().hex[:8]}"
+            winmm = ctypes.windll.winmm
+            if winmm.mciSendStringW(f'open "{fn}" type mpegvideo alias {alias}', None, 0, 0) == 0:
+                winmm.mciSendStringW(f'play {alias} wait', None, 0, 0)
+                winmm.mciSendStringW(f'close {alias}', None, 0, 0)
+            if os.path.exists(fn):
+                os.remove(fn)
+        except Exception as err:
+            logger.error(f"Mustaqil ovoz ijrosida xato: {err}")
+
+    threading.Thread(target=_standalone_speak, daemon=True, name="StandaloneTTS").start()
+    return True
+
+
 async def handle_voice_speak(request):
     """POST /api/voice/speak - Istalgan matnni ovoz chiqarib o'qish"""
     try:
@@ -998,13 +1044,10 @@ async def handle_voice_speak(request):
     if not text:
         return web.json_response({"ok": False, "error": "Matn kiritilmadi"}, status=400)
 
-    m, _, _, _, _, _ = get_modules()
-    if m and hasattr(m, "ovoz_chiqar_tez"):
-        loop = asyncio.get_running_loop()
-        sync_broadcast("voice_state", {"state": "speaking"}, loop)
-        m.ovoz_chiqar_tez(text)
-        return web.json_response({"ok": True, "message": "Ovoz chiqarilmoqda"})
-    return web.json_response({"ok": False, "error": "Audio moduli mavjud emas"}, status=500)
+    loop = asyncio.get_running_loop()
+    sync_broadcast("voice_state", {"state": "speaking"}, loop)
+    speak_out_loud(text)
+    return web.json_response({"ok": True, "message": "Ovoz chiqarilmoqda"})
 
 
 async def handle_chat_clear(request):
