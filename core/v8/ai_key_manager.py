@@ -1,0 +1,283 @@
+# ========== core/v8/ai_key_manager.py ==========
+# Misa AI v9.0.0 — Database AI Key Management & Auto-Activation
+# Handles dynamic AI key storage in Supabase / Cloud, multi-key rotation,
+# user-account auto-sync, and fallback priority.
+
+import os
+import json
+import time
+import logging
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+
+logger = logging.getLogger(__name__)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+CACHE_FILE = REPO_ROOT / "data" / "ai_keys_cache.json"
+
+DEFAULT_GEMINI_MODELS = [
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.7-flash",
+    "gemini-pro-latest",
+]
+
+
+class AIKeyManager:
+    """Markazlashgan dinamik AI kalitlari boshqaruvchisi.
+    Kalitlarni Supabase bazasida, bulut backendda va mahalliy keshda saqlaydi hamda
+    foydalanuvchi akkaunti bilan kirganda avtomatik faollashtiradi.
+    """
+
+    _instance: Optional["AIKeyManager"] = None
+
+    def __init__(self):
+        self._system_keys: Dict[str, List[str]] = {
+            "gemini": [],
+            "openrouter": [],
+            "groq": [],
+        }
+        self._user_keys: Dict[str, Dict[str, str]] = {}  # user_id -> {provider: key}
+        self._active_models: Dict[str, str] = {
+            "gemini": "gemini-3.1-flash-lite",
+            "openrouter": "google/gemini-2.0-flash-exp:free",
+        }
+        self._key_cooldowns: Dict[str, float] = {}  # key -> cooldown_until_timestamp
+        self._last_sync_time: float = 0
+        self._load_cache()
+
+    @classmethod
+    def get_instance(cls) -> "AIKeyManager":
+        if cls._instance is None:
+            cls._instance = AIKeyManager()
+        return cls._instance
+
+    def _load_cache(self):
+        """Mahalliy keshdan saqlangan kalitlarni yuklash"""
+        try:
+            if CACHE_FILE.exists():
+                with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for prov in ("gemini", "openrouter", "groq"):
+                        keys = data.get(prov, [])
+                        if isinstance(keys, list):
+                            self._system_keys[prov] = [str(k).strip() for k in keys if k and str(k).strip()]
+                        elif isinstance(keys, str) and keys.strip():
+                            self._system_keys[prov] = [keys.strip()]
+                    if data.get("active_models"):
+                        self._active_models.update(data["active_models"])
+        except Exception as e:
+            logger.warning(f"AI kalitlari keshini yuklashda xatolik: {e}")
+
+    def _save_cache(self):
+        """Kalitlarni xavfsiz mahalliy keshga saqlash"""
+        try:
+            CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "gemini": self._system_keys.get("gemini", []),
+                "openrouter": self._system_keys.get("openrouter", []),
+                "groq": self._system_keys.get("groq", []),
+                "active_models": self._active_models,
+                "updated_at": time.time(),
+            }
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"AI kalitlari keshini saqlashda xatolik: {e}")
+
+    def register_system_key(self, provider: str, key: str, prepend: bool = True):
+        """Tizim kalitini xotiraga va keshga qo'shish"""
+        k = (key or "").strip()
+        if not k or len(k) < 8:
+            return
+        prov = provider.lower()
+        if prov not in self._system_keys:
+            self._system_keys[prov] = []
+        if k in self._system_keys[prov]:
+            self._system_keys[prov].remove(k)
+        if prepend:
+            self._system_keys[prov].insert(0, k)
+        else:
+            self._system_keys[prov].append(k)
+        self._save_cache()
+
+    def set_user_key(self, user_id: str, provider: str, key: str):
+        """Foydalanuvchining shaxsiy API kalitini saqlash"""
+        if not user_id:
+            return
+        prov = provider.lower()
+        if user_id not in self._user_keys:
+            self._user_keys[user_id] = {}
+        if key and key.strip():
+            self._user_keys[user_id][prov] = key.strip()
+        else:
+            self._user_keys[user_id].pop(prov, None)
+
+    def mark_key_failed(self, key: str, cooldown_seconds: float = 120.0):
+        """Kvotasi to'lgan yoki xato bergan kalitni vaqtincha cooldown ga qo'yish"""
+        if not key:
+            return
+        self._key_cooldowns[key] = time.time() + cooldown_seconds
+        logger.warning(f"AI kaliti vaqtinchalik sovutishga olindi: {key[:8]}... ({cooldown_seconds}s)")
+
+    def get_active_gemini_key(self, user_id: Optional[str] = None) -> str:
+        """Deterministik ustuvorlik tartibida faol Gemini API kalitini olish:
+        1. Joriy foydalanuvchining shaxsiy kaliti (user_id bo'yicha)
+        2. Supabase bazasi / Cloud dan sinxronlangan tizim kalitlari
+        3. Environment o'zgaruvchilari (GEMINI_API_KEY, GOOGLE_API_KEY)
+        4. data/config.json
+        """
+        now = time.time()
+
+        # 1. User shaxsiy kaliti
+        if user_id and user_id in self._user_keys:
+            ukey = self._user_keys[user_id].get("gemini")
+            if ukey and now >= self._key_cooldowns.get(ukey, 0):
+                return ukey
+
+        # 2. Bazadan/keshdan olingan tizim kalitlari (cooldown dagi kalitlarni o'tkazib yuborish)
+        for k in self._system_keys.get("gemini", []):
+            if k and now >= self._key_cooldowns.get(k, 0):
+                return k
+
+        # 3. Environment o'zgaruvchisi
+        env_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+        if env_key and now >= self._key_cooldowns.get(env_key, 0):
+            return env_key
+
+        # 4. data/config.json fallback
+        try:
+            cfg_path = REPO_ROOT / "data" / "config.json"
+            if cfg_path.exists():
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    ck = (
+                        cfg.get("gemini_api_key")
+                        or cfg.get("google_api_key")
+                        or cfg.get("ai", {}).get("gemini_api_key")
+                    )
+                    if ck and str(ck).strip() and now >= self._key_cooldowns.get(str(ck).strip(), 0):
+                        return str(ck).strip()
+        except Exception:
+            pass
+
+        # Cooldown da bo'lsa ham oxirgi chora sifatida har qanday mavjud kalitni qaytarish
+        if self._system_keys.get("gemini"):
+            return self._system_keys["gemini"][0]
+        if env_key:
+            return env_key
+
+        return ""
+
+    def get_active_openrouter_key(self, user_id: Optional[str] = None) -> str:
+        """OpenRouter API kalitini olish"""
+        if user_id and user_id in self._user_keys:
+            ukey = self._user_keys[user_id].get("openrouter")
+            if ukey:
+                return ukey
+        for k in self._system_keys.get("openrouter", []):
+            if k:
+                return k
+        return os.getenv("OPENROUTER_API_KEY", "").strip()
+
+    def sync_from_user_session(self, user_id: str, metadata: Dict[str, Any]):
+        """Foydalanuvchi akkaunti bilan tizimga kirganda ma'lumotlarni avtomatik sinxronlash"""
+        if not metadata:
+            return
+        # Foydalanuvchi metadata ichida kalit bormi?
+        g_key = (
+            metadata.get("gemini_api_key")
+            or metadata.get("google_api_key")
+            or metadata.get("ai_key")
+            or metadata.get("custom_gemini_key")
+        )
+        if g_key and str(g_key).strip():
+            self.set_user_key(user_id, "gemini", str(g_key).strip())
+            logger.info(f"Foydalanuvchi {user_id} uchun shaxsiy Gemini kaliti yuklandi.")
+
+        # Agar foydalanuvchida maxsus model sozlangan bo'lsa
+        custom_model = metadata.get("preferred_model") or metadata.get("ai_model")
+        if custom_model:
+            self._active_models["gemini"] = str(custom_model).strip()
+
+    def sync_from_cloud(self, cloud_url: Optional[str] = None, auth_token: Optional[str] = None) -> bool:
+        """Railway bulut serveri yoki Supabase dan eng so'nggi faol AI kalitlarini yuklab olish"""
+        import requests
+        base_cloud = (cloud_url or os.getenv("MISA_CLOUD_URL") or "https://misa.up.railway.app").rstrip("/")
+        headers = {}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+
+        # 1. Bulut backenddan so'rash
+        try:
+            res = requests.get(f"{base_cloud}/api/ai/config", headers=headers, timeout=4)
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("ok"):
+                    active_keys = data.get("active_keys", {})
+                    for prov, key in active_keys.items():
+                        if key and not key.endswith("..."):
+                            self.register_system_key(prov, key)
+                    self._last_sync_time = time.time()
+                    logger.info("Bulut backenddan AI kalitlari muvaffaqiyatli sinxronlandi.")
+                    return True
+        except Exception as e:
+            logger.debug(f"Bulut backenddan AI kalitlarini olishda xatolik: {e}")
+
+        # 2. Supabase PostgREST orqali so'rash
+        supa_url = (os.getenv("SUPABASE_URL") or "https://vdcssmzguxfknqkfxbed.supabase.co").rstrip("/")
+        anon_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+        if supa_url and anon_key:
+            try:
+                supa_headers = {
+                    "apikey": anon_key,
+                    "Authorization": f"Bearer {auth_token or anon_key}"
+                }
+                # profiles yoki system_config jadvalini tekshirish
+                resp = requests.get(f"{supa_url}/rest/v1/system_ai_keys?is_active=eq.true&select=*&order=priority.asc", headers=supa_headers, timeout=4)
+                if resp.status_code == 200:
+                    records = resp.json()
+                    for r in records:
+                        prov = r.get("provider", "gemini").lower()
+                        k = r.get("api_key", "").strip()
+                        if k:
+                            self.register_system_key(prov, k)
+                    self._last_sync_time = time.time()
+                    return True
+            except Exception as e:
+                logger.debug(f"Supabase PostgREST orqali AI kalitlarini olishda xatolik: {e}")
+
+        return False
+
+    def set_preferred_model(self, model: str, provider: str = "gemini"):
+        """Afzal ko'rilgan AI modelini sozlash"""
+        if model and str(model).strip():
+            self._active_models[provider.lower()] = str(model).strip()
+            self._save_cache()
+
+    def get_preferred_model(self, provider: str = "gemini") -> str:
+        """Joriy afzal ko'rilgan AI modelini olish"""
+        return self._active_models.get(provider.lower(), "gemini-3.1-flash-lite")
+
+    def get_status_summary(self) -> Dict[str, Any]:
+        """Tizim va UI uchun kalitlar holatini xavfsiz qaytarish (kalitlar maskalangan)"""
+        active_gemini = self.get_active_gemini_key()
+        has_gemini = bool(active_gemini)
+        masked_gemini = (active_gemini[:8] + "..." + active_gemini[-4:]) if has_gemini and len(active_gemini) > 12 else ""
+
+        return {
+            "gemini_configured": has_gemini,
+            "masked_key": masked_gemini,
+            "system_keys_count": len(self._system_keys.get("gemini", [])),
+            "preferred_model": self.get_preferred_model("gemini"),
+            "supported_models": DEFAULT_GEMINI_MODELS,
+            "last_sync": self._last_sync_time,
+            "status": "ready" if has_gemini else "missing_key",
+        }
+
+
+def get_ai_key_manager() -> AIKeyManager:
+    return AIKeyManager.get_instance()

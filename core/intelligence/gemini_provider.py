@@ -63,10 +63,12 @@ class GeminiProvider(AIProvider):
     """Google Gemini rasmiy REST API provayderi"""
 
     DEFAULT_MODELS = [
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite",
         "gemini-flash-lite-latest",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-3.7-flash",
         "gemini-pro-latest",
     ]
 
@@ -76,9 +78,16 @@ class GeminiProvider(AIProvider):
 
     @property
     def api_key(self) -> str:
-        """Dinamik ravishda API kalitni olish (explicit key, GEMINI_API_KEY, GOOGLE_API_KEY yoki config.json)"""
+        """Dinamik ravishda API kalitni olish (explicit key, AIKeyManager, GEMINI_API_KEY, GOOGLE_API_KEY yoki config.json)"""
         if self._api_key and self._api_key.strip():
             return self._api_key.strip()
+        try:
+            from core.v8.ai_key_manager import get_ai_key_manager
+            manager_key = get_ai_key_manager().get_active_gemini_key()
+            if manager_key:
+                return manager_key
+        except Exception:
+            pass
         env_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
         if env_key:
             return env_key
@@ -112,7 +121,16 @@ class GeminiProvider(AIProvider):
 
     def generate(self, request: AIRequest) -> AIResponse:
         """Gemini API orqali so'rov yuborish va normalizatsiya qilingan AIResponse qaytarish"""
-        active_key = self.api_key
+        user_id = request.metadata.get("user_id") if request and hasattr(request, "metadata") and isinstance(request.metadata, dict) else None
+        active_key = ""
+        try:
+            from core.v8.ai_key_manager import get_ai_key_manager
+            active_key = get_ai_key_manager().get_active_gemini_key(user_id=user_id)
+        except Exception:
+            pass
+        if not active_key:
+            active_key = self.api_key
+
         if not active_key:
             return AIResponse(
                 provider=self.name,
@@ -122,6 +140,7 @@ class GeminiProvider(AIProvider):
                 success=False,
                 error_code="API_KEY_MISSING"
             )
+
 
         # 1. Contents va Suhbat tarixi tuzish
         contents = []
@@ -207,6 +226,12 @@ class GeminiProvider(AIProvider):
                 last_error = str(e)
                 logger.warning(f"Gemini {model} istisno: {e}")
                 continue
+
+        try:
+            from core.v8.ai_key_manager import get_ai_key_manager
+            get_ai_key_manager().mark_key_failed(active_key, cooldown_seconds=60.0)
+        except Exception:
+            pass
 
         return AIResponse(
             provider=self.name,

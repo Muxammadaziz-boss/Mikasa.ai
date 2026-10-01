@@ -1840,6 +1840,66 @@ class BackendService {
     }
   }
 
+  public async getAiConfig(): Promise<{
+    ok: boolean;
+    config?: {
+      gemini_configured: boolean;
+      masked_key: string;
+      system_keys_count: number;
+      preferred_model: string;
+      supported_models: string[];
+      last_sync: number;
+      status: string;
+    };
+    user_id?: string;
+    has_user_key?: boolean;
+    active_keys?: Record<string, string>;
+  }> {
+    try {
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/ai/config`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+      });
+      return await res.json();
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  public async saveAiConfig(data: {
+    gemini_api_key?: string;
+    provider?: string;
+    is_system?: boolean;
+    preferred_model?: string;
+  }): Promise<{ ok: boolean; message?: string; config?: any; error?: string }> {
+    try {
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/ai/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { ok: false, error: err.message || "Xatolik yuz berdi" };
+    }
+  }
+
+  public async syncAiKeys(): Promise<{ ok: boolean; synced?: boolean; config?: any }> {
+    try {
+      const authHeaders = await this.getFreshAuthHeaders();
+      const res = await fetch(`${API_BASE}/api/ai/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+      });
+      return await res.json();
+    } catch {
+      return { ok: false };
+    }
+  }
+
+
   // ========== Agentic Multi-Step Intelligence ==========
   public async executeAgentGoal(
     goal: string

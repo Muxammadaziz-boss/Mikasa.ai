@@ -281,13 +281,19 @@ export const AccountPage: React.FC<AccountPageProps> = ({
         },
       } as any);
 
-      if (onProfileChange) {
-        onProfileChange(cleanName, avatarStyle);
-      }
       if (geminiApiKey.trim()) {
+        try {
+          await supabase.auth.updateUser({
+            data: { gemini_api_key: geminiApiKey.trim() }
+          });
+        } catch (e) {
+          console.warn("Supabase user_metadata ga saqlashda ogohlantirish:", e);
+        }
+        setApiKeyMasked(geminiApiKey.trim().slice(0, 8) + "..." + geminiApiKey.trim().slice(-4));
         setGeminiApiKey("");
       }
       showToast("Shaxsiy ma'lumotlar muvaffaqiyatli saqlandi ✓");
+
     } catch {
       showToast("Shaxsiy ma'lumotlar saqlandi ✓");
     } finally {
@@ -962,15 +968,28 @@ export const AccountPage: React.FC<AccountPageProps> = ({
 
             {/* Gemini API Key & Voice Test */}
             <div>
-              <label style={{ display: "block", fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "6px" }}>
-                Gemini AI API Kaliti {apiKeyMasked ? `(Joriy: ${apiKeyMasked})` : ""}
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                  Gemini AI API Kaliti {apiKeyMasked ? `(Joriy: ${apiKeyMasked})` : ""}
+                </label>
+                <span style={{
+                  fontSize: "11px",
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  background: apiKeyMasked ? "rgba(16, 185, 129, 0.15)" : "rgba(234, 179, 8, 0.15)",
+                  color: apiKeyMasked ? "#34D399" : "#FBBF24",
+                  fontWeight: 600,
+                  border: apiKeyMasked ? "1px solid rgba(52, 211, 153, 0.3)" : "1px solid rgba(251, 191, 36, 0.3)"
+                }}>
+                  {apiKeyMasked ? "● AI Faol (Auto)" : "○ Standart Rejim"}
+                </span>
+              </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <input
                   type="password"
                   value={geminiApiKey}
                   onChange={(e) => setGeminiApiKey(e.target.value)}
-                  placeholder="AIzaSy... yangi kalit kiritish"
+                  placeholder={apiKeyMasked ? "Yangi yoki shaxsiy kalit kiritish (ixtiyoriy)" : "AIzaSy... yangi kalit kiritish"}
                   className="misa-glass-input"
                   style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", fontSize: "12.5px" }}
                 />
@@ -1011,7 +1030,11 @@ export const AccountPage: React.FC<AccountPageProps> = ({
                   <span>Ovoz</span>
                 </button>
               </div>
+              <p style={{ fontSize: "11px", color: "var(--text-muted, #94a3b8)", marginTop: "6px", marginBottom: "0" }}>
+                Akkauntingiz bilan kirganingizda bulut bazasidagi faol AI avtomatik ulanadi. Kerak bo'lsa, o'z shaxsiy kalitingizni ham kiritishingiz mumkin.
+              </p>
             </div>
+
 
             {/* Cognitive Toggles */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

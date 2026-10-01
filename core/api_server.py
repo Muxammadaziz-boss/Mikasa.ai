@@ -403,7 +403,7 @@ async def handle_system_metrics(request):
 
 
 # ========== 2. CHAT & VOICE HANDLERS ==========
-def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask") -> str:
+def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask", user_id: Optional[str] = None) -> str:
     """
     Misa AI 9.0.0 — Unified Command & AI Pipeline
     Mahalliy buyruqlarni darhol kompyuterda bajaradi, murakkab savollarni AI ga yo'naltiradi.
@@ -411,6 +411,7 @@ def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask")
     clean_text = text.strip()
     if not clean_text:
         return "Bo'sh so'rov."
+
 
     m, ai, mem, _, _, dispatcher = get_modules()
     last_gui_messages = []
@@ -534,11 +535,12 @@ def execute_command_pipeline(text: str, user: str, ovoz: str, mode: str = "ask")
     # 3. AI ga yo'naltirish
     if mode == "summary" and ai:
         prompt = f"Quyidagi matnni tahlil qilib, eng muhim jihatlarini qisqa va aniq xulosalab ber:\n\n{clean_text}"
-        reply = ai.ai_savol_yuborish(prompt, user)
+        reply = ai.ai_savol_yuborish(prompt, user, user_id=user_id)
         return reply if isinstance(reply, str) else str(reply)
     elif ai:
         try:
-            reply = ai.ai_savol_yuborish(clean_text, user)
+            reply = ai.ai_savol_yuborish(clean_text, user, user_id=user_id)
+
             
             # Agar AI bu buyruq deb topsa, kompyuterda haqiqatdan bajarish!
             if isinstance(reply, dict) and reply.get("type") == "command":
@@ -589,7 +591,10 @@ async def handle_chat(request):
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)
 
     m, _, mem, _, _, _ = get_modules()
+    user_id, auth_user, session, _ = resolve_auth_identity(request, required=False)
     user = get_current_user_name()
+    if auth_user and hasattr(auth_user, "display_name") and auth_user.display_name:
+        user = auth_user.display_name
     ovoz = get_current_voice_type()
 
     loop = asyncio.get_running_loop()
@@ -599,7 +604,8 @@ async def handle_chat(request):
     def _execute():
         global _voice_state
         try:
-            reply_text = execute_command_pipeline(text, user, ovoz, mode)
+            reply_text = execute_command_pipeline(text, user, ovoz, mode, user_id=user_id)
+
             if mem:
                 try:
                     mem.add_conversation(text, reply_text[:500])
@@ -800,7 +806,16 @@ async def handle_ai_test_key(request):
         except Exception as ce:
             logger.warning(f"config.json ga API kalitni saqlashda xatolik: {ce}")
 
-        active_model = model_list[0] if model_list else "gemini-2.5-flash"
+        try:
+            from core.v8.ai_key_manager import get_ai_key_manager
+            mgr = get_ai_key_manager()
+            mgr.register_system_key("gemini", api_key, prepend=True)
+            if active_model:
+                mgr.set_preferred_model(active_model)
+        except Exception:
+            pass
+
+        active_model = model_list[0] if model_list else "gemini-3.1-flash-lite"
         return web.json_response({
             "ok": True,
             "valid": True,
@@ -815,6 +830,92 @@ async def handle_ai_test_key(request):
         "valid": False,
         "error_code": reason,
         "error": f"API kaliti yaroqsiz ({reason}): {msg}"
+    })
+
+
+async def handle_ai_config_get(request):
+    """GET /api/ai/config - AI kalitlari va modellarining holatini olish (Sinxronizatsiya uchun)"""
+    user_id, user, session, err = resolve_auth_identity(request, required=_is_production_mode())
+    if err:
+        return err
+
+    from core.v8.ai_key_manager import get_ai_key_manager
+    mgr = get_ai_key_manager()
+    summary = mgr.get_status_summary()
+
+    response_data = {
+        "ok": True,
+        "config": summary,
+        "user_id": user_id,
+        "has_user_key": bool(mgr.get_active_gemini_key(user_id=user_id) if user_id else False)
+    }
+
+    # Autentifikatsiyalangan foydalanuvchilar yoki desktop uchun faol kalitni (baza/serverdan) ulashish
+    if user_id or not _is_production_mode():
+        active_k = mgr.get_active_gemini_key(user_id=user_id)
+        if active_k:
+            response_data["active_keys"] = {
+                "gemini": active_k
+            }
+
+    return web.json_response(response_data)
+
+
+async def handle_ai_config_set(request):
+    """POST /api/ai/config - AI kaliti yoki model sozlamalarini yangilash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=True)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Noto'g'ri JSON formati"}, status=400)
+
+    gemini_key = str(body.get("gemini_api_key") or body.get("api_key") or "").strip()
+    provider = str(body.get("provider") or "gemini").strip().lower()
+    save_as_system = bool(body.get("is_system", False))
+    preferred_model = str(body.get("preferred_model") or "").strip()
+
+    from core.v8.ai_key_manager import get_ai_key_manager
+    mgr = get_ai_key_manager()
+
+    if gemini_key:
+        if save_as_system:
+            if _is_production_mode() and (not session or session.role not in ("admin", "service_role")):
+                return web.json_response({"ok": False, "error": "Tizim kalitini faqat administrator o'zgartira oladi"}, status=403)
+            mgr.register_system_key(provider, gemini_key, prepend=True)
+        else:
+            mgr.set_user_key(user_id, provider, gemini_key)
+            if user and hasattr(user, "metadata") and isinstance(user.metadata, dict):
+                user.metadata["gemini_api_key"] = gemini_key
+                try:
+                    from core.v8 import AccountDeviceManager
+                    AccountDeviceManager.get_default_instance().save()
+                except Exception:
+                    pass
+
+    if preferred_model:
+        mgr.set_preferred_model(preferred_model)
+
+    return web.json_response({
+        "ok": True,
+        "message": "AI konfiguratsiyasi muvaffaqiyatli saqlandi",
+        "config": mgr.get_status_summary()
+    })
+
+
+async def handle_ai_sync(request):
+    """POST /api/ai/sync - AI kalitlarini bulut/baza bilan qayta sinxronlash"""
+    user_id, user, session, err = resolve_auth_identity(request, required=False)
+    from core.v8.ai_key_manager import get_ai_key_manager
+    mgr = get_ai_key_manager()
+    token = get_auth_token_from_request(request)
+    synced = mgr.sync_from_cloud(auth_token=token)
+    return web.json_response({
+        "ok": True,
+        "synced": synced,
+        "config": mgr.get_status_summary()
     })
 
 
@@ -1957,7 +2058,16 @@ async def handle_account_get(request):
     bio = user_cfg.get("bio") or mem_profile.get("bio", "Misa AI shaxsiy sun'iy intellekt yordamchisi")
     language = user_cfg.get("language") or mem_profile.get("til", "uz")
 
-    has_gemini = bool(os.environ.get("GEMINI_API_KEY") or ai_cfg.get("gemini_api_key"))
+    masked_key = ""
+    try:
+        from core.v8.ai_key_manager import get_ai_key_manager
+        ai_mgr = get_ai_key_manager()
+        active_key = ai_mgr.get_active_gemini_key(user_id=user_id)
+        has_gemini = bool(active_key)
+        if has_gemini and len(active_key) > 12:
+            masked_key = active_key[:8] + "..." + active_key[-4:]
+    except Exception:
+        has_gemini = bool(os.environ.get("GEMINI_API_KEY") or ai_cfg.get("gemini_api_key"))
 
     return web.json_response({
         "ok": True,
@@ -1988,7 +2098,10 @@ async def handle_account_get(request):
         "ai_mode": ai_cfg.get("mode", "balanced"),
         "thinking_enabled": ai_cfg.get("thinking_enabled", True),
         "has_gemini_key": has_gemini,
+        "api_key_masked": masked_key,
+        "ai_status": "ready" if has_gemini else "missing_key",
         "version": "9.0.0",
+
         "app_info": {
             "name": "Misa AI",
             "version": "9.0.0",
@@ -2198,6 +2311,15 @@ async def handle_account_update(request):
             except Exception:
                 pass
             try:
+                from core.v8.ai_key_manager import get_ai_key_manager
+                ai_mgr = get_ai_key_manager()
+                if user_id:
+                    ai_mgr.set_user_key(user_id, "gemini", key)
+                ai_mgr.register_system_key("gemini", key, prepend=True)
+            except Exception:
+                pass
+
+            try:
                 env_path = os.path.join(BASE_DIR, ".env")
                 lines = []
                 if os.path.exists(env_path):
@@ -2210,6 +2332,7 @@ async def handle_account_update(request):
                     f.writelines(lines)
             except Exception:
                 pass
+
 
     # 5. Bildirishnomalar
     if "notifications" in body and isinstance(body["notifications"], dict):
@@ -3049,7 +3172,22 @@ def resolve_auth_identity(
             _last_active_desktop_auth["token"] = token
             _last_active_desktop_auth["updated_at"] = time.time()
 
+        # Foydalanuvchi hisobidagi AI kalitlarni avtomatik sinxronlash (Auto AI)
+        try:
+            from core.v8.ai_key_manager import get_ai_key_manager
+            mgr = get_ai_key_manager()
+            user_meta = {}
+            if session and hasattr(session, "raw_claims") and isinstance(session.raw_claims, dict):
+                user_meta.update(session.raw_claims.get("user_metadata", {}) or {})
+            if user and hasattr(user, "metadata") and isinstance(user.metadata, dict):
+                user_meta.update(user.metadata)
+            if user_meta:
+                mgr.sync_from_user_session(authenticated_user_id, user_meta)
+        except Exception as _ex:
+            logger.debug(f"AI key sync error in resolve_auth_identity: {_ex}")
+
         return authenticated_user_id, user, session, None
+
 
     # Token yo'q holat
     # XAVFSIZLIK: Production rejimda Supabase sozlanmagan bo'lsa ham autentifikatsiya majburiy
@@ -5716,11 +5854,15 @@ def create_app():
     # AI Chat va Ovoz
     app.router.add_post("/api/chat", handle_chat)
     app.router.add_post("/api/chat/clear", handle_chat_clear)
+    app.router.add_get("/api/ai/config", handle_ai_config_get)
+    app.router.add_post("/api/ai/config", handle_ai_config_set)
+    app.router.add_post("/api/ai/sync", handle_ai_sync)
     app.router.add_post("/api/ai/test-key", handle_ai_test_key)
     app.router.add_post("/api/account/test-api-key", handle_ai_test_key)
     app.router.add_post("/api/voice/start", handle_voice_start)
     app.router.add_post("/api/voice/stop", handle_voice_stop)
     app.router.add_post("/api/voice/speak", handle_voice_speak)
+
 
     # Buyruqlar (Commands)
     app.router.add_get("/api/commands", handle_commands_list)
@@ -5927,6 +6069,7 @@ def run_server(host=None, port=None):
                         logger.debug(f"Port {aux_port} band yoki ulanib bo'lmadi: {e}")
 
             async def _desktop_cloud_sync_loop():
+                sync_counter = 0
                 while True:
                     try:
                         await asyncio.sleep(5.0)
@@ -5934,12 +6077,20 @@ def run_server(host=None, port=None):
                         tok = _last_active_desktop_auth.get("token")
                         if uid and tok:
                             await _sync_user_devices_to_cloud(uid, tok)
+                            sync_counter += 1
+                            if sync_counter % 6 == 0:
+                                try:
+                                    from core.v8.ai_key_manager import get_ai_key_manager
+                                    get_ai_key_manager().sync_from_cloud(auth_token=tok)
+                                except Exception:
+                                    pass
                     except asyncio.CancelledError:
                         break
                     except Exception:
                         pass
 
             sync_task = asyncio.create_task(_desktop_cloud_sync_loop())
+
 
         stop_event = asyncio.Event()
 

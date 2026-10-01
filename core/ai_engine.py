@@ -7,11 +7,15 @@ import json
 import logging
 import requests
 import time
-import base64
 import io
+import base64
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
+
 
 # ========== Sozlamalar ==========
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
@@ -19,12 +23,21 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
 
 
-def get_gemini_api_key() -> str:
-    """Dinamik Google Gemini API kalitini olish"""
+def get_gemini_api_key(user_id: Optional[str] = None) -> str:
+    """Dinamik Google Gemini API kalitini olish (AIKeyManager, environment yoki config.json orqali)"""
     global GOOGLE_API_KEY
+    try:
+        from core.v8.ai_key_manager import get_ai_key_manager
+        m_key = get_ai_key_manager().get_active_gemini_key(user_id=user_id)
+        if m_key:
+            return m_key
+    except Exception:
+        pass
+
     if GOOGLE_API_KEY and str(GOOGLE_API_KEY).strip():
         return str(GOOGLE_API_KEY).strip()
     key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+
     if key:
         GOOGLE_API_KEY = key
         return key
@@ -160,7 +173,7 @@ FAQAT JSON QAYTARING. BOSHQA HECH NARSA YOZMANG.
 """
 
 
-def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
+def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi", user_id: Optional[str] = None):
     """AI ga savol yuborish — Misa Intelligence Core orqali
     (Context -> Intent -> Reasoning -> Decision -> Tool -> Verification -> Response)
     Har qanday nosozlikda an'anaviy to'g'ridan-to'g'ri fallback saqlanadi.
@@ -168,13 +181,14 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
     try:
         from core.intelligence import get_orchestrator, CompatibilityAdapter
         orchestrator = get_orchestrator()
-        intel_resp = orchestrator.handle(matn, user_name=foydalanuvchi_ismi)
+        intel_resp = orchestrator.handle(matn, user_name=foydalanuvchi_ismi, user_id=user_id)
         if intel_resp:
             legacy_dict = CompatibilityAdapter.to_legacy_ai_engine_dict(intel_resp)
             if legacy_dict:
                 return legacy_dict
     except Exception as e:
         logging.warning(f"Intelligence Orchestrator orqali chaqirishda xatolik: {e}, an'anaviy oqimga o'tilmoqda...")
+
     
     enriched_prompt = SYSTEM_PROMPT
     
@@ -225,8 +239,8 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
 """
     
     # 1-urinish: Google Gemini
-    if get_gemini_api_key():
-        javob = _gemini_yuborish(matn, enriched_prompt)
+    if get_gemini_api_key(user_id=user_id):
+        javob = _gemini_yuborish(matn, enriched_prompt, user_id=user_id)
         if javob is not None:
             return javob
         logging.warning("Gemini ishlamadi, OpenRouter ga o'tilmoqda...")
@@ -241,14 +255,17 @@ def ai_savol_yuborish(matn, foydalanuvchi_ismi="Foydalanuvchi"):
     return None
 
 
-def _gemini_yuborish(matn, system_prompt=None):
+def _gemini_yuborish(matn, system_prompt=None, user_id=None):
+
     """Google Gemini API orqali so'rov — Google Search Grounding va Thinking Mode bilan"""
     prompt = system_prompt or SYSTEM_PROMPT
     GEMINI_MODELS = [
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite",
         "gemini-flash-lite-latest",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-3.7-flash",
         "gemini-pro-latest",
     ]
     
@@ -270,7 +287,7 @@ def _gemini_yuborish(matn, system_prompt=None):
                 "tools": [{"google_search": {}}]
             }
             
-            active_gemini_key = get_gemini_api_key()
+            active_gemini_key = get_gemini_api_key(user_id=user_id)
             if not active_gemini_key:
                 logging.warning("Gemini API kaliti topilmadi")
                 break
@@ -283,7 +300,12 @@ def _gemini_yuborish(matn, system_prompt=None):
             )
             
             if response.status_code == 429:
-                logging.warning(f"Gemini {model} kvota tugagan, keyingi model...")
+                logging.warning(f"Gemini {model} kvota tugagan (429), keyingi model...")
+                try:
+                    from core.v8.ai_key_manager import get_ai_key_manager
+                    get_ai_key_manager().mark_key_failed(active_gemini_key, cooldown_seconds=60.0)
+                except Exception:
+                    pass
                 continue
             
             if response.status_code != 200:
@@ -292,13 +314,14 @@ def _gemini_yuborish(matn, system_prompt=None):
                 if response.status_code == 400:
                     del request_body["tools"]
                     response = requests.post(
-                        f"{url}?key={GOOGLE_API_KEY}",
+                        f"{url}?key={active_gemini_key}",
                         headers={"Content-Type": "application/json"},
                         json=request_body,
                         timeout=15
                     )
                     if response.status_code != 200:
                         continue
+
                 else:
                     continue
             

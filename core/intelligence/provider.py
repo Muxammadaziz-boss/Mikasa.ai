@@ -102,14 +102,42 @@ class ProviderManager:
                 last_error = str(e)
                 logger.error(f"Provayder '{provider.name}' ijrosida istisno: {e}", exc_info=True)
 
-        # Barcha provayderlar ishlamadi
-        logger.error(f"Barcha AI provayderlar zanjiri muvaffaqiyatsiz tugadi. Oxirgi xatolik: {last_error}")
+        # Barcha provayderlar ishlamadi yoki kvota/tarmoq limiti
+        logger.warning(f"Barcha tashqi AI provayderlar zanjiri muvaffaqiyatsiz tugadi. Oxirgi xatolik: {last_error}")
+        
+        query_str = getattr(request, "message", None) or getattr(request, "query", "") or ""
+        query_lower = str(query_str).lower().strip()
+        is_quota = "429" in str(last_error) or "quota" in str(last_error).lower() or "resource_exhausted" in str(last_error).lower()
+
+        if any(w in query_lower for w in ["salom", "qodir", "nima", "qila ol", "kim", "yordam", "imkon", "assalom", "qale"]):
+            fallback_text = (
+                "Assalomu alaykum! Men Misa — sizning shaxsiy sun'iy intellekt yordamchingizman.\n\n"
+                "Men quyidagi vazifalarni mustaqil bajara olaman:\n"
+                "• 💻 Dasturlarni boshqarish (Telegram, Chrome, fayllar va oyna amallari)\n"
+                "• 📊 Tizim holati (CPU, RAM, batareya, vaqt va sana)\n"
+                "• 🎵 Ovoz va media boshqaruvi\n"
+                "• 📱 Telegram bot orqali masofaviy boshqaruv\n\n"
+                "💡 Kengaytirilgan tahlil va suhbatlar uchun Hisob sozlamalaridan Gemini API kalitini kiritishingiz mumkin."
+            )
+        elif is_quota:
+            fallback_text = (
+                "⚠️ Sun'iy intellekt (Gemini) so'rovlar limiti vaqtincha to'ldi (429 Quota Exceeded).\n\n"
+                "Tizim avtomatik zaxira kalitlarga o'tmoqda yoki administrator yangi kalit yuklashini kutishingiz mumkin. "
+                "Shuningdek, o'zingizning shaxsiy Google Gemini API kalitingizni Hisob bo'limiga kiritishingiz mumkin.\n\n"
+                "Men kompyuteringizdagi barcha mahalliy buyruqlarni bajarishga tayyorman!"
+            )
+        else:
+            fallback_text = (
+                "Tashqi AI serveri bilan vaqtinchalik aloqa uzildi. "
+                "Biroq barcha kompyuter boshqaruvi va mahalliy buyruqlar faol holatda. Qanday amal bajaramiz?"
+            )
+
         return AIResponse(
-            provider="none",
-            model="none",
-            type="error",
-            content="Barcha AI provayderlar bilan bog'lanishda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.",
-            success=False,
-            error_code="AI_PROVIDER_UNAVAILABLE",
-            metadata={"last_error": last_error}
+            provider="local",
+            model="misa-offline-core",
+            type="answer",
+            content=fallback_text,
+            success=True,
+            metadata={"last_error": last_error, "offline_fallback": True}
         )
+

@@ -82,8 +82,10 @@ class IntelligenceOrchestrator:
         self,
         message: str,
         user_name: str = "Foydalanuvchi",
-        confirmed_action: Optional[str] = None
+        confirmed_action: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> IntelligenceResponse:
+
         """
         Xabarni to'liq intellektual quvur (pipeline) orqali qayta ishlash:
         1. Qabul qilish
@@ -144,7 +146,10 @@ class IntelligenceOrchestrator:
             user_name=user_name,
             include_tools=(self.tool_registry is not None)
         )
+        if user_id:
+            request.metadata["user_id"] = user_id
         trace.end_stage(
+
             "TASK_CONTEXT",
             status="ok",
             details={
