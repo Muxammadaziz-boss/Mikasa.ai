@@ -42,8 +42,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "WebView2Loader.dll",
-      "backend/**/*"
+      "WebView2Loader.dll"
     ]
   }
 }
