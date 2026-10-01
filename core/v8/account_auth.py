@@ -458,9 +458,11 @@ class SupabaseAuthManager:
             and not self._explicit_url
         ):
             raw_iss = str(payload.get("iss") or "").strip().rstrip("/")
-            default_proj_url = "https://bfpffefwsewsfhlbsetd.supabase.co"
-            if raw_iss in (default_proj_url, f"{default_proj_url}/auth/v1"):
-                self.jwks_client.set_supabase_url(default_proj_url)
+            if raw_iss.startswith("https://") and ".supabase.co" in raw_iss:
+                base_iss = raw_iss.split("/auth/v1")[0]
+                self.jwks_client.set_supabase_url(base_iss)
+            else:
+                self.jwks_client.set_supabase_url("https://vdcssmzguxfknqkfxbed.supabase.co")
 
         if alg in ("RS256", "RS384", "RS512"):
             pub_key = self.jwks_client.get_public_key(kid)

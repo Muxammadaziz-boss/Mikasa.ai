@@ -246,8 +246,9 @@ pub fn ensure_backend_running(state: &SupervisorState) {
             .env("MISA_API_PORT", "18420")
             .env("PORT", "18420")
             .env("ENVIRONMENT", "desktop")
-            .env("SUPABASE_URL", "https://bfpffefwsewsfhlbsetd.supabase.co")
-            .env("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_52822f9I67t2c-7nJ33nCA_3p_p6n1v");
+            .env("SUPABASE_URL", "https://vdcssmzguxfknqkfxbed.supabase.co")
+            .env("SUPABASE_ANON_KEY", "sb_publishable_Mwowz4aOLM4njc3OyX7VNQ_GxpxuTr8")
+            .env("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_Mwowz4aOLM4njc3OyX7VNQ_GxpxuTr8");
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(creation_flags);
