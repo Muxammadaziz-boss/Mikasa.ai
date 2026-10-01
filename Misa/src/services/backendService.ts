@@ -1059,14 +1059,15 @@ class BackendService {
 
   public async sendChat(
     text: string,
-    mode: "ask" | "command" | "summary" = "ask"
+    mode: "ask" | "command" | "summary" = "ask",
+    speak: boolean = true
   ): Promise<ChatResponse> {
     this.notifyVoiceState("thinking");
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, mode }),
+        body: JSON.stringify({ text, mode, speak }),
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -3417,10 +3418,11 @@ class BackendService {
 
   public async sendMessage(
     text: string,
-    options?: { mode?: "ask" | "command" | "summary" | string; [key: string]: any }
+    options?: { mode?: "ask" | "command" | "summary" | string; speak?: boolean; [key: string]: any }
   ): Promise<ChatResponse> {
     const mode = (options?.mode === "command" || options?.mode === "summary" ? options.mode : "ask") as "ask" | "command" | "summary";
-    const res = await this.sendChat(text, mode);
+    const speak = options?.speak !== undefined ? Boolean(options.speak) : true;
+    const res = await this.sendChat(text, mode, speak);
     return {
       ...res,
       reply: res.reply || res.response,

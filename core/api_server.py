@@ -585,7 +585,11 @@ async def handle_chat(request):
 
     text = (body.get("text") or body.get("query") or "").strip()
     mode = body.get("mode", "ask")
-    speak_out = body.get("speak", False) or mode == "voice"
+    speak_param = body.get("speak")
+    if speak_param is not None:
+        speak_out = bool(speak_param)
+    else:
+        speak_out = True
 
     if not text:
         return web.json_response({"ok": False, "error": "Matn bo'sh bo'lishi mumkin emas"}, status=400)

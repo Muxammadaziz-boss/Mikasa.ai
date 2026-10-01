@@ -101,6 +101,24 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [composerMode, setComposerMode] = useState<ComposerMode>("chat");
   const [sessionSearch, setSessionSearch] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content?: string }[]>([]);
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("misa_auto_speak");
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleAutoSpeak = () => {
+    setAutoSpeak((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("misa_auto_speak", String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Live Multi-Step Agent Execution state
   const [activeAgentPlan, setActiveAgentPlan] = useState<AgentPlanEvent | null>(null);
@@ -378,7 +396,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     setActiveAgentPlan(null);
 
     try {
-      const response = await backendService.sendMessage(effectiveQuery);
+      const response = await backendService.sendMessage(effectiveQuery, { speak: autoSpeak });
       const completedPlan = activeAgentPlanRef.current || undefined;
       const aiMsg: Message = {
         id: `a_${Date.now()}`,
@@ -1620,6 +1638,30 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                       </span>
                     </>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleAutoSpeak}
+                  title={autoSpeak ? "Ovozli javob: Yoqilgan (O'chirish uchun bosing)" : "Ovozli javob: O'chiq (Yoqish uchun bosing)"}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    padding: "6px 10px",
+                    borderRadius: "9999px",
+                    background: autoSpeak ? "rgba(147, 3, 197, 0.28)" : "rgba(255, 255, 255, 0.05)",
+                    border: autoSpeak ? "1px solid rgba(192, 76, 253, 0.45)" : "1px solid rgba(255, 255, 255, 0.1)",
+                    color: autoSpeak ? "#E8B3FF" : "var(--text-muted)",
+                    fontSize: "11.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <VolumeIcon size={12} color={autoSpeak ? "#E8B3FF" : "currentColor"} />
+                  <span>{autoSpeak ? "Ovoz: Yoqilgan" : "Ovoz: O'chiq"}</span>
                 </button>
               </div>
 

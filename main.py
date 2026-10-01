@@ -503,15 +503,17 @@ def ovoz_chiqar_tez(text):
     """
     Misa AI 9.0.0 — Yuqori sifatli va barqaror TTS audio ijrosi.
     Edge TTS (uz-UZ-MadinaNeural / uz-UZ-SardorNeural) orqali ovoz yaratadi
-    va sounddevice / pygame orqali ijro etadi.
+    va Windows Native MCI (winmm.dll), pygame yoki sounddevice orqali
+    foydalanuvchining asosiy audio qurilmasida (karnay/naushnik/monitor) ijro etadi.
     """
     if not text:
         return
 
     def _ijro_et():
+        import ctypes
         try:
             global_state.gapirmoqda = True
-            logging.debug(f"Audio playing request: {text}")
+            logging.info(f"Ovoz chiqarish boshlandi: {text[:80]}")
 
             # 1. Matnni keraksiz belgilardan tozalash (Markdown, URL, emojilar)
             clean_text = re.sub(r"\[.*?\]\(.*?\)", "", text)  # Markdown linklar
@@ -564,7 +566,7 @@ def ovoz_chiqar_tez(text):
                         break
 
                     filename = os.path.join(
-                        tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.mp3"
+                        tempfile.gettempdir(), f"misa_tts_{uuid.uuid4().hex}.mp3"
                     )
                     try:
                         communicate = edge_tts.Communicate(
@@ -572,20 +574,29 @@ def ovoz_chiqar_tez(text):
                         )
                         await communicate.save(filename)
 
-                        # Audio ijro: 1-variant sounddevice
                         played = False
-                        try:
-                            import soundfile as sf
-                            import sounddevice as sd
-                            data, fs = sf.read(filename)
-                            sd.play(data, fs)
-                            sd.wait()
-                            played = True
-                        except Exception as e:
-                            logging.debug(f"sounddevice ijro xatosi: {e}")
 
-                        # 2-variant pygame fallback
-                        if not played:
+                        # 1-variant: Windows Native MCI (winmm.dll) — Eng barqaror va tizim default qurilmasiga to'g'ridan-to'g'ri uzatuvchi
+                        try:
+                            alias = f"misa_{uuid.uuid4().hex[:8]}"
+                            winmm = ctypes.windll.winmm
+                            r_open = winmm.mciSendStringW(f'open "{filename}" type mpegvideo alias {alias}', None, 0, 0)
+                            if r_open == 0:
+                                winmm.mciSendStringW(f'play {alias}', None, 0, 0)
+                                status_buf = ctypes.create_unicode_buffer(64)
+                                while global_state.gapirmoqda:
+                                    winmm.mciSendStringW(f'status {alias} mode', status_buf, 64, 0)
+                                    if status_buf.value != "playing":
+                                        break
+                                    await asyncio.sleep(0.04)
+                                winmm.mciSendStringW(f'stop {alias}', None, 0, 0)
+                                winmm.mciSendStringW(f'close {alias}', None, 0, 0)
+                                played = True
+                        except Exception as e:
+                            logging.debug(f"winmm ijro xatosi: {e}")
+
+                        # 2-variant: Pygame fallback
+                        if not played and global_state.gapirmoqda:
                             try:
                                 import pygame
                                 if not pygame.mixer.get_init():
@@ -593,13 +604,27 @@ def ovoz_chiqar_tez(text):
                                 pygame.mixer.music.load(filename)
                                 pygame.mixer.music.play()
                                 while pygame.mixer.music.get_busy() and global_state.gapirmoqda:
-                                    await asyncio.sleep(0.05)
+                                    await asyncio.sleep(0.04)
+                                pygame.mixer.music.stop()
                                 pygame.mixer.music.unload()
+                                played = True
                             except Exception as e:
                                 logging.warning(f"Pygame ijro xatosi: {e}")
 
+                        # 3-variant: sounddevice fallback
+                        if not played and global_state.gapirmoqda:
+                            try:
+                                import soundfile as sf
+                                import sounddevice as sd
+                                data, fs = sf.read(filename)
+                                sd.play(data, fs)
+                                sd.wait()
+                                played = True
+                            except Exception as e:
+                                logging.debug(f"sounddevice ijro xatosi: {e}")
+
                     except Exception as e:
-                        logging.error(f"TTS generatsiya xatosi: {e}")
+                        logging.error(f"TTS generatsiya yoki ijro xatosi: {e}")
                     finally:
                         try:
                             if os.path.exists(filename):
@@ -622,7 +647,7 @@ def ovoz_chiqar_tez(text):
         finally:
             global_state.oxirgi_gapirish_vaqti = time.time()
             global_state.gapirmoqda = False
-            logging.debug("Speech finished, microphone re-enabled")
+            logging.info("Ovoz ijrosi yakunlandi")
 
     threading.Thread(target=_ijro_et, daemon=True, name="TTSPlaybackThread").start()
 
