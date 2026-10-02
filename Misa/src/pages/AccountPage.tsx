@@ -186,12 +186,12 @@ export const AccountPage: React.FC<AccountPageProps> = ({
       .getAccount()
       .then((data: any) => {
         if (data.ok) {
-          if (data.name && data.name !== "Ustoz") {
+          if (data.name) {
             setFullName(data.name);
-          } else if (!localStorage.getItem("misa_user_name") && currentUser?.username) {
+          } else if (currentUser?.username) {
             setFullName(currentUser.username);
           }
-          if (data.email && data.email !== "user@misa.ai" && data.email !== "user@mikasa.ai") {
+          if (data.email) {
             setEmail(data.email);
           } else if (currentUser?.email) {
             setEmail(currentUser.email);

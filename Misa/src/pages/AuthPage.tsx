@@ -439,13 +439,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
+        maxHeight: "100vh",
         width: "100%",
         backgroundColor: "var(--bg-darkest, #02060E)",
         color: "#F8FAFC",
         fontFamily: "var(--font-sans)",
         position: "relative",
-        overflow: "hidden",
-        padding: "20px",
+        overflowY: "auto",
+        overflowX: "hidden",
+        padding: "64px 20px 32px 20px",
         boxSizing: "border-box",
       }}
     >
@@ -457,7 +459,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       <header
         data-tauri-drag-region
         style={{
-          position: "absolute",
+          position: "fixed",
           top: 0,
           left: 0,
           right: 0,
@@ -529,6 +531,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           padding: "36px 32px",
           position: "relative",
           zIndex: 10,
+          margin: "auto",
         }}
       >
         {/* Header Branding */}

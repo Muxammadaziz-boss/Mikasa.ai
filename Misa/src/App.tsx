@@ -24,9 +24,7 @@ export type MisaAuthUser = MikasaAuthUser;
 
 export function applyMisaAppearanceSettings() {
   try {
-    const raw =
-      localStorage.getItem("misa_appearance_settings") ||
-      localStorage.getItem("misa_appearance_settings");
+    const raw = localStorage.getItem("misa_appearance_settings");
     if (!raw) return;
     const parsed = JSON.parse(raw);
     const root = document.documentElement;
@@ -112,18 +110,10 @@ function App() {
   const [authChecking, setAuthChecking] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<MisaAuthUser | null>(null);
   const [userName, setUserName] = useState<string>(() => {
-    return (
-      localStorage.getItem("misa_user_name") ||
-      localStorage.getItem("misa_user_name") ||
-      "Ustoz"
-    );
+    return localStorage.getItem("misa_user_name") || "Ustoz";
   });
   const [avatarStyle, setAvatarStyle] = useState<string>(() => {
-    return (
-      localStorage.getItem("misa_user_avatar") ||
-      localStorage.getItem("misa_user_avatar") ||
-      "cosmic"
-    );
+    return localStorage.getItem("misa_user_avatar") || "cosmic";
   });
 
   // Verify existing session on startup and subscribe to auth changes

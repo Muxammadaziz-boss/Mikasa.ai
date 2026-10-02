@@ -248,6 +248,11 @@ export const RemoteControlPage: React.FC<RemoteControlPageProps> = () => {
   return (
     <div
       style={{
+        flex: 1,
+        width: "100%",
+        height: "100%",
+        overflowY: "auto",
+        boxSizing: "border-box",
         padding: "24px 32px 48px 32px",
         maxWidth: "1380px",
         margin: "0 auto",

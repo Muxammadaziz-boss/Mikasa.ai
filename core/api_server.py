@@ -1061,6 +1061,113 @@ async def handle_chat_clear(request):
     return web.json_response({"ok": True, "message": "Suhbat tarixi tozalandi"})
 
 
+async def handle_chat_feedback(request):
+    """POST /api/chat/feedback - Foydalanuvchi fikr-mulohazasi (like/dislike/rating)"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    def _save():
+        try:
+            feedback_file = os.path.join(DATA_DIR, "chat_feedback.json")
+            existing = []
+            if os.path.exists(feedback_file):
+                with open(feedback_file, "r", encoding="utf-8") as f:
+                    try:
+                        existing = json.load(f)
+                    except Exception:
+                        existing = []
+            if not isinstance(existing, list):
+                existing = []
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "query": body.get("query"),
+                "response": body.get("response"),
+                "rating": body.get("rating"),
+                "message_id": body.get("message_id")
+            }
+            existing.append(entry)
+            if len(existing) > 500:
+                existing = existing[-500:]
+            with open(feedback_file, "w", encoding="utf-8") as f:
+                json.dump(existing, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.warning(f"Feedback saqlashda xatolik: {e}")
+
+    await asyncio.to_thread(_save)
+    return web.json_response({"ok": True, "message": "Fikr-mulohaza qabul qilindi"})
+
+
+async def handle_images_list(request):
+    """GET /api/images - Yaratilgan yoki saqlangan tasvirlar ro'yxati"""
+    def _load():
+        images_dir = os.path.join(DATA_DIR, "images")
+        os.makedirs(images_dir, exist_ok=True)
+        items = []
+        valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        try:
+            for f in sorted(os.listdir(images_dir), reverse=True):
+                ext = os.path.splitext(f)[1].lower()
+                if ext in valid_exts:
+                    full_p = os.path.join(images_dir, f)
+                    mtime = os.path.getmtime(full_p)
+                    items.append({
+                        "filename": f,
+                        "url": f"/api/images/{f}",
+                        "created_at": datetime.fromtimestamp(mtime).isoformat(),
+                        "prompt": os.path.splitext(f)[0].replace("_", " ")
+                    })
+        except Exception as e:
+            logger.warning(f"Tasvirlar ro'yxatini olishda xatolik: {e}")
+        return items
+
+    images = await asyncio.to_thread(_load)
+    return web.json_response({"ok": True, "images": images})
+
+
+async def handle_images_serve(request):
+    """GET /api/images/{filename} - Tasvir faylini xavfsiz uzatish"""
+    filename = request.match_info.get("filename", "")
+    safe_name = os.path.basename(filename)
+    if not safe_name or safe_name != filename or safe_name.startswith("."):
+        return web.Response(text="Noto'g'ri fayl nomi", status=400)
+
+    file_path = os.path.join(DATA_DIR, "images", safe_name)
+    if not os.path.isfile(file_path):
+        return web.Response(text="Tasvir topilmadi", status=404)
+
+    ext = os.path.splitext(safe_name)[1].lower()
+    content_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif"
+    }
+    ct = content_types.get(ext, "application/octet-stream")
+    return web.FileResponse(file_path, headers={"Content-Type": ct, "Cache-Control": "public, max-age=86400"})
+
+
+async def handle_images_generate(request):
+    """POST /api/images/generate - Tasvir generatsiyasi so'rovi"""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    prompt = str(body.get("prompt") or "").strip()
+    if not prompt:
+        return web.json_response({"ok": False, "error": "Prompt kiritilmagan"}, status=400)
+
+    images_dir = os.path.join(DATA_DIR, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    return web.json_response({
+        "ok": True,
+        "message": f"'{prompt}' bo'yicha so'rov qabul qilindi.",
+        "prompt": prompt,
+    })
+
+
 def format_tool_result(name: str, res: dict) -> str:
     """ToolRegistry natijalarini foydalanuvchiga tushunarli formatga o'tkazish"""
     if not res.get("success"):
@@ -5901,6 +6008,10 @@ def create_app():
     # AI Chat va Ovoz
     app.router.add_post("/api/chat", handle_chat)
     app.router.add_post("/api/chat/clear", handle_chat_clear)
+    app.router.add_post("/api/chat/feedback", handle_chat_feedback)
+    app.router.add_get("/api/images", handle_images_list)
+    app.router.add_get("/api/images/{filename}", handle_images_serve)
+    app.router.add_post("/api/images/generate", handle_images_generate)
     app.router.add_get("/api/ai/config", handle_ai_config_get)
     app.router.add_post("/api/ai/config", handle_ai_config_set)
     app.router.add_post("/api/ai/sync", handle_ai_sync)
