@@ -1018,14 +1018,38 @@ def speak_out_loud(text: str) -> bool:
             if not clean_text:
                 return
             fn = os.path.join(tempfile.gettempdir(), f"misa_sa_{uuid.uuid4().hex}.mp3")
-            asyncio.run(edge_tts.Communicate(clean_text, voice).save(fn))
-            alias = f"sa_{uuid.uuid4().hex[:8]}"
-            winmm = ctypes.windll.winmm
-            if winmm.mciSendStringW(f'open "{fn}" type mpegvideo alias {alias}', None, 0, 0) == 0:
-                winmm.mciSendStringW(f'play {alias} wait', None, 0, 0)
-                winmm.mciSendStringW(f'close {alias}', None, 0, 0)
-            if os.path.exists(fn):
-                os.remove(fn)
+            try:
+                asyncio.run(edge_tts.Communicate(clean_text, voice).save(fn))
+                played = False
+                alias = f"sa_{uuid.uuid4().hex[:8]}"
+                try:
+                    winmm = ctypes.windll.winmm
+                    if winmm.mciSendStringW(f'open "{fn}" type mpegvideo alias {alias}', None, 0, 0) == 0:
+                        winmm.mciSendStringW(f'play {alias} wait', None, 0, 0)
+                        winmm.mciSendStringW(f'close {alias}', None, 0, 0)
+                        played = True
+                except Exception:
+                    pass
+
+                if not played:
+                    try:
+                        import pygame
+                        if not pygame.mixer.get_init():
+                            pygame.mixer.init()
+                        pygame.mixer.music.load(fn)
+                        pygame.mixer.music.play()
+                        while pygame.mixer.music.get_busy():
+                            time.sleep(0.05)
+                        pygame.mixer.music.unload()
+                        played = True
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    if os.path.exists(fn):
+                        os.remove(fn)
+                except Exception:
+                    pass
         except Exception as err:
             logger.error(f"Mustaqil ovoz ijrosida xato: {err}")
 

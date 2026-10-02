@@ -326,7 +326,12 @@ def _gemini_yuborish(matn, system_prompt=None, user_id=None):
                     continue
             
             data = response.json()
-            parts = data["candidates"][0]["content"]["parts"]
+            candidates = data.get("candidates") or []
+            if not candidates:
+                logging.warning(f"Gemini ({model}): candidates ro'yxati bo'sh")
+                continue
+            cand0 = candidates[0]
+            parts = cand0.get("content", {}).get("parts", [])
             ai_text = ""
             for part in parts:
                 # Agar modelning ichki o'ylash (thought) qismi bo'lsa, uni o'tkazib yuboramiz
@@ -335,9 +340,11 @@ def _gemini_yuborish(matn, system_prompt=None, user_id=None):
                 if "text" in part:
                     ai_text += part["text"]
             ai_text = ai_text.strip()
+            if not ai_text:
+                continue
             
             # Grounding metadata bormi tekshirish
-            grounding = data["candidates"][0].get("groundingMetadata", {})
+            grounding = cand0.get("groundingMetadata", {})
             if grounding:
                 logging.debug(f"Gemini ({model}): Google Search Grounding ishlatildi")
             
@@ -640,7 +647,13 @@ def _gemini_vision(img_base64, savol):
                 continue
             
             data = response.json()
-            ai_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            candidates = data.get("candidates") or []
+            if not candidates:
+                continue
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts or "text" not in parts[0]:
+                continue
+            ai_text = parts[0]["text"].strip()
             logging.debug(f"Vision ({model}) javobi: {ai_text[:100]}")
             return ai_text
             
@@ -774,7 +787,10 @@ def _agent_gemini_call(prompt: str, system_prompt: str, history: list = None) ->
                 continue
             
             data = response.json()
-            parts = data["candidates"][0]["content"]["parts"]
+            candidates = data.get("candidates") or []
+            if not candidates:
+                continue
+            parts = candidates[0].get("content", {}).get("parts", [])
             ai_text = ""
             for part in parts:
                 if "text" in part:
